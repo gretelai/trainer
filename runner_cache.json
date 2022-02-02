@@ -1,0 +1,2099 @@
+{
+    "id": "foo",
+    "partitions": [
+        {
+            "idx": 0,
+            "rows": {
+                "start": 0,
+                "end": 33
+            },
+            "columns": {
+                "headers": [
+                    "ps2",
+                    "class",
+                    "ps479",
+                    "ps478",
+                    "ps203",
+                    "ps204",
+                    "ps205",
+                    "ps480",
+                    "ps477",
+                    "ps346",
+                    "ps533",
+                    "ps540",
+                    "ps27",
+                    "ps71",
+                    "ps257",
+                    "ps434",
+                    "ps403",
+                    "ps532",
+                    "ps534",
+                    "ps379"
+                ],
+                "idx": 0
+            },
+            "ctx": {
+                "artifact": null,
+                "status": "completed",
+                "model_id": "61f097a0014a41e84378a70d",
+                "attempt": 1,
+                "sqs": {
+                    "synthetic_data_quality_score": {
+                        "raw_score": 63.251851851851846,
+                        "grade": "Good",
+                        "score": 63
+                    },
+                    "field_correlation_stability": {
+                        "raw_score": 0.10322211435310429,
+                        "grade": "Good",
+                        "score": 67
+                    },
+                    "principal_component_stability": {
+                        "raw_score": 0.4430222959535574,
+                        "grade": "Moderate",
+                        "score": 57
+                    },
+                    "field_distribution_stability": {
+                        "raw_score": 0.2539633248267747,
+                        "grade": "Good",
+                        "score": 65
+                    },
+                    "privacy_protection_level": {
+                        "grade": "Normal",
+                        "score": 0,
+                        "outlier_filter": "Disabled",
+                        "similarity_filter": "Disabled",
+                        "overfitting_protection": "Disabled",
+                        "differential_privacy": "Disabled"
+                    }
+                }
+            }
+        },
+        {
+            "idx": 1,
+            "rows": {
+                "start": 0,
+                "end": 33
+            },
+            "columns": {
+                "headers": [
+                    "ps535",
+                    "ps539",
+                    "ps541",
+                    "ps529",
+                    "ps182",
+                    "ps173",
+                    "ps177",
+                    "ps167",
+                    "ps175",
+                    "ps169",
+                    "ps179",
+                    "ps181",
+                    "ps171",
+                    "ps432",
+                    "ps421",
+                    "ps426",
+                    "ps430",
+                    "ps424",
+                    "ps428",
+                    "ps422"
+                ],
+                "idx": 1
+            },
+            "ctx": {
+                "artifact": null,
+                "status": "completed",
+                "model_id": "61f097a2014a41e84378a70e",
+                "attempt": 1,
+                "sqs": {
+                    "synthetic_data_quality_score": {
+                        "raw_score": 77.6148148148148,
+                        "grade": "Good",
+                        "score": 77
+                    },
+                    "field_correlation_stability": {
+                        "raw_score": 0.004235372948066999,
+                        "grade": "Excellent",
+                        "score": 100
+                    },
+                    "principal_component_stability": {
+                        "raw_score": 0.3356125336240981,
+                        "grade": "Good",
+                        "score": 69
+                    },
+                    "field_distribution_stability": {
+                        "raw_score": 0.29429525196584827,
+                        "grade": "Good",
+                        "score": 60
+                    },
+                    "privacy_protection_level": {
+                        "grade": "Normal",
+                        "score": 0,
+                        "outlier_filter": "Disabled",
+                        "similarity_filter": "Disabled",
+                        "overfitting_protection": "Disabled",
+                        "differential_privacy": "Disabled"
+                    }
+                }
+            }
+        },
+        {
+            "idx": 2,
+            "rows": {
+                "start": 0,
+                "end": 33
+            },
+            "columns": {
+                "headers": [
+                    "ps369",
+                    "ps367",
+                    "ps373",
+                    "ps391",
+                    "ps397",
+                    "ps405",
+                    "ps407",
+                    "ps395",
+                    "ps387",
+                    "ps377",
+                    "ps392",
+                    "ps398",
+                    "ps418",
+                    "ps413",
+                    "ps415",
+                    "ps409",
+                    "ps385",
+                    "ps381",
+                    "ps401"
+                ],
+                "idx": 2
+            },
+            "ctx": {
+                "artifact": null,
+                "status": "completed",
+                "model_id": "61f097a4014a41e84378a70f",
+                "attempt": 1,
+                "sqs": {
+                    "synthetic_data_quality_score": {
+                        "raw_score": 69.27407407407406,
+                        "grade": "Good",
+                        "score": 69
+                    },
+                    "field_correlation_stability": {
+                        "raw_score": 0.00012382296874040934,
+                        "grade": "Excellent",
+                        "score": 100
+                    },
+                    "principal_component_stability": {
+                        "raw_score": 0.6990537582350074,
+                        "grade": "Poor",
+                        "score": 34
+                    },
+                    "field_distribution_stability": {
+                        "raw_score": 0.23354977367572904,
+                        "grade": "Good",
+                        "score": 68
+                    },
+                    "privacy_protection_level": {
+                        "grade": "Normal",
+                        "score": 0,
+                        "outlier_filter": "Disabled",
+                        "similarity_filter": "Disabled",
+                        "overfitting_protection": "Disabled",
+                        "differential_privacy": "Disabled"
+                    }
+                }
+            }
+        },
+        {
+            "idx": 3,
+            "rows": {
+                "start": 0,
+                "end": 33
+            },
+            "columns": {
+                "headers": [
+                    "ps394",
+                    "ps390",
+                    "ps408",
+                    "ps370",
+                    "ps402",
+                    "ps414",
+                    "ps376",
+                    "ps386",
+                    "ps389",
+                    "ps382",
+                    "ps380",
+                    "ps400",
+                    "ps420",
+                    "ps412",
+                    "ps366",
+                    "ps384",
+                    "ps388",
+                    "ps410",
+                    "ps416",
+                    "ps383"
+                ],
+                "idx": 3
+            },
+            "ctx": {
+                "artifact": null,
+                "status": "completed",
+                "model_id": "61f097a6014a41e84378a710",
+                "attempt": 1,
+                "sqs": {
+                    "synthetic_data_quality_score": {
+                        "raw_score": 75.45185185185184,
+                        "grade": "Good",
+                        "score": 75
+                    },
+                    "field_correlation_stability": {
+                        "raw_score": 0.0004584938505437031,
+                        "grade": "Excellent",
+                        "score": 100
+                    },
+                    "principal_component_stability": {
+                        "raw_score": 0.41661179307192064,
+                        "grade": "Good",
+                        "score": 60
+                    },
+                    "field_distribution_stability": {
+                        "raw_score": 0.2801615576467452,
+                        "grade": "Good",
+                        "score": 62
+                    },
+                    "privacy_protection_level": {
+                        "grade": "Normal",
+                        "score": 0,
+                        "outlier_filter": "Disabled",
+                        "similarity_filter": "Disabled",
+                        "overfitting_protection": "Disabled",
+                        "differential_privacy": "Disabled"
+                    }
+                }
+            }
+        },
+        {
+            "idx": 4,
+            "rows": {
+                "start": 0,
+                "end": 33
+            },
+            "columns": {
+                "headers": [
+                    "ps393",
+                    "ps417",
+                    "ps399",
+                    "ps419",
+                    "ps411",
+                    "ps396",
+                    "ps374",
+                    "ps406",
+                    "ps429",
+                    "ps431",
+                    "ps427",
+                    "ps425",
+                    "ps423",
+                    "ps433",
+                    "ps404",
+                    "ps372",
+                    "ps375",
+                    "ps371",
+                    "ps368",
+                    "ps180"
+                ],
+                "idx": 4
+            },
+            "ctx": {
+                "artifact": null,
+                "status": "completed",
+                "model_id": "61f097a9014a41e84378a711",
+                "attempt": 1,
+                "sqs": {
+                    "synthetic_data_quality_score": {
+                        "raw_score": 66.72592592592592,
+                        "grade": "Good",
+                        "score": 66
+                    },
+                    "field_correlation_stability": {
+                        "raw_score": 0.0003503554296209133,
+                        "grade": "Excellent",
+                        "score": 100
+                    },
+                    "principal_component_stability": {
+                        "raw_score": 0.6971102614286037,
+                        "grade": "Poor",
+                        "score": 34
+                    },
+                    "field_distribution_stability": {
+                        "raw_score": 0.2920779619070585,
+                        "grade": "Good",
+                        "score": 60
+                    },
+                    "privacy_protection_level": {
+                        "grade": "Normal",
+                        "score": 0,
+                        "outlier_filter": "Disabled",
+                        "similarity_filter": "Disabled",
+                        "overfitting_protection": "Disabled",
+                        "differential_privacy": "Disabled"
+                    }
+                }
+            }
+        },
+        {
+            "idx": 5,
+            "rows": {
+                "start": 0,
+                "end": 33
+            },
+            "columns": {
+                "headers": [
+                    "ps170",
+                    "ps168",
+                    "ps174",
+                    "ps166",
+                    "ps176",
+                    "ps178",
+                    "ps172",
+                    "ps378",
+                    "ps551",
+                    "ps543",
+                    "Unnamed: 555",
+                    "ps537",
+                    "ps531",
+                    "ps549",
+                    "ps545",
+                    "ps553"
+                ],
+                "idx": 5
+            },
+            "ctx": {
+                "artifact": null,
+                "status": "completed",
+                "model_id": "61f097ab014a41e84378a712",
+                "attempt": 1,
+                "sqs": {
+                    "synthetic_data_quality_score": {
+                        "raw_score": 73.07407407407408,
+                        "grade": "Good",
+                        "score": 73
+                    },
+                    "field_correlation_stability": {
+                        "raw_score": 0.002532805019349796,
+                        "grade": "Excellent",
+                        "score": 100
+                    },
+                    "principal_component_stability": {
+                        "raw_score": 0.6607438884889223,
+                        "grade": "Poor",
+                        "score": 37
+                    },
+                    "field_distribution_stability": {
+                        "raw_score": 0.1674493418190157,
+                        "grade": "Good",
+                        "score": 77
+                    },
+                    "privacy_protection_level": {
+                        "grade": "Normal",
+                        "score": 0,
+                        "outlier_filter": "Disabled",
+                        "similarity_filter": "Disabled",
+                        "overfitting_protection": "Disabled",
+                        "differential_privacy": "Disabled"
+                    }
+                }
+            }
+        },
+        {
+            "idx": 6,
+            "rows": {
+                "start": 0,
+                "end": 33
+            },
+            "columns": {
+                "headers": [
+                    "ps530",
+                    "ps536",
+                    "Unnamed: 556",
+                    "ps538",
+                    "ps542",
+                    "ps552",
+                    "ps547",
+                    "ps550",
+                    "ps546",
+                    "ps544",
+                    "ps554",
+                    "ps548",
+                    "ps435",
+                    "ps165",
+                    "ps251",
+                    "ps187",
+                    "ps58",
+                    "ps32",
+                    "ps31",
+                    "ps48"
+                ],
+                "idx": 6
+            },
+            "ctx": {
+                "artifact": null,
+                "status": "completed",
+                "model_id": "61f097ae014a41e84378a714",
+                "attempt": 1,
+                "sqs": {
+                    "synthetic_data_quality_score": {
+                        "raw_score": 76.09629629629629,
+                        "grade": "Good",
+                        "score": 76
+                    },
+                    "field_correlation_stability": {
+                        "raw_score": 0.014545816599717334,
+                        "grade": "Excellent",
+                        "score": 95
+                    },
+                    "principal_component_stability": {
+                        "raw_score": 0.3474174903689082,
+                        "grade": "Good",
+                        "score": 67
+                    },
+                    "field_distribution_stability": {
+                        "raw_score": 0.27062164048584114,
+                        "grade": "Good",
+                        "score": 63
+                    },
+                    "privacy_protection_level": {
+                        "grade": "Normal",
+                        "score": 0,
+                        "outlier_filter": "Disabled",
+                        "similarity_filter": "Disabled",
+                        "overfitting_protection": "Disabled",
+                        "differential_privacy": "Disabled"
+                    }
+                }
+            }
+        },
+        {
+            "idx": 7,
+            "rows": {
+                "start": 0,
+                "end": 33
+            },
+            "columns": {
+                "headers": [
+                    "ps26",
+                    "ps43",
+                    "ps46",
+                    "ps10",
+                    "ps54",
+                    "ps51",
+                    "ps49",
+                    "ps53",
+                    "ps11",
+                    "ps8",
+                    "ps9",
+                    "ps52",
+                    "ps14",
+                    "ps24",
+                    "ps22",
+                    "ps16",
+                    "ps18"
+                ],
+                "idx": 7
+            },
+            "ctx": {
+                "artifact": null,
+                "status": "completed",
+                "model_id": "61f097b2014a41e84378a715",
+                "attempt": 1,
+                "sqs": {
+                    "synthetic_data_quality_score": {
+                        "raw_score": 68.88888888888889,
+                        "grade": "Good",
+                        "score": 68
+                    },
+                    "field_correlation_stability": {
+                        "raw_score": 0.0033375497218504436,
+                        "grade": "Excellent",
+                        "score": 100
+                    },
+                    "principal_component_stability": {
+                        "raw_score": 0.5943355111312789,
+                        "grade": "Moderate",
+                        "score": 43
+                    },
+                    "field_distribution_stability": {
+                        "raw_score": 0.3078540574091879,
+                        "grade": "Moderate",
+                        "score": 58
+                    },
+                    "privacy_protection_level": {
+                        "grade": "Normal",
+                        "score": 0,
+                        "outlier_filter": "Disabled",
+                        "similarity_filter": "Disabled",
+                        "overfitting_protection": "Disabled",
+                        "differential_privacy": "Disabled"
+                    }
+                }
+            }
+        },
+        {
+            "idx": 8,
+            "rows": {
+                "start": 0,
+                "end": 33
+            },
+            "columns": {
+                "headers": [
+                    "ps76",
+                    "ps75",
+                    "ps67",
+                    "ps74",
+                    "ps61",
+                    "ps29",
+                    "ps62",
+                    "ps20",
+                    "ps42",
+                    "ps72",
+                    "ps78"
+                ],
+                "idx": 8
+            },
+            "ctx": {
+                "artifact": null,
+                "status": "completed",
+                "model_id": "61f097b5014a41e84378a716",
+                "attempt": 1,
+                "sqs": {
+                    "synthetic_data_quality_score": {
+                        "raw_score": 81.72592592592592,
+                        "grade": "Excellent",
+                        "score": 81
+                    },
+                    "field_correlation_stability": {
+                        "raw_score": 0.0005389807499537627,
+                        "grade": "Excellent",
+                        "score": 100
+                    },
+                    "principal_component_stability": {
+                        "raw_score": 0.2983101644999511,
+                        "grade": "Good",
+                        "score": 73
+                    },
+                    "field_distribution_stability": {
+                        "raw_score": 0.22711240590147305,
+                        "grade": "Good",
+                        "score": 69
+                    },
+                    "privacy_protection_level": {
+                        "grade": "Normal",
+                        "score": 0,
+                        "outlier_filter": "Disabled",
+                        "similarity_filter": "Disabled",
+                        "overfitting_protection": "Disabled",
+                        "differential_privacy": "Disabled"
+                    }
+                }
+            }
+        },
+        {
+            "idx": 9,
+            "rows": {
+                "start": 0,
+                "end": 33
+            },
+            "columns": {
+                "headers": [
+                    "ps30",
+                    "ps34",
+                    "ps39",
+                    "ps33",
+                    "ps41",
+                    "ps35",
+                    "ps38",
+                    "ps40",
+                    "ps64",
+                    "ps60",
+                    "ps68",
+                    "ps70",
+                    "ps63",
+                    "ps69",
+                    "ps37",
+                    "ps25",
+                    "ps79",
+                    "ps36",
+                    "ps77",
+                    "ps73"
+                ],
+                "idx": 9
+            },
+            "ctx": {
+                "artifact": "gretel_4b860725441c45e3b4036e43310dde4d_foo-9.csv",
+                "status": "completed",
+                "model_id": "61f097b9014a41e84378a717",
+                "attempt": 1,
+                "sqs": {
+                    "synthetic_data_quality_score": {
+                        "raw_score": 69.86666666666666,
+                        "grade": "Good",
+                        "score": 69
+                    },
+                    "field_correlation_stability": {
+                        "raw_score": 0.0007508684365961887,
+                        "grade": "Excellent",
+                        "score": 100
+                    },
+                    "principal_component_stability": {
+                        "raw_score": 0.6248094729311863,
+                        "grade": "Moderate",
+                        "score": 40
+                    },
+                    "field_distribution_stability": {
+                        "raw_score": 0.26035960184557794,
+                        "grade": "Good",
+                        "score": 64
+                    },
+                    "privacy_protection_level": {
+                        "grade": "Normal",
+                        "score": 0,
+                        "outlier_filter": "Disabled",
+                        "similarity_filter": "Disabled",
+                        "overfitting_protection": "Disabled",
+                        "differential_privacy": "Disabled"
+                    }
+                }
+            }
+        },
+        {
+            "idx": 10,
+            "rows": {
+                "start": 0,
+                "end": 33
+            },
+            "columns": {
+                "headers": [
+                    "ps17",
+                    "ps19",
+                    "ps65",
+                    "ps57",
+                    "ps21",
+                    "ps50",
+                    "ps15",
+                    "ps23",
+                    "ps59",
+                    "ps55",
+                    "ps47",
+                    "ps45",
+                    "ps44",
+                    "ps56",
+                    "ps66",
+                    "ps28",
+                    "ps13",
+                    "ps5",
+                    "ps12",
+                    "ps351"
+                ],
+                "idx": 10
+            },
+            "ctx": {
+                "artifact": "gretel_1b33ce260a354375993fce681339d92f_foo-10.csv",
+                "status": "completed",
+                "model_id": "61f097bd014a41e84378a718",
+                "attempt": 1,
+                "sqs": {
+                    "synthetic_data_quality_score": {
+                        "raw_score": 79.64444444444443,
+                        "grade": "Good",
+                        "score": 79
+                    },
+                    "field_correlation_stability": {
+                        "raw_score": 0.0010984972185374754,
+                        "grade": "Excellent",
+                        "score": 100
+                    },
+                    "principal_component_stability": {
+                        "raw_score": 0.48526700589873806,
+                        "grade": "Moderate",
+                        "score": 53
+                    },
+                    "field_distribution_stability": {
+                        "raw_score": 0.13453457799685767,
+                        "grade": "Excellent",
+                        "score": 82
+                    },
+                    "privacy_protection_level": {
+                        "grade": "Normal",
+                        "score": 0,
+                        "outlier_filter": "Disabled",
+                        "similarity_filter": "Disabled",
+                        "overfitting_protection": "Disabled",
+                        "differential_privacy": "Disabled"
+                    }
+                }
+            }
+        },
+        {
+            "idx": 11,
+            "rows": {
+                "start": 0,
+                "end": 33
+            },
+            "columns": {
+                "headers": [
+                    "ps253",
+                    "ps331",
+                    "ps354",
+                    "ps248",
+                    "ps156",
+                    "ps502",
+                    "ps184",
+                    "ps287",
+                    "ps190",
+                    "ps244",
+                    "ps521",
+                    "ps219",
+                    "ps232",
+                    "ps449",
+                    "ps210",
+                    "ps207"
+                ],
+                "idx": 11
+            },
+            "ctx": {
+                "artifact": null,
+                "status": "completed",
+                "model_id": "61f097c46de685c2c17fdb15",
+                "attempt": 1,
+                "sqs": {
+                    "synthetic_data_quality_score": {
+                        "raw_score": 78.57037037037036,
+                        "grade": "Good",
+                        "score": 78
+                    },
+                    "field_correlation_stability": {
+                        "raw_score": 0.0054901152202760034,
+                        "grade": "Excellent",
+                        "score": 100
+                    },
+                    "principal_component_stability": {
+                        "raw_score": 0.328853382615686,
+                        "grade": "Good",
+                        "score": 69
+                    },
+                    "field_distribution_stability": {
+                        "raw_score": 0.2712675309348561,
+                        "grade": "Good",
+                        "score": 63
+                    },
+                    "privacy_protection_level": {
+                        "grade": "Normal",
+                        "score": 0,
+                        "outlier_filter": "Disabled",
+                        "similarity_filter": "Disabled",
+                        "overfitting_protection": "Disabled",
+                        "differential_privacy": "Disabled"
+                    }
+                }
+            }
+        },
+        {
+            "idx": 12,
+            "rows": {
+                "start": 0,
+                "end": 33
+            },
+            "columns": {
+                "headers": [
+                    "ps243",
+                    "ps247",
+                    "ps215",
+                    "ps229",
+                    "ps528",
+                    "ps245",
+                    "ps231",
+                    "ps227",
+                    "ps217",
+                    "ps157",
+                    "ps254",
+                    "ps330",
+                    "ps526",
+                    "ps297",
+                    "ps501",
+                    "ps193",
+                    "ps329",
+                    "ps328",
+                    "ps314",
+                    "ps524"
+                ],
+                "idx": 12
+            },
+            "ctx": {
+                "artifact": null,
+                "status": "completed",
+                "model_id": "61f097c96de685c2c17fdb16",
+                "attempt": 1,
+                "sqs": {
+                    "synthetic_data_quality_score": {
+                        "raw_score": 78.94814814814814,
+                        "grade": "Good",
+                        "score": 78
+                    },
+                    "field_correlation_stability": {
+                        "raw_score": 0.002846519447333103,
+                        "grade": "Excellent",
+                        "score": 100
+                    },
+                    "principal_component_stability": {
+                        "raw_score": 0.40195484410283466,
+                        "grade": "Good",
+                        "score": 61
+                    },
+                    "field_distribution_stability": {
+                        "raw_score": 0.20214823433566717,
+                        "grade": "Good",
+                        "score": 72
+                    },
+                    "privacy_protection_level": {
+                        "grade": "Normal",
+                        "score": 0,
+                        "outlier_filter": "Disabled",
+                        "similarity_filter": "Disabled",
+                        "overfitting_protection": "Disabled",
+                        "differential_privacy": "Disabled"
+                    }
+                }
+            }
+        },
+        {
+            "idx": 13,
+            "rows": {
+                "start": 0,
+                "end": 33
+            },
+            "columns": {
+                "headers": [
+                    "ps3",
+                    "ps334",
+                    "ps81",
+                    "ps308",
+                    "ps316",
+                    "ps340",
+                    "ps503",
+                    "ps240",
+                    "ps224",
+                    "ps234",
+                    "ps222",
+                    "ps200",
+                    "ps306",
+                    "ps292",
+                    "ps282",
+                    "ps291",
+                    "ps255",
+                    "ps212"
+                ],
+                "idx": 13
+            },
+            "ctx": {
+                "artifact": "gretel_14ec04522a074a75b867b730032084df_foo-13.csv",
+                "status": "completed",
+                "model_id": "61f097cf6de685c2c17fdb18",
+                "attempt": 1,
+                "sqs": {
+                    "synthetic_data_quality_score": {
+                        "raw_score": 66.67407407407406,
+                        "grade": "Good",
+                        "score": 66
+                    },
+                    "field_correlation_stability": {
+                        "raw_score": 0.00150959677111923,
+                        "grade": "Excellent",
+                        "score": 100
+                    },
+                    "principal_component_stability": {
+                        "raw_score": 0.6094385121454545,
+                        "grade": "Moderate",
+                        "score": 41
+                    },
+                    "field_distribution_stability": {
+                        "raw_score": 0.35044802898474464,
+                        "grade": "Moderate",
+                        "score": 53
+                    },
+                    "privacy_protection_level": {
+                        "grade": "Normal",
+                        "score": 0,
+                        "outlier_filter": "Disabled",
+                        "similarity_filter": "Disabled",
+                        "overfitting_protection": "Disabled",
+                        "differential_privacy": "Disabled"
+                    }
+                }
+            }
+        },
+        {
+            "idx": 14,
+            "rows": {
+                "start": 0,
+                "end": 33
+            },
+            "columns": {
+                "headers": [
+                    "ps246",
+                    "ps230",
+                    "ps256",
+                    "ps218",
+                    "ps228",
+                    "ps216",
+                    "ps242",
+                    "ps214",
+                    "ps195",
+                    "ps506",
+                    "ps235",
+                    "ps305",
+                    "ps185",
+                    "ps289",
+                    "ps199",
+                    "ps209",
+                    "ps221",
+                    "ps223",
+                    "ps201",
+                    "ps155"
+                ],
+                "idx": 14
+            },
+            "ctx": {
+                "artifact": "gretel_e3a77bd63c6b4f2db272a1aa8f2c4997_foo-14.csv",
+                "status": "completed",
+                "model_id": "61f097d46de685c2c17fdb19",
+                "attempt": 1,
+                "sqs": {
+                    "synthetic_data_quality_score": {
+                        "raw_score": 80.77777777777777,
+                        "grade": "Excellent",
+                        "score": 80
+                    },
+                    "field_correlation_stability": {
+                        "raw_score": 0.0011911701279629604,
+                        "grade": "Excellent",
+                        "score": 100
+                    },
+                    "principal_component_stability": {
+                        "raw_score": 0.3076991472238553,
+                        "grade": "Good",
+                        "score": 72
+                    },
+                    "field_distribution_stability": {
+                        "raw_score": 0.2373072444275504,
+                        "grade": "Good",
+                        "score": 67
+                    },
+                    "privacy_protection_level": {
+                        "grade": "Normal",
+                        "score": 0,
+                        "outlier_filter": "Disabled",
+                        "similarity_filter": "Disabled",
+                        "overfitting_protection": "Disabled",
+                        "differential_privacy": "Disabled"
+                    }
+                }
+            }
+        },
+        {
+            "idx": 15,
+            "rows": {
+                "start": 0,
+                "end": 33
+            },
+            "columns": {
+                "headers": [
+                    "ps293",
+                    "ps161",
+                    "ps163",
+                    "ps160",
+                    "ps211",
+                    "ps213",
+                    "ps249",
+                    "ps518",
+                    "ps237",
+                    "ps225",
+                    "ps508",
+                    "ps514",
+                    "ps516",
+                    "ps510",
+                    "ps512",
+                    "ps498",
+                    "ps494",
+                    "ps496",
+                    "ps488",
+                    "ps484"
+                ],
+                "idx": 15
+            },
+            "ctx": {
+                "artifact": "gretel_7c9907c8b7a94cd8b2a67a2b8f8d034a_foo-15.csv",
+                "status": "completed",
+                "model_id": "61f097d96de685c2c17fdb1b",
+                "attempt": 1,
+                "sqs": {
+                    "synthetic_data_quality_score": {
+                        "raw_score": 60.13333333333333,
+                        "grade": "Good",
+                        "score": 60
+                    },
+                    "field_correlation_stability": {
+                        "raw_score": 0.0007481000899365513,
+                        "grade": "Excellent",
+                        "score": 100
+                    },
+                    "principal_component_stability": {
+                        "raw_score": 0.8868896521708074,
+                        "grade": "Poor",
+                        "score": 21
+                    },
+                    "field_distribution_stability": {
+                        "raw_score": 0.35866448505265824,
+                        "grade": "Moderate",
+                        "score": 52
+                    },
+                    "privacy_protection_level": {
+                        "grade": "Normal",
+                        "score": 0,
+                        "outlier_filter": "Disabled",
+                        "similarity_filter": "Disabled",
+                        "overfitting_protection": "Disabled",
+                        "differential_privacy": "Disabled"
+                    }
+                }
+            }
+        },
+        {
+            "idx": 16,
+            "rows": {
+                "start": 0,
+                "end": 33
+            },
+            "columns": {
+                "headers": [
+                    "ps233",
+                    "ps239",
+                    "ps241",
+                    "ps119",
+                    "ps93",
+                    "ps137",
+                    "ps125",
+                    "ps143",
+                    "ps145",
+                    "ps285",
+                    "ps294",
+                    "ps296",
+                    "ps94",
+                    "ps146",
+                    "ps110",
+                    "ps118",
+                    "ps89",
+                    "ps332",
+                    "ps194"
+                ],
+                "idx": 16
+            },
+            "ctx": {
+                "artifact": "gretel_f802871118de4a59833995c778e603e3_foo-16.csv",
+                "status": "completed",
+                "model_id": "61f097df6de685c2c17fdb1c",
+                "attempt": 1,
+                "sqs": {
+                    "synthetic_data_quality_score": {
+                        "raw_score": 68.94814814814814,
+                        "grade": "Good",
+                        "score": 68
+                    },
+                    "field_correlation_stability": {
+                        "raw_score": 0.000670400127866501,
+                        "grade": "Excellent",
+                        "score": 100
+                    },
+                    "principal_component_stability": {
+                        "raw_score": 0.691996231738679,
+                        "grade": "Poor",
+                        "score": 35
+                    },
+                    "field_distribution_stability": {
+                        "raw_score": 0.24798856545312759,
+                        "grade": "Good",
+                        "score": 66
+                    },
+                    "privacy_protection_level": {
+                        "grade": "Normal",
+                        "score": 0,
+                        "outlier_filter": "Disabled",
+                        "similarity_filter": "Disabled",
+                        "overfitting_protection": "Disabled",
+                        "differential_privacy": "Disabled"
+                    }
+                }
+            }
+        },
+        {
+            "idx": 17,
+            "rows": {
+                "start": 0,
+                "end": 33
+            },
+            "columns": {
+                "headers": [
+                    "ps513",
+                    "ps517",
+                    "ps343",
+                    "ps341",
+                    "ps359",
+                    "ps88",
+                    "ps357",
+                    "ps307"
+                ],
+                "idx": 17
+            },
+            "ctx": {
+                "artifact": "gretel_a4d6b13726fd4affbef32fa3648d082c_foo-17.csv",
+                "status": "completed",
+                "model_id": "61f097e66de685c2c17fdb1d",
+                "attempt": 1,
+                "sqs": {
+                    "synthetic_data_quality_score": {
+                        "raw_score": 79.2148148148148,
+                        "grade": "Good",
+                        "score": 79
+                    },
+                    "field_correlation_stability": {
+                        "raw_score": 0.0020164985738769063,
+                        "grade": "Excellent",
+                        "score": 100
+                    },
+                    "principal_component_stability": {
+                        "raw_score": 0.33794582714989824,
+                        "grade": "Good",
+                        "score": 68
+                    },
+                    "field_distribution_stability": {
+                        "raw_score": 0.2489954264481628,
+                        "grade": "Good",
+                        "score": 66
+                    },
+                    "privacy_protection_level": {
+                        "grade": "Normal",
+                        "score": 0,
+                        "outlier_filter": "Disabled",
+                        "similarity_filter": "Disabled",
+                        "overfitting_protection": "Disabled",
+                        "differential_privacy": "Disabled"
+                    }
+                }
+            }
+        },
+        {
+            "idx": 18,
+            "rows": {
+                "start": 0,
+                "end": 33
+            },
+            "columns": {
+                "headers": [
+                    "ps482",
+                    "ps486",
+                    "ps151",
+                    "ps304",
+                    "ps299",
+                    "ps325",
+                    "ps337",
+                    "ps153",
+                    "ps149",
+                    "ps197",
+                    "ps339",
+                    "ps333",
+                    "ps490",
+                    "ps309",
+                    "ps317",
+                    "ps301",
+                    "ps335",
+                    "ps303",
+                    "ps353",
+                    "ps363"
+                ],
+                "idx": 18
+            },
+            "ctx": {
+                "artifact": "gretel_b35c8a8c30a14bda80cdc949a1b945be_foo-18.csv",
+                "status": "completed",
+                "model_id": "61f097eb6de685c2c17fdb1e",
+                "attempt": 1,
+                "sqs": {
+                    "synthetic_data_quality_score": {
+                        "raw_score": 57.74074074074074,
+                        "grade": "Moderate",
+                        "score": 57
+                    },
+                    "field_correlation_stability": {
+                        "raw_score": 0.00026355788445216633,
+                        "grade": "Excellent",
+                        "score": 100
+                    },
+                    "principal_component_stability": {
+                        "raw_score": 1.0,
+                        "grade": "Very Poor",
+                        "score": 0
+                    },
+                    "field_distribution_stability": {
+                        "raw_score": 0.25616808910118116,
+                        "grade": "Good",
+                        "score": 65
+                    },
+                    "privacy_protection_level": {
+                        "grade": "Normal",
+                        "score": 0,
+                        "outlier_filter": "Disabled",
+                        "similarity_filter": "Disabled",
+                        "overfitting_protection": "Disabled",
+                        "differential_privacy": "Disabled"
+                    }
+                }
+            }
+        },
+        {
+            "idx": 19,
+            "rows": {
+                "start": 0,
+                "end": 33
+            },
+            "columns": {
+                "headers": [
+                    "ps525",
+                    "ps453",
+                    "ps142",
+                    "ps105",
+                    "ps126",
+                    "ps138",
+                    "ps103",
+                    "ps124",
+                    "ps91",
+                    "ps140",
+                    "ps101",
+                    "ps485",
+                    "ps483",
+                    "ps107",
+                    "ps92",
+                    "ps117",
+                    "ps108",
+                    "ps111",
+                    "ps104",
+                    "ps139"
+                ],
+                "idx": 19
+            },
+            "ctx": {
+                "artifact": "gretel_fb1beef33759482aaf13f7a922d55729_foo-19.csv",
+                "status": "completed",
+                "model_id": "61f097f26de685c2c17fdb20",
+                "attempt": 1,
+                "sqs": {
+                    "synthetic_data_quality_score": {
+                        "raw_score": 72.45185185185184,
+                        "grade": "Good",
+                        "score": 72
+                    },
+                    "field_correlation_stability": {
+                        "raw_score": 0.011899582930714591,
+                        "grade": "Excellent",
+                        "score": 96
+                    },
+                    "principal_component_stability": {
+                        "raw_score": 0.5111824803369589,
+                        "grade": "Moderate",
+                        "score": 50
+                    },
+                    "field_distribution_stability": {
+                        "raw_score": 0.24260396159294845,
+                        "grade": "Good",
+                        "score": 67
+                    },
+                    "privacy_protection_level": {
+                        "grade": "Normal",
+                        "score": 0,
+                        "outlier_filter": "Disabled",
+                        "similarity_filter": "Disabled",
+                        "overfitting_protection": "Disabled",
+                        "differential_privacy": "Disabled"
+                    }
+                }
+            }
+        },
+        {
+            "idx": 20,
+            "rows": {
+                "start": 0,
+                "end": 33
+            },
+            "columns": {
+                "headers": [
+                    "ps82",
+                    "ps468",
+                    "ps476",
+                    "ps448",
+                    "ps458",
+                    "ps438",
+                    "ps98",
+                    "ps97",
+                    "ps115",
+                    "ps100",
+                    "ps113",
+                    "ps121",
+                    "ps123"
+                ],
+                "idx": 20
+            },
+            "ctx": {
+                "artifact": "gretel_71f8d24ef9364aed88dbeae28810a244_foo-20.csv",
+                "status": "completed",
+                "model_id": "61f099566de685c2c17fdb28",
+                "attempt": 1,
+                "sqs": {
+                    "synthetic_data_quality_score": {
+                        "raw_score": 62.05185185185186,
+                        "grade": "Good",
+                        "score": 62
+                    },
+                    "field_correlation_stability": {
+                        "raw_score": 0.0004489373372918788,
+                        "grade": "Excellent",
+                        "score": 100
+                    },
+                    "principal_component_stability": {
+                        "raw_score": 0.8927177805924129,
+                        "grade": "Poor",
+                        "score": 20
+                    },
+                    "field_distribution_stability": {
+                        "raw_score": 0.30317282754416036,
+                        "grade": "Moderate",
+                        "score": 59
+                    },
+                    "privacy_protection_level": {
+                        "grade": "Normal",
+                        "score": 0,
+                        "outlier_filter": "Disabled",
+                        "similarity_filter": "Disabled",
+                        "overfitting_protection": "Disabled",
+                        "differential_privacy": "Disabled"
+                    }
+                }
+            }
+        },
+        {
+            "idx": 21,
+            "rows": {
+                "start": 0,
+                "end": 33
+            },
+            "columns": {
+                "headers": [
+                    "ps452",
+                    "ps444",
+                    "ps456",
+                    "ps446",
+                    "ps436",
+                    "ps440",
+                    "ps454",
+                    "ps127",
+                    "ps466",
+                    "ps450",
+                    "ps460",
+                    "ps462",
+                    "ps472",
+                    "ps470",
+                    "ps474",
+                    "ps133",
+                    "ps83",
+                    "ps141",
+                    "ps338"
+                ],
+                "idx": 21
+            },
+            "ctx": {
+                "artifact": "gretel_c5abed34d6d84ee9a90f541ec9813114_foo-21.csv",
+                "status": "completed",
+                "model_id": "61f0995e6de685c2c17fdb29",
+                "attempt": 1,
+                "sqs": {
+                    "synthetic_data_quality_score": {
+                        "raw_score": 71.74814814814815,
+                        "grade": "Good",
+                        "score": 71
+                    },
+                    "field_correlation_stability": {
+                        "raw_score": 0.0003468087326511502,
+                        "grade": "Excellent",
+                        "score": 100
+                    },
+                    "principal_component_stability": {
+                        "raw_score": 0.5802981136912291,
+                        "grade": "Moderate",
+                        "score": 44
+                    },
+                    "field_distribution_stability": {
+                        "raw_score": 0.24709368009302124,
+                        "grade": "Good",
+                        "score": 66
+                    },
+                    "privacy_protection_level": {
+                        "grade": "Normal",
+                        "score": 0,
+                        "outlier_filter": "Disabled",
+                        "similarity_filter": "Disabled",
+                        "overfitting_protection": "Disabled",
+                        "differential_privacy": "Disabled"
+                    }
+                }
+            }
+        },
+        {
+            "idx": 22,
+            "rows": {
+                "start": 0,
+                "end": 33
+            },
+            "columns": {
+                "headers": [
+                    "ps318",
+                    "ps324",
+                    "ps322"
+                ],
+                "idx": 22
+            },
+            "ctx": {
+                "artifact": null,
+                "status": "completed",
+                "model_id": "61f099666de685c2c17fdb2b",
+                "attempt": 1,
+                "sqs": {
+                    "synthetic_data_quality_score": {
+                        "raw_score": 66.46666666666665,
+                        "grade": "Good",
+                        "score": 66
+                    },
+                    "field_correlation_stability": {
+                        "raw_score": 0.0007890142611352629,
+                        "grade": "Excellent",
+                        "score": 100
+                    },
+                    "principal_component_stability": {
+                        "raw_score": 0.8085959840172747,
+                        "grade": "Poor",
+                        "score": 26
+                    },
+                    "field_distribution_stability": {
+                        "raw_score": 0.24188293586731036,
+                        "grade": "Good",
+                        "score": 67
+                    },
+                    "privacy_protection_level": {
+                        "grade": "Normal",
+                        "score": 0,
+                        "outlier_filter": "Disabled",
+                        "similarity_filter": "Disabled",
+                        "overfitting_protection": "Disabled",
+                        "differential_privacy": "Disabled"
+                    }
+                }
+            }
+        },
+        {
+            "idx": 23,
+            "rows": {
+                "start": 0,
+                "end": 33
+            },
+            "columns": {
+                "headers": [
+                    "ps116",
+                    "ps114",
+                    "ps130",
+                    "ps84",
+                    "ps86",
+                    "ps128",
+                    "ps455",
+                    "ps467",
+                    "ps437",
+                    "ps447",
+                    "ps457",
+                    "ps459",
+                    "ps99",
+                    "ps463",
+                    "ps473",
+                    "ps465",
+                    "ps439",
+                    "ps461",
+                    "ps471",
+                    "ps451"
+                ],
+                "idx": 23
+            },
+            "ctx": {
+                "artifact": "gretel_92dcddb79764444ea805b3930c9eabfe_foo-23.csv",
+                "status": "completed",
+                "model_id": "61f099946de685c2c17fdb2c",
+                "attempt": 1,
+                "sqs": {
+                    "synthetic_data_quality_score": {
+                        "raw_score": 66.81481481481481,
+                        "grade": "Good",
+                        "score": 66
+                    },
+                    "field_correlation_stability": {
+                        "raw_score": 9.83173201851506e-05,
+                        "grade": "Excellent",
+                        "score": 100
+                    },
+                    "principal_component_stability": {
+                        "raw_score": 0.8679744494194479,
+                        "grade": "Poor",
+                        "score": 22
+                    },
+                    "field_distribution_stability": {
+                        "raw_score": 0.20468843219519312,
+                        "grade": "Good",
+                        "score": 72
+                    },
+                    "privacy_protection_level": {
+                        "grade": "Normal",
+                        "score": 0,
+                        "outlier_filter": "Disabled",
+                        "similarity_filter": "Disabled",
+                        "overfitting_protection": "Disabled",
+                        "differential_privacy": "Disabled"
+                    }
+                }
+            }
+        },
+        {
+            "idx": 24,
+            "rows": {
+                "start": 0,
+                "end": 33
+            },
+            "columns": {
+                "headers": [
+                    "ps122",
+                    "ps132",
+                    "ps320",
+                    "ps441",
+                    "ps350",
+                    "ps198",
+                    "ps352",
+                    "ps481",
+                    "ps487",
+                    "ps489",
+                    "ps300",
+                    "ps364",
+                    "ps196",
+                    "ps154",
+                    "ps342",
+                    "ps150",
+                    "ps152",
+                    "ps148",
+                    "ps464",
+                    "ps87"
+                ],
+                "idx": 24
+            },
+            "ctx": {
+                "artifact": "gretel_1844b81faf08453c861c9638ff03a1f1_foo-24.csv",
+                "status": "completed",
+                "model_id": "61f099af6de685c2c17fdb2d",
+                "attempt": 1,
+                "sqs": {
+                    "synthetic_data_quality_score": {
+                        "raw_score": 85.17777777777778,
+                        "grade": "Excellent",
+                        "score": 85
+                    },
+                    "field_correlation_stability": {
+                        "raw_score": 0.0001591273245968872,
+                        "grade": "Excellent",
+                        "score": 100
+                    },
+                    "principal_component_stability": {
+                        "raw_score": 0.23348830842000406,
+                        "grade": "Excellent",
+                        "score": 80
+                    },
+                    "field_distribution_stability": {
+                        "raw_score": 0.19756498888470292,
+                        "grade": "Good",
+                        "score": 73
+                    },
+                    "privacy_protection_level": {
+                        "grade": "Normal",
+                        "score": 0,
+                        "outlier_filter": "Disabled",
+                        "similarity_filter": "Disabled",
+                        "overfitting_protection": "Disabled",
+                        "differential_privacy": "Disabled"
+                    }
+                }
+            }
+        },
+        {
+            "idx": 25,
+            "rows": {
+                "start": 0,
+                "end": 33
+            },
+            "columns": {
+                "headers": [
+                    "ps96",
+                    "ps85",
+                    "ps321",
+                    "ps315",
+                    "ps319",
+                    "ps323",
+                    "ps129",
+                    "ps134",
+                    "ps95",
+                    "ps102",
+                    "ps147",
+                    "ps109"
+                ],
+                "idx": 25
+            },
+            "ctx": {
+                "artifact": "gretel_0d0402b79d3948ad8d13b4ef25507d3a_foo-25.csv",
+                "status": "completed",
+                "model_id": "61f099bb6de685c2c17fdb2e",
+                "attempt": 1,
+                "sqs": {
+                    "synthetic_data_quality_score": {
+                        "raw_score": 55.38518518518518,
+                        "grade": "Moderate",
+                        "score": 55
+                    },
+                    "field_correlation_stability": {
+                        "raw_score": 0.000713477755888541,
+                        "grade": "Excellent",
+                        "score": 100
+                    },
+                    "principal_component_stability": {
+                        "raw_score": 0.9562244903258101,
+                        "grade": "Very Poor",
+                        "score": 17
+                    },
+                    "field_distribution_stability": {
+                        "raw_score": 0.46669194522021207,
+                        "grade": "Moderate",
+                        "score": 41
+                    },
+                    "privacy_protection_level": {
+                        "grade": "Normal",
+                        "score": 0,
+                        "outlier_filter": "Disabled",
+                        "similarity_filter": "Disabled",
+                        "overfitting_protection": "Disabled",
+                        "differential_privacy": "Disabled"
+                    }
+                }
+            }
+        },
+        {
+            "idx": 26,
+            "rows": {
+                "start": 0,
+                "end": 33
+            },
+            "columns": {
+                "headers": [
+                    "ps515",
+                    "ps511",
+                    "ps509",
+                    "ps519",
+                    "ps505",
+                    "ps493",
+                    "ps497",
+                    "ps507",
+                    "ps499",
+                    "ps358",
+                    "ps298",
+                    "ps208",
+                    "ps236",
+                    "ps220",
+                    "ps226",
+                    "ps238",
+                    "ps164",
+                    "ps288",
+                    "ps290",
+                    "ps310"
+                ],
+                "idx": 26
+            },
+            "ctx": {
+                "artifact": "gretel_066c03bf095145cf9b800516d96b3811_foo-26.csv",
+                "status": "completed",
+                "model_id": "61f099c56de685c2c17fdb2f",
+                "attempt": 1,
+                "sqs": {
+                    "synthetic_data_quality_score": {
+                        "raw_score": 70.2148148148148,
+                        "grade": "Good",
+                        "score": 70
+                    },
+                    "field_correlation_stability": {
+                        "raw_score": 0.0016052845722800725,
+                        "grade": "Excellent",
+                        "score": 100
+                    },
+                    "principal_component_stability": {
+                        "raw_score": 0.6680258346334857,
+                        "grade": "Poor",
+                        "score": 36
+                    },
+                    "field_distribution_stability": {
+                        "raw_score": 0.2240422536552472,
+                        "grade": "Good",
+                        "score": 69
+                    },
+                    "privacy_protection_level": {
+                        "grade": "Normal",
+                        "score": 0,
+                        "outlier_filter": "Disabled",
+                        "similarity_filter": "Disabled",
+                        "overfitting_protection": "Disabled",
+                        "differential_privacy": "Disabled"
+                    }
+                }
+            }
+        },
+        {
+            "idx": 27,
+            "rows": {
+                "start": 0,
+                "end": 33
+            },
+            "columns": {
+                "headers": [
+                    "ps495",
+                    "ps491",
+                    "ps475",
+                    "ps469",
+                    "ps144",
+                    "ps136",
+                    "ps192",
+                    "ps355",
+                    "ps158",
+                    "ps295",
+                    "ps90",
+                    "ps106",
+                    "ps135",
+                    "ps162",
+                    "ps131",
+                    "ps504",
+                    "ps286",
+                    "ps312",
+                    "ps348",
+                    "ps344"
+                ],
+                "idx": 27
+            },
+            "ctx": {
+                "artifact": "gretel_e205f3edb7834f34bc3b5f9bac69c83f_foo-27.csv",
+                "status": "completed",
+                "model_id": "61f099d06de685c2c17fdb31",
+                "attempt": 1,
+                "sqs": {
+                    "synthetic_data_quality_score": {
+                        "raw_score": 68.3185185185185,
+                        "grade": "Good",
+                        "score": 68
+                    },
+                    "field_correlation_stability": {
+                        "raw_score": 0.0007653122942397467,
+                        "grade": "Excellent",
+                        "score": 100
+                    },
+                    "principal_component_stability": {
+                        "raw_score": 0.6952529450646755,
+                        "grade": "Poor",
+                        "score": 34
+                    },
+                    "field_distribution_stability": {
+                        "raw_score": 0.2521913777778081,
+                        "grade": "Good",
+                        "score": 65
+                    },
+                    "privacy_protection_level": {
+                        "grade": "Normal",
+                        "score": 0,
+                        "outlier_filter": "Disabled",
+                        "similarity_filter": "Disabled",
+                        "overfitting_protection": "Disabled",
+                        "differential_privacy": "Disabled"
+                    }
+                }
+            }
+        },
+        {
+            "idx": 28,
+            "rows": {
+                "start": 0,
+                "end": 33
+            },
+            "columns": {
+                "headers": [
+                    "ps362",
+                    "ps492",
+                    "ps191",
+                    "ps345",
+                    "ps349",
+                    "ps6",
+                    "ps7",
+                    "ps500",
+                    "ps327",
+                    "ps112",
+                    "ps313",
+                    "ps361",
+                    "ps202",
+                    "ps326",
+                    "ps445",
+                    "ps311",
+                    "ps522"
+                ],
+                "idx": 28
+            },
+            "ctx": {
+                "artifact": "gretel_a34e827004f24e9cb1b2f4afd81bd087_foo-28.csv",
+                "status": "completed",
+                "model_id": "61f099f06de685c2c17fdb33",
+                "attempt": 1,
+                "sqs": {
+                    "synthetic_data_quality_score": {
+                        "raw_score": 85.28148148148148,
+                        "grade": "Excellent",
+                        "score": 85
+                    },
+                    "field_correlation_stability": {
+                        "raw_score": 0.0026447071606512146,
+                        "grade": "Excellent",
+                        "score": 100
+                    },
+                    "principal_component_stability": {
+                        "raw_score": 0.3595349414354275,
+                        "grade": "Good",
+                        "score": 66
+                    },
+                    "field_distribution_stability": {
+                        "raw_score": 0.09759559252949658,
+                        "grade": "Excellent",
+                        "score": 87
+                    },
+                    "privacy_protection_level": {
+                        "grade": "Normal",
+                        "score": 0,
+                        "outlier_filter": "Disabled",
+                        "similarity_filter": "Disabled",
+                        "overfitting_protection": "Disabled",
+                        "differential_privacy": "Disabled"
+                    }
+                }
+            }
+        },
+        {
+            "idx": 29,
+            "rows": {
+                "start": 0,
+                "end": 33
+            },
+            "columns": {
+                "headers": [
+                    "ps347",
+                    "ps283",
+                    "ps443",
+                    "ps442",
+                    "ps250",
+                    "ps360",
+                    "ps336",
+                    "ps186",
+                    "ps527",
+                    "ps188",
+                    "ps120",
+                    "ps284",
+                    "ps183",
+                    "ps189",
+                    "ps252",
+                    "ps302",
+                    "ps365",
+                    "ps159",
+                    "ps281",
+                    "ps520"
+                ],
+                "idx": 29
+            },
+            "ctx": {
+                "artifact": "gretel_c1c8dbf5f05347eb821d6a3c255aa16e_foo-29.csv",
+                "status": "completed",
+                "model_id": "61f09a286de685c2c17fdb39",
+                "attempt": 1,
+                "sqs": {
+                    "synthetic_data_quality_score": {
+                        "raw_score": 64.60000000000001,
+                        "grade": "Good",
+                        "score": 64
+                    },
+                    "field_correlation_stability": {
+                        "raw_score": 0.00802959566695003,
+                        "grade": "Excellent",
+                        "score": 100
+                    },
+                    "principal_component_stability": {
+                        "raw_score": 0.8957241469616102,
+                        "grade": "Poor",
+                        "score": 20
+                    },
+                    "field_distribution_stability": {
+                        "raw_score": 0.24257901213445154,
+                        "grade": "Good",
+                        "score": 67
+                    },
+                    "privacy_protection_level": {
+                        "grade": "Normal",
+                        "score": 0,
+                        "outlier_filter": "Disabled",
+                        "similarity_filter": "Disabled",
+                        "overfitting_protection": "Disabled",
+                        "differential_privacy": "Disabled"
+                    }
+                }
+            }
+        },
+        {
+            "idx": 30,
+            "rows": {
+                "start": 0,
+                "end": 33
+            },
+            "columns": {
+                "headers": [
+                    "ps523",
+                    "ps4",
+                    "ps206",
+                    "ps356",
+                    "ps80",
+                    "ps262",
+                    "ps260",
+                    "ps258",
+                    "ps278",
+                    "ps272",
+                    "ps266",
+                    "ps264",
+                    "ps268",
+                    "ps270",
+                    "ps276",
+                    "ps274"
+                ],
+                "idx": 30
+            },
+            "ctx": {
+                "artifact": "gretel_ff79ac51b29e4c0a8585cf0570541369_foo-30.csv",
+                "status": "completed",
+                "model_id": "61f09a65014a41e84378a71f",
+                "attempt": 1,
+                "sqs": {
+                    "synthetic_data_quality_score": {
+                        "raw_score": 61.407407407407405,
+                        "grade": "Good",
+                        "score": 61
+                    },
+                    "field_correlation_stability": {
+                        "raw_score": 0.032988624580302675,
+                        "grade": "Excellent",
+                        "score": 89
+                    },
+                    "principal_component_stability": {
+                        "raw_score": 0.7498817918499521,
+                        "grade": "Poor",
+                        "score": 30
+                    },
+                    "field_distribution_stability": {
+                        "raw_score": 0.2905493829215723,
+                        "grade": "Good",
+                        "score": 60
+                    },
+                    "privacy_protection_level": {
+                        "grade": "Normal",
+                        "score": 0,
+                        "outlier_filter": "Disabled",
+                        "similarity_filter": "Disabled",
+                        "overfitting_protection": "Disabled",
+                        "differential_privacy": "Disabled"
+                    }
+                }
+            }
+        },
+        {
+            "idx": 31,
+            "rows": {
+                "start": 0,
+                "end": 33
+            },
+            "columns": {
+                "headers": [
+                    "ps275",
+                    "ps267",
+                    "ps269",
+                    "ps271",
+                    "ps277",
+                    "ps263",
+                    "ps279",
+                    "ps265",
+                    "ps273",
+                    "ps259",
+                    "ps261",
+                    "ps280",
+                    "test_name"
+                ],
+                "idx": 31
+            },
+            "ctx": {
+                "artifact": "gretel_86253b2fef804c2eb5fbe640bea1a06c_foo-31.csv",
+                "status": "completed",
+                "model_id": "61f09a756de685c2c17fdb3d",
+                "attempt": 1,
+                "sqs": {
+                    "synthetic_data_quality_score": {
+                        "raw_score": 61.533333333333324,
+                        "grade": "Good",
+                        "score": 61
+                    },
+                    "field_correlation_stability": {
+                        "raw_score": 0.020914756254481248,
+                        "grade": "Excellent",
+                        "score": 93
+                    },
+                    "principal_component_stability": {
+                        "raw_score": 0.608852445248207,
+                        "grade": "Moderate",
+                        "score": 41
+                    },
+                    "field_distribution_stability": {
+                        "raw_score": 0.42303720445287885,
+                        "grade": "Moderate",
+                        "score": 45
+                    },
+                    "privacy_protection_level": {
+                        "grade": "Normal",
+                        "score": 0,
+                        "outlier_filter": "Disabled",
+                        "similarity_filter": "Disabled",
+                        "overfitting_protection": "Disabled",
+                        "differential_privacy": "Disabled"
+                    }
+                }
+            }
+        }
+    ],
+    "header_cluster_count": 32
+}
