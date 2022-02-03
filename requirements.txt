@@ -1,3 +1,5 @@
 pydantic==1.9.0
 gretel-client>=0.9.0
 gretel-synthetics>=0.17.0
+category-encoders==2.3.0
+dython==0.7.0
