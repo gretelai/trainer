@@ -51,7 +51,6 @@ def _remote_dataframe_fetcher(payload: RemoteDFPayload) -> RemoteDFPayload:
     if payload.job_type == "model":
         job = Model(payload.project, model_id=payload.uid)
 
-    print(f"Fetching artifact data for partition {payload.partition}")
     download_url = job.get_artifact_link(payload.artifact_type)
     payload.df = pd.read_csv(download_url, compression="gzip")
     return payload
@@ -165,6 +164,16 @@ class StrategyRunner:
 
             if current_model.status == Status.COMPLETED:
                 report = current_model.peek_report()
+                sqs = report['synthetic_data_quality_score']['score']
+                label = "Moderate"
+                if sqs >= 80:
+                    label = "Excellent"
+                elif sqs >= 60:
+                    label = "Good"
+
+                if last_status != current_model.status:
+                    print(f"Partition {partition.idx} completes with SQS: {label} ({sqs})")
+
                 _update.update({SQS: report})
             partition.update_ctx(_update)
 
@@ -267,7 +276,8 @@ class StrategyRunner:
             }
         )
         self._strategy.save()
-        print(f"Started model: {model.model_id}")
+        print(f"Started model: {model.print_obj['model_name']} "
+              f"source: {model.print_obj['config']['models'][0]['synthetics']['data_source']}")
         return model.model_id
 
     @_needs_load
@@ -287,7 +297,7 @@ class StrategyRunner:
                 and partition.ctx.get(ATTEMPT, 0) < self._error_retry_limit
             ):
                 print(
-                    f"Parition {partition.idx} status: {status.value}, re-attempting job"
+                    f"Partition {partition.idx} status: {status.value}, re-attempting job"
                 )
                 start_job = True
 
@@ -362,8 +372,6 @@ class StrategyRunner:
         df_chunks = {
             i: pd.DataFrame() for i in range(0, self._strategy.header_cluster_count)
         }
-
-        print(f"Re-assembling data for {len(df_chunks)} header clusters")
 
         pool = ThreadPoolExecutor()
         futures = []
