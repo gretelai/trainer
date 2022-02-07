@@ -5,10 +5,11 @@ import time
 
 from collections import Counter
 from concurrent.futures import ALL_COMPLETED, ThreadPoolExecutor, wait
+from copy import deepcopy
 from dataclasses import dataclass
 from functools import wraps
 from pathlib import Path
-from typing import List, Optional, Union
+from typing import List, Optional, Union, Tuple, NamedTuple
 
 import pandas as pd
 
@@ -24,6 +25,11 @@ STATUS = "status"
 ARTIFACT = "artifact"
 SQS = "sqs"
 ATTEMPT = "attempt"
+
+
+class Artifact(NamedTuple):
+    id: str
+    record_count: int
 
 
 def _needs_load(func):
@@ -201,7 +207,7 @@ class StrategyRunner:
         self._refresh_max_job_capacity()
         return num_active < self._max_jobs_active
 
-    def _partition_to_artifact(self, partition: Partition) -> Optional[str]:
+    def _partition_to_artifact(self, partition: Partition) -> Artifact:
         project_artifacts = self._project.artifacts
         curr_artifacts = set()
 
@@ -257,12 +263,16 @@ class StrategyRunner:
             artifact_id = self._project.upload_artifact(target_file)
         partition.update_ctx({ARTIFACT: artifact_id})
         self._strategy.save()
-        return artifact_id
+        return Artifact(artifact_id, len(df_to_upload))
 
     @_needs_load
-    def train_partition(self, partition: Partition, artifact_id: str) -> str:
+    def train_partition(self, partition: Partition, artifact: Artifact) -> str:
+
+        model_config = deepcopy(self._model_config)
+        model_config[0]['synthetics']['generate'] = {"num_records": artifact.record_count, "max_invalid": None}
+
         model = self._project.create_model_obj(
-            model_config=self._model_config, data_source=artifact_id
+            model_config=model_config, data_source=artifact.id
         )
         model = model.submit_cloud()
 
@@ -270,7 +280,7 @@ class StrategyRunner:
         partition.ctx.update(
             {
                 STATUS: model.status,
-                ARTIFACT: artifact_id,
+                ARTIFACT: artifact.id,
                 MODEL_ID: model.model_id,
                 ATTEMPT: attempt,
             }
@@ -302,10 +312,10 @@ class StrategyRunner:
                 start_job = True
 
             if start_job:
-                artifact_id = self._partition_to_artifact(partition)
-                if artifact_id is None:
+                artifact = self._partition_to_artifact(partition)
+                if artifact.id is None:
                     return None
-                return self.train_partition(partition, artifact_id)
+                return self.train_partition(partition, artifact)
 
     def _gather_statuses(self, statuses: List[Status]) -> List[Partition]:
         out = []
