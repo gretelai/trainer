@@ -269,7 +269,8 @@ class StrategyRunner:
     def train_partition(self, partition: Partition, artifact: Artifact) -> str:
 
         model_config = deepcopy(self._model_config)
-        model_config[0]['synthetics']['generate'] = {"num_records": artifact.record_count, "max_invalid": None}
+        model_config['models'][0]['synthetics']['generate'] = {
+            "num_records": artifact.record_count, "max_invalid": None}
 
         model = self._project.create_model_obj(
             model_config=model_config, data_source=artifact.id
