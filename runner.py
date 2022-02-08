@@ -414,4 +414,5 @@ class StrategyRunner:
                 drop=True
             )
 
-        return pd.concat(list(df_chunks.values()), axis=1)
+        tmp = pd.concat(list(df_chunks.values()), axis=1)
+        return tmp[self._df.columns]
