@@ -8,6 +8,7 @@ from concurrent.futures import ALL_COMPLETED, ThreadPoolExecutor, wait
 from copy import deepcopy
 from dataclasses import dataclass
 from functools import wraps
+import logging
 from pathlib import Path
 from typing import List, Optional, Union, Tuple, NamedTuple
 
@@ -26,8 +27,11 @@ ARTIFACT = "artifact"
 SQS = "sqs"
 ATTEMPT = "attempt"
 
+logger = logging.getLogger(__name__)
+logger.setLevel('DEBUG')
 
-class Artifact(NamedTuple):
+
+class ArtifactResult(NamedTuple):
     id: str
     record_count: int
 
@@ -147,7 +151,7 @@ class StrategyRunner:
         # by just searching for any partitions have have a "model_id"
         # set
         partitions = self._strategy.query_glob(MODEL_ID, "*")
-        # print(f"Fetching updates for {len(partitions)} models...")
+        # logger.info(f"Fetching updates for {len(partitions)} models...")
         self._status_counter = Counter()
         for partition in partitions:
             model_id = partition.ctx.get(MODEL_ID)
@@ -162,7 +166,7 @@ class StrategyRunner:
 
             # Did our model status change?
             if last_status != current_model.status:
-                print(
+                logger.info(
                     f"Partition {partition.idx} status change from {last_status} to {current_model.status}"
                 )
 
@@ -178,7 +182,7 @@ class StrategyRunner:
                     label = "Good"
 
                 if last_status != current_model.status:
-                    print(f"Partition {partition.idx} completes with SQS: {label} ({sqs})")
+                    logger.info(f"Partition {partition.idx} completes with SQS: {label} ({sqs})")
 
                 _update.update({SQS: report})
             partition.update_ctx(_update)
@@ -194,7 +198,7 @@ class StrategyRunner:
 
             # Hydrate a Model object from the remote API
             current_model = Model(self._project, model_id=model_id)
-            print(f"Cancelling: {current_model.id}")
+            logger.warning(f"Cancelling: {current_model.id}")
             current_model.cancel()
 
     def _refresh_max_job_capacity(self):
@@ -207,7 +211,7 @@ class StrategyRunner:
         self._refresh_max_job_capacity()
         return num_active < self._max_jobs_active
 
-    def _partition_to_artifact(self, partition: Partition) -> Artifact:
+    def _partition_to_artifact(self, partition: Partition) -> ArtifactResult:
         project_artifacts = self._project.artifacts
         curr_artifacts = set()
 
@@ -228,7 +232,7 @@ class StrategyRunner:
                     continue
 
                 if artifact_key:
-                    print(f"Attempting to remove artifact: {p.ctx.get(ARTIFACT)}")
+                    logger.debug(f"Attempting to remove artifact: {p.ctx.get(ARTIFACT)}")
                     self._project.delete_artifact(artifact_key)
                     p.update_ctx({ARTIFACT: None})
                     self._strategy.save()
@@ -239,7 +243,7 @@ class StrategyRunner:
             # we'll just remove some other random one
             if not found_artifact:
                 try:
-                    print("Removing artifact not belonging to this Strategy...")
+                    logger.debug("Removing artifact not belonging to this Strategy...")
                     for art in project_artifacts:
                         key = art.get("key")
                         if key in curr_artifacts:
@@ -248,10 +252,10 @@ class StrategyRunner:
                         found_artifact = True
                         break
                 except Exception as err:
-                    print(f"Could not delete artifact: {str(err)}")
+                    logger.warning(f"Could not delete artifact: {str(err)}")
 
                 if not found_artifact:
-                    print("Could not make room for next dataset, waiting for room...")
+                    logger.debug("Could not make room for next data set, waiting for room...")
                     # We couldn't make room so we don't try and upload the next artifact
                     return None
 
@@ -263,21 +267,24 @@ class StrategyRunner:
             artifact_id = self._project.upload_artifact(target_file)
         partition.update_ctx({ARTIFACT: artifact_id})
         self._strategy.save()
-        return Artifact(artifact_id, len(df_to_upload))
+        return ArtifactResult(artifact_id, len(df_to_upload))
 
     @_needs_load
-    def train_partition(self, partition: Partition, artifact: Artifact) -> str:
+    def train_partition(self, partition: Partition, artifact: ArtifactResult) -> str:
 
+        attempt = partition.ctx.get(ATTEMPT, 0) + 1
         model_config = deepcopy(self._model_config)
         model_config['models'][0]['synthetics']['generate'] = {
-            "num_records": artifact.record_count, "max_invalid": None}
+            "num_records": artifact.record_count, "max_invalid": None
+        }
+        if attempt > 1:
+            model_config['models'][0]['synthetics']['params']['vocab_size'] = 0
 
         model = self._project.create_model_obj(
             model_config=model_config, data_source=artifact.id
         )
         model = model.submit_cloud()
 
-        attempt = partition.ctx.get(ATTEMPT, 0) + 1
         partition.ctx.update(
             {
                 STATUS: model.status,
@@ -287,8 +294,8 @@ class StrategyRunner:
             }
         )
         self._strategy.save()
-        print(f"Started model: {model.print_obj['model_name']} "
-              f"source: {model.print_obj['config']['models'][0]['synthetics']['data_source']}")
+        logger.info(f"Started model: {model.print_obj['model_name']} "
+                    f"source: {model.print_obj['config']['models'][0]['synthetics']['data_source']}")
         return model.model_id
 
     @_needs_load
@@ -299,7 +306,7 @@ class StrategyRunner:
 
             # If we've never done a job for this partition, we should start one
             if status is None:
-                print(f"Partition {partition.idx} is new, starting model creation")
+                logger.info(f"Partition {partition.idx} is new, starting model creation")
                 start_job = True
 
             # If the job failed, should we try again?
@@ -307,7 +314,7 @@ class StrategyRunner:
                 status in (Status.ERROR, Status.LOST)
                 and partition.ctx.get(ATTEMPT, 0) < self._error_retry_limit
             ):
-                print(
+                logger.info(
                     f"Partition {partition.idx} status: {status.value}, re-attempting job"
                 )
                 start_job = True
@@ -350,11 +357,11 @@ class StrategyRunner:
 
     @_needs_load
     def train_all_partitions(self):
-        print(f"Processing {len(self._strategy.partitions)} partitions")
+        logger.info(f"Processing {len(self._strategy.partitions)} partitions")
         while True:
             self._update_job_status()
             if not self.has_capacity:
-                print("At active capacity, waiting for more...")
+                logger.debug("At active capacity, waiting for more...")
                 time.sleep(10)
                 continue
 
@@ -367,7 +374,7 @@ class StrategyRunner:
 
             time.sleep(10)
 
-        print(dict(self._status_counter))
+        logger.info(dict(self._status_counter))
 
     @_needs_load
     def get_training_synthetic_data(self) -> pd.DataFrame:
