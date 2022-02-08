@@ -5,12 +5,12 @@ import pandas as pd
 import pytest
 
 from gretel_synthetics.utils.header_clusters import cluster
-from strategy import PartitionConstraints, PartitionStrategy
+from trainer.strategy import PartitionConstraints, PartitionStrategy
 
 
 @pytest.fixture(scope="module", autouse=True)
 def test_df() -> pd.DataFrame:
-    return pd.read_csv(str(Path(__file__).parent / "core-221-train.csv"))
+    return pd.read_csv(str(Path(__file__).parent / "data" / "core-221-train.csv"))
 
 
 @pytest.fixture(scope="module")

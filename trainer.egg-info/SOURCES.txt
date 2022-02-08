@@ -1,0 +1,8 @@
+README.md
+setup.py
+tests/__init__.py
+tests/test_strategy.py
+trainer.egg-info/PKG-INFO
+trainer.egg-info/SOURCES.txt
+trainer.egg-info/dependency_links.txt
+trainer.egg-info/top_level.txt
