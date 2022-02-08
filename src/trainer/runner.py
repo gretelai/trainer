@@ -14,7 +14,7 @@ from typing import List, Optional, Union, Tuple, NamedTuple
 
 import pandas as pd
 
-from strategy import Partition, PartitionConstraints, PartitionStrategy
+from trainer.strategy import Partition, PartitionConstraints, PartitionStrategy
 
 from gretel_client.projects import Project
 from gretel_client.projects.jobs import ACTIVE_STATES
