@@ -4,12 +4,10 @@ This code is designed to help users successfully train synthetic models on compl
 
 # Get Started
 
-Install the package locally via pip. 
-```bash
-pip install -e .
-```
-
-Run `gretel configure` from the command line to cache API credentials, and give the Notebook a try.
+## Running the notebook
+1. Launch the [Notebook](https://github.com/gretelai/trainer/blob/main/notebooks/gretel-trainer.ipynb) in [Google Colab](https://colab.research.google.com/github/gretelai/trainer/blob/main/notebooks/gretel-trainer.ipynb) or your preferred environment.
+2. Add your dataset and [Gretel API](https://console.gretel.cloud) key to the notebook.
+3. Generate synthetic data! 
 
 **NOTE**: Either delete the existing or choose a new cache file name if you are starting
 a dataset run from scratch.
