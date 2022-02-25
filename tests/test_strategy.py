@@ -1,5 +1,6 @@
 from pathlib import Path
 from typing import List
+from dataclasses import dataclass
 
 import pandas as pd
 import pytest
@@ -18,6 +19,19 @@ def header_clusters(test_df) -> List[List[str]]:
     clusters = cluster(test_df)
     assert len(clusters) == 2
     return clusters
+
+
+@dataclass
+class ClusterData:
+    clusters: List[List[str]]
+    seeds: List[str]
+
+
+@pytest.fixture(scope="module")
+def header_clusters_seed(test_df) -> ClusterData:
+    seeds = ["goal", "goal_type", "goals"]
+    clusters = cluster(test_df, header_prefix=seeds)
+    return ClusterData(clusters=clusters, seeds=seeds)
 
 
 def test_invalid_partition_constraints():
@@ -100,6 +114,24 @@ def test_strategy_column_batches(
 
     final = pd.concat([part1, part2], axis=1)
     assert final.shape == test_df.shape
+
+
+@pytest.mark.parametrize(
+    "constraints",
+    [
+        PartitionConstraints(max_row_partitions=3),
+        PartitionConstraints(max_row_count=100),
+    ],
+)
+def test_strategy_seeds(constraints: PartitionConstraints, test_df, header_clusters_seed: ClusterData):
+    constraints.header_clusters = header_clusters_seed.clusters
+    constraints.seed_headers = header_clusters_seed.seeds
+    strategy = PartitionStrategy.from_dataframe("foo", test_df, constraints)
+    for partition in strategy.partitions:
+        if partition.columns.idx == 0:
+            assert partition.columns.seed_headers == header_clusters_seed.seeds
+        else:
+            assert not partition.columns.seed_headers
 
 
 def test_read_write(test_df, header_clusters, tmpdir):
