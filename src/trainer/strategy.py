@@ -18,6 +18,7 @@ class RowPartition(BaseModel):
 
 class ColumnPartition(BaseModel):
     headers: Optional[List[str]]
+    seed_headers: Optional[List[str]]
     idx: int
 
 
@@ -42,6 +43,7 @@ class PartitionConstraints:
     max_row_count: Optional[int] = None
     max_row_partitions: Optional[int] = None
     header_clusters: Optional[List[List[str]]] = None
+    seed_headers: Optional[List[str]] = None
 
     def __post_init__(self):
         if self.max_row_count is not None and self.max_row_partitions is not None:
@@ -76,10 +78,11 @@ def _build_partitions(
 
         while total_rows_remain > 0:
             for idx, header_cluster in enumerate(header_clusters):
+                seed_headers = constraints.seed_headers if idx == 0 else None
                 partitions.append(
                     Partition(
                         rows=RowPartition(start=next_start, end=next_end),
-                        columns=ColumnPartition(headers=header_cluster, idx=idx),
+                        columns=ColumnPartition(headers=header_cluster, idx=idx, seed_headers=seed_headers),
                         idx=partition_idx,
                     )
                 )
@@ -105,12 +108,13 @@ def _build_partitions(
         curr_start = 0
         for chunk_size in chunks:
             for idx, header_cluster in enumerate(header_clusters):
+                seed_headers = constraints.seed_headers if idx == 0 else None
                 partitions.append(
                     Partition(
                         rows=RowPartition(
                             start=curr_start, end=curr_start + chunk_size
                         ),
-                        columns=ColumnPartition(headers=header_cluster, idx=idx),
+                        columns=ColumnPartition(headers=header_cluster, idx=idx, seed_headers=seed_headers),
                         idx=partition_idx,
                     )
                 )
@@ -124,6 +128,8 @@ class PartitionStrategy(BaseModel):
     id: str
     partitions: Optional[List[Partition]]
     header_cluster_count: int
+    original_headers: Optional[List[str]]
+    status_counter: Optional[dict]
     _disk_location: Path = PrivateAttr(default=None)
 
     @classmethod
@@ -135,6 +141,7 @@ class PartitionStrategy(BaseModel):
             id=id,
             partitions=partitions,
             header_cluster_count=constraints.header_cluster_count,
+            original_headers=list(df)
         )
 
     @classmethod
