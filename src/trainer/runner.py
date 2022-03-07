@@ -175,19 +175,21 @@ class StrategyRunner:
         self._loaded = True
 
     @classmethod
-    def from_completed(cls, project: Project, cache_file: Union[str, Path]):
+    def from_completed(cls, project: Project, cache_file: Union[str, Path]) -> StrategyRunner:
         cache_file = Path(cache_file)
         if not cache_file.exists():
             raise ValueError("cache file does not exist")
 
-        return cls(
+        inst = cls(
             strategy_id="__none__",
             df=None,
             cache_file=cache_file,
             model_config=None,
-            partition_constraints=PartitionConstraints(max_row_partitions=1),
+            partition_constraints=None,
             project=project,
         )
+        inst.load()
+        return inst
 
     def _update_job_status(self):
         # Get all jobs that have been created, we can do this
@@ -197,6 +199,13 @@ class StrategyRunner:
         # logger.info(f"Fetching updates for {len(partitions)} models...")
         self._status_counter = Counter()
         for partition in partitions:
+            last_status = partition.ctx.get(STATUS)
+
+            # If we are done successfully, go on to the next one
+            if last_status in (Status.COMPLETED,):
+                self._status_counter.update([Status(last_status)])
+                continue
+
             model_id = partition.ctx.get(MODEL_ID)
 
             # Hydrate a Model object from the remote API
@@ -204,8 +213,6 @@ class StrategyRunner:
 
             # Update our strategy-wide counter of model states
             self._status_counter.update([current_model.status])
-
-            last_status = partition.ctx.get(STATUS)
 
             # Did our model status change?
             if last_status != current_model.status:
@@ -243,6 +250,12 @@ class StrategyRunner:
         for partition in partitions:
             model_id = partition.ctx.get(MODEL_ID)
             handler_id = partition.ctx.get(HANDLER, {}).get(HANDLER_ID)
+            last_status = partition.ctx.get(HANDLER, {}).get(STATUS)
+
+            # No need to refresh completed handlers from the remote API
+            if last_status in (Status.COMPLETED,):
+                self._handler_status_counter.update([Status(last_status)])
+                continue
 
             if not handler_id:
                 continue
@@ -252,8 +265,6 @@ class StrategyRunner:
             current_handler = RecordHandler(model=current_model, record_id=handler_id)
 
             self._handler_status_counter.update([current_handler.status])
-
-            last_status = partition.ctx.get(HANDLER, {}).get(STATUS)
 
             if last_status != current_handler.status:
                 logger.info(
@@ -412,6 +423,9 @@ class StrategyRunner:
         NOTE: This assumes the partition is successfully trained and has an
         available model.
         """
+        handler_dict = partition.ctx.get(HANDLER)
+        if handler_dict is None:
+            partition.ctx[HANDLER] = {}
         attempt = partition.ctx.get(HANDLER).get(ATTEMPT, 0) + 1
         model_id = partition.ctx.get(MODEL_ID)
 
@@ -477,16 +491,13 @@ class StrategyRunner:
         start_job = False
         for partition in self._strategy.partitions:
             status = partition.ctx.get(HANDLER, {}).get(STATUS)  # type: Status
+            attempt_count = partition.ctx.get(HANDLER, {}).get(ATTEMPT, 0)
 
             if status is None:
                 logger.info(f"Generating data for partition {partition.idx}")
                 start_job = True
 
-            elif (
-                status in (Status.ERROR, Status.LOST)
-                and partition.ctx.get(HANDLER, {}).get(ATTEMPT, 0)
-                < self._error_retry_limit
-            ):
+            elif status in (Status.ERROR, Status.LOST) and attempt_count < self._error_retry_limit:
                 logger.info(
                     f"Partition {partition.idx} has status {status.value}, re-attempting generation"
                 )
@@ -499,17 +510,24 @@ class StrategyRunner:
                 if partition.columns.seed_headers and isinstance(
                     gen_payload.seed_df, pd.DataFrame
                 ):
-                    logger.info("Partition has seed fields, uploading seed artifact...")
-                    use_seeds = True
-                    removed_artifact = self._remove_unused_artifact()
-                    if removed_artifact is None:
-                        logger.info(
-                            "Could not start generation with seeds, an old artifact could not be removed"
-                        )
-                        return None
+                    # NOTE(jm): If we've tried N-1 attempts with seeds and the handler has continued
+                    # fail then we should not use seeds to at least let the handler try to succeed. 
+                    # One example of this happening would be when a partition's model receives seeds
+                    # where the values of the seeds were not in the training set (due to partitioning).
+                    if attempt_count == self._error_retry_limit - 1:
+                        logger.info(f"WARNING: Disabling seeds for partition {partition.idx} due to previous failed generation attempts...")
+                    else:
+                        logger.info("Partition has seed fields, uploading seed artifact...")
+                        use_seeds = True
+                        removed_artifact = self._remove_unused_artifact()
+                        if removed_artifact is None:
+                            logger.info(
+                                "Could not start generation with seeds, an old artifact could not be removed"
+                            )
+                            return None
 
-                    filename = f"{self.strategy_id}-seeds-{partition.idx}.csv"
-                    artifact = self._df_to_artifact(gen_payload.seed_df, filename)
+                        filename = f"{self.strategy_id}-seeds-{partition.idx}.csv"
+                        artifact = self._df_to_artifact(gen_payload.seed_df, filename)
 
                 new_payload = GenPayload(
                     num_records=gen_payload.num_records,
@@ -659,6 +677,7 @@ class StrategyRunner:
         seed_df: Optional[pd.DataFrame] = None,
         num_records: Optional[int] = None,
         max_invalid: Optional[int] = None,
+        clear_cache: bool = False
     ):
         if seed_df is None and not num_records:
             raise ValueError("must provide a seed_df or num_records to generate")
@@ -667,6 +686,7 @@ class StrategyRunner:
             raise ValueError("must use one of seed_df or num_records only")
 
         # Refresh all of the trained models
+        logger.info("Loading existing model information...")
         self._update_job_status()
 
         # We can't generate a dataset if any of the models are in a bad state, so we check that here
@@ -677,7 +697,8 @@ class StrategyRunner:
             )
 
         # Clear out all previous record handler metadata
-        self.clear_partition_runs()
+        if clear_cache:
+            self.clear_partition_runs()
 
         # If we have seeds, then we use the number of seeds as the number of records
         # to generate from each model.
@@ -700,7 +721,7 @@ class StrategyRunner:
 
         # NOTE: This payload will be used to create a new payload object per
         # partition, so this will get passed in more as a template to the next
-        # routine.
+        # routine
         gen_payload = GenPayload(
             seed_df=seed_df, num_records=num_records, max_invalid=max_invalid
         )
@@ -709,19 +730,43 @@ class StrategyRunner:
             f"Starting data generation from {self._strategy.partition_count} models"
         )
 
+        update_remote = True
+
         while True:
-            self._update_handler_status()
-            if not self.has_capacity:
-                logger.debug("At active capacity, waiting for more...")
-                time.sleep(10)
-                continue
+            # Try and start as many jobs as we can, until we hit a rate
+            # limit error, then we can check our capacity availabiliy and
+            # wait until trying more.
+            #
+            # The main idea is that we want to avoid polling for re-hydration
+            # so much since that can take so long.
+            if update_remote:
+                logger.info("Refreshing generation statuses...")
+                self._update_handler_status()
+                update_remote = False
 
-            handler_id = self.run_next_partition(gen_payload)
-            if handler_id:
-                continue
+            try:
+                handler_id = self.run_next_partition(gen_payload)
+                if handler_id is not None:
+                    # Go around and try again if this succeeded
+                    continue
+            
+            # Catch a 4xx in the event we are at capacity, or something else goes wrong
+            except Exception as err:
+                logger.warning(f"Error running model: {str(err)}")
 
+            # Are we done done?
             if self.is_done(handler=True):
                 break
+
+            # Wait until we have capacity, once we have capacity, we'll
+            # set our flag to refresh the remote status update
+            while True:
+                if not self.has_capacity:
+                    logger.info("Waiting for more job capacity.")
+                    time.sleep(10)
+                else:
+                    update_remote = True
+                    break
 
             time.sleep(10)
 
