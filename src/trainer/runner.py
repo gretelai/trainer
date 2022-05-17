@@ -43,6 +43,7 @@ from gretel_client.projects.jobs import ACTIVE_STATES
 from gretel_client.projects.models import Model, Status
 from gretel_client.projects.records import RecordHandler
 from gretel_client.users.users import get_me
+from gretel_client.rest import ApiException
 
 MODEL_ID = "model_id"
 HANDLER_ID = "handler_id"
@@ -107,6 +108,16 @@ def _remote_dataframe_fetcher(payload: RemoteDFPayload) -> RemoteDFPayload:
     payload.df = pd.read_csv(download_url, compression="gzip")
     return payload
 
+
+def _maybe_submit_job(job: Union[Model, RecordHandler]) -> Optional[Union[Model, RecordHandler]]:
+    try:
+        job = job.submit_cloud()
+    except ApiException as err:
+        if "Maximum number of jobs" in str(err):
+            logger.warning("Rate limiting: Max jobs created, skipping new job for now...")
+        return None
+    
+    return job
 
 class StrategyRunner:
 
@@ -237,12 +248,16 @@ class StrategyRunner:
                     )
 
                 _update.update({SQS: report})
+            
             partition.update_ctx(_update)
-
             self._strategy.status_counter = dict(self._status_counter)
-
             # Aggressive, but save after every update
+            self._strategy.status_counter = dict(self._status_counter)
             self._strategy.save()
+
+        # If every partition is done, we may not have saved the strategy
+        self._strategy.status_counter = dict(self._status_counter)
+        self._strategy.save()
 
     def _update_handler_status(self):
         partitions = self._strategy.partitions
@@ -374,7 +389,7 @@ class StrategyRunner:
             return ArtifactResult(id=artifact_id, record_count=len(df))
 
     @_needs_load
-    def train_partition(self, partition: Partition, artifact: ArtifactResult) -> str:
+    def train_partition(self, partition: Partition, artifact: ArtifactResult) -> Optional[str]:
         attempt = partition.ctx.get(ATTEMPT, 0) + 1
         model_config = deepcopy(self._model_config)
         model_config["models"][0]["synthetics"]["generate"] = {
@@ -398,7 +413,10 @@ class StrategyRunner:
         model = self._project.create_model_obj(
             model_config=model_config, data_source=artifact.id
         )
-        model = model.submit_cloud()
+
+        model = _maybe_submit_job(model)
+        if model is None:
+            return None
 
         partition.ctx.update(
             {
@@ -416,7 +434,7 @@ class StrategyRunner:
         return model.model_id
 
     @_needs_load
-    def run_partition(self, partition: Partition, gen_payload: GenPayload) -> str:
+    def run_partition(self, partition: Partition, gen_payload: GenPayload) -> Optional[str]:
         """
         Run a record handler for a model and return the job id.
 
@@ -440,7 +458,9 @@ class StrategyRunner:
                 "max_invalid": gen_payload.max_invalid,
             }
         )
-        handler_obj = handler_obj.submit_cloud()
+        handler_obj = _maybe_submit_job(handler_obj)
+        if handler_obj is None:
+            return None
 
         _ctx_update = {
             ATTEMPT: attempt,
