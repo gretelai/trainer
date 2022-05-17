@@ -248,12 +248,16 @@ class StrategyRunner:
                     )
 
                 _update.update({SQS: report})
+            
             partition.update_ctx(_update)
-            print("*******", self._status_counter)
             self._strategy.status_counter = dict(self._status_counter)
-
             # Aggressive, but save after every update
+            self._strategy.status_counter = dict(self._status_counter)
             self._strategy.save()
+
+        # If every partition is done, we may not have saved the strategy
+        self._strategy.status_counter = dict(self._status_counter)
+        self._strategy.save()
 
     def _update_handler_status(self):
         partitions = self._strategy.partitions
