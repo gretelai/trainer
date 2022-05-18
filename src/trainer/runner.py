@@ -113,7 +113,7 @@ def _maybe_submit_job(job: Union[Model, RecordHandler]) -> Optional[Union[Model,
     try:
         job = job.submit_cloud()
     except ApiException as err:
-        if "Maximum number of jobs" in str(err):
+        if "Maximum number of" in str(err):
             logger.warning("Rate limiting: Max jobs created, skipping new job for now...")
         return None
     
