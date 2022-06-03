@@ -40,13 +40,14 @@ class Model(namedtuple("Model", "config"), ExtendedEnum):
 
 
 class Trainer:
-    f"""Automated generative training and sampling tool
+    """Automated generative training and sampling tool
 
     Args:
         project_name (str, optional): Gretel project name. Defaults to "trainer".
         max_header_clusters (int, optional): Max number of clusters per batch. Defaults to 20.
         max_rows (int, optional): Max number of rows per batch. Defaults to 50000.
-        model_type (str, optional): Options include {Model.get_types()}. Defaults to "GretelLSTM".
+        model_type (str, optional): Options include ["GretelLSTM", "GretelCTGAN"]. Defaults to "GretelLSTM".
+        model_kwargs (dict, optional): Modify model configuration settings by key. E.g. {'epochs': 20}
     """
 
     def __init__(
@@ -55,6 +56,7 @@ class Trainer:
         max_header_clusters: int = 20,
         max_rows: int = 50000,
         model_type: str = "GretelLSTM",
+        model_kwargs: dict = {}
     ):
 
         configure_session(api_key="prompt", cache="yes", validate=True)
@@ -69,7 +71,12 @@ class Trainer:
         if model_type in Model.get_types():
             config = pkgutil.get_data(__name__, Model.get_config(model_type))
             self.config = yaml.load(config, Loader=yaml.FullLoader)
+
+            # Update default config settings with kwargs by key
+            for key, value in model_kwargs.items():
+                self.config = self.replace_nested_key(self.config, key, value)
             logger.debug(self.config)
+
         else:
             raise ValueError(
                 f"Invalid model type. Must be {Model.get_model_types()}")
@@ -97,6 +104,18 @@ class Trainer:
         """Generate synthetic data"""
         self.run.generate_data(num_records=num_records, max_invalid=None)
         return self.run.get_synthetic_data()
+ 
+    def replace_nested_key(self, data, key, value):
+        """Replace nested keys"""
+        if isinstance(data, dict):
+            return {
+                k: value if k == key else self.replace_nested_key(v, key, value)
+                for k, v in data.items()
+            }
+        elif isinstance(data, list):
+            return [self.replace_nested_key(v, key, value) for v in data]
+        else:
+            return data
 
     def _preprocess_data(
         self, dataset_path: str, round_decimals: int = 4
