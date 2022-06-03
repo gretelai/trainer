@@ -30,13 +30,15 @@ from concurrent.futures import ALL_COMPLETED, ThreadPoolExecutor, wait
 from copy import deepcopy
 from dataclasses import dataclass
 from functools import wraps
+import json
 import logging
 from pathlib import Path
 from typing import List, Optional, Union
 
+import smart_open
 import pandas as pd
 
-from trainer.strategy import Partition, PartitionConstraints, PartitionStrategy
+from gretel_trainer.strategy import Partition, PartitionConstraints, PartitionStrategy
 
 from gretel_client.projects import Project
 from gretel_client.projects.jobs import ACTIVE_STATES
@@ -98,7 +100,7 @@ def _remote_dataframe_fetcher(payload: RemoteDFPayload) -> RemoteDFPayload:
     # We need the model object no matter what
     model = Model(payload.project, model_id=payload.uid)
     job = model
-    
+
     # if we are downloading handler data, we reset our job
     # to the specific handler object
     if payload.job_type == "run":
@@ -109,15 +111,20 @@ def _remote_dataframe_fetcher(payload: RemoteDFPayload) -> RemoteDFPayload:
     return payload
 
 
-def _maybe_submit_job(job: Union[Model, RecordHandler]) -> Optional[Union[Model, RecordHandler]]:
+def _maybe_submit_job(
+    job: Union[Model, RecordHandler]
+) -> Optional[Union[Model, RecordHandler]]:
     try:
         job = job.submit_cloud()
     except ApiException as err:
         if "Maximum number of" in str(err):
-            logger.warning("Rate limiting: Max jobs created, skipping new job for now...")
+            logger.warning(
+                "Rate limiting: Max jobs created, skipping new job for now..."
+            )
         return None
-    
+
     return job
+
 
 class StrategyRunner:
 
@@ -186,7 +193,9 @@ class StrategyRunner:
         self._loaded = True
 
     @classmethod
-    def from_completed(cls, project: Project, cache_file: Union[str, Path]) -> StrategyRunner:
+    def from_completed(
+        cls, project: Project, cache_file: Union[str, Path]
+    ) -> StrategyRunner:
         cache_file = Path(cache_file)
         if not cache_file.exists():
             raise ValueError("cache file does not exist")
@@ -235,6 +244,13 @@ class StrategyRunner:
 
             if current_model.status == Status.COMPLETED:
                 report = current_model.peek_report()
+
+                if report is None:
+                    with smart_open.open(
+                        current_model.get_artifact_link("report_json")
+                    ) as fin:
+                        report = json.loads(fin.read())
+
                 sqs = report["synthetic_data_quality_score"]["score"]
                 label = "Moderate"
                 if sqs >= 80:
@@ -248,7 +264,7 @@ class StrategyRunner:
                     )
 
                 _update.update({SQS: report})
-            
+
             partition.update_ctx(_update)
             self._strategy.status_counter = dict(self._status_counter)
             # Aggressive, but save after every update
@@ -277,7 +293,8 @@ class StrategyRunner:
 
             # Hydrate a Model and Handler object from the remote API
             current_model = Model(self._project, model_id=model_id)
-            current_handler = RecordHandler(model=current_model, record_id=handler_id)
+            current_handler = RecordHandler(
+                model=current_model, record_id=handler_id)
 
             self._handler_status_counter.update([current_handler.status])
 
@@ -331,7 +348,8 @@ class StrategyRunner:
                 continue
 
             if artifact_key:
-                logger.debug(f"Attempting to remove artifact: {p.ctx.get(ARTIFACT)}")
+                logger.debug(
+                    f"Attempting to remove artifact: {p.ctx.get(ARTIFACT)}")
                 self._project.delete_artifact(artifact_key)
                 p.update_ctx({ARTIFACT: None})
                 self._strategy.save()
@@ -370,7 +388,8 @@ class StrategyRunner:
     def _partition_to_artifact(self, partition: Partition) -> Optional[ArtifactResult]:
         removed_artifact = self._remove_unused_artifact()
         if not removed_artifact:
-            logger.debug("Could not make room for next data set, waiting for room...")
+            logger.debug(
+                "Could not make room for next data set, waiting for room...")
             # We couldn't make room so we don't try and upload the next artifact
             return None
 
@@ -389,26 +408,35 @@ class StrategyRunner:
             return ArtifactResult(id=artifact_id, record_count=len(df))
 
     @_needs_load
-    def train_partition(self, partition: Partition, artifact: ArtifactResult) -> Optional[str]:
+    def train_partition(
+        self, partition: Partition, artifact: ArtifactResult
+    ) -> Optional[str]:
         attempt = partition.ctx.get(ATTEMPT, 0) + 1
         model_config = deepcopy(self._model_config)
-        model_config["models"][0]["synthetics"]["generate"] = {
-            "num_records": artifact.record_count,
-            "max_invalid": None,
-        }
+        data_source = None
 
-        # If we're trying this model for a second+ time, we reduce the vocab size to
-        # utilize the char encoder in order to give a better chance and success
-        if attempt > 1:
-            model_config["models"][0]["synthetics"]["params"]["vocab_size"] = 0
+        if "synthetics" in model_config["models"][0].keys():
 
-        # If this partition is for the first-N headers and we have known seed headers, we have to
-        # modify the configuration to account for the seed task.
-        if partition.columns.seed_headers:
-            model_config["models"][0]["synthetics"]["task"] = {
-                "type": "seed",
-                "attrs": {"fields": partition.columns.seed_headers},
+            model_config["models"][0]["synthetics"]["generate"] = {
+                "num_records": artifact.record_count,
+                "max_invalid": None,
             }
+
+            # If we're trying this model for a second+ time, we reduce the vocab size to
+            # utilize the char encoder in order to give a better chance and success
+            if attempt > 1:
+                model_config["models"][0]["synthetics"]["params"]["vocab_size"] = 0
+
+            # If this partition is for the first-N headers and we have known seed headers, we have to
+            # modify the configuration to account for the seed task.
+            if partition.columns.seed_headers:
+                model_config["models"][0]["synthetics"]["task"] = {
+                    "type": "seed",
+                    "attrs": {"fields": partition.columns.seed_headers},
+                }
+
+        elif "ctgan" in model_config["models"][0].keys():
+            pass
 
         model = self._project.create_model_obj(
             model_config=model_config, data_source=artifact.id
@@ -428,13 +456,14 @@ class StrategyRunner:
         )
         self._strategy.save()
         logger.info(
-            f"Started model: {model.print_obj['model_name']} "
-            f"source: {model.print_obj['config']['models'][0]['synthetics']['data_source']}"
+            f"Started model: {model.print_obj['model_name']} " f"source: {artifact.id}"
         )
         return model.model_id
 
     @_needs_load
-    def run_partition(self, partition: Partition, gen_payload: GenPayload) -> Optional[str]:
+    def run_partition(
+        self, partition: Partition, gen_payload: GenPayload
+    ) -> Optional[str]:
         """
         Run a record handler for a model and return the job id.
 
@@ -456,7 +485,7 @@ class StrategyRunner:
             params={
                 "num_records": gen_payload.num_records,
                 "max_invalid": gen_payload.max_invalid,
-            }
+            },
         )
         handler_obj = _maybe_submit_job(handler_obj)
         if handler_obj is None:
@@ -517,7 +546,10 @@ class StrategyRunner:
                 logger.info(f"Generating data for partition {partition.idx}")
                 start_job = True
 
-            elif status in (Status.ERROR, Status.LOST) and attempt_count < self._error_retry_limit:
+            elif (
+                status in (Status.ERROR, Status.LOST)
+                and attempt_count < self._error_retry_limit
+            ):
                 logger.info(
                     f"Partition {partition.idx} has status {status.value}, re-attempting generation"
                 )
@@ -531,13 +563,17 @@ class StrategyRunner:
                     gen_payload.seed_df, pd.DataFrame
                 ):
                     # NOTE(jm): If we've tried N-1 attempts with seeds and the handler has continued
-                    # fail then we should not use seeds to at least let the handler try to succeed. 
+                    # fail then we should not use seeds to at least let the handler try to succeed.
                     # One example of this happening would be when a partition's model receives seeds
                     # where the values of the seeds were not in the training set (due to partitioning).
                     if attempt_count == self._error_retry_limit - 1:
-                        logger.info(f"WARNING: Disabling seeds for partition {partition.idx} due to previous failed generation attempts...")
+                        logger.info(
+                            f"WARNING: Disabling seeds for partition {partition.idx} due to previous failed generation attempts..."
+                        )
                     else:
-                        logger.info("Partition has seed fields, uploading seed artifact...")
+                        logger.info(
+                            "Partition has seed fields, uploading seed artifact..."
+                        )
                         use_seeds = True
                         removed_artifact = self._remove_unused_artifact()
                         if removed_artifact is None:
@@ -547,7 +583,8 @@ class StrategyRunner:
                             return None
 
                         filename = f"{self.strategy_id}-seeds-{partition.idx}.csv"
-                        artifact = self._df_to_artifact(gen_payload.seed_df, filename)
+                        artifact = self._df_to_artifact(
+                            gen_payload.seed_df, filename)
 
                 new_payload = GenPayload(
                     num_records=gen_payload.num_records,
@@ -628,7 +665,8 @@ class StrategyRunner:
             num_completed = self._status_counter.get(Status.COMPLETED, 0)
         elif job_type == "run":
             self._update_handler_status()
-            num_completed = self._handler_status_counter.get(Status.COMPLETED, 0)
+            num_completed = self._handler_status_counter.get(
+                Status.COMPLETED, 0)
         else:
             raise ValueError("invalid job_type")
 
@@ -697,10 +735,11 @@ class StrategyRunner:
         seed_df: Optional[pd.DataFrame] = None,
         num_records: Optional[int] = None,
         max_invalid: Optional[int] = None,
-        clear_cache: bool = False
+        clear_cache: bool = False,
     ):
         if seed_df is None and not num_records:
-            raise ValueError("must provide a seed_df or num_records to generate")
+            raise ValueError(
+                "must provide a seed_df or num_records to generate")
 
         if isinstance(seed_df, pd.DataFrame) and num_records:
             raise ValueError("must use one of seed_df or num_records only")
@@ -769,7 +808,7 @@ class StrategyRunner:
                 if handler_id is not None:
                     # Go around and try again if this succeeded
                     continue
-            
+
             # Catch a 4xx in the event we are at capacity, or something else goes wrong
             except Exception as err:
                 logger.warning(f"Error running model: {str(err)}")
