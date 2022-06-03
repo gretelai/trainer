@@ -8,5 +8,7 @@ setup(name="gretel-trainer",
       version="0.0.1",
       package_dir={'': 'src'}, 
       install_requires=install_requires, 
-      packages=find_packages("src")
+      packages=find_packages("src"),
+      package_data={'': ['*.yaml']},
+      include_package_data=True
 )
