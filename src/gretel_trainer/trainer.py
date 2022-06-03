@@ -2,6 +2,7 @@
 
 from collections import namedtuple
 from enum import Enum
+import json
 import logging
 import pandas as pd
 import pkgutil
@@ -75,7 +76,7 @@ class Trainer:
             # Update default config settings with kwargs by key
             for key, value in model_kwargs.items():
                 self.config = self.replace_nested_key(self.config, key, value)
-            logger.debug(self.config)
+            logger.debug(json.dumps(self.config,indent=2))
 
         else:
             raise ValueError(
