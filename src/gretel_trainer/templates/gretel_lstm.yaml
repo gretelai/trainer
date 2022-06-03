@@ -28,5 +28,5 @@ models:
         num_records: 5000
         max_invalid: null
       privacy_filters:
-        outliers: medium
-        similarity: medium
+        outliers: null
+        similarity: null
