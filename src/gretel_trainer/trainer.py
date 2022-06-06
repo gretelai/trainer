@@ -48,7 +48,7 @@ class Trainer:
         max_header_clusters (int, optional): Max number of clusters per batch. Defaults to 20.
         max_rows (int, optional): Max number of rows per batch. Defaults to 50000.
         model_type (str, optional): Options include ["GretelLSTM", "GretelCTGAN"]. Defaults to "GretelLSTM".
-        model_kwargs (dict, optional): Modify model configuration settings by key. E.g. {'epochs': 20}
+        model_params (dict, optional): Modify model configuration settings by key. E.g. {'epochs': 20}
     """
 
     def __init__(
@@ -57,7 +57,7 @@ class Trainer:
         max_header_clusters: int = 20,
         max_rows: int = 50000,
         model_type: str = "GretelLSTM",
-        model_kwargs: dict = {}
+        model_params: dict = {}
     ):
 
         configure_session(api_key="prompt", cache="yes", validate=True)
@@ -74,7 +74,7 @@ class Trainer:
             self.config = yaml.load(config, Loader=yaml.FullLoader)
 
             # Update default config settings with kwargs by key
-            for key, value in model_kwargs.items():
+            for key, value in model_params.items():
                 self.config = self.replace_nested_key(self.config, key, value)
             logger.debug(json.dumps(self.config,indent=2))
 
