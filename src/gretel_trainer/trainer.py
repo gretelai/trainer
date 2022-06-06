@@ -73,9 +73,9 @@ class Trainer:
             config = pkgutil.get_data(__name__, Model.get_config(model_type))
             self.config = yaml.load(config, Loader=yaml.FullLoader)
 
-            # Update default config settings with kwargs by key
+            # Update default config settings with params by key
             for key, value in model_params.items():
-                self.config = self.replace_nested_key(self.config, key, value)
+                self.config = self._replace_nested_key(self.config, key, value)
             logger.debug(json.dumps(self.config,indent=2))
 
         else:
@@ -106,15 +106,15 @@ class Trainer:
         self.run.generate_data(num_records=num_records, max_invalid=None)
         return self.run.get_synthetic_data()
  
-    def replace_nested_key(self, data, key, value):
+    def _replace_nested_key(self, data, key, value):
         """Replace nested keys"""
         if isinstance(data, dict):
             return {
-                k: value if k == key else self.replace_nested_key(v, key, value)
+                k: value if k == key else self._replace_nested_key(v, key, value)
                 for k, v in data.items()
             }
         elif isinstance(data, list):
-            return [self.replace_nested_key(v, key, value) for v in data]
+            return [self._replace_nested_key(v, key, value) for v in data]
         else:
             return data
 
