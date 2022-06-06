@@ -5,8 +5,8 @@ models:
     data_source: __tmp__
     params:
       batch_size: 200
-      discriminator_dim: !!python/tuple [256, 256]
+      discriminator_dim: [256, 256]
       discriminator_lr: 0.00033
       epochs: 50
-      generator_dim: !!python/tuple [256, 256]
+      generator_dim: [256, 256]
       generator_lr: 1.0e-05
