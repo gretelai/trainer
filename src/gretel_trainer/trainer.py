@@ -127,9 +127,10 @@ class Trainer:
         return tmp
 
     def _initialize_run(
-        self, df: pd.DataFrame = pd.DataFrame(), overwrite: bool = True
+        self, df: pd.DataFrame = None, overwrite: bool = True
     ) -> runner.StrategyRunner:
         """Create training jobs"""
+        df = pd.DataFrame()
         constraints = None
 
         if not df.empty:
