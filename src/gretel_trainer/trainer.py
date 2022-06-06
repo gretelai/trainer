@@ -5,8 +5,6 @@ from enum import Enum
 import json
 import logging
 import pandas as pd
-import pkgutil
-import yaml
 
 from gretel_client import configure_session, ClientConfig
 from gretel_client.projects import create_or_get_unique_project
@@ -36,8 +34,8 @@ class ExtendedEnum(Enum):
 class Model(namedtuple("Model", "config"), ExtendedEnum):
     """Enum to pair valid models and configurations"""
 
-    GretelLSTM = "templates/gretel_lstm.yaml"
-    GretelCTGAN = "templates/gretel_ctgan.yaml"
+    GretelLSTM = "synthetics/default"
+    GretelCTGAN = "synthetics/ctgan"
 
 
 class Trainer:
@@ -70,8 +68,7 @@ class Trainer:
         self.max_rows = max_rows
 
         if model_type in Model.get_types():
-            config = pkgutil.get_data(__name__, Model.get_config(model_type))
-            self.config = yaml.load(config, Loader=yaml.FullLoader)
+            self.config = read_model_config(Model.get_config(model_type))
 
             # Update default config settings with params by key
             for key, value in model_params.items():
