@@ -41,7 +41,7 @@ class Model(namedtuple("Model", "config"), ExtendedEnum):
 
 
 class Trainer:
-    """Automated generative training and sampling tool
+    """Automated model training and synthetic data generation tool
 
     Args:
         project_name (str, optional): Gretel project name. Defaults to "trainer".
