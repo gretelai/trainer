@@ -130,7 +130,8 @@ class Trainer:
         self, df: pd.DataFrame = None, overwrite: bool = True
     ) -> runner.StrategyRunner:
         """Create training jobs"""
-        df = pd.DataFrame()
+        if df is None:
+            df = pd.DataFrame()
         constraints = None
 
         if not df.empty:
