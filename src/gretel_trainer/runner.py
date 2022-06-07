@@ -22,30 +22,29 @@ various models and handlers used. The context object has the following shape:
 """
 from __future__ import annotations
 
+import json
+import logging
 import tempfile
 import time
-
 from collections import Counter
 from concurrent.futures import ALL_COMPLETED, ThreadPoolExecutor, wait
 from copy import deepcopy
 from dataclasses import dataclass
 from functools import wraps
-import json
-import logging
 from pathlib import Path
 from typing import List, Optional, Union
 
-import smart_open
 import pandas as pd
-
-from gretel_trainer.strategy import Partition, PartitionConstraints, PartitionStrategy
-
+import smart_open
 from gretel_client.projects import Project
 from gretel_client.projects.jobs import ACTIVE_STATES
 from gretel_client.projects.models import Model, Status
 from gretel_client.projects.records import RecordHandler
-from gretel_client.users.users import get_me
 from gretel_client.rest import ApiException
+from gretel_client.users.users import get_me
+
+from gretel_trainer.strategy import (Partition, PartitionConstraints,
+                                     PartitionStrategy)
 
 MODEL_ID = "model_id"
 HANDLER_ID = "handler_id"
@@ -737,6 +736,7 @@ class StrategyRunner:
         max_invalid: Optional[int] = None,
         clear_cache: bool = False,
     ):
+
         if seed_df is None and not num_records:
             raise ValueError(
                 "must provide a seed_df or num_records to generate")
