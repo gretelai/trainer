@@ -6,7 +6,7 @@ import pandas as pd
 import pytest
 
 from gretel_synthetics.utils.header_clusters import cluster
-from trainer.strategy import PartitionConstraints, PartitionStrategy
+from gretel_trainer.strategy import PartitionConstraints, PartitionStrategy
 
 
 @pytest.fixture(scope="module", autouse=True)
