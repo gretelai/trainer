@@ -1,4 +1,4 @@
-from gretel_trainer import trainer
+from gretel_trainer import trainer, runner
 
 dataset = "https://gretel-public-website.s3-us-west-2.amazonaws.com/datasets/USAdultIncome5k.csv"
 
@@ -18,13 +18,12 @@ df = model.generate()
 #df = model.generate()
 
 # Specify synthetic model and update config params
-#model = trainer.Trainer(model_type="GretelCTGAN", model_kwargs={'epochs': 20})
+#model = trainer.Trainer(model_type="GretelCTGAN", model_params={'epochs':2})
 #model.train(dataset)
 #df = model.generate()
 
 # Load and generate data from an existing model
-#model = trainer.Trainer()
-#model.load()
-#df = model.generate(num_records=500)
+#model = trainer.Trainer.load()
+#df = model.generate(num_records=70)
 
 print(df)
