@@ -32,7 +32,7 @@ class Partition(BaseModel):
         if self.columns is not None:
             df = df[self.columns.headers]
 
-        return df.iloc[self.rows.start : self.rows.end]  # noqa
+        return df.iloc[self.rows.start: self.rows.end]  # noqa
 
     def update_ctx(self, update: dict):
         self.ctx.update(update)
@@ -47,10 +47,12 @@ class PartitionConstraints:
 
     def __post_init__(self):
         if self.max_row_count is not None and self.max_row_partitions is not None:
-            raise AttributeError("cannot use both max_row_count and max_row_partitions")
+            raise AttributeError(
+                "cannot use both max_row_count and max_row_partitions")
 
         if self.max_row_count is None and self.max_row_partitions is None:
-            raise AttributeError("must use one of max_row_count or max_row_partitions")
+            raise AttributeError(
+                "must use one of max_row_count or max_row_partitions")
 
     @property
     def header_cluster_count(self) -> int:
@@ -82,7 +84,9 @@ def _build_partitions(
                 partitions.append(
                     Partition(
                         rows=RowPartition(start=next_start, end=next_end),
-                        columns=ColumnPartition(headers=header_cluster, idx=idx, seed_headers=seed_headers),
+                        columns=ColumnPartition(
+                            headers=header_cluster, idx=idx, seed_headers=seed_headers
+                        ),
                         idx=partition_idx,
                     )
                 )
@@ -114,7 +118,9 @@ def _build_partitions(
                         rows=RowPartition(
                             start=curr_start, end=curr_start + chunk_size
                         ),
-                        columns=ColumnPartition(headers=header_cluster, idx=idx, seed_headers=seed_headers),
+                        columns=ColumnPartition(
+                            headers=header_cluster, idx=idx, seed_headers=seed_headers
+                        ),
                         idx=partition_idx,
                     )
                 )
@@ -141,7 +147,7 @@ class PartitionStrategy(BaseModel):
             id=id,
             partitions=partitions,
             header_cluster_count=constraints.header_cluster_count,
-            original_headers=list(df)
+            original_headers=list(df),
         )
 
     @classmethod
