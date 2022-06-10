@@ -2,17 +2,37 @@
 
 This code is designed to help users successfully train synthetic models on complex datasets with high row and column counts. The code works by intelligently dividing a dataset into a set of smaller datasets of correlated columns that can be parallelized and then joined together.
 
-# Get Started
+# Install
 
-## Running the notebook
-1. Launch the [Notebook](https://github.com/gretelai/trainer/blob/main/notebooks/gretel-trainer.ipynb) in [Google Colab](https://colab.research.google.com/github/gretelai/trainer/blob/main/notebooks/gretel-trainer.ipynb) or your preferred environment.
-2. Add your dataset and [Gretel API](https://console.gretel.cloud) key to the notebook.
+**Using `pip`:**
+
+```bash
+pip install -U gretel-trainer
+```
+
+# Quickstart
+
+1. Add your [Gretel API](https://console.gretel.cloud) key via the Gretel CLI.
+```bash
+gretel configure
+```
+
+2. Train or fine-tune a model using the Gretel API
+
+```python3
+from gretel_trainer import trainer
+
+dataset = "https://gretel-public-website.s3-us-west-2.amazonaws.com/datasets/USAdultIncome5k.csv"
+
+model = trainer.Trainer()
+model.train(dataset)
+```
+
 3. Generate synthetic data! 
-
-**NOTE**: Either delete the existing or choose a new cache file name if you are starting
-a dataset run from scratch.
+```python3
+df = model.generate()
+```
 
 # TODOs / Roadmap
 
-- [ ] Enable additional sampling from from trained models.
-- [ ] Detect and label encode random UIDs (preprocessing).
+- [ ] Enable conditional generation via SDK interface (supported in Notebooks currently).
