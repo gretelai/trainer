@@ -18,7 +18,7 @@ This module is designed to provide a simple interface to help users successfully
     
 ## Try it out now!
 
-If you want to quickly get started synthesizing data with **Gretel.ai**, simply click the button below and follow the examples!
+If you want to quickly get started synthesizing data with **Gretel.ai**, simply click the button below and follow the examples. See additional Python3 and Jupyter Notebook examples in the `./notebooks` folder.
 
 [![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/gretelai/gretel-trainer/blob/master/notebooks/trainer-examples.ipynb)
 
