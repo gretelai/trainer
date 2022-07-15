@@ -38,7 +38,7 @@ class Model(namedtuple("Model", "config"), ExtendedEnum):
     """Enum to pair valid models and configurations"""
 
     GretelLSTM = "synthetics/default"
-    GretelCTGAN = "synthetics/ctgan"
+    GretelCTGAN = "synthetics/high-dimensionality"
 
 
 class Trainer:
