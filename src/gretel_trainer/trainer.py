@@ -3,8 +3,7 @@
 import json
 import logging
 import os.path
-from collections import namedtuple
-from enum import Enum
+
 
 import pandas as pd
 from gretel_client import ClientConfig, configure_session
@@ -14,31 +13,13 @@ from gretel_client.projects.models import read_model_config
 from gretel_synthetics.utils.header_clusters import cluster
 
 from gretel_trainer import runner, strategy
+from gretel_trainer.models import Model
 
 logger = logging.getLogger(__name__)
 logger.setLevel("DEBUG")
 
 DEFAULT_PROJECT = "trainer"
 DEFAULT_CACHE = f"{DEFAULT_PROJECT}-runner.json"
-
-
-class ExtendedEnum(Enum):
-    """Utility class for Model enum"""
-
-    @classmethod
-    def get_types(cls):
-        return list(map(lambda c: c.name, cls))
-
-    @classmethod
-    def get_config(cls, model: str):
-        return cls[model].config
-
-
-class Model(namedtuple("Model", "config"), ExtendedEnum):
-    """Enum to pair valid models and configurations"""
-
-    GretelLSTM = "synthetics/default"
-    GretelCTGAN = "synthetics/high-dimensionality"
 
 
 class Trainer:
@@ -58,8 +39,6 @@ class Trainer:
     def __init__(
         self,
         project_name: str = "trainer",
-        max_header_clusters: int = 20,
-        max_rows: int = 50000,
         model_type: str = "GretelLSTM",
         model_params: dict = {},
         cache_file: str = None,
@@ -74,13 +53,13 @@ class Trainer:
         self.run = None
         self.project_name = project_name
         self.project = create_or_get_unique_project(name=project_name)
-        self.max_header_clusters = max_header_clusters
-        self.max_rows = max_rows
         self.overwrite = overwrite
         self.cache_file = self._get_cache_file(cache_file)
 
         if model_type in Model.get_types():
             self.config = read_model_config(Model.get_config(model_type))
+            self.max_rows = Model.get_max_rows(model_type)
+            self.max_header_clusters = Model.get_max_header_clusters(model_type)
 
             # Update default config settings with params by key
             for key, value in model_params.items():
@@ -100,9 +79,7 @@ class Trainer:
             logger.debug(json.dumps(self.config, indent=2))
 
     @classmethod
-    def load(
-        cls, cache_file: str = DEFAULT_CACHE, project_name: str = DEFAULT_PROJECT
-    ) -> runner.StrategyRunner:
+    def load(cls, cache_file: str = DEFAULT_CACHE, project_name: str = DEFAULT_PROJECT) -> runner.StrategyRunner:
         """Load an existing project from a cache.
 
         Args:
@@ -112,8 +89,7 @@ class Trainer:
             Trainer: returns an initialized StrategyRunner class.
         """
         project = create_or_get_unique_project(name=project_name)
-        model = cls(cache_file=cache_file,
-                    project_name=project_name, overwrite=False)
+        model = cls(cache_file=cache_file, project_name=project_name, overwrite=False)
 
         if not os.path.exists(cache_file):
             raise ValueError(
