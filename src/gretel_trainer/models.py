@@ -18,8 +18,8 @@ class BaseConfig:
 class GretelLSTMConfig(BaseConfig):
 
     config = "synthetics/default"
-    max_header_clusters: int = 20
-    max_rows: int = 50000
+    max_header_clusters = 20
+    max_rows = 50000
 
     def __init__(self):
         super().__init__(
@@ -32,8 +32,8 @@ class GretelLSTMConfig(BaseConfig):
 class GretelCTGANConfig(BaseConfig):
 
     config = "synthetics/high-dimensionality"
-    max_header_clusters: int = 1000
-    max_rows: int = 1000000
+    max_header_clusters = 1000
+    max_rows = 50000
 
     def __init__(self):
         super().__init__(
