@@ -438,8 +438,10 @@ class StrategyRunner:
             pass
 
         model = self._project.create_model_obj(
-            model_config=model_config, data_source=artifact.id
+            data_source=artifact.id,
+            model_config=model_config, 
         )
+        model.name = artifact.id.split("_")[-1]
 
         model = _maybe_submit_job(model)
         if model is None:
