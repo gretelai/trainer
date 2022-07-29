@@ -32,7 +32,7 @@ class GretelLSTMConfig(BaseConfig):
 class GretelCTGANConfig(BaseConfig):
 
     config = "synthetics/high-dimensionality"
-    max_header_clusters = 1000
+    max_header_clusters = 100
     max_rows = 50000
 
     def __init__(self):
