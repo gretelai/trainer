@@ -34,6 +34,7 @@ class Trainer:
         cache_file (str, optional): Select a path to save or load the cache file. Default is `[project_name]-runner.json`. 
         overwrite (bool, optional): Overwrite previous progress. Defaults to True.
         enable_privacy_filters (bool, optional): Enable privacy filters on all batches. Warning: On small batches, enabling privacy filters can result in too many records being filtered out at generation time. Defaults to False.
+        seed_fields (list, optional): List fields that can be used for conditional generation. Required for LSTM model type.
     """
 
     def __init__(
@@ -44,6 +45,7 @@ class Trainer:
         cache_file: str = None,
         overwrite: bool = True,
         enable_privacy_filters: bool = False,
+        seed_fields: list = None
     ):
 
         configure_session(api_key="prompt", cache="yes", validate=True)
@@ -99,7 +101,7 @@ class Trainer:
         model.run = model._initialize_run(df=None, overwrite=model.overwrite)
         return model
 
-    def train(self, dataset_path: str, round_decimals: int = 4):
+    def train(self, dataset_path: str, round_decimals: int = 4, seed_fields: list = None):
         """Train a model on the dataset
 
         Args:
@@ -110,20 +112,24 @@ class Trainer:
         self.df = self._preprocess_data(
             dataset_path=dataset_path, round_decimals=round_decimals
         )
-        self.run = self._initialize_run(df=self.df, overwrite=self.overwrite)
+        self.run = self._initialize_run(df=self.df, overwrite=self.overwrite, seed_fields=seed_fields)
         self.run.train_all_partitions()
 
-    def generate(self, num_records: int = 500) -> pd.DataFrame:
+    def generate(self, num_records: int = 500, seed_df: pd.DataFrame = None) -> pd.DataFrame:
         """Generate synthetic data
 
         Args:
             num_records (int, optional): Number of records to generate from model. Defaults to 500.
+            seed_df (pd.DataFrame, optional): Pandas DataFrame of values to seed the model with. Defaults to None.
 
         Returns:
             pd.DataFrame: Synthetic data.
         """
         self.run.generate_data(
-            num_records=num_records, max_invalid=None, clear_cache=True
+            num_records=num_records if seed_df.empty else None, 
+            max_invalid=None, 
+            clear_cache=True, 
+            seed_df=seed_df
         )
         return self.run.get_synthetic_data()
 
@@ -164,7 +170,7 @@ class Trainer:
         return cache_file
 
     def _initialize_run(
-        self, df: pd.DataFrame = None, overwrite: bool = True
+        self, df: pd.DataFrame = None, overwrite: bool = True, seed_fields: list = None
     ) -> runner.StrategyRunner:
         """Create training jobs"""
         constraints = None
@@ -173,14 +179,16 @@ class Trainer:
 
         if not df.empty:
             header_clusters = cluster(
-                df, maxsize=self.max_header_clusters, plot=False)
+                df, maxsize=self.max_header_clusters, header_prefix=seed_fields, plot=False)
             logger.info(
                 f"Header clustering created {len(header_clusters)} cluster(s) "
                 f"of length(s) {[len(x) for x in header_clusters]}"
             )
 
             constraints = strategy.PartitionConstraints(
-                header_clusters=header_clusters, max_row_count=self.max_rows
+                header_clusters=header_clusters, 
+                max_row_count=self.max_rows, 
+                seed_headers=seed_fields
             )
 
         run = runner.StrategyRunner(
