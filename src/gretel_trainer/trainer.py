@@ -3,6 +3,7 @@
 import json
 import logging
 import os.path
+from re import A
 
 
 import pandas as pd
@@ -27,55 +28,59 @@ class Trainer:
 
     Args:
         project_name (str, optional): Gretel project name. Defaults to "trainer".
-        max_header_clusters (int, optional): Max number of clusters per batch. Defaults to 20.
-        max_rows (int, optional): Max number of rows per batch. Defaults to 50000.
+        max_header_clusters (int, optional): Max number of clusters per batch.
+        max_rows (int, optional): Max number of rows per batch.
         model_type (str, optional): Options include ["GretelLSTM", "GretelCTGAN"]. Defaults to "GretelLSTM".
         model_params (dict, optional): Modify model configuration settings by key. E.g. {'epochs': 20}
         cache_file (str, optional): Select a path to save or load the cache file. Default is `[project_name]-runner.json`. 
         overwrite (bool, optional): Overwrite previous progress. Defaults to True.
         enable_privacy_filters (bool, optional): Enable privacy filters on all batches. Warning: On small batches, enabling privacy filters can result in too many records being filtered out at generation time. Defaults to False.
-        seed_fields (list, optional): List fields that can be used for conditional generation. Required for LSTM model type.
     """
 
     def __init__(
         self,
         project_name: str = "trainer",
+        max_header_clusters: int = None,
+        max_rows: int = None,
         model_type: str = "GretelLSTM",
         model_params: dict = {},
         cache_file: str = None,
         overwrite: bool = True,
         enable_privacy_filters: bool = False,
-        seed_fields: list = None
     ):
-
         configure_session(api_key="prompt", cache="yes", validate=True)
 
         self.df = None
         self.dataset_path = None
+        self.max_header_clusters = max_header_clusters
+        self.max_rows = max_rows
         self.run = None
         self.project_name = project_name
         self.project = create_or_get_unique_project(name=project_name)
         self.overwrite = overwrite
         self.cache_file = self._get_cache_file(cache_file)
 
-        if model_type in Model.get_types():
-            self.config = read_model_config(Model.get_config(model_type))
-            self.max_rows = Model.get_max_rows(model_type)
-            self.max_header_clusters = Model.get_max_header_clusters(model_type)
+        # Verify model specific settings
+        if model_type not in Model.get_types():
+            raise ValueError(f"Invalid model type specified. Must be one of {Model.get_types()}.")
+        if self.max_rows and self.max_rows >= Model.get_max_rows(model_type):
+            raise ValueError(f"Max_rows param for the '{model_type}' model must be {Model.get_max_rows(model_type)} or less.")
+        if self.max_header_clusters and self.max_header_clusters >= Model.get_max_header_clusters(model_type):
+            raise ValueError(f"Max_header_clusters param for the '{model_type}' model must be {Model.get_max_header_clusters(model_type)} or less.")
 
-            # Update default config settings with params by key
-            for key, value in model_params.items():
-                self.config = self._replace_nested_key(self.config, key, value)
+        self.config = read_model_config(Model.get_config(model_type))
+        self.max_rows = self.max_rows or Model.get_default_rows(model_type)
+        self.max_header_clusters = self.max_header_clusters or Model.get_default_header_clusters(model_type)
 
-            if not enable_privacy_filters:
-                self.config = self._replace_nested_key(
-                    self.config, "outliers", None)
-                self.config = self._replace_nested_key(
-                    self.config, "similarity", None)
+        # Update default config settings with params by key
+        for key, value in model_params.items():
+            self.config = self._replace_nested_key(self.config, key, value)
 
-        else:
-            raise ValueError(
-                f"Invalid model type. Must be {Model.get_model_types()}")
+        if not enable_privacy_filters:
+            self.config = self._replace_nested_key(
+                self.config, "outliers", None)
+            self.config = self._replace_nested_key(
+                self.config, "similarity", None)
 
         if self.overwrite:
             logger.debug(json.dumps(self.config, indent=2))
@@ -107,6 +112,7 @@ class Trainer:
         Args:
             dataset_path (str): Path or URL to CSV
             round_decimals (int, optional): Round decimals in CSV as preprocessing step. Defaults to `4`.
+            seed_fields (list, optional): List fields that can be used for conditional generation.
         """
         self.dataset_path = dataset_path
         self.df = self._preprocess_data(
@@ -126,7 +132,7 @@ class Trainer:
             pd.DataFrame: Synthetic data.
         """
         self.run.generate_data(
-            num_records=num_records if seed_df.empty else None, 
+            num_records=num_records if not seed_df else None, 
             max_invalid=None, 
             clear_cache=True, 
             seed_df=seed_df
