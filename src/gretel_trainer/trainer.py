@@ -50,9 +50,10 @@ class Trainer:
         max_rows (int, optional): Max number of rows per batch. Defaults to 50000.
         model_type (str, optional): Options include ["GretelLSTM", "GretelCTGAN"]. Defaults to "GretelLSTM".
         model_params (dict, optional): Modify model configuration settings by key. E.g. {'epochs': 20}
-        cache_file (str, optional): Select a path to save or load the cache file. Default is `[project_name]-runner.json`. 
+        cache_file (str, optional): Select a path to save or load the cache file. Default is `[project_name]-runner.json`.
         overwrite (bool, optional): Overwrite previous progress. Defaults to True.
         enable_privacy_filters (bool, optional): Enable privacy filters on all batches. Warning: On small batches, enabling privacy filters can result in too many records being filtered out at generation time. Defaults to False.
+        config (str, optional): Path to a Gretel config file (yaml or json). Overrides `model_type` if both are provided. Serves as the base configuration if `model_params` are also provided.
     """
 
     def __init__(
@@ -65,6 +66,7 @@ class Trainer:
         cache_file: str = None,
         overwrite: bool = True,
         enable_privacy_filters: bool = False,
+        config: str = None,
     ):
 
         configure_session(api_key="prompt", cache="yes", validate=True)
@@ -79,22 +81,23 @@ class Trainer:
         self.overwrite = overwrite
         self.cache_file = self._get_cache_file(cache_file)
 
-        if model_type in Model.get_types():
-            self.config = read_model_config(Model.get_config(model_type))
-
-            # Update default config settings with params by key
-            for key, value in model_params.items():
-                self.config = self._replace_nested_key(self.config, key, value)
-
-            if not enable_privacy_filters:
-                self.config = self._replace_nested_key(
-                    self.config, "outliers", None)
-                self.config = self._replace_nested_key(
-                    self.config, "similarity", None)
-
-        else:
+        if model_type not in Model.get_types():
             raise ValueError(
                 f"Invalid model type. Must be {Model.get_model_types()}")
+            )
+
+        base_config = config or Model.get_config(model_type)
+        self.config = read_model_config(base_config)
+
+        # Update default config settings with params by key
+        for key, value in model_params.items():
+            self.config = self._replace_nested_key(self.config, key, value)
+
+        if not enable_privacy_filters:
+            self.config = self._replace_nested_key(
+                self.config, "outliers", None)
+            self.config = self._replace_nested_key(
+                self.config, "similarity", None)
 
         if self.overwrite:
             logger.debug(json.dumps(self.config, indent=2))
@@ -106,7 +109,7 @@ class Trainer:
         """Load an existing project from a cache.
 
         Args:
-            cache_file (str, optional): Valid file path to load the cache file from. Defaults to `[project-name]-runner.json` 
+            cache_file (str, optional): Valid file path to load the cache file from. Defaults to `[project-name]-runner.json`
 
         Returns:
             Trainer: returns an initialized StrategyRunner class.
