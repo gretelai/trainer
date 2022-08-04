@@ -18,9 +18,11 @@ seed_df = pd.DataFrame(data=[
     ["asian", "chinese", "F"]
 ], columns=["RACE", "ETHNICITY", "GENDER"])
 
+
 # Train a model and conditionally generate data
+seed_fields = seed_df.columns.values.tolist()
 model = trainer.Trainer(model_type=MODEL_TYPE)
-model.train(DATASET_PATH, seed_fields=seed_df.columns.values.tolist())
+model.train(DATASET_PATH, seed_fields=seed_fields)
 print(model.generate(seed_df=seed_df))
 
 # Load a existing model and conditionally generate data
