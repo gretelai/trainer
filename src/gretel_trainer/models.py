@@ -19,37 +19,25 @@ class BaseConfig:
 
 class GretelLSTMConfig(BaseConfig):
 
-    config = "synthetics/default"
-    default_header_clusters = 20
-    max_header_clusters = 30
-    default_rows = 50000
-    max_rows = 1000000
-
     def __init__(self):
         super().__init__(
-            config_file=self.config,
-            default_rows=self.default_rows,
-            max_rows=self.max_rows,
-            default_header_clusters=self.default_header_clusters,
-            max_header_clusters=self.max_header_clusters,
+            config_file="synthetics/default",
+            default_rows=50000,
+            max_rows=1000000,
+            default_header_clusters=20,
+            max_header_clusters=30
         )
 
 
 class GretelCTGANConfig(BaseConfig):
 
-    config = "synthetics/high-dimensionality"
-    default_header_clusters = 100
-    max_header_clusters = 1000
-    default_rows = 50000
-    max_rows = 1000000
-
     def __init__(self):
         super().__init__(
-            config_file=self.config,
-            default_rows=self.default_rows,
-            max_rows=self.max_rows,
-            default_header_clusters=self.default_header_clusters,
-            max_header_clusters=self.max_header_clusters,
+            config_file="synthetics/high-dimensionality",
+            default_rows=50000,
+            max_rows=1000000,
+            default_header_clusters=500,
+            max_header_clusters=1000
         )
 
 
@@ -65,21 +53,20 @@ class ExtendedEnum(Enum):
         return cls[model].config.config_file
 
     @classmethod
-    def get_max_rows(cls, model: str) -> int:
-        return cls[model].config.max_rows
-
-    @classmethod
-    def get_max_header_clusters(cls, model: str) -> int:
-        return cls[model].config.max_header_clusters
-
-    @classmethod
     def get_default_rows(cls, model: str) -> int:
         return cls[model].config.default_rows
+
+    @classmethod
+    def get_max_rows(cls, model: str) -> int:
+        return cls[model].config.max_rows
 
     @classmethod
     def get_default_header_clusters(cls, model: str) -> int:
         return cls[model].config.default_header_clusters
 
+    @classmethod
+    def get_max_header_clusters(cls, model: str) -> int:
+        return cls[model].config.max_header_clusters
 
 
 class Model(namedtuple("Model", "config"), ExtendedEnum):
