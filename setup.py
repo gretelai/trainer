@@ -5,7 +5,7 @@ local_path = pathlib.Path(__file__).parent
 install_requires = (local_path / "requirements.txt").read_text().splitlines()
 
 setup(name="gretel-trainer",
-      version="0.2.1",
+      version="0.2.2",
       package_dir={'': 'src'}, 
       install_requires=install_requires, 
       python_requires=">=3.7",
