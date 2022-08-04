@@ -32,6 +32,7 @@ from copy import deepcopy
 from dataclasses import dataclass
 from functools import wraps
 from pathlib import Path
+from random import choice
 from typing import List, Optional, Union
 
 import pandas as pd
@@ -424,7 +425,13 @@ class StrategyRunner:
             # If we're trying this model for a second+ time, we reduce the vocab size to
             # utilize the char encoder in order to give a better chance and success
             if attempt > 1:
-                model_config["models"][0]["synthetics"]["params"]["vocab_size"] = 0
+                learning_rate = choice([0.001, 0.01])
+                vocab_size = choice([20000, 0])
+                vocab_description = "enabled" if vocab_size > 0 else "disabled"
+
+                logger.info(f"Modifying configuration parameters. Setting learning rate to {learning_rate}. SentencePiece tokenizer {vocab_description}.")
+                model_config["models"][0]["synthetics"]["params"]["learning_rate"] = learning_rate
+                model_config["models"][0]["synthetics"]["params"]["vocab_size"] = vocab_size
 
             # If this partition is for the first-N headers and we have known seed headers, we have to
             # modify the configuration to account for the seed task.
