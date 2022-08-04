@@ -62,31 +62,42 @@ class Trainer:
 
         # Verify model specific settings
         if model_type not in Model.get_types():
-            raise ValueError(f"Invalid model type specified. Must be one of {Model.get_types()}.")
+            raise ValueError(
+                f"Invalid model type specified. Must be one of {Model.get_types()}."
+            )
         if self.max_rows and self.max_rows >= Model.get_max_rows(model_type):
-            raise ValueError(f"Max_rows param for the '{model_type}' model must be {Model.get_max_rows(model_type)} or less.")
-        if self.max_header_clusters and self.max_header_clusters >= Model.get_max_header_clusters(model_type):
-            raise ValueError(f"Max_header_clusters param for the '{model_type}' model must be {Model.get_max_header_clusters(model_type)} or less.")
+            raise ValueError(
+                f"Max_rows param for the '{model_type}' model must be {Model.get_max_rows(model_type)} or less."
+            )
+        if (
+            self.max_header_clusters
+            and self.max_header_clusters >= Model.get_max_header_clusters(model_type)
+        ):
+            raise ValueError(
+                f"Max_header_clusters param for the '{model_type}' model must be {Model.get_max_header_clusters(model_type)} or less."
+            )
 
         self.config = read_model_config(Model.get_config(model_type))
         self.max_rows = self.max_rows or Model.get_default_rows(model_type)
-        self.max_header_clusters = self.max_header_clusters or Model.get_default_header_clusters(model_type)
+        self.max_header_clusters = (
+            self.max_header_clusters or Model.get_default_header_clusters(model_type)
+        )
 
         # Update default config settings with params by key
         for key, value in model_params.items():
             self.config = self._replace_nested_key(self.config, key, value)
 
         if not enable_privacy_filters:
-            self.config = self._replace_nested_key(
-                self.config, "outliers", None)
-            self.config = self._replace_nested_key(
-                self.config, "similarity", None)
+            self.config = self._replace_nested_key(self.config, "outliers", None)
+            self.config = self._replace_nested_key(self.config, "similarity", None)
 
         if self.overwrite:
             logger.debug(json.dumps(self.config, indent=2))
 
     @classmethod
-    def load(cls, cache_file: str = DEFAULT_CACHE, project_name: str = DEFAULT_PROJECT) -> runner.StrategyRunner:
+    def load(
+        cls, cache_file: str = DEFAULT_CACHE, project_name: str = DEFAULT_PROJECT
+    ) -> runner.StrategyRunner:
         """Load an existing project from a cache.
 
         Args:
@@ -106,7 +117,9 @@ class Trainer:
         model.run = model._initialize_run(df=None, overwrite=model.overwrite)
         return model
 
-    def train(self, dataset_path: str, round_decimals: int = 4, seed_fields: list = None):
+    def train(
+        self, dataset_path: str, round_decimals: int = 4, seed_fields: list = None
+    ):
         """Train a model on the dataset
 
         Args:
@@ -118,10 +131,14 @@ class Trainer:
         self.df = self._preprocess_data(
             dataset_path=dataset_path, round_decimals=round_decimals
         )
-        self.run = self._initialize_run(df=self.df, overwrite=self.overwrite, seed_fields=seed_fields)
+        self.run = self._initialize_run(
+            df=self.df, overwrite=self.overwrite, seed_fields=seed_fields
+        )
         self.run.train_all_partitions()
 
-    def generate(self, num_records: int = 500, seed_df: pd.DataFrame = None) -> pd.DataFrame:
+    def generate(
+        self, num_records: int = 500, seed_df: pd.DataFrame = None
+    ) -> pd.DataFrame:
         """Generate synthetic data
 
         Args:
@@ -132,10 +149,10 @@ class Trainer:
             pd.DataFrame: Synthetic data.
         """
         self.run.generate_data(
-            num_records=num_records if seed_df is None else None, 
-            max_invalid=None, 
-            clear_cache=True, 
-            seed_df=seed_df
+            num_records=num_records if seed_df is None else None,
+            max_invalid=None,
+            clear_cache=True,
+            seed_df=seed_df,
         )
         return self.run.get_synthetic_data()
 
@@ -143,8 +160,7 @@ class Trainer:
         """Replace nested keys"""
         if isinstance(data, dict):
             return {
-                k: value if k == key else self._replace_nested_key(
-                    v, key, value)
+                k: value if k == key else self._replace_nested_key(v, key, value)
                 for k, v in data.items()
             }
         elif isinstance(data, list):
@@ -167,8 +183,7 @@ class Trainer:
 
         if os.path.exists(cache_file):
             if self.overwrite:
-                logger.warning(
-                    f"Overwriting existing run cache: {cache_file}.")
+                logger.warning(f"Overwriting existing run cache: {cache_file}.")
             else:
                 logger.info(f"Using existing run cache: {cache_file}.")
         else:
@@ -185,16 +200,20 @@ class Trainer:
 
         if not df.empty:
             header_clusters = cluster(
-                df, maxsize=self.max_header_clusters, header_prefix=seed_fields, plot=False)
+                df,
+                maxsize=self.max_header_clusters,
+                header_prefix=seed_fields,
+                plot=False,
+            )
             logger.info(
                 f"Header clustering created {len(header_clusters)} cluster(s) "
                 f"of length(s) {[len(x) for x in header_clusters]}"
             )
 
             constraints = strategy.PartitionConstraints(
-                header_clusters=header_clusters, 
-                max_row_count=self.max_rows, 
-                seed_headers=seed_fields
+                header_clusters=header_clusters,
+                max_row_count=self.max_rows,
+                seed_headers=seed_fields,
             )
 
         run = runner.StrategyRunner(

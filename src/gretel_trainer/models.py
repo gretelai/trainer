@@ -9,7 +9,14 @@ class BaseConfig:
     derived from this class
     """
 
-    def __init__(self, config_file: str, default_rows: int, max_rows: int, default_header_clusters: int, max_header_clusters: int):
+    def __init__(
+        self,
+        config_file: str,
+        default_rows: int,
+        max_rows: int,
+        default_header_clusters: int,
+        max_header_clusters: int,
+    ):
         self.config_file = config_file
         self.default_rows = default_rows
         self.max_rows = max_rows
@@ -18,26 +25,24 @@ class BaseConfig:
 
 
 class GretelLSTMConfig(BaseConfig):
-
     def __init__(self):
         super().__init__(
             config_file="synthetics/default",
             default_rows=50000,
             max_rows=1000000,
             default_header_clusters=20,
-            max_header_clusters=30
+            max_header_clusters=30,
         )
 
 
 class GretelCTGANConfig(BaseConfig):
-
     def __init__(self):
         super().__init__(
             config_file="synthetics/high-dimensionality",
             default_rows=50000,
             max_rows=1000000,
             default_header_clusters=500,
-            max_header_clusters=1000
+            max_header_clusters=1000,
         )
 
 
