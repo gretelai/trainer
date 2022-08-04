@@ -132,7 +132,7 @@ class Trainer:
             pd.DataFrame: Synthetic data.
         """
         self.run.generate_data(
-            num_records=num_records if not seed_df else None, 
+            num_records=num_records if seed_df is None else None, 
             max_invalid=None, 
             clear_cache=True, 
             seed_df=seed_df
