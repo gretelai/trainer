@@ -12,6 +12,7 @@ class _BaseConfig:
     """This should be overridden on concrete classes"""
     _max_header_clusters_limit: int
     _max_rows_limit: int
+    _model_slug: str
 
     # Should be set by concrete constructors
     config: Union[str, dict]
@@ -47,6 +48,9 @@ class _BaseConfig:
             self.config = self._replace_nested_key(self.config, key, value)
         
     def validate(self):
+        if self._model_slug not in list(self.config['models'][0].keys()):
+            raise ValueError("Invalid configuration file selected for this model type")
+
         if self.max_rows > self._max_rows_limit:
             raise ValueError(f"max_rows must be less than {self._max_rows_limit} for this model type.")
 
@@ -70,6 +74,7 @@ class GretelLSTM(_BaseConfig):
 
     _max_header_clusters_limit: int = 30
     _max_rows_limit: int = 5000000
+    _model_slug: str = "synthetics"
 
     def __init__(
         self,
@@ -90,6 +95,7 @@ class GretelCTGAN(_BaseConfig):
 
     _max_header_clusters_limit: int = 1000
     _max_rows_limit: int = 5000000
+    _model_slug: str = "ctgan"
 
     def __init__(
         self,
