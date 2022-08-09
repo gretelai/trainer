@@ -12,10 +12,6 @@ class _BaseConfig:
     _max_header_clusters: int
     """This should be overridden on concrete classes"""
 
-    # Default values for all configs, may be overridden if needed
-    _max_rows: int = 1000000
-    _enable_privacy_filters: bool = False
-
     # Should be set by concrete constructors
     config: Union[str, dict]
     max_rows: int
