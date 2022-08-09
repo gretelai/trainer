@@ -9,8 +9,9 @@ class _BaseConfig:
     derived from this class
     """
 
-    _max_header_clusters: int
     """This should be overridden on concrete classes"""
+    _max_header_clusters_limit: int
+    _max_rows_limit: int
 
     # Should be set by concrete constructors
     config: Union[str, dict]
@@ -46,11 +47,11 @@ class _BaseConfig:
             self.config = self._replace_nested_key(self.config, key, value)
         
     def validate(self):
-        if self.max_rows > self._max_rows:
-            raise ValueError(f"max_rows must be less than {self._max_rows} for this model type.")
+        if self.max_rows > self._max_rows_limit:
+            raise ValueError(f"max_rows must be less than {self._max_rows_limit} for this model type.")
 
-        if self.max_header_clusters > self._max_header_clusters:
-            raise ValueError(f"max_header_clusters must be less than {self._max_header_clusters} for this model type.")
+        if self.max_header_clusters > self._max_header_clusters_limit:
+            raise ValueError(f"max_header_clusters must be less than {self._max_header_clusters_limit} for this model type.")
 
     def _replace_nested_key(self, data, key, value) -> dict:
         """Replace nested keys"""
@@ -67,7 +68,8 @@ class _BaseConfig:
 
 class GretelLSTM(_BaseConfig):
 
-    _max_header_clusters: int = 30
+    _max_header_clusters_limit: int = 30
+    _max_rows_limit: int = 5000000
 
     def __init__(
         self,
@@ -86,7 +88,8 @@ class GretelLSTM(_BaseConfig):
 
 class GretelCTGAN(_BaseConfig):
 
-    _max_header_clusters: int = 1000
+    _max_header_clusters_limit: int = 1000
+    _max_rows_limit: int = 5000000
 
     def __init__(
         self,
