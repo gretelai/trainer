@@ -39,7 +39,7 @@ class _BaseConfig:
 
         self.validate()
 
-    def update_params(self, params:dict):
+    def update_params(self, params: dict):
         """Convenience function to update model specific parameters from the base config by key value.
 
         Args:
