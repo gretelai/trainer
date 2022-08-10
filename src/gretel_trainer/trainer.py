@@ -112,7 +112,7 @@ class Trainer:
         )
         return self.run.get_synthetic_data()
 
-    def get_sqs_score(self) -> float:
+    def get_sqs_score(self) -> int:
         """Return the average SQS synthetic data quality score.
 
         Requires the model has been trained.
@@ -121,7 +121,7 @@ class Trainer:
             sqs["synthetic_data_quality_score"]["score"]
             for sqs in self.run.get_sqs_information
         ]
-        return sum(scores) / len(scores)
+        return int(sum(scores) / len(scores))
 
     def _preprocess_data(
         self, dataset_path: str, round_decimals: int = 4
