@@ -32,6 +32,7 @@ from copy import deepcopy
 from dataclasses import dataclass
 from functools import wraps
 from pathlib import Path
+from random import choice
 from typing import List, Optional, Union
 
 import pandas as pd
@@ -43,8 +44,7 @@ from gretel_client.projects.records import RecordHandler
 from gretel_client.rest import ApiException
 from gretel_client.users.users import get_me
 
-from gretel_trainer.strategy import (Partition, PartitionConstraints,
-                                     PartitionStrategy)
+from gretel_trainer.strategy import Partition, PartitionConstraints, PartitionStrategy
 
 MODEL_ID = "model_id"
 HANDLER_ID = "handler_id"
@@ -292,8 +292,7 @@ class StrategyRunner:
 
             # Hydrate a Model and Handler object from the remote API
             current_model = Model(self._project, model_id=model_id)
-            current_handler = RecordHandler(
-                model=current_model, record_id=handler_id)
+            current_handler = RecordHandler(model=current_model, record_id=handler_id)
 
             self._handler_status_counter.update([current_handler.status])
 
@@ -347,8 +346,7 @@ class StrategyRunner:
                 continue
 
             if artifact_key:
-                logger.debug(
-                    f"Attempting to remove artifact: {p.ctx.get(ARTIFACT)}")
+                logger.debug(f"Attempting to remove artifact: {p.ctx.get(ARTIFACT)}")
                 self._project.delete_artifact(artifact_key)
                 p.update_ctx({ARTIFACT: None})
                 self._strategy.save()
@@ -387,8 +385,7 @@ class StrategyRunner:
     def _partition_to_artifact(self, partition: Partition) -> Optional[ArtifactResult]:
         removed_artifact = self._remove_unused_artifact()
         if not removed_artifact:
-            logger.debug(
-                "Could not make room for next data set, waiting for room...")
+            logger.debug("Could not make room for next data set, waiting for room...")
             # We couldn't make room so we don't try and upload the next artifact
             return None
 
@@ -424,7 +421,19 @@ class StrategyRunner:
             # If we're trying this model for a second+ time, we reduce the vocab size to
             # utilize the char encoder in order to give a better chance and success
             if attempt > 1:
-                model_config["models"][0]["synthetics"]["params"]["vocab_size"] = 0
+                learning_rate = choice([0.001, 0.01])
+                vocab_size = choice([20000, 0])
+                vocab_description = "enabled" if vocab_size > 0 else "disabled"
+
+                logger.info(
+                    f"Modifying configuration parameters. Setting learning rate to {learning_rate}. SentencePiece tokenizer {vocab_description}."
+                )
+                model_config["models"][0]["synthetics"]["params"][
+                    "learning_rate"
+                ] = learning_rate
+                model_config["models"][0]["synthetics"]["params"][
+                    "vocab_size"
+                ] = vocab_size
 
             # If this partition is for the first-N headers and we have known seed headers, we have to
             # modify the configuration to account for the seed task.
@@ -438,8 +447,9 @@ class StrategyRunner:
             pass
 
         model = self._project.create_model_obj(
-            model_config=model_config, data_source=artifact.id
+            data_source=artifact.id, model_config=model_config,
         )
+        model.name = artifact.id.split("_")[-1]
 
         model = _maybe_submit_job(model)
         if model is None:
@@ -582,8 +592,7 @@ class StrategyRunner:
                             return None
 
                         filename = f"{self.strategy_id}-seeds-{partition.idx}.csv"
-                        artifact = self._df_to_artifact(
-                            gen_payload.seed_df, filename)
+                        artifact = self._df_to_artifact(gen_payload.seed_df, filename)
 
                 new_payload = GenPayload(
                     num_records=gen_payload.num_records,
@@ -664,8 +673,7 @@ class StrategyRunner:
             num_completed = self._status_counter.get(Status.COMPLETED, 0)
         elif job_type == "run":
             self._update_handler_status()
-            num_completed = self._handler_status_counter.get(
-                Status.COMPLETED, 0)
+            num_completed = self._handler_status_counter.get(Status.COMPLETED, 0)
         else:
             raise ValueError("invalid job_type")
 
@@ -738,8 +746,7 @@ class StrategyRunner:
     ):
 
         if seed_df is None and not num_records:
-            raise ValueError(
-                "must provide a seed_df or num_records to generate")
+            raise ValueError("must provide a seed_df or num_records to generate")
 
         if isinstance(seed_df, pd.DataFrame) and num_records:
             raise ValueError("must use one of seed_df or num_records only")
