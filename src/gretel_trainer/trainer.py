@@ -10,7 +10,7 @@ from gretel_client.projects import create_or_get_unique_project
 from gretel_synthetics.utils.header_clusters import cluster
 
 from gretel_trainer import runner, strategy
-from gretel_trainer.models import _BaseConfig, GretelLSTM
+from gretel_trainer.models import _BaseConfig, determine_best_model
 
 logger = logging.getLogger(__name__)
 logger.setLevel("DEBUG")
@@ -24,15 +24,15 @@ class Trainer:
 
     Args:
         project_name (str, optional): Gretel project name. Defaults to "trainer".
-        model_config (_BaseConfig, optional): Options include GretelLSTM(), GretelCTGAN(). Defaults to GretelLSTM().
-        cache_file (str, optional): Select a path to save or load the cache file. Default is `[project_name]-runner.json`. 
+        model_config (_BaseConfig, optional): Options include GretelLSTM(), GretelCTGAN(). If unspecified, the best option will be chosen at train time based on the training dataset.
+        cache_file (str, optional): Select a path to save or load the cache file. Default is `[project_name]-runner.json`.
         overwrite (bool, optional): Overwrite previous progress. Defaults to True.
     """
 
     def __init__(
         self,
         project_name: str = "trainer",
-        model_type: _BaseConfig = GretelLSTM(),
+        model_type: _BaseConfig = None,
         cache_file: str = None,
         overwrite: bool = True,
     ):
@@ -47,7 +47,7 @@ class Trainer:
         self.cache_file = self._get_cache_file(cache_file)
         self.model_type = model_type
 
-        if self.overwrite:
+        if self.overwrite and self.model_type is not None:
             logger.debug(json.dumps(self.model_type.config, indent=2))
 
     @classmethod
@@ -150,10 +150,15 @@ class Trainer:
     ) -> runner.StrategyRunner:
         """Create training jobs"""
         constraints = None
+        model_config = None
+
         if df is None:
             df = pd.DataFrame()
 
         if not df.empty:
+            self.model_type = determine_best_model(df)
+            model_config = self.model_type.config
+
             header_clusters = cluster(
                 df,
                 maxsize=self.model_type.max_header_clusters,
@@ -176,7 +181,7 @@ class Trainer:
             df=self.df,
             cache_file=self.cache_file,
             cache_overwrite=overwrite,
-            model_config=self.model_type.config,
+            model_config=model_config,
             partition_constraints=constraints,
             project=self.project,
         )
