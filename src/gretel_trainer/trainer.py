@@ -74,18 +74,19 @@ class Trainer:
         return model
 
     def train(
-        self, dataset_path: str, round_decimals: int = 4, seed_fields: list = None
+        self, dataset_path: str, delimiter: str = ",", round_decimals: int = 4, seed_fields: list = None,
     ):
         """Train a model on the dataset
 
         Args:
             dataset_path (str): Path or URL to CSV
+            delimiter (str, optional): Delimiter to use when reading the dataset. Defaults to comma (",").
             round_decimals (int, optional): Round decimals in CSV as preprocessing step. Defaults to `4`.
             seed_fields (list, optional): List fields that can be used for conditional generation.
         """
         self.dataset_path = dataset_path
         self.df = self._preprocess_data(
-            dataset_path=dataset_path, round_decimals=round_decimals
+            dataset_path=dataset_path, delimiter=delimiter, round_decimals=round_decimals
         )
         self.run = self._initialize_run(
             df=self.df, overwrite=self.overwrite, seed_fields=seed_fields
@@ -124,10 +125,10 @@ class Trainer:
         return int(sum(scores) / len(scores))
 
     def _preprocess_data(
-        self, dataset_path: str, round_decimals: int = 4
+        self, dataset_path: str, delimiter: str, round_decimals: int = 4
     ) -> pd.DataFrame:
         """Preprocess input data"""
-        tmp = pd.read_csv(dataset_path, low_memory=False)
+        tmp = pd.read_csv(dataset_path, sep=delimiter, low_memory=False)
         tmp = tmp.round(round_decimals)
         return tmp
 
