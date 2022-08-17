@@ -1,7 +1,10 @@
-import logging
-from typing import Union
+from __future__ import annotations
 
-import pandas as pd
+import logging
+from typing import TYPE_CHECKING, Union
+
+if TYPE_CHECKING:
+    import pandas as pd
 
 from gretel_client.projects.models import read_model_config
 
