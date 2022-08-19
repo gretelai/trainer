@@ -120,7 +120,7 @@ class Trainer:
         """
         scores = [
             sqs["synthetic_data_quality_score"]["score"]
-            for sqs in self.run.get_sqs_information
+            for sqs in self.run.get_sqs_information()
         ]
         return int(sum(scores) / len(scores))
 
