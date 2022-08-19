@@ -157,7 +157,9 @@ class Trainer:
             df = pd.DataFrame()
 
         if not df.empty:
-            self.model_type = determine_best_model(df)
+            if self.model_type is None:
+                self.model_type = determine_best_model(df)
+
             model_config = self.model_type.config
 
             header_clusters = cluster(
