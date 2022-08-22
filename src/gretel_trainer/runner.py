@@ -413,11 +413,6 @@ class StrategyRunner:
 
         if "synthetics" in model_config["models"][0].keys():
 
-            model_config["models"][0]["synthetics"]["generate"] = {
-                "num_records": artifact.record_count,
-                "max_invalid": None,
-            }
-
             # If we're trying this model for a second+ time, we reduce the vocab size to
             # utilize the char encoder in order to give a better chance and success
             if attempt > 1:
