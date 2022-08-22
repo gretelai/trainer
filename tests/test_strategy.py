@@ -63,6 +63,10 @@ def test_strategy_all_columns(constraints: PartitionConstraints, test_df):
             <= len(test_df) // constraints.max_row_count + 1
         )
 
+    # partitions are of roughly equal size
+    extracted_df_lengths = [len(partition.extract_df(test_df)) for partition in strategy.partitions]
+    assert max(extracted_df_lengths) - min(extracted_df_lengths) <= 1
+
     # re-assemble all partitions and compare
     compare = pd.DataFrame()
     for idx, partition in enumerate(strategy.partitions):
@@ -101,6 +105,10 @@ def test_strategy_column_batches(
             <= strategy.partition_count / len(header_clusters)
             <= len(test_df) // constraints.max_row_count + 1
         )
+
+    # partitions are of roughly equal size
+    extracted_df_lengths = [len(partition.extract_df(test_df)) for partition in strategy.partitions]
+    assert max(extracted_df_lengths) - min(extracted_df_lengths) <= 1
 
     part1 = pd.DataFrame()
     part2 = pd.DataFrame()

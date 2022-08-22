@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import fnmatch
+import math
 
 from dataclasses import dataclass
 from pathlib import Path
@@ -71,61 +72,40 @@ def _build_partitions(
     partitions = []
     partition_idx = 0
 
-    if constraints.max_row_count is not None:
-        total_rows_remain = total_rows
-        next_start = 0
-        next_end = constraints.max_row_count
-
-        while total_rows_remain > 0:
-            for idx, header_cluster in enumerate(header_clusters):
-                seed_headers = constraints.seed_headers if idx == 0 else None
-                partitions.append(
-                    Partition(
-                        rows=RowPartition(start=next_start, end=next_end),
-                        columns=ColumnPartition(
-                            headers=header_cluster, idx=idx, seed_headers=seed_headers
-                        ),
-                        idx=partition_idx,
-                    )
-                )
-                partition_idx += 1
-
-            next_start += constraints.max_row_count
-            next_end += constraints.max_row_count
-            total_rows_remain -= constraints.max_row_count
-
-        return partitions
-
     if constraints.max_row_partitions is not None:
-        # We need to break up the number of rows into roughly even chunks
-        chunk_size, remain = divmod(total_rows, constraints.max_row_partitions)
+        partition_count = constraints.max_row_partitions
+    elif constraints.max_row_count is not None:
+        partition_count = math.ceil(total_rows / constraints.max_row_count)
 
-        # each item in this array is the size of the chunk
-        chunks = [chunk_size] * constraints.max_row_partitions
+    # We need to break up the number of rows into roughly even chunks
+    chunk_size, remain = divmod(total_rows, partition_count)
 
-        # spread out the remainder evenly across the first N chunks
-        for i in range(0, remain):
-            chunks[i] += 1
+    # each item in this array is the size of the chunk
+    chunks = [chunk_size] * partition_count
 
-        curr_start = 0
-        for chunk_size in chunks:
-            for idx, header_cluster in enumerate(header_clusters):
-                seed_headers = constraints.seed_headers if idx == 0 else None
-                partitions.append(
-                    Partition(
-                        rows=RowPartition(
-                            start=curr_start, end=curr_start + chunk_size
-                        ),
-                        columns=ColumnPartition(
-                            headers=header_cluster, idx=idx, seed_headers=seed_headers
-                        ),
-                        idx=partition_idx,
-                    )
+    # spread out the remainder evenly across the first N chunks
+    for i in range(0, remain):
+        chunks[i] += 1
+
+    curr_start = 0
+    for chunk_size in chunks:
+        for idx, header_cluster in enumerate(header_clusters):
+            seed_headers = constraints.seed_headers if idx == 0 else None
+            partitions.append(
+                Partition(
+                    rows=RowPartition(
+                        start=curr_start, end=curr_start + chunk_size
+                    ),
+                    columns=ColumnPartition(
+                        headers=header_cluster, idx=idx, seed_headers=seed_headers
+                    ),
+                    idx=partition_idx,
                 )
-                partition_idx += 1
-            curr_start += chunk_size
+            )
+            partition_idx += 1
+        curr_start += chunk_size
 
-        return partitions
+    return partitions
 
 
 class PartitionStrategy(BaseModel):
