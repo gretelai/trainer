@@ -47,8 +47,11 @@ class Trainer:
         self.cache_file = self._get_cache_file(cache_file)
         self.model_type = model_type
 
-        if self.overwrite and self.model_type is not None:
-            logger.debug(json.dumps(self.model_type.config, indent=2))
+        if self.overwrite:
+            if self.model_type is None:
+                logger.debug("Deferring model configuration to optimize based on training data.")
+            else:
+                logger.debug(json.dumps(self.model_type.config, indent=2))
 
     @classmethod
     def load(
@@ -159,6 +162,7 @@ class Trainer:
         if not df.empty:
             if self.model_type is None:
                 self.model_type = determine_best_model(df)
+                logger.debug(json.dumps(self.model_type.config, indent=2))
 
             model_config = self.model_type.config
 
