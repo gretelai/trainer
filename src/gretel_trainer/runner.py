@@ -24,6 +24,7 @@ from __future__ import annotations
 
 import json
 import logging
+import math
 import tempfile
 import time
 from collections import Counter
@@ -789,8 +790,9 @@ class StrategyRunner:
         # NOTE: This payload will be used to create a new payload object per
         # partition, so this will get passed in more as a template to the next
         # routine
+        partition_num_records = math.ceil(num_records / self._strategy.row_partition_count)
         gen_payload = GenPayload(
-            seed_df=seed_df, num_records=num_records, max_invalid=max_invalid
+            seed_df=seed_df, num_records=partition_num_records, max_invalid=max_invalid
         )
 
         logger.info(
