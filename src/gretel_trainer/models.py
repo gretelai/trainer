@@ -23,7 +23,7 @@ def determine_best_model(df: pd.DataFrame):
     elif row_count < LOW_RECORD_THRESHOLD or column_count < LOW_COLUMN_THRESHOLD:
         return GretelCTGAN(config="synthetics/low-record-count")
     else:
-        return GretelLSTM()
+        return GretelLSTM(config="synthetics/default")
 
 
 class _BaseConfig:
