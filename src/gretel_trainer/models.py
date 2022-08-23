@@ -1,7 +1,29 @@
+from __future__ import annotations
+
 import logging
-from typing import Union
+from typing import TYPE_CHECKING, Union
+
+if TYPE_CHECKING:
+    import pandas as pd
 
 from gretel_client.projects.models import read_model_config
+
+
+HIGH_COLUMN_THRESHOLD = 20
+HIGH_RECORD_THRESHOLD = 50000
+LOW_COLUMN_THRESHOLD = 4
+LOW_RECORD_THRESHOLD = 1000
+
+
+def determine_best_model(df: pd.DataFrame):
+    row_count, column_count = df.shape
+
+    if row_count > HIGH_RECORD_THRESHOLD or column_count > HIGH_COLUMN_THRESHOLD:
+        return GretelCTGAN(config="synthetics/high-dimensionality")
+    elif row_count < LOW_RECORD_THRESHOLD or column_count < LOW_COLUMN_THRESHOLD:
+        return GretelCTGAN(config="synthetics/low-record-count")
+    else:
+        return GretelLSTM(config="synthetics/default")
 
 
 class _BaseConfig:

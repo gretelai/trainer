@@ -10,7 +10,7 @@ from gretel_client.projects import create_or_get_unique_project
 from gretel_synthetics.utils.header_clusters import cluster
 
 from gretel_trainer import runner, strategy
-from gretel_trainer.models import _BaseConfig, GretelLSTM
+from gretel_trainer.models import _BaseConfig, determine_best_model
 
 logger = logging.getLogger(__name__)
 logger.setLevel("DEBUG")
@@ -24,15 +24,15 @@ class Trainer:
 
     Args:
         project_name (str, optional): Gretel project name. Defaults to "trainer".
-        model_config (_BaseConfig, optional): Options include GretelLSTM(), GretelCTGAN(). Defaults to GretelLSTM().
-        cache_file (str, optional): Select a path to save or load the cache file. Default is `[project_name]-runner.json`. 
+        model_type (_BaseConfig, optional): Options include GretelLSTM(), GretelCTGAN(). If unspecified, the best option will be chosen at train time based on the training dataset.
+        cache_file (str, optional): Select a path to save or load the cache file. Default is `[project_name]-runner.json`.
         overwrite (bool, optional): Overwrite previous progress. Defaults to True.
     """
 
     def __init__(
         self,
         project_name: str = "trainer",
-        model_type: _BaseConfig = GretelLSTM(),
+        model_type: _BaseConfig = None,
         cache_file: str = None,
         overwrite: bool = True,
     ):
@@ -48,7 +48,10 @@ class Trainer:
         self.model_type = model_type
 
         if self.overwrite:
-            logger.debug(json.dumps(self.model_type.config, indent=2))
+            if self.model_type is None:
+                logger.debug("Deferring model configuration to optimize based on training data.")
+            else:
+                logger.debug(json.dumps(self.model_type.config, indent=2))
 
     @classmethod
     def load(
@@ -57,7 +60,7 @@ class Trainer:
         """Load an existing project from a cache.
 
         Args:
-            cache_file (str, optional): Valid file path to load the cache file from. Defaults to `[project-name]-runner.json` 
+            cache_file (str, optional): Valid file path to load the cache file from. Defaults to `[project-name]-runner.json`
 
         Returns:
             Trainer: returns an initialized StrategyRunner class.
@@ -74,18 +77,19 @@ class Trainer:
         return model
 
     def train(
-        self, dataset_path: str, round_decimals: int = 4, seed_fields: list = None
+        self, dataset_path: str, delimiter: str = ",", round_decimals: int = 4, seed_fields: list = None,
     ):
         """Train a model on the dataset
 
         Args:
             dataset_path (str): Path or URL to CSV
+            delimiter (str, optional): Delimiter to use when reading the dataset. Defaults to comma (",").
             round_decimals (int, optional): Round decimals in CSV as preprocessing step. Defaults to `4`.
             seed_fields (list, optional): List fields that can be used for conditional generation.
         """
         self.dataset_path = dataset_path
         self.df = self._preprocess_data(
-            dataset_path=dataset_path, round_decimals=round_decimals
+            dataset_path=dataset_path, delimiter=delimiter, round_decimals=round_decimals
         )
         self.run = self._initialize_run(
             df=self.df, overwrite=self.overwrite, seed_fields=seed_fields
@@ -119,15 +123,15 @@ class Trainer:
         """
         scores = [
             sqs["synthetic_data_quality_score"]["score"]
-            for sqs in self.run.get_sqs_information
+            for sqs in self.run.get_sqs_information()
         ]
         return int(sum(scores) / len(scores))
 
     def _preprocess_data(
-        self, dataset_path: str, round_decimals: int = 4
+        self, dataset_path: str, delimiter: str, round_decimals: int = 4
     ) -> pd.DataFrame:
         """Preprocess input data"""
-        tmp = pd.read_csv(dataset_path, low_memory=False)
+        tmp = pd.read_csv(dataset_path, sep=delimiter, low_memory=False)
         tmp = tmp.round(round_decimals)
         return tmp
 
@@ -150,10 +154,18 @@ class Trainer:
     ) -> runner.StrategyRunner:
         """Create training jobs"""
         constraints = None
+        model_config = None
+
         if df is None:
             df = pd.DataFrame()
 
         if not df.empty:
+            if self.model_type is None:
+                self.model_type = determine_best_model(df)
+                logger.debug(json.dumps(self.model_type.config, indent=2))
+
+            model_config = self.model_type.config
+
             header_clusters = cluster(
                 df,
                 maxsize=self.model_type.max_header_clusters,
@@ -176,7 +188,7 @@ class Trainer:
             df=self.df,
             cache_file=self.cache_file,
             cache_overwrite=overwrite,
-            model_config=self.model_type.config,
+            model_config=model_config,
             partition_constraints=constraints,
             project=self.project,
         )
