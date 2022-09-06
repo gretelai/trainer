@@ -2,7 +2,7 @@ import os
 import pandas as pd
 import random
 
-from gretel_trainer.connectors import SQLite
+from gretel_trainer.relational.connectors import SQLite
 
 
 WORKING_DIR = "working"

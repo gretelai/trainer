@@ -93,3 +93,16 @@ class SQLite(_Connection):
         print("Connecting to database")
         self.engine = create_engine(self.db_path)
         self.connect()
+
+
+class PostgreSQL(_Connection):
+    """
+    Connector to load data from Postgres databases
+    """
+
+    def __init__(self, db_path: str, working_dir: str):
+        super().__init__(db_path=db_path, working_dir=working_dir)
+
+        print("Connecting to database")
+        self.engine = create_engine(self.db_path)
+        self.connect()
