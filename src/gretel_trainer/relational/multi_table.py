@@ -30,17 +30,6 @@ class MultiTable:
         if not os.path.exists(WORKING_DIR):
             os.makedirs(WORKING_DIR)
 
-    def generate_data(
-        table: str, model, training_data: dict, synth_record_counts: dict
-    ):
-        rh = model.create_record_handler_obj(
-            training_data[table], params={
-                "num_records": synth_record_counts[table]}
-        )
-        rh.submit_cloud()
-        print("Generation started for " + table)
-        return rh
-
     def _prepare_training_data(self, rdb_config: dict):
         # Remove all primary and foreign key fields from the training data
         # Start by gathering the columns for each table
@@ -76,8 +65,14 @@ class MultiTable:
 
         return training_data
 
-    def synthesize_tables(self, record_size_ratio=1):
+    def fit(self):
+        # TODO: Trainer synthetic code goes here
+        # For now, just repeating source data
+        self.models = self._prepare_training_data(self.db.config)
+        for table, table_df in self.models.items():
+            print(f"Fitting model: {table}")
 
+    def sample(self, record_size_ratio=1):
         # Compute the number of records needed for each table
         self.db.config["synth_record_size_ratio"] = record_size_ratio
         self.synth_record_counts = {}
@@ -89,15 +84,8 @@ class MultiTable:
             synth_size = train_size * self.db.config["synth_record_size_ratio"]
             self.synth_record_counts[table] = synth_size
 
-        # Prepare training data
-        training_data = self._prepare_training_data(self.db.config)
-
-        for table, table_df in training_data.items():
-            print(f"Synthesizing table {table}")
-
-            # TODO: Trainer synthetic code goes here
-            # For now, just repeating source data
-            data = pd.concat([table_df] * record_size_ratio)
+            print(f"Sampling {synth_size} rows from {table}")
+            data = pd.concat([self.models[table]] * record_size_ratio)
             synthetic_tables[table] = data
 
         synthetic_tables = self._synthesize_keys(synthetic_tables, self.db.config)
@@ -125,10 +113,6 @@ class MultiTable:
             synth_primary_keys[table_name] = new_key
             df[field_name] = new_key
             synthetic_tables[table_name] = df
-            print(
-                f"Synthetic table {table_name} is"
-                f" {len(synthetic_tables[table_name])} rows long"
-            )
 
         # Synthesize foreign keys
         for relationship in rdb_config["relationships"]:
@@ -162,7 +146,7 @@ class MultiTable:
         for table_name, foreign_keys in synth_foreign_keys.items():
             df = synthetic_tables[table_name]
             for key_name, synthetic_keys in foreign_keys.items():
-                df[key_name] = synthetic_keys[0: len(df)]
+                df[key_name] = synthetic_keys[0 : len(df)]
             synthetic_tables[table_name] = df
 
         return synthetic_tables
