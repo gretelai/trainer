@@ -30,7 +30,7 @@ class MultiTable:
         if not os.path.exists(WORKING_DIR):
             os.makedirs(WORKING_DIR)
 
-    def _prepare_training_data(self, rdb_config: dict):
+    def _prepare_training_data(self, rdb_config: dict) -> dict:
         # Remove all primary and foreign key fields from the training data
         # Start by gathering the columns for each table
         table_fields = {}
@@ -66,13 +66,22 @@ class MultiTable:
         return training_data
 
     def fit(self):
+        """Train synthetic data models on each table in the relational dataset"""
         # TODO: Trainer synthetic code goes here
         # For now, just repeating source data
         self.models = self._prepare_training_data(self.db.config)
         for table, table_df in self.models.items():
             print(f"Fitting model: {table}")
 
-    def sample(self, record_size_ratio=1):
+    def sample(self, record_size_ratio=1) -> dict:
+        """Sample synthetic data from trained models
+
+        Args:
+            record_size_ratio (int, optional): Ratio to upsample real world data size with. Defaults to 1.
+
+        Returns:
+            dict(pd.DataFrame): Return a dictionary of table names and synthetic data.
+        """
         # Compute the number of records needed for each table
         self.db.config["synth_record_size_ratio"] = record_size_ratio
         self.synth_record_counts = {}
@@ -96,7 +105,7 @@ class MultiTable:
         self,
         synthetic_tables: dict,
         rdb_config: dict,
-    ):
+    ) -> dict:
         # Recompute the number of records needed for each table
         synth_primary_keys = {}
         synth_foreign_keys = {}
