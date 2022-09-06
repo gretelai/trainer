@@ -1,4 +1,4 @@
-from gretel_trainer import trainer
+from gretel_trainer import Trainer
 from gretel_trainer.models import GretelLSTM, GretelACTGAN
 
 
@@ -15,7 +15,7 @@ model_type = GretelACTGAN(
 # Optionally update model parameters from a base config
 model_type.update_params({"epochs": 500})
 
-model = trainer.Trainer(model_type=model_type)
+model = Trainer(model_type=model_type)
 model.train(dataset)
 print(model.generate())
 
