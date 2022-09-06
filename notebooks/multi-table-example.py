@@ -1,7 +1,6 @@
-from gretel_trainer.multi_table import MultiTable
+from gretel_trainer.relational import MultiTable
 
 #!wget https://gretel-blueprints-pub.s3.amazonaws.com/rdb/ecom_xf.db
-
 mt = MultiTable("sqlite:///ecom_xf.db")
 synthetic_tables = mt.synthesize_tables(record_size_ratio=2)
 
