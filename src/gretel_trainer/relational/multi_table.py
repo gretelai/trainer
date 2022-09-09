@@ -9,7 +9,7 @@ from gretel_trainer.relational.connectors import SQLite
 
 
 WORKING_DIR = "working"
-MAX_ROWS = 1000 # FIXME FOR TEST/DEV ONLY
+MAX_ROWS = 1000  # FIXME FOR TEST/DEV ONLY
 
 
 class MultiTable:
@@ -76,7 +76,6 @@ class MultiTable:
 
         training_data = self._prepare_training_data(self.db.config)
         for table, training_csv in training_data.items():
-            print(table, training_csv)
             model_cache = Path.cwd() / WORKING_DIR / f"{table}-runner.json"
             model_name = str(model_cache)
             self.models[table] = model_name
@@ -85,14 +84,12 @@ class MultiTable:
             model_type = GretelCTGAN(
                 config="synthetics/high-dimensionality",
             )
-            print(table)
             trainer = Trainer(
                 model_type=model_type,
                 project_name=f"{self.project_prefix}-{table.replace('_', '-')}",
                 cache_file=model_cache,
                 overwrite=False,
             )
-            print(f"Training csv: {training_csv}")
             trainer.train(training_csv)
 
     def sample(self, record_size_ratio=1) -> dict:
@@ -116,8 +113,11 @@ class MultiTable:
             self.synth_record_counts[table] = synth_size
 
             print(f"Sampling {synth_size} rows from {table}")
-            model = Trainer.load(cache_file=self.models[table])
-            data = model.sample(num_rows=self.synth_record_counts[table])
+            model = Trainer.load(
+                cache_file=self.models[table],
+                project_name=f"{self.project_prefix}-{table.replace('_', '-')}",
+            )
+            data = model.generate(num_records=self.synth_record_counts[table])
             synthetic_tables[table] = data
 
         synthetic_tables = self._synthesize_keys(synthetic_tables, self.db.config)
