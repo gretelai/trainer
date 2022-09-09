@@ -1,11 +1,15 @@
 import os
 import pandas as pd
+from pathlib import Path
 import random
 
+from gretel_trainer import Trainer
+from gretel_trainer.models import GretelCTGAN
 from gretel_trainer.relational.connectors import SQLite
 
 
 WORKING_DIR = "working"
+MAX_ROWS = 1000 # FIXME FOR TEST/DEV ONLY
 
 
 class MultiTable:
@@ -20,12 +24,14 @@ class MultiTable:
     def __init__(
         self,
         db_path: str,
-        project_name: str = "multi-table",
+        project_prefix: str = "relational",
     ):
         print("Initializing connection to database")
+        self.project_prefix = project_prefix
         self.db = SQLite(db_path=db_path, working_dir=WORKING_DIR)
         self.db.crawl_db()
         self.synthetic_tables = {}
+        self.models = {}
 
         if not os.path.exists(WORKING_DIR):
             os.makedirs(WORKING_DIR)
@@ -58,20 +64,36 @@ class MultiTable:
         # Remove the key fields from the training data
         training_data = {}
         for table in rdb_config["table_data"]:
-            table_train = rdb_config["table_data"][table].filter(
-                table_fields_use[table]
-            )
-            training_data[table] = table_train
+            train_df = rdb_config["table_data"][table].filter(table_fields_use[table])
+            training_path = Path.cwd() / WORKING_DIR / f"{table}-train.csv"
+            train_df.head(MAX_ROWS).to_csv(training_path, index=False)
+            training_data[table] = training_path
 
         return training_data
 
-    def fit(self):
+    def fit(self, overwrite=False):
         """Train synthetic data models on each table in the relational dataset"""
-        # TODO: Trainer synthetic code goes here
-        # For now, just repeating source data
-        self.models = self._prepare_training_data(self.db.config)
-        for table, table_df in self.models.items():
+
+        training_data = self._prepare_training_data(self.db.config)
+        for table, training_csv in training_data.items():
+            print(table, training_csv)
+            model_cache = Path.cwd() / WORKING_DIR / f"{table}-runner.json"
+            model_name = str(model_cache)
+            self.models[table] = model_name
+
             print(f"Fitting model: {table}")
+            model_type = GretelCTGAN(
+                config="synthetics/high-dimensionality",
+            )
+            print(table)
+            trainer = Trainer(
+                model_type=model_type,
+                project_name=f"{self.project_prefix}-{table.replace('_', '-')}",
+                cache_file=model_cache,
+                overwrite=False,
+            )
+            print(f"Training csv: {training_csv}")
+            trainer.train(training_csv)
 
     def sample(self, record_size_ratio=1) -> dict:
         """Sample synthetic data from trained models
@@ -94,7 +116,8 @@ class MultiTable:
             self.synth_record_counts[table] = synth_size
 
             print(f"Sampling {synth_size} rows from {table}")
-            data = pd.concat([self.models[table]] * record_size_ratio)
+            model = Trainer.load(cache_file=self.models[table])
+            data = model.sample(num_rows=self.synth_record_counts[table])
             synthetic_tables[table] = data
 
         synthetic_tables = self._synthesize_keys(synthetic_tables, self.db.config)
