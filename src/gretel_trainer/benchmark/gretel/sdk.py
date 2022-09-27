@@ -1,0 +1,119 @@
+from dataclasses import dataclass
+from typing import Callable, Dict, Protocol
+
+import pandas as pd
+
+from gretel_trainer.benchmark.core import DataSource, Datatype, Evaluator
+from gretel_trainer.benchmark.gretel.models import GretelModel, GretelModelConfig
+
+import gretel_client.helpers
+
+from gretel_client.projects.projects import create_or_get_unique_project
+
+
+class GretelSDKJob(Protocol):
+    def submit_cloud(self) -> None:
+        ...
+
+
+class GretelSDKRecordHandler(GretelSDKJob, Protocol):
+    def get_artifact_link(self, artifact_key: str) -> str:
+        ...
+
+
+class GretelSDKModel(GretelSDKJob, Protocol):
+    def create_record_handler_obj(self, params: Dict) -> GretelSDKRecordHandler:
+        ...
+
+    def peek_report(self) -> Dict:
+        ...
+
+
+class GretelSDKProject(Protocol):
+    def create_model_obj(
+        self, model_config: GretelModelConfig, data_source: str
+    ) -> GretelSDKModel:
+        ...
+
+    def delete(self) -> None:
+        ...
+
+
+Poll = Callable[[GretelSDKJob], None]
+
+
+@dataclass
+class GretelSDK:
+    create_project: Callable[..., GretelSDKProject]
+    delete_project: Callable[[str], None]
+    poll: Poll
+
+
+def _create_project(name: str) -> GretelSDKProject:
+    return create_or_get_unique_project(name=name)
+
+
+def _delete_project(name: str) -> None:
+    project = create_or_get_unique_project(name=name)
+    project.delete()
+
+
+ActualGretelSDK = GretelSDK(
+    create_project=_create_project,
+    delete_project=_delete_project,
+    poll=gretel_client.helpers.poll,
+)
+
+
+class GretelSDKExecutor:
+    def __init__(
+        self,
+        project_name: str,
+        model: GretelModel,
+        model_key: str,
+        sdk: GretelSDK,
+        evaluator: Evaluator,
+    ):
+        self.project_name = project_name
+        self.model = model
+        self.model_key = model_key
+        self.sdk = sdk
+        self.evaluator = evaluator
+
+    @property
+    def model_name(self) -> str:
+        return self.model.name
+
+    def runnable(self, source: DataSource) -> bool:
+        if self.model_key == "gpt_x":
+            if source.column_count > 1 or source.datatype != Datatype.NATURAL_LANGUAGE:
+                return False
+
+        return True
+
+    def train(self, source: str, **kwargs) -> None:
+        self.project = self.sdk.create_project(self.project_name)
+        self.model_obj = self.project.create_model_obj(
+            model_config=self.model.config, data_source=source
+        )
+        self.model_obj.submit_cloud()
+        self.sdk.poll(self.model_obj)
+
+    def generate(self, **kwargs) -> pd.DataFrame:
+        record_handler = self.model_obj.create_record_handler_obj(
+            params={"num_records": kwargs["training_row_count"]}
+        )
+        record_handler.submit_cloud()
+        self.sdk.poll(record_handler)
+        return pd.read_csv(record_handler.get_artifact_link("data"), compression="gzip")
+
+    def get_sqs_score(self, synthetic: pd.DataFrame, reference: str) -> int:
+        report = self.model_obj.peek_report()
+        if report is None:
+            return self.evaluator.get_sqs_score(
+                synthetic=synthetic, reference=reference
+            )
+        return report["synthetic_data_quality_score"]["score"]
+
+    def cleanup(self) -> None:
+        self.project.delete()
