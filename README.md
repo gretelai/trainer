@@ -15,7 +15,7 @@ This module is designed to provide a simple interface to help users successfully
     * `Gretel-CTGAN` model type supports tabular and conditional data generation.
     * `Gretel-GPT` natural language synthesis based on an open-source implementation of GPT-3 (coming soon).
     * `Gretel-DGAN` multi-variate time series based on DoppelGANger (coming soon).
-    
+
 ## Try it out now!
 
 If you want to quickly get started synthesizing data with **Gretel.ai**, simply click the button below and follow the examples. See additional Python3 and Jupyter Notebook examples in the `./notebooks` folder.
@@ -57,10 +57,15 @@ model = trainer.Trainer()
 model.train(dataset)
 ```
 
-### 3. Generate synthetic data! 
+### 3. Generate synthetic data!
 ```python3
 df = model.generate()
 ```
+
+## Development
+
+- Run tests via `make test`
+- Run type-checking (limited coverage) via `make type`
 
 ## TODOs / Roadmap
 
