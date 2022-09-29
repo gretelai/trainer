@@ -33,24 +33,7 @@ class GretelAuto(GretelModel):
 
 
 class GretelGPTX(GretelModel):
-    # TODO: change to blueprint when available
-    config = {
-        "schema_version": "1.0",
-        "name": "benchmark-GretelGPTX",
-        "models": [
-            {
-                "gpt_x": {
-                    "pretrained_model": "EleutherAI/gpt-neo-125M",
-                    "batch_size": 4,
-                    "epochs": 3,
-                    "weight_decay": 0.1,
-                    "warmup_steps": 100,
-                    "lr_scheduler": "cosine",
-                    "learning_rate": 5e-6,
-                },
-            }
-        ],
-    }
+    config = _config("synthetics/natural-language", "GretelGPTX")
 
 
 class GretelAmplify(GretelModel):
