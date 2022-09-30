@@ -44,10 +44,10 @@ TEST_GRETEL_DATASET_REPO = GretelPublicDatasetRepo(
 )
 
 TEST_RUNTIME_CONFIG = RuntimeConfig(
-    cleanup_wait_secs=0.1,
     local_dir=TEST_BENCHMARK_DIR,
     project_prefix=lambda: "proj",
     thread_pool=ThreadPoolExecutor(4),
+    wait_secs=0.1,
 )
 
 

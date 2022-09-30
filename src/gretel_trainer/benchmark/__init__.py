@@ -68,10 +68,10 @@ def compare(
         datasets=datasets,
         models=models,
         runtime_config=c.RuntimeConfig(
-            cleanup_wait_secs=10,
             local_dir=BENCHMARK_DIR,
             project_prefix=_timestamp,
-            thread_pool=ThreadPoolExecutor(4),
+            thread_pool=ThreadPoolExecutor(5),
+            wait_secs=10,
         ),
         gretel_sdk=ActualGretelSDK,
         evaluator=GretelEvaluate(),

@@ -36,10 +36,10 @@ GretelExecutor = Union[GretelSDKExecutor, GretelTrainerExecutor]
 
 @dataclass
 class RuntimeConfig:
-    cleanup_wait_secs: float
     local_dir: str
     project_prefix: Callable[[], str]
     thread_pool: futures.Executor
+    wait_secs: float
 
 
 class Comparison:
@@ -68,15 +68,6 @@ class Comparison:
 
     @property
     def results(self) -> pd.DataFrame:
-        while True:
-            try:
-                result = self.results_queue.get_nowait()
-                for run in self.all_runs:
-                    if run.identifier == result["identifier"]:
-                        run.status = result["status"]
-            except queue.Empty:
-                break
-
         result_dicts = [_result_dict(run) for run in self.all_runs]
         return pd.DataFrame.from_records(result_dicts)
 
@@ -84,16 +75,17 @@ class Comparison:
         self.results.to_csv(destination, index=False)
 
     def execute(self):
-        parallel_runs_futures = [
-            self.runtime_config.thread_pool.submit(execute, run, self.results_queue)
-            for run in self.gretel_model_runs
-        ]
-        self.futures.extend(parallel_runs_futures)
+        self.futures.append(
+            self.runtime_config.thread_pool.submit(self._process_results_and_cleanup)
+        )
 
-        _run_sequentially(self.custom_model_runs, self.results_queue)
+        for run in self.gretel_model_runs:
+            self.futures.append(
+                self.runtime_config.thread_pool.submit(execute, run, self.results_queue)
+            )
 
-        cleanup_future = self.runtime_config.thread_pool.submit(self._cleanup)
-        self.futures.append(cleanup_future)
+        for run in self.custom_model_runs:
+            execute(run, self.results_queue)
 
         return self
 
@@ -101,18 +93,19 @@ class Comparison:
         [future.result() for future in self.futures]
         return self
 
-    def _cleanup(self):
+    def _process_results_and_cleanup(self):
         while not self.is_complete:
-            time.sleep(self.runtime_config.cleanup_wait_secs)
-            self.results
-
+            time.sleep(self.runtime_config.wait_secs)
+            while True:
+                try:
+                    result = self.results_queue.get_nowait()
+                    for run in self.all_runs:
+                        if run.identifier == result["identifier"]:
+                            run.status = result["status"]
+                except queue.Empty:
+                    break
         with suppress(FileNotFoundError):
             shutil.rmtree(self.runtime_config.local_dir)
-
-
-def _run_sequentially(runs, queue):
-    for run in runs:
-        execute(run, queue)
 
 
 def _result_dict(run: Run) -> Dict:
