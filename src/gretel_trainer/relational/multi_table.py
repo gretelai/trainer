@@ -48,10 +48,9 @@ class MultiTable:
         # Now, loop through the primary/foreign key relations and gather those columns
         primary_keys_processed = []
         for key_set in rdb_config["relationships"]:
-            first = True
             for table_field_pair in key_set:
                 table, field = table_field_pair
-                if first:
+                if field==rdb_config["primary_keys"][table]:
                     primary_keys_processed.append(table)
                 table_fields_use[table].remove(field)
 
@@ -148,13 +147,11 @@ class MultiTable:
 
         # Synthesize foreign keys
         for relationship in rdb_config["relationships"]:
-            # The first table/field pair is the primary key
-            first = True
             for table_field_pair in relationship:
                 rel_table, rel_field = table_field_pair
-                if first:
+                # Check if the table/field pair is the primary key
+                if rel_field==rdb_config["primary_keys"][rel_table]:
                     primary_key_values = synth_primary_keys[rel_table]
-                    first = False
                 else:
                     # Find the average number of records with the same foreign key value
                     synth_size = synth_record_counts[rel_table]
