@@ -3,6 +3,7 @@ import time
 from contextlib import suppress
 from dataclasses import dataclass, field
 from enum import Enum
+from multiprocessing.managers import DictProxy
 from typing import (
     Callable,
     ContextManager,
@@ -149,7 +150,6 @@ class Run(Generic[T]):
     identifier: str
     source: DataSource
     executor: T
-    status: RunStatus
 
 
 class BenchmarkException(Exception):
@@ -180,41 +180,31 @@ def _cleanup(executor: Executor) -> None:
         executor.cleanup()
 
 
-class ResultQueue(Protocol):
-    def put(self, obj):
-        ...
+def execute(run: Run[Executor], results_dict: DictProxy) -> None:
+    def _set_status(status: RunStatus) -> None:
+        results_dict[run.identifier] = status
 
-
-def execute(run: Run[Executor], queue: ResultQueue) -> None:
     if not run.executor.runnable(run.source):
-        queue.put({"identifier": run.identifier, "status": Skipped()})
+        _set_status(Skipped())
         return None
 
     with run.source.unwrap() as path:
-        queue.put({"identifier": run.identifier, "status": InProgress(stage=TRAIN)})
+        _set_status(InProgress(stage=TRAIN))
 
         train_time = Timer()
         try:
             with train_time:
                 run.executor.train(path, delimiter=run.source.delimiter)
         except Exception as e:
-            queue.put(
-                {
-                    "identifier": run.identifier,
-                    "status": Failed(
-                        during=TRAIN, train_secs=train_time.duration(), error=e
-                    ),
-                }
-            )
+            _set_status(Failed(
+                during=TRAIN,
+                error=e,
+                train_secs=train_time.duration()
+            ))
             _cleanup(run.executor)
             return None
 
-        queue.put(
-            {
-                "identifier": run.identifier,
-                "status": InProgress(stage=GENERATE, train_secs=train_time.duration()),
-            }
-        )
+        _set_status(InProgress(stage=GENERATE, train_secs=train_time.duration()))
 
         generate_time = Timer()
         try:
@@ -223,58 +213,34 @@ def execute(run: Run[Executor], queue: ResultQueue) -> None:
                     training_row_count=run.source.row_count
                 )
         except Exception as e:
-            queue.put(
-                {
-                    "identifier": run.identifier,
-                    "status": Failed(
-                        during=GENERATE,
-                        error=e,
-                        train_secs=train_time.duration(),
-                        generate_secs=generate_time.duration(),
-                    ),
-                }
-            )
+            _set_status(Failed(
+                during=GENERATE,
+                error=e,
+                train_secs=train_time.duration(),
+                generate_secs=generate_time.duration()
+            ))
             _cleanup(run.executor)
             return None
 
-        queue.put(
-            {
-                "identifier": run.identifier,
-                "status": InProgress(
-                    stage=EVALUATE,
-                    train_secs=train_time.duration(),
-                    generate_secs=generate_time.duration(),
-                ),
-            }
-        )
+        _set_status(InProgress(stage=EVALUATE, train_secs=train_time.duration(), generate_secs=generate_time.duration()))
 
         try:
             sqs_score = run.executor.get_sqs_score(synthetic_dataframe, path)
         except Exception as e:
-            queue.put(
-                {
-                    "identifier": run.identifier,
-                    "status": Failed(
-                        during=EVALUATE,
-                        error=e,
-                        train_secs=train_time.duration(),
-                        generate_secs=generate_time.duration(),
-                        synthetic_data=synthetic_dataframe,
-                    ),
-                }
-            )
+            _set_status(Failed(
+                during=EVALUATE,
+                error=e,
+                train_secs=train_time.duration(),
+                generate_secs=generate_time.duration(),
+                synthetic_data=synthetic_dataframe
+            ))
             _cleanup(run.executor)
             return None
 
-    queue.put(
-        {
-            "identifier": run.identifier,
-            "status": Completed(
-                sqs=sqs_score,
-                train_secs=train_time.duration(),
-                generate_secs=generate_time.duration(),
-                synthetic_data=synthetic_dataframe,
-            ),
-        }
-    )
+    _set_status(Completed(
+        sqs=sqs_score,
+        train_secs=train_time.duration(),
+        generate_secs=generate_time.duration(),
+        synthetic_data=synthetic_dataframe
+    ))
     _cleanup(run.executor)

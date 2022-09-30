@@ -81,17 +81,25 @@ class FailingEvaluator:
 class MockGretelTrainer:
     def __init__(self, **kwargs):
         self.kwargs = kwargs
+        self.called_with = {}
         self.fail = kwargs.get("fail", None)
 
+    def _factory_args(self, **kwargs):
+        self.called_with["_factory_args"] = kwargs
+        return self
+
     def train(self, source: str, delimiter: Optional[str]) -> None:
+        self.called_with["train"] = (source, delimiter)
         self._maybe_fail("train")
         return self.kwargs.get("train", None)
 
     def generate(self, num_records: int) -> pd.DataFrame:
+        self.called_with["generate"] = (num_records,)
         self._maybe_fail("generate")
         return self.kwargs.get("generate", None)
 
     def get_sqs_score(self) -> int:
+        self.called_with["get_sqs_score"] = ()
         self._maybe_fail("get_sqs_score")
         return self.kwargs.get("get_sqs_score", None)
 

@@ -1,11 +1,11 @@
 import concurrent.futures as futures
 import multiprocessing as mp
-import queue
 import shutil
 import time
 
 from contextlib import suppress
 from dataclasses import dataclass
+from multiprocessing.managers import DictProxy
 from typing import Callable, Dict, List, Type, Union
 
 import pandas as pd
@@ -52,8 +52,11 @@ class Comparison:
         self.gretel_model_runs = gretel_model_runs
         self.custom_model_runs = custom_model_runs
         self.runtime_config = runtime_config
+        self._manager = mp.Manager()
+        self.results_dict = self._manager.dict()
+        for run in self.all_runs:
+            self.results_dict[run.identifier] = NotStarted()
         self.futures = []
-        self.results_queue = mp.Queue()
 
     @property
     def all_runs(self):
@@ -62,30 +65,30 @@ class Comparison:
     @property
     def is_complete(self):
         return all(
-            isinstance(run.status, (Completed, Failed, Skipped))
-            for run in self.all_runs
+            isinstance(status, (Completed, Failed, Skipped))
+            for status in self.results_dict.values()
         )
 
     @property
     def results(self) -> pd.DataFrame:
-        result_dicts = [_result_dict(run) for run in self.all_runs]
+        result_dicts = [_result_dict(run, self.results_dict) for run in self.all_runs]
         return pd.DataFrame.from_records(result_dicts)
 
     def export_results(self, destination: str):
         self.results.to_csv(destination, index=False)
 
     def execute(self):
-        self.futures.append(
-            self.runtime_config.thread_pool.submit(self._process_results_and_cleanup)
-        )
-
         for run in self.gretel_model_runs:
             self.futures.append(
-                self.runtime_config.thread_pool.submit(execute, run, self.results_queue)
+                self.runtime_config.thread_pool.submit(execute, run, self.results_dict)
             )
 
         for run in self.custom_model_runs:
-            execute(run, self.results_queue)
+            execute(run, self.results_dict)
+
+        self.futures.append(
+            self.runtime_config.thread_pool.submit(self._cleanup)
+        )
 
         return self
 
@@ -93,33 +96,27 @@ class Comparison:
         [future.result() for future in self.futures]
         return self
 
-    def _process_results_and_cleanup(self):
+    def _cleanup(self):
         while not self.is_complete:
             time.sleep(self.runtime_config.wait_secs)
-            while True:
-                try:
-                    result = self.results_queue.get_nowait()
-                    for run in self.all_runs:
-                        if run.identifier == result["identifier"]:
-                            run.status = result["status"]
-                except queue.Empty:
-                    break
         with suppress(FileNotFoundError):
             shutil.rmtree(self.runtime_config.local_dir)
 
 
-def _result_dict(run: Run) -> Dict:
+def _result_dict(run: Run, results_dict: DictProxy) -> Dict:
+    status = results_dict[run.identifier]
+
     sqs = None
-    if isinstance(run.status, Completed):
-        sqs = run.status.sqs
+    if isinstance(status, Completed):
+        sqs = status.sqs
 
     train_time = None
-    if isinstance(run.status, (Completed, Failed, InProgress)):
-        train_time = run.status.train_secs
+    if isinstance(status, (Completed, Failed, InProgress)):
+        train_time = status.train_secs
 
     generate_time = None
-    if isinstance(run.status, (Completed, Failed, InProgress)):
-        generate_time = run.status.generate_secs
+    if isinstance(status, (Completed, Failed, InProgress)):
+        generate_time = status.generate_secs
 
     total_time = train_time
     if train_time is not None and generate_time is not None:
@@ -131,7 +128,7 @@ def _result_dict(run: Run) -> Dict:
         "DataType": run.source.datatype,
         "Rows": run.source.row_count,
         "Columns": run.source.column_count,
-        "Status": run.status.display,
+        "Status": status.display,
         "SQS": sqs,
         "Train time": train_time,
         "Generate time": generate_time,
@@ -175,7 +172,6 @@ def compare(
                             identifier=f"gretel-{gretel_run_id}",
                             source=source,
                             executor=executor,
-                            status=NotStarted(),
                         )
                     )
                 else:
@@ -185,7 +181,6 @@ def compare(
                             identifier=f"custom-{custom_run_id}",
                             source=source,
                             executor=CustomExecutor(model=model, evaluator=evaluator),
-                            status=NotStarted(),
                         )
                     )
 

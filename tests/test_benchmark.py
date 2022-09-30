@@ -5,10 +5,12 @@ import uuid
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import suppress
 from typing import Union
-from unittest.mock import ANY, Mock, patch
+from unittest.mock import Mock, patch
 
 import pandas as pd
 import pytest
+
+from gretel_trainer import models as tm
 
 from gretel_trainer.benchmark import (
     Datatype,
@@ -33,6 +35,7 @@ from tests.mocks import (
     LocalFileConfigGretelModel,
     mock_gretel_trainer_factory,
     MockEvaluator,
+    MockGretelTrainer,
 )
 
 TEST_BENCHMARK_DIR = "./.benchmark_test"
@@ -160,44 +163,40 @@ def test_failures_during_cleanup_are_ignored(csv):
 
 
 @pytest.mark.parametrize(
-    "model",
+    "model,expected_model_type",
     [
-        GretelAuto,
-        GretelCTGAN,
-        GretelLSTM,
-        DictConfigGretelModel,
-        LocalFileConfigGretelModel,
+        (GretelAuto, None),
+        (GretelCTGAN, tm.GretelCTGAN),
+        (GretelLSTM, tm.GretelLSTM),
+        (DictConfigGretelModel, tm.GretelLSTM),
+        (LocalFileConfigGretelModel, tm.GretelLSTM),
     ],
 )
-def test_auto_lstm_ctgan_models_use_trainer_executor(model, csv):
-    class PickleMock(Mock):
-        def __reduce__(self):
-            return (Mock, ())
-
-    mock_gretel_trainer = PickleMock()
-    mock_factory = PickleMock(return_value=mock_gretel_trainer)
+def test_auto_lstm_ctgan_models_use_trainer_executor(model, expected_model_type, csv):
+    mock_gretel_trainer = MockGretelTrainer()
 
     csv_dataset = _make_dataset([csv])
 
     compare(
         datasets=[csv_dataset],
-        models=[
-            model,
-        ],
+        models=[model],
         runtime_config=TEST_RUNTIME_CONFIG,
         gretel_sdk=_make_gretel_sdk(),
         evaluator=MockEvaluator(42),
-        gretel_trainer_factory=mock_factory,
+        gretel_trainer_factory=lambda **kw: mock_gretel_trainer._factory_args(**kw),
     ).wait()
 
-    mock_factory.assert_called_with(
-        project_name="benchmark-proj-0",
-        model_type=ANY,
-        cache_file=f"{TEST_BENCHMARK_DIR}/benchmark-proj-0-runner.json",
-    )
-    mock_gretel_trainer.train.assert_called_with(csv, delimiter=",")
-    mock_gretel_trainer.generate.assert_called_with(num_records=3)
-    mock_gretel_trainer.get_sqs_score.assert_called_once()
+    assert mock_gretel_trainer.called_with["train"] == (csv, ",")
+    assert mock_gretel_trainer.called_with["generate"] == (3,)
+    assert mock_gretel_trainer.called_with["get_sqs_score"] == ()
+
+    factory_args = mock_gretel_trainer.called_with["_factory_args"]
+    assert factory_args["project_name"] == "benchmark-proj-0"
+    assert factory_args["cache_file"] == f"{TEST_BENCHMARK_DIR}/benchmark-proj-0-runner.json"
+    if expected_model_type is None:
+        assert factory_args["model_type"] is None
+    else:
+        assert isinstance(factory_args["model_type"], expected_model_type)
 
 
 def test_gptx_uses_sdk_executor(csv):
