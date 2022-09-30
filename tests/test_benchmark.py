@@ -413,3 +413,18 @@ def test_runs_with_gptx_are_skipped_when_too_many_columns_or_wrong_datatype():
     ).wait()
 
     assert comparison.results["Status"].values.tolist() == ["Skipped", "Skipped"]
+
+
+def test_runs_with_lstm_are_skipped_when_over_150_columns():
+    too_many_columns = _make_dataset([pd.DataFrame(index=range(151), columns=range(151))])
+
+    comparison = compare(
+        datasets=[too_many_columns],
+        models=[GretelLSTM],
+        runtime_config=TEST_RUNTIME_CONFIG,
+        gretel_sdk=_make_gretel_sdk(),
+        evaluator=Mock(),
+        gretel_trainer_factory=Mock(),
+    ).wait()
+
+    assert comparison.results["Status"].values.tolist() == ["Skipped"]

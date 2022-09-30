@@ -49,12 +49,14 @@ class GretelTrainerExecutor:
         self,
         project_name: str,
         model: GretelModel,
+        model_key: Optional[str],
         trainer_factory: Callable[..., Trainer],
         delete_project: Callable[[str], None],
         benchmark_dir: str,
     ):
         self.project_name = project_name
         self.model = model
+        self.model_key = model_key
         self.trainer_factory = trainer_factory
         self.delete_project = delete_project
         self.benchmark_dir = benchmark_dir
@@ -65,6 +67,10 @@ class GretelTrainerExecutor:
         return self.model.name
 
     def runnable(self, source: DataSource) -> bool:
+        if self.model_key is not None and self.model_key in ("lstm", "synthetics"):
+            if source.column_count > 150:
+                return False
+
         return True
 
     def train(self, source: str, **kwargs) -> None:

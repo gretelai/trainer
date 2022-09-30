@@ -202,6 +202,7 @@ def _create_gretel_executor(
     if model.config == "AUTO":
         return GretelTrainerExecutor(
             model=model,
+            model_key=None,
             project_name=project_name,
             trainer_factory=gretel_trainer_factory,
             delete_project=gretel_sdk.delete_project,
@@ -217,6 +218,7 @@ def _create_gretel_executor(
     if model_key in ("ctgan", "lstm", "synthetics"):
         return GretelTrainerExecutor(
             model=model,
+            model_key=model_key,
             project_name=project_name,
             trainer_factory=gretel_trainer_factory,
             delete_project=gretel_sdk.delete_project,
