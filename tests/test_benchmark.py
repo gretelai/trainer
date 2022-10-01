@@ -311,7 +311,7 @@ def test_gretel_model_with_bad_custom_config_fails_before_execution_starts(csv):
 def test_list_gretel_datasets_and_tags():
     tags = TEST_GRETEL_DATASET_REPO.list_tags()
     assert len(tags) > 0
-    for expected_tag in ["small", "large", "e-commerce", "health"]:
+    for expected_tag in ["small", "large", "e-commerce", "healthcare"]:
         assert expected_tag in tags
 
     assert (
