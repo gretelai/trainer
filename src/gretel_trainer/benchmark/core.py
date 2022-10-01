@@ -175,14 +175,13 @@ GENERATE = "generate"
 EVALUATE = "evaluate"
 
 
-def _cleanup(executor: Executor) -> None:
-    with suppress(Exception):
-        executor.cleanup()
-
-
 def execute(run: Run[Executor], results_dict: DictProxy) -> None:
     def _set_status(status: RunStatus) -> None:
         results_dict[run.identifier] = status
+
+    def _cleanup() -> None:
+        with suppress(Exception):
+            run.executor.cleanup()
 
     if not run.executor.runnable(run.source):
         _set_status(Skipped())
@@ -201,7 +200,7 @@ def execute(run: Run[Executor], results_dict: DictProxy) -> None:
                 error=e,
                 train_secs=train_time.duration()
             ))
-            _cleanup(run.executor)
+            _cleanup()
             return None
 
         _set_status(InProgress(stage=GENERATE, train_secs=train_time.duration()))
@@ -219,7 +218,7 @@ def execute(run: Run[Executor], results_dict: DictProxy) -> None:
                 train_secs=train_time.duration(),
                 generate_secs=generate_time.duration()
             ))
-            _cleanup(run.executor)
+            _cleanup()
             return None
 
         _set_status(InProgress(stage=EVALUATE, train_secs=train_time.duration(), generate_secs=generate_time.duration()))
@@ -234,7 +233,7 @@ def execute(run: Run[Executor], results_dict: DictProxy) -> None:
                 generate_secs=generate_time.duration(),
                 synthetic_data=synthetic_dataframe
             ))
-            _cleanup(run.executor)
+            _cleanup()
             return None
 
     _set_status(Completed(
@@ -243,4 +242,4 @@ def execute(run: Run[Executor], results_dict: DictProxy) -> None:
         generate_secs=generate_time.duration(),
         synthetic_data=synthetic_dataframe
     ))
-    _cleanup(run.executor)
+    _cleanup()
