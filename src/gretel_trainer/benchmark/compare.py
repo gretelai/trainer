@@ -54,25 +54,22 @@ class Comparison:
         self.runtime_config = runtime_config
         self._manager = mp.Manager()
         self.results_dict = self._manager.dict()
-        for run in self.all_runs:
+        for run in self._all_runs:
             self.results_dict[run.identifier] = NotStarted()
         self.futures = []
 
     @property
-    def all_runs(self):
+    def _all_runs(self) -> List[Run]:
         return self.gretel_model_runs + self.custom_model_runs
 
     @property
-    def is_complete(self):
-        return all(
-            isinstance(status, (Completed, Failed, Skipped))
-            for status in self.results_dict.values()
-        )
+    def is_complete(self) -> bool:
+        return _is_complete(self.results_dict)
 
     @property
     def results(self) -> pd.DataFrame:
-        result_dicts = [_result_dict(run, self.results_dict) for run in self.all_runs]
-        return pd.DataFrame.from_records(result_dicts)
+        result_records = [_result_dict(run, self.results_dict) for run in self._all_runs]
+        return pd.DataFrame.from_records(result_records)
 
     def export_results(self, destination: str):
         self.results.to_csv(destination, index=False)
@@ -87,7 +84,7 @@ class Comparison:
             execute(run, self.results_dict)
 
         self.futures.append(
-            self.runtime_config.thread_pool.submit(self._cleanup)
+            self.runtime_config.thread_pool.submit(_cleanup, self.results_dict, self.runtime_config)
         )
 
         return self
@@ -96,11 +93,19 @@ class Comparison:
         [future.result() for future in self.futures]
         return self
 
-    def _cleanup(self):
-        while not self.is_complete:
-            time.sleep(self.runtime_config.wait_secs)
-        with suppress(FileNotFoundError):
-            shutil.rmtree(self.runtime_config.local_dir)
+
+def _cleanup(results_dict: DictProxy, runtime_config: RuntimeConfig) -> None:
+    while not _is_complete(results_dict):
+        time.sleep(runtime_config.wait_secs)
+    with suppress(FileNotFoundError):
+        shutil.rmtree(runtime_config.local_dir)
+
+
+def _is_complete(results_dict: DictProxy) -> bool:
+    return all(
+        isinstance(status, (Completed, Failed, Skipped))
+        for status in results_dict.values()
+    )
 
 
 def _result_dict(run: Run, results_dict: DictProxy) -> Dict:
