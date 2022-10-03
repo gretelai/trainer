@@ -1,6 +1,3 @@
-import os
-
-from contextlib import suppress
 from pathlib import Path
 from typing import Callable, Optional, Protocol
 
@@ -51,16 +48,13 @@ class GretelTrainerExecutor:
         model: GretelModel,
         model_key: Optional[str],
         trainer_factory: Callable[..., Trainer],
-        delete_project: Callable[[str], None],
         benchmark_dir: str,
     ):
         self.project_name = project_name
         self.model = model
         self.model_key = model_key
         self.trainer_factory = trainer_factory
-        self.delete_project = delete_project
         self.benchmark_dir = benchmark_dir
-        self.trainer_cache_file = f"{benchmark_dir}/{self.project_name}-runner.json"
 
     @property
     def model_name(self) -> str:
@@ -75,10 +69,11 @@ class GretelTrainerExecutor:
 
     def train(self, source: str, **kwargs) -> None:
         Path(self.benchmark_dir).mkdir(exist_ok=True)
+        cache_file = f"{self.benchmark_dir}/{self.project_name}-runner.json"
         self.trainer_model = self.trainer_factory(
             project_name=self.project_name,
             model_type=_get_trainer_model_type(self.model.config),
-            cache_file=self.trainer_cache_file,
+            cache_file=cache_file,
         )
         self.trainer_model.train(source, delimiter=kwargs["delimiter"])
 
@@ -87,8 +82,3 @@ class GretelTrainerExecutor:
 
     def get_sqs_score(self, synthetic: pd.DataFrame, reference: str) -> int:
         return self.trainer_model.get_sqs_score()
-
-    def cleanup(self) -> None:
-        self.delete_project(self.project_name)
-        with suppress(FileNotFoundError):
-            os.remove(self.trainer_cache_file)

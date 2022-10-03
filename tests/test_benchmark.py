@@ -69,10 +69,10 @@ def _make_dataset(
     )
 
 
-def _make_gretel_sdk(create_project=None, delete_project=None, poll=None) -> GretelSDK:
+def _make_gretel_sdk(create_project=None, search_projects=None, poll=None) -> GretelSDK:
     return GretelSDK(
         create_project=create_project or Mock(),
-        delete_project=delete_project or Mock(),
+        search_projects=search_projects or Mock(return_value=[Mock()]),
         poll=poll or Mock(),
     )
 
@@ -143,7 +143,7 @@ def test_failures_during_train_generate_or_custom_evaluate(csv):
 
 
 def test_failures_during_cleanup_are_ignored(csv):
-    def _failing_delete(_):
+    def _failing_search(_):
         raise Exception("failed")
 
     csv_dataset = _make_dataset([csv])
@@ -154,7 +154,7 @@ def test_failures_during_cleanup_are_ignored(csv):
             GretelAuto,
         ],
         runtime_config=TEST_RUNTIME_CONFIG,
-        gretel_sdk=_make_gretel_sdk(delete_project=_failing_delete),
+        gretel_sdk=_make_gretel_sdk(search_projects=_failing_search),
         evaluator=MockEvaluator(42),
         gretel_trainer_factory=mock_gretel_trainer_factory(),
     ).wait()
@@ -354,7 +354,8 @@ def test_run_comparison_with_gretel_dataset():
 
 
 def test_benchmark_cleans_up_after_failures(csv):
-    mock_delete_project = Mock()
+    mock_project = Mock()
+    mock_search_projects = Mock(return_value=[mock_project])
 
     csv_dataset = _make_dataset([csv])
 
@@ -364,14 +365,14 @@ def test_benchmark_cleans_up_after_failures(csv):
             GretelAuto,
         ],
         runtime_config=TEST_RUNTIME_CONFIG,
-        gretel_sdk=_make_gretel_sdk(delete_project=mock_delete_project),
+        gretel_sdk=_make_gretel_sdk(search_projects=mock_search_projects),
         evaluator=MockEvaluator(42),
         gretel_trainer_factory=mock_gretel_trainer_factory(fail="train"),
     ).wait()
 
     assert comparison.results["Status"].values.tolist() == ["Failed (train)"]
 
-    mock_delete_project.assert_called_once_with("benchmark-proj-0")
+    mock_project.delete.assert_called()
 
 
 def test_make_dataset_with_different_datatypes(csv):

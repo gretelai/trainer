@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import Callable, Dict, Protocol
+from typing import Callable, Dict, List, Protocol
 
 import pandas as pd
 
@@ -8,7 +8,7 @@ from gretel_trainer.benchmark.gretel.models import GretelModel, GretelModelConfi
 
 import gretel_client.helpers
 
-from gretel_client.projects.projects import create_or_get_unique_project
+from gretel_client.projects.projects import create_or_get_unique_project, search_projects
 
 
 class GretelSDKJob(Protocol):
@@ -45,7 +45,7 @@ Poll = Callable[[GretelSDKJob], None]
 @dataclass
 class GretelSDK:
     create_project: Callable[..., GretelSDKProject]
-    delete_project: Callable[[str], None]
+    search_projects: Callable[..., List[GretelSDKProject]]
     poll: Poll
 
 
@@ -53,14 +53,13 @@ def _create_project(name: str) -> GretelSDKProject:
     return create_or_get_unique_project(name=name)
 
 
-def _delete_project(name: str) -> None:
-    project = create_or_get_unique_project(name=name)
-    project.delete()
+def _search_projects(query: str) -> List[GretelSDKProject]:
+    return search_projects(query=query)
 
 
 ActualGretelSDK = GretelSDK(
     create_project=_create_project,
-    delete_project=_delete_project,
+    search_projects=_search_projects,
     poll=gretel_client.helpers.poll,
 )
 
@@ -92,8 +91,8 @@ class GretelSDKExecutor:
         return True
 
     def train(self, source: str, **kwargs) -> None:
-        self.project = self.sdk.create_project(self.project_name)
-        self.model_obj = self.project.create_model_obj(
+        project = self.sdk.create_project(self.project_name)
+        self.model_obj = project.create_model_obj(
             model_config=self.model.config, data_source=source
         )
         self.model_obj.submit_cloud()
@@ -114,6 +113,3 @@ class GretelSDKExecutor:
                 synthetic=synthetic, reference=reference
             )
         return report["synthetic_data_quality_score"]["score"]
-
-    def cleanup(self) -> None:
-        self.project.delete()

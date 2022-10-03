@@ -48,10 +48,12 @@ class Comparison:
         gretel_model_runs: List[Run[GretelExecutor]],
         custom_model_runs: List[Run[CustomExecutor]],
         runtime_config: RuntimeConfig,
+        gretel_sdk: GretelSDK,
     ):
         self.gretel_model_runs = gretel_model_runs
         self.custom_model_runs = custom_model_runs
         self.runtime_config = runtime_config
+        self.gretel_sdk = gretel_sdk
         self._manager = mp.Manager()
         self.results_dict = self._manager.dict()
         for run in self._all_runs:
@@ -84,7 +86,9 @@ class Comparison:
             execute(run, self.results_dict)
 
         self.futures.append(
-            self.runtime_config.thread_pool.submit(_cleanup, self.results_dict, self.runtime_config)
+            self.runtime_config.thread_pool.submit(
+                _cleanup, self.results_dict, self.runtime_config, self.gretel_sdk
+            )
         )
 
         return self
@@ -94,10 +98,13 @@ class Comparison:
         return self
 
 
-def _cleanup(results_dict: DictProxy, runtime_config: RuntimeConfig) -> None:
+def _cleanup(results_dict: DictProxy, runtime_config: RuntimeConfig, sdk: GretelSDK) -> None:
     while not _is_complete(results_dict):
         time.sleep(runtime_config.wait_secs)
-    with suppress(FileNotFoundError):
+
+    with suppress(Exception):
+        for project in sdk.search_projects(runtime_config.project_prefix):
+            project.delete()
         shutil.rmtree(runtime_config.local_dir)
 
 
@@ -191,6 +198,7 @@ def compare(
         gretel_model_runs=gretel_model_runs,
         custom_model_runs=custom_model_runs,
         runtime_config=runtime_config,
+        gretel_sdk=gretel_sdk,
     ).execute()
 
 
@@ -208,7 +216,6 @@ def _create_gretel_executor(
             model_key=None,
             project_name=project_name,
             trainer_factory=gretel_trainer_factory,
-            delete_project=gretel_sdk.delete_project,
             benchmark_dir=benchmark_dir,
         )
 
@@ -224,7 +231,6 @@ def _create_gretel_executor(
             model_key=model_key,
             project_name=project_name,
             trainer_factory=gretel_trainer_factory,
-            delete_project=gretel_sdk.delete_project,
             benchmark_dir=benchmark_dir,
         )
 

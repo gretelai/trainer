@@ -23,6 +23,3 @@ class CustomExecutor:
 
     def get_sqs_score(self, synthetic: pd.DataFrame, reference: str) -> int:
         return self.evaluator.get_sqs_score(synthetic=synthetic, reference=reference)
-
-    def cleanup(self) -> None:
-        pass

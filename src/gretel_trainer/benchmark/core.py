@@ -1,6 +1,5 @@
 import time
 
-from contextlib import suppress
 from dataclasses import dataclass, field
 from enum import Enum
 from multiprocessing.managers import DictProxy
@@ -75,9 +74,6 @@ class Executor(Model, Protocol):
         ...
 
     def get_sqs_score(self, synthetic: pd.DataFrame, reference: str) -> int:
-        ...
-
-    def cleanup(self) -> None:
         ...
 
 
@@ -179,10 +175,6 @@ def execute(run: Run[Executor], results_dict: DictProxy) -> None:
     def _set_status(status: RunStatus) -> None:
         results_dict[run.identifier] = status
 
-    def _cleanup() -> None:
-        with suppress(Exception):
-            run.executor.cleanup()
-
     if not run.executor.runnable(run.source):
         _set_status(Skipped())
         return None
@@ -200,7 +192,6 @@ def execute(run: Run[Executor], results_dict: DictProxy) -> None:
                 error=e,
                 train_secs=train_time.duration()
             ))
-            _cleanup()
             return None
 
         _set_status(InProgress(stage=GENERATE, train_secs=train_time.duration()))
@@ -218,7 +209,6 @@ def execute(run: Run[Executor], results_dict: DictProxy) -> None:
                 train_secs=train_time.duration(),
                 generate_secs=generate_time.duration()
             ))
-            _cleanup()
             return None
 
         _set_status(InProgress(stage=EVALUATE, train_secs=train_time.duration(), generate_secs=generate_time.duration()))
@@ -233,7 +223,6 @@ def execute(run: Run[Executor], results_dict: DictProxy) -> None:
                 generate_secs=generate_time.duration(),
                 synthetic_data=synthetic_dataframe
             ))
-            _cleanup()
             return None
 
     _set_status(Completed(
@@ -242,4 +231,3 @@ def execute(run: Run[Executor], results_dict: DictProxy) -> None:
         generate_secs=generate_time.duration(),
         synthetic_data=synthetic_dataframe
     ))
-    _cleanup()
