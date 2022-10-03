@@ -14,7 +14,6 @@ from gretel_trainer.benchmark.core import (
     BenchmarkException,
     Completed,
     Dataset,
-    Evaluator,
     execute,
     Failed,
     InProgress,
