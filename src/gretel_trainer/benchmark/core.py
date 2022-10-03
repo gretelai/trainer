@@ -78,7 +78,7 @@ class Executor(Model, Protocol):
 
 
 class Evaluator(Protocol):
-    def get_sqs_score(self, synthetic: pd.DataFrame, reference: str) -> int:
+    def __call__(self, synthetic: pd.DataFrame, reference: str) -> int:
         ...
 
 

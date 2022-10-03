@@ -8,7 +8,6 @@ import pandas as pd
 
 from gretel_trainer.benchmark.core import Dataset, Datatype, ModelFactory
 from gretel_trainer.benchmark.gretel.datasets import GretelDataset, GretelPublicDatasetRepo
-from gretel_trainer.benchmark.gretel.evaluate import GretelEvaluate
 from gretel_trainer.benchmark.gretel.models import (
     GretelAmplify,
     GretelAuto,
@@ -74,7 +73,6 @@ def compare(
             wait_secs=10,
         ),
         gretel_sdk=ActualGretelSDK,
-        evaluator=GretelEvaluate(),
         gretel_trainer_factory=trainer.Trainer,
     )
 

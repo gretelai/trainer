@@ -65,19 +65,6 @@ class DictConfigGretelModel(GretelModel):
     }
 
 
-class MockEvaluator:
-    def __init__(self, returning: int):
-        self.returning = returning
-
-    def get_sqs_score(self, synthetic, reference):
-        return self.returning
-
-
-class FailingEvaluator:
-    def get_sqs_score(self, synthetic, reference):
-        raise Exception("failed")
-
-
 class MockGretelTrainer:
     def __init__(self, **kwargs):
         self.kwargs = kwargs

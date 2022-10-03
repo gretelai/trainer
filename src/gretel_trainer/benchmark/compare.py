@@ -154,7 +154,6 @@ def compare(
     models: List[Union[ModelFactory, Type[GretelModel]]],
     runtime_config: RuntimeConfig,
     gretel_sdk: GretelSDK,
-    evaluator: Evaluator,
     gretel_trainer_factory: Callable[..., Trainer],
 ) -> Comparison:
     gretel_model_runs: List[Run[GretelExecutor]] = []
@@ -174,7 +173,6 @@ def compare(
                         project_name=project_name,
                         gretel_sdk=gretel_sdk,
                         gretel_trainer_factory=gretel_trainer_factory,
-                        evaluator=evaluator,
                         benchmark_dir=runtime_config.local_dir,
                     )
                     gretel_model_runs.append(
@@ -190,7 +188,7 @@ def compare(
                         Run(
                             identifier=f"custom-{custom_run_id}",
                             source=source,
-                            executor=CustomExecutor(model=model, evaluator=evaluator),
+                            executor=CustomExecutor(model=model, evaluate=gretel_sdk.evaluate),
                         )
                     )
 
@@ -207,7 +205,6 @@ def _create_gretel_executor(
     project_name: str,
     gretel_sdk: GretelSDK,
     gretel_trainer_factory: Callable[..., Trainer],
-    evaluator: Evaluator,
     benchmark_dir: str,
 ) -> GretelExecutor:
     if model.config == "AUTO":
@@ -239,5 +236,4 @@ def _create_gretel_executor(
         model=model,
         model_key=model_key,
         sdk=gretel_sdk,
-        evaluator=evaluator,
     )

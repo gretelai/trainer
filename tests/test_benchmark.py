@@ -30,11 +30,9 @@ from gretel_trainer.benchmark.gretel.sdk import GretelSDK
 from tests.mocks import (
     DictConfigGretelModel,
     DoNothingModel,
-    FailingEvaluator,
     FailingModel,
     LocalFileConfigGretelModel,
     mock_gretel_trainer_factory,
-    MockEvaluator,
     MockGretelTrainer,
 )
 
@@ -69,10 +67,11 @@ def _make_dataset(
     )
 
 
-def _make_gretel_sdk(create_project=None, search_projects=None, poll=None) -> GretelSDK:
+def _make_gretel_sdk(create_project=None, search_projects=None, evaluate=None, poll=None) -> GretelSDK:
     return GretelSDK(
         create_project=create_project or Mock(),
         search_projects=search_projects or Mock(return_value=[Mock()]),
+        evaluate=evaluate or Mock(return_value=42),
         poll=poll or Mock(),
     )
 
@@ -96,7 +95,6 @@ def test_end_to_end_with_custom_datasets(df, csv, psv):
         ],
         runtime_config=TEST_RUNTIME_CONFIG,
         gretel_sdk=_make_gretel_sdk(),
-        evaluator=MockEvaluator(42),
         gretel_trainer_factory=mock_gretel_trainer_factory(get_sqs_score=84),
     ).wait()
 
@@ -120,6 +118,9 @@ def test_end_to_end_with_custom_datasets(df, csv, psv):
 
 
 def test_failures_during_train_generate_or_custom_evaluate(csv):
+    def _fail(synthetic, reference):
+        raise Exception("failed")
+
     csv_dataset = _make_dataset([csv])
 
     comparison = compare(
@@ -130,8 +131,7 @@ def test_failures_during_train_generate_or_custom_evaluate(csv):
             DoNothingModel,
         ],
         runtime_config=TEST_RUNTIME_CONFIG,
-        gretel_sdk=_make_gretel_sdk(),
-        evaluator=FailingEvaluator(),
+        gretel_sdk=_make_gretel_sdk(evaluate=_fail),
         gretel_trainer_factory=mock_gretel_trainer_factory(),
     ).wait()
 
@@ -155,7 +155,6 @@ def test_failures_during_cleanup_are_ignored(csv):
         ],
         runtime_config=TEST_RUNTIME_CONFIG,
         gretel_sdk=_make_gretel_sdk(search_projects=_failing_search),
-        evaluator=MockEvaluator(42),
         gretel_trainer_factory=mock_gretel_trainer_factory(),
     ).wait()
 
@@ -182,7 +181,6 @@ def test_auto_lstm_ctgan_models_use_trainer_executor(model, expected_model_type,
         models=[model],
         runtime_config=TEST_RUNTIME_CONFIG,
         gretel_sdk=_make_gretel_sdk(),
-        evaluator=MockEvaluator(42),
         gretel_trainer_factory=lambda **kw: mock_gretel_trainer._factory_args(**kw),
     ).wait()
 
@@ -231,7 +229,6 @@ def test_gptx_uses_sdk_executor(csv):
                 create_project=mock_project_factory,
                 poll=mock_poll,
             ),
-            evaluator=MockEvaluator(42),
             gretel_trainer_factory=mock_trainer_factory,
         ).wait()
 
@@ -270,7 +267,6 @@ def test_amplify_uses_sdk_executor_and_evaluate(csv):
                 create_project=mock_project_factory,
                 poll=mock_poll,
             ),
-            evaluator=MockEvaluator(42),
             gretel_trainer_factory=mock_trainer_factory,
         ).wait()
 
@@ -300,7 +296,6 @@ def test_gretel_model_with_bad_custom_config_fails_before_execution_starts(csv):
             ],
             runtime_config=TEST_RUNTIME_CONFIG,
             gretel_sdk=_make_gretel_sdk(create_project=mock_project_factory),
-            evaluator=MockEvaluator(42),
             gretel_trainer_factory=mock_trainer_factory,
         )
 
@@ -341,7 +336,6 @@ def test_run_comparison_with_gretel_dataset():
         ],
         runtime_config=TEST_RUNTIME_CONFIG,
         gretel_sdk=_make_gretel_sdk(),
-        evaluator=MockEvaluator(42),
         gretel_trainer_factory=mock_gretel_trainer_factory(get_sqs_score=84),
     ).wait()
 
@@ -366,7 +360,6 @@ def test_benchmark_cleans_up_after_failures(csv):
         ],
         runtime_config=TEST_RUNTIME_CONFIG,
         gretel_sdk=_make_gretel_sdk(search_projects=mock_search_projects),
-        evaluator=MockEvaluator(42),
         gretel_trainer_factory=mock_gretel_trainer_factory(fail="train"),
     ).wait()
 
@@ -409,7 +402,6 @@ def test_runs_with_gptx_are_skipped_when_too_many_columns_or_wrong_datatype():
         models=[GretelGPTX],
         runtime_config=TEST_RUNTIME_CONFIG,
         gretel_sdk=_make_gretel_sdk(),
-        evaluator=Mock(),
         gretel_trainer_factory=Mock(),
     ).wait()
 
@@ -424,7 +416,6 @@ def test_runs_with_lstm_are_skipped_when_over_150_columns():
         models=[GretelLSTM],
         runtime_config=TEST_RUNTIME_CONFIG,
         gretel_sdk=_make_gretel_sdk(),
-        evaluator=Mock(),
         gretel_trainer_factory=Mock(),
     ).wait()
 

@@ -4,9 +4,9 @@ from gretel_trainer.benchmark.core import DataSource, Evaluator, Model
 
 
 class CustomExecutor:
-    def __init__(self, model: Model, evaluator: Evaluator):
+    def __init__(self, model: Model, evaluate: Evaluator):
         self.model = model
-        self.evaluator = evaluator
+        self.evaluate = evaluate
 
     @property
     def model_name(self) -> str:
@@ -22,4 +22,4 @@ class CustomExecutor:
         return self.model.generate(**kwargs)
 
     def get_sqs_score(self, synthetic: pd.DataFrame, reference: str) -> int:
-        return self.evaluator.get_sqs_score(synthetic=synthetic, reference=reference)
+        return self.evaluate(synthetic=synthetic, reference=reference)
