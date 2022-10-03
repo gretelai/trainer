@@ -62,6 +62,7 @@ def compare(
     *,
     datasets: List[Dataset],
     models: List[Union[ModelFactory, Type[GretelModel]]],
+    auto_clean: bool = True,
 ) -> c.Comparison:
     return c.compare(
         datasets=datasets,
@@ -71,6 +72,7 @@ def compare(
             project_prefix=f"benchmark-{_timestamp()}",
             thread_pool=ThreadPoolExecutor(5),
             wait_secs=10,
+            auto_clean=auto_clean,
         ),
         gretel_sdk=ActualGretelSDK,
         gretel_trainer_factory=trainer.Trainer,

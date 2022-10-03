@@ -40,6 +40,7 @@ class RuntimeConfig:
     project_prefix: str
     thread_pool: futures.Executor
     wait_secs: float
+    auto_clean: bool
 
 
 class Comparison:
@@ -99,13 +100,14 @@ class Comparison:
 
 
 def _cleanup(results_dict: DictProxy, runtime_config: RuntimeConfig, sdk: GretelSDK) -> None:
-    while not _is_complete(results_dict):
-        time.sleep(runtime_config.wait_secs)
+    if runtime_config.auto_clean:
+        while not _is_complete(results_dict):
+            time.sleep(runtime_config.wait_secs)
 
-    with suppress(Exception):
-        for project in sdk.search_projects(runtime_config.project_prefix):
-            project.delete()
-        shutil.rmtree(runtime_config.local_dir)
+        with suppress(Exception):
+            for project in sdk.search_projects(runtime_config.project_prefix):
+                project.delete()
+            shutil.rmtree(runtime_config.local_dir)
 
 
 def _is_complete(results_dict: DictProxy) -> bool:

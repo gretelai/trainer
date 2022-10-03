@@ -49,6 +49,7 @@ TEST_RUNTIME_CONFIG = RuntimeConfig(
     project_prefix="benchmark-proj",
     thread_pool=ThreadPoolExecutor(4),
     wait_secs=0.1,
+    auto_clean=True,
 )
 
 
@@ -420,3 +421,28 @@ def test_runs_with_lstm_are_skipped_when_over_150_columns():
     ).wait()
 
     assert comparison.results["Status"].values.tolist() == ["Skipped"]
+
+
+def test_skip_cleanup_when_requested():
+    with suppress(FileNotFoundError):
+        shutil.rmtree(TEST_BENCHMARK_DIR)
+
+    runtime_config = TEST_RUNTIME_CONFIG
+    runtime_config.auto_clean = False
+
+    mock_project = Mock()
+    mock_search_projects = Mock(return_value=[mock_project])
+
+    dataset = TEST_GRETEL_DATASET_REPO.list_datasets()[0]
+
+    compare(
+        datasets=[dataset],
+        models=[GretelLSTM],
+        runtime_config=runtime_config,
+        gretel_sdk=_make_gretel_sdk(search_projects=mock_search_projects),
+        gretel_trainer_factory=lambda **kw: MockGretelTrainer(),
+    ).wait()
+
+    assert not mock_project.delete.called
+    assert len(os.listdir(TEST_BENCHMARK_DIR)) > 0
+    shutil.rmtree(TEST_BENCHMARK_DIR)
