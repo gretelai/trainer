@@ -69,7 +69,7 @@ def compare(
         models=models,
         runtime_config=c.RuntimeConfig(
             local_dir=BENCHMARK_DIR,
-            project_prefix=_timestamp,
+            project_prefix=f"benchmark-{_timestamp()}",
             thread_pool=ThreadPoolExecutor(5),
             wait_secs=10,
         ),

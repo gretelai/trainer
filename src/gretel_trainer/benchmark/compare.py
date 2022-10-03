@@ -37,7 +37,7 @@ GretelExecutor = Union[GretelSDKExecutor, GretelTrainerExecutor]
 @dataclass
 class RuntimeConfig:
     local_dir: str
-    project_prefix: Callable[[], str]
+    project_prefix: str
     thread_pool: futures.Executor
     wait_secs: float
 
@@ -150,8 +150,6 @@ def compare(
     evaluator: Evaluator,
     gretel_trainer_factory: Callable[..., Trainer],
 ) -> Comparison:
-    project_name_prefix = f"benchmark-{runtime_config.project_prefix()}"
-
     gretel_model_runs: List[Run[GretelExecutor]] = []
     custom_model_runs: List[Run[CustomExecutor]] = []
 
@@ -162,7 +160,7 @@ def compare(
             for model_factory in models:
                 model = model_factory()
                 if isinstance(model, GretelModel):
-                    project_name = f"{project_name_prefix}-{gretel_run_id}"
+                    project_name = f"{runtime_config.project_prefix}-{gretel_run_id}"
                     gretel_run_id = gretel_run_id + 1
                     executor = _create_gretel_executor(
                         model=model,
