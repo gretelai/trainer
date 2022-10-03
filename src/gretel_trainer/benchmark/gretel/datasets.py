@@ -50,18 +50,14 @@ class GretelDataset:
         self.s3 = s3
         self.bucket = bucket
         self.load_dir = load_dir
-        self._sources: Optional[List[GretelCSVSource]] = None
 
     def sources(self) -> List[GretelCSVSource]:
-        self._load()
-        if self._sources is None:
+        _sources = self._load()
+        if len(_sources) == 0:
             raise BenchmarkException(f"Could not load sources for dataset {self.name}")
-        return self._sources
+        return _sources
 
-    def _load(self) -> GretelDataset:
-        if self._sources is not None:
-            return self
-
+    def _load(self) -> List[GretelCSVSource]:
         prefix = f"{self.name}/"
         list_s3_objects = self.s3.list_objects_v2(
             Bucket=self.bucket,
@@ -86,9 +82,7 @@ class GretelDataset:
                     column_count=shape[1],
                 )
             )
-
-        self._sources = sources
-        return self
+        return sources
 
 
 def _get_data_shape(path: str) -> Tuple[int, int]:
