@@ -143,9 +143,9 @@ def _result_dict(run: Run, results_dict: DictProxy) -> Dict:
         "Columns": run.source.column_count,
         "Status": status.display,
         "SQS": sqs,
-        "Train time": train_time,
-        "Generate time": generate_time,
-        "Total time": total_time,
+        "Train time (sec)": train_time,
+        "Generate time (sec)": generate_time,
+        "Total time (sec)": total_time,
     }
 
 
