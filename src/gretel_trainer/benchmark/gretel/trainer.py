@@ -1,5 +1,6 @@
 from pathlib import Path
-from typing import Callable, Optional, Protocol
+from typing import Callable, Optional
+from typing_extensions import Protocol
 
 import gretel_trainer
 import pandas as pd

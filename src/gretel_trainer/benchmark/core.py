@@ -9,10 +9,10 @@ from typing import (
     Generic,
     List,
     Optional,
-    Protocol,
     TypeVar,
     Union,
 )
+from typing_extensions import Protocol
 
 import pandas as pd
 
