@@ -15,8 +15,10 @@ LOW_COLUMN_THRESHOLD = 4
 LOW_RECORD_THRESHOLD = 1000
 
 
-def determine_best_model(df: pd.DataFrame):
-    row_count, column_count = df.shape
+def determine_best_model(manifest: dict):
+    # TODO confirm manifest format, key names, nesting
+    row_count = manifest["record_count"]
+    column_count = manifest["field_count"]
 
     if row_count > HIGH_RECORD_THRESHOLD or column_count > HIGH_COLUMN_THRESHOLD:
         return GretelCTGAN(config="synthetics/high-dimensionality")

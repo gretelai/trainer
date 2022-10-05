@@ -1,3 +1,5 @@
 gretel-client
 gretel-synthetics[utils]
 pydantic==1.9.0
+retry
+pandas

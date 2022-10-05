@@ -5,6 +5,7 @@ import logging
 import os.path
 
 import pandas as pd
+from retry import retry
 from gretel_client import configure_session
 from gretel_client.projects import create_or_get_unique_project
 from gretel_synthetics.utils.header_clusters import cluster
@@ -161,7 +162,8 @@ class Trainer:
 
         if not df.empty:
             if self.model_type is None:
-                self.model_type = determine_best_model(df)
+                manifest = self._generate_artifact_manifest(df)
+                self.model_type = determine_best_model(manifest)
                 logger.debug(json.dumps(self.model_type.config, indent=2))
 
             model_config = self.model_type.config
@@ -193,3 +195,22 @@ class Trainer:
             project=self.project,
         )
         return run
+
+    def _generate_artifact_manifest(self, df: pd.DataFrame) -> dict:
+        """Upload DataFrame to API to generate manifest.
+
+        Blocks until manifest is generated and returned.
+        """
+        with tempfile.TemporaryDirectory() as tmp:
+            target_file = str(Path(tmp) / "trainer-original.csv")
+            df.to_csv(target_file, index=False)
+            artifact_id = self._project.upload_artifact(target_file)
+
+        return self._fetch_artifact_manifest(artifact_id)
+
+    @retry(tries=5, delay=1, backoff=2)
+    def _fetch_artifact_manifest(self, artifact_id: str) -> dict:
+        """Request (with retries) the manifest for an existing artifact_id."""
+        manifest = project.get_artifact_manifest(artifact_id)
+
+        return manifest["manifest"]
