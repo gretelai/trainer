@@ -204,13 +204,13 @@ class Trainer:
         with tempfile.TemporaryDirectory() as tmp:
             target_file = str(Path(tmp) / "trainer-original.csv")
             df.to_csv(target_file, index=False)
-            artifact_id = self._project.upload_artifact(target_file)
+            artifact_id = self.project.upload_artifact(target_file)
 
         return self._fetch_artifact_manifest(artifact_id)
 
     @retry(tries=5, delay=1, backoff=2)
     def _fetch_artifact_manifest(self, artifact_id: str) -> dict:
         """Request (with retries) the manifest for an existing artifact_id."""
-        manifest = project.get_artifact_manifest(artifact_id)
+        manifest = self.project.get_artifact_manifest(artifact_id)
 
         return manifest["manifest"]
