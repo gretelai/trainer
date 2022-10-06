@@ -3,6 +3,7 @@
 import json
 import logging
 import os.path
+from pathlib import Path
 
 import pandas as pd
 from gretel_client import configure_session
@@ -18,6 +19,19 @@ logger.setLevel("DEBUG")
 DEFAULT_PROJECT = "trainer"
 DEFAULT_CACHE = f"{DEFAULT_PROJECT}-runner.json"
 
+_ACCEPTABLE_CHARS = set(
+    [chr(c) for c in range(ord("a"), ord("z")+1)] +
+    [chr(c) for c in range(ord("A"), ord("Z")+1)] +
+    [chr(c) for c in range(ord("0"), ord("9")+1)] +
+    ["-"]
+)
+def _sanitize_name(name: str):
+    """Replace unacceptable characters for Gretel API project or model names."""
+    # Does not account for the following requirements:
+    # - must start with [a-zA-Z]
+    # - must end with [a-zA-Z0-9]
+    # - minimum and maximum length
+    return "".join(c if c in _ACCEPTABLE_CHARS else "-" for c in name)
 
 class Trainer:
     """Automated model training and synthetic data generation tool
@@ -39,7 +53,7 @@ class Trainer:
         configure_session(api_key="prompt", cache="yes", validate=True)
 
         self.df = None
-        self.dataset_path = None
+        self.dataset_path: Optional[Path] = None
         self.run = None
         self.project_name = project_name
         self.project = create_or_get_unique_project(name=project_name)
@@ -87,7 +101,7 @@ class Trainer:
             round_decimals (int, optional): Round decimals in CSV as preprocessing step. Defaults to `4`.
             seed_fields (list, optional): List fields that can be used for conditional generation.
         """
-        self.dataset_path = dataset_path
+        self.dataset_path = Path(dataset_path)
         self.df = self._preprocess_data(
             dataset_path=dataset_path, delimiter=delimiter, round_decimals=round_decimals
         )
@@ -128,10 +142,10 @@ class Trainer:
         return int(sum(scores) / len(scores))
 
     def _preprocess_data(
-        self, dataset_path: str, delimiter: str, round_decimals: int = 4
+        self, dataset_path: Path, delimiter: str, round_decimals: int = 4
     ) -> pd.DataFrame:
         """Preprocess input data"""
-        tmp = pd.read_csv(dataset_path, sep=delimiter, low_memory=False)
+        tmp = pd.read_csv(str(dataset_path), sep=delimiter, low_memory=False)
         tmp = tmp.round(round_decimals)
         return tmp
 
@@ -183,8 +197,13 @@ class Trainer:
                 seed_headers=seed_fields,
             )
 
+        if self.dataset_path is None:
+            strategy_id = f"{self.project_name}"
+        else:
+            strategy_id = f"{self.project_name}-{self.dataset_path.stem}"
+
         run = runner.StrategyRunner(
-            strategy_id=f"{self.project_name}",
+            strategy_id=_sanitize_name(strategy_id),
             df=self.df,
             cache_file=self.cache_file,
             cache_overwrite=overwrite,
