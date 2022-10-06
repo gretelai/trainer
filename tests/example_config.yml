@@ -1,0 +1,13 @@
+schema_version: "1.0"
+
+models:
+  - synthetics:
+      params:
+        epochs: 100
+        learning_rate: 0.001
+      validators:
+        in_set_count: 10
+        pattern_count: 10
+      privacy_filters:
+        outliers: medium
+        similarity: medium
