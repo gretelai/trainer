@@ -22,7 +22,7 @@ If you want to quickly get started synthesizing data with **Gretel.ai**, simply 
 
 [![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/gretelai/trainer/blob/main/notebooks/trainer-examples.ipynb)
 
-## Join they Synthetic Data Community Discord
+## Join the Synthetic Data Community Discord
 
 If you want to be part of the Synthetic Data Community to receive announcements of the latest releases,
 ask questions, suggest new features or participate in the development meetings, please join
