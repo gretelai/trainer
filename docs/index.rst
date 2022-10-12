@@ -25,7 +25,7 @@ Current functionality and features:
 Train Synthetic Data in as Little as Three Lines of Code!
 ---------------------------------------------------------
 
-#. Install the Gretel CLI and Gretel Trainer either on your system or in your Notebook
+#. Install the Gretel CLI and Gretel Trainer either on your system or in your Notebook.
 
    .. code-block:: bash
 
