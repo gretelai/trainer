@@ -4,7 +4,7 @@ Quickstart
 Initial Setup
 -------------
 
-#. Install the Gretel CLI and Gretel Trainer either on your system or in your Notebook
+#. Install the Gretel CLI and Gretel Trainer either on your system or in your Notebook.
 
    .. code-block:: bash
 
@@ -28,7 +28,7 @@ Train Synthetic Data
     :target: https://colab.research.google.com/github/gretelai/trainer/blob/main/notebooks/trainer-examples.ipynb
     :alt: Open in Colab
 
-#. Train or fine-tune a model using the Gretel API
+#. Train or fine-tune a model using the Gretel API.
 
     .. code-block:: python3
 
@@ -51,7 +51,7 @@ Conditional Data Generation
     :target: https://colab.research.google.com/github/gretelai/trainer/blob/main/notebooks/simple-conditional-generation.ipynb
     :alt: Open in Colab
 
-#. Load and preview the dataset, set seed fields
+#. Load and preview the dataset, and set seed fields.
 
     .. code-block:: python3
 
@@ -65,7 +65,7 @@ Conditional Data Generation
         print("\nPreviewing real world dataset\n")
         pd.read_csv(DATASET_PATH)
 
-#. Train the model
+#. Train the model.
 
     .. code-block:: python3
 
@@ -73,7 +73,7 @@ Conditional Data Generation
         model = trainer.Trainer()
         model.train(DATASET_PATH, seed_fields=SEED_FIELDS)
 
-#. Conditionally generate data
+#. Conditionally generate data.
 
     .. code-block:: python3
 

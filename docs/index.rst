@@ -43,7 +43,7 @@ Train Synthetic Data in as Little as Three Lines of Code!
 
       gretel configure
 
-#. Train or fine-tune a model using the Gretel API
+#. Train or fine-tune a model using the Gretel API.
 
    .. code-block:: python3
 
@@ -73,7 +73,7 @@ Join the Synthetic Data Community Discord
 -----------------------------------------
 
 If you want to be part of the Synthetic Data Community to receive announcements of the latest releases,
-ask questions, suggest new features or participate in the development meetings, please join
+ask questions, suggest new features, or participate in the development meetings, please join
 the Synthetic Data Community Server!
 
 .. image:: https://img.shields.io/discord/1007817822614847500?label=Discord&logo=Discord
