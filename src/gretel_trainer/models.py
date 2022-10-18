@@ -8,13 +8,11 @@ if TYPE_CHECKING:
 
 from gretel_client.projects.models import read_model_config
 
-
 HIGH_RECORD_THRESHOLD = 1500000
 MEDIUM_RECORD_THRESHOLD_2 = 500000
 MEDIUM_RECORD_THRESHOLD_1 = 200000
 LOW_RECORD_THRESHOLD = 500
-
-HIGH_COLUMN_THRESHOLD = 2
+HIGH_COLUMN_THRESHOLD = 20
 LOW_COLUMN_THRESHOLD = 1
 
 
@@ -78,16 +76,13 @@ def determine_best_model(manifest: dict):
             else:
                 return GretelLSTM("synthetics/default")
         elif row_count < MEDIUM_RECORD_THRESHOLD_2:
-            ## change this based on either n_rows * n_cols or n_rows/n_cols
             return GretelCTGAN("synthetics/high-dimensionality")
         else:
-            ## change this based on either n_rows * n_cols or n_rows/n_cols
             return GretelCTGAN("synthetics/high-dimensionality-high-records")
     elif column_count > HIGH_COLUMN_THRESHOLD:
         if row_count < MEDIUM_RECORD_THRESHOLD_1:
             return GretelCTGAN("synthetics/high-dimensionality")
         else:
-            ## change to high-dim-high-records when available
             return GretelCTGAN("synthetics/high-dimensionality-high-records")
 
 
