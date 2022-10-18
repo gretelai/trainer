@@ -50,7 +50,9 @@ class Trainer:
 
         if self.overwrite:
             if self.model_type is None:
-                logger.debug("Deferring model configuration to optimize based on training data.")
+                logger.debug(
+                    "Deferring model configuration to optimize based on training data."
+                )
             else:
                 logger.debug(json.dumps(self.model_type.config, indent=2))
 
@@ -78,7 +80,11 @@ class Trainer:
         return model
 
     def train(
-        self, dataset_path: str, delimiter: str = ",", round_decimals: int = 4, seed_fields: list = None,
+        self,
+        dataset_path: str,
+        delimiter: str = ",",
+        round_decimals: int = 4,
+        seed_fields: list = None,
     ):
         """Train a model on the dataset
 
@@ -90,7 +96,9 @@ class Trainer:
         """
         self.dataset_path = dataset_path
         self.df = self._preprocess_data(
-            dataset_path=dataset_path, delimiter=delimiter, round_decimals=round_decimals
+            dataset_path=dataset_path,
+            delimiter=delimiter,
+            round_decimals=round_decimals,
         )
         self.run = self._initialize_run(
             df=self.df, overwrite=self.overwrite, seed_fields=seed_fields
@@ -213,4 +221,4 @@ class Trainer:
         """Request (with retries) the manifest for an existing artifact_id."""
         manifest = self.project.get_artifact_manifest(artifact_id)
 
-        return manifest["manifest"]
+        return manifest["data"]["manifest"]
