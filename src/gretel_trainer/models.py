@@ -48,9 +48,9 @@ def determine_best_model(manifest: dict):
         [field.get("max_precision", 0) for field in manifest["fields"]],
         default=0,
     )
-    highly_unique_field_count = max(
+    highly_unique_field_count = sum(
         [
-            field.get("unique_percent", 0)
+            field.get("unique_percent", 0) > 80
             for field in manifest["fields"]
             if field.get("type") != "numeric"
         ],
