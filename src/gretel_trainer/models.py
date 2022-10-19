@@ -45,7 +45,7 @@ def determine_best_model(manifest: dict):
         type_info["type"]: type_info["count"] for type_info in manifest["types"]
     }
     max_precision = max(
-        [field.get("max_precision", default=0) for field in manifest["fields"]],
+        [field.get("max_precision", 0) for field in manifest["fields"]],
         default=0,
     )
     highly_unique_field_count = manifest["highly_unique_field_count"]
@@ -64,16 +64,13 @@ def determine_best_model(manifest: dict):
 
     elif column_count <= HIGH_COLUMN_THRESHOLD:
         if row_count < MEDIUM_RECORD_THRESHOLD_1:
-            if (
-                type_count.get("other", default=0) + type_count.get("text", default=0)
-                > 0
-            ):
+            if type_count.get("other", 0) + type_count.get("text", 0) > 0:
                 return GretelLSTM("synthetics/complex-or-free-text")
             elif highly_unique_field_count > 0:
                 return GretelLSTM("synthetics/complex-or-free-text")
             elif max_precision > 2:
                 return GretelCTGAN("synthetics/high-dimensionality")
-            elif type_count.get("numeric", default=0) / column_count > 0.5:
+            elif type_count.get("numeric", 0) / column_count > 0.5:
                 return GretelCTGAN("synthetics/high-dimensionality")
             else:
                 return GretelLSTM("synthetics/default")
