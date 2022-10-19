@@ -5,7 +5,6 @@ import logging
 import os.path
 
 import pandas as pd
-from retry import retry
 from gretel_client import configure_session
 from gretel_client.projects import create_or_get_unique_project
 from gretel_synthetics.utils.header_clusters import cluster
@@ -214,11 +213,6 @@ class Trainer:
             df.to_csv(target_file, index=False)
             artifact_id = self.project.upload_artifact(target_file)
 
-        return self._fetch_artifact_manifest(artifact_id)
-
-    @retry(tries=5, delay=1, backoff=2)
-    def _fetch_artifact_manifest(self, artifact_id: str) -> dict:
-        """Request (with retries) the manifest for an existing artifact_id."""
         manifest = self.project.get_artifact_manifest(artifact_id)
 
         return manifest["data"]["manifest"]
