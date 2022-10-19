@@ -53,8 +53,7 @@ def determine_best_model(manifest: dict):
             field.get("unique_percent", 0) > 80
             for field in manifest["fields"]
             if field.get("type") != "numeric"
-        ],
-        default=0,
+        ]
     )
 
     if column_count <= LOW_COLUMN_THRESHOLD:
