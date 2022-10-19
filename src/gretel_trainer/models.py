@@ -48,7 +48,14 @@ def determine_best_model(manifest: dict):
         [field.get("max_precision", default=0) for field in manifest["fields"]],
         default=0,
     )
-    highly_unique_field_count = manifest["highly_unique_field_count"]
+    highly_unique_field_count = max(
+        [
+            field.get("unique_percent", 0)
+            for field in manifest["fields"]
+            if field.get("type") != "numeric"
+        ],
+        default=0,
+    )
 
     if column_count <= LOW_COLUMN_THRESHOLD:
         if type_count["text"] == LOW_COLUMN_THRESHOLD:
