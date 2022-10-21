@@ -58,15 +58,15 @@ def determine_best_model(manifest: dict):
 
     if column_count <= LOW_COLUMN_THRESHOLD:
         if type_count["text"] == LOW_COLUMN_THRESHOLD:
-            return GretelGPT(config="synthetics/natural-language")
+            return GretelGPT(config="synthetics/natural-language", max_rows = row_count)
         else:
-            return GretelAmplify(config="synthetics/amplify")
+            return GretelAmplify(config="synthetics/amplify", max_rows = row_count)
 
     elif row_count > HIGH_RECORD_THRESHOLD:
-        return GretelAmplify(config="synthetics/amplify")
+        return GretelAmplify(config="synthetics/amplify", max_rows = row_count)
 
     elif row_count < LOW_RECORD_THRESHOLD:
-        return GretelCTGAN("synthetics/low-record-count")
+        return GretelCTGAN("synthetics/low-record-count", max_rows = row_count)
 
     elif column_count <= HIGH_COLUMN_THRESHOLD:
         if row_count < MEDIUM_RECORD_THRESHOLD_1:
@@ -75,20 +75,22 @@ def determine_best_model(manifest: dict):
             elif highly_unique_field_count > 0:
                 return GretelLSTM("synthetics/complex-or-free-text")
             elif max_precision > 2:
-                return GretelCTGAN("synthetics/high-dimensionality")
+                return GretelCTGAN("synthetics/high-dimensionality", max_rows = row_count)
             elif type_count.get("numeric", 0) / column_count > 0.5:
-                return GretelCTGAN("synthetics/high-dimensionality")
+                return GretelCTGAN("synthetics/high-dimensionality", max_rows = row_count)
             else:
                 return GretelLSTM("synthetics/default")
         elif row_count < MEDIUM_RECORD_THRESHOLD_2:
-            return GretelCTGAN("synthetics/high-dimensionality")
+            return GretelCTGAN("synthetics/high-dimensionality", max_rows = row_count)
         else:
-            return GretelCTGAN("synthetics/high-dimensionality-high-records")
+            return GretelCTGAN("synthetics/high-dimensionality", max_rows = row_count)
+            # return GretelCTGAN("synthetics/high-dimensionality-high-records", max_rows = row_count)
     elif column_count > HIGH_COLUMN_THRESHOLD:
         if row_count < MEDIUM_RECORD_THRESHOLD_1:
-            return GretelCTGAN("synthetics/high-dimensionality")
+            return GretelCTGAN("synthetics/high-dimensionality", max_rows = row_count)
         else:
-            return GretelCTGAN("synthetics/high-dimensionality-high-records")
+            return GretelCTGAN("synthetics/high-dimensionality", max_rows = row_count)
+            # return GretelCTGAN("synthetics/high-dimensionality-high-records", max_rows = row_count)
 
 
 class _BaseConfig:
@@ -186,7 +188,7 @@ class GretelLSTM(_BaseConfig):
 
 class GretelCTGAN(_BaseConfig):
 
-    _max_header_clusters_limit: int = 1000
+    _max_header_clusters_limit: int = 200
     _max_rows_limit: int = 5000000
     _model_slug: str = "ctgan"
 
@@ -194,7 +196,7 @@ class GretelCTGAN(_BaseConfig):
         self,
         config="synthetics/high-dimensionality",
         max_rows=50000,
-        max_header_clusters=500,
+        max_header_clusters=10,
         enable_privacy_filters=False,
     ):
         super().__init__(
@@ -207,33 +209,41 @@ class GretelCTGAN(_BaseConfig):
 
 class GretelGPT(_BaseConfig):
 
-    _max_header_clusters_limit: int = 1000
-    _max_rows_limit: int = 5000000
+    _max_header_clusters_limit: int = 1
+    _max_rows_limit: int = 5000000,
     _model_slug: str = "gpt_x"
 
     def __init__(
         self,
         config="synthetics/natural-language",
+        max_rows=50000,
+        max_header_clusters=1,
         enable_privacy_filters=False,
     ):
         super().__init__(
             config=config,
+            max_rows=max_rows,
+            max_header_clusters=max_header_clusters,
             enable_privacy_filters=enable_privacy_filters,
         )
 
 
 class GretelAmplify(_BaseConfig):
 
-    _max_header_clusters_limit: int = 1000
+    _max_header_clusters_limit: int = 1
     _max_rows_limit: int = 5000000
     _model_slug: str = "amplify"
 
     def __init__(
         self,
         config="synthetics/amplify",
+        max_rows=50000,
+        max_header_clusters=1,
         enable_privacy_filters=False,
     ):
         super().__init__(
             config=config,
+            max_rows=max_rows,
+            max_header_clusters=max_header_clusters,
             enable_privacy_filters=enable_privacy_filters,
         )
