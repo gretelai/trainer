@@ -4,6 +4,7 @@ import json
 import logging
 import os.path
 from pathlib import Path
+from typing import Optional
 
 import pandas as pd
 from gretel_client import configure_session

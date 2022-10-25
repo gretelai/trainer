@@ -10,15 +10,15 @@ from gretel_client.projects.models import read_model_config
 
 
 HIGH_COLUMN_THRESHOLD = 20
-HIGH_RECORD_THRESHOLD = 50000
+HIGH_RECORD_THRESHOLD = 50_000
 LOW_COLUMN_THRESHOLD = 4
-LOW_RECORD_THRESHOLD = 1000
+LOW_RECORD_THRESHOLD = 1_000
 
 
-def determine_best_model(df: pd.DataFrame):
+def determine_best_model(df: pd.DataFrame) -> _BaseConfig:
     """
     Determine the Gretel model best suited for generating synthetic data
-    for your dataset. 
+    for your dataset.
 
     Args:
         df (pd.DataFrame): Pandas DataFrame containing the data used to train a synthetic model.
@@ -63,11 +63,13 @@ class _BaseConfig:
         self.max_header_clusters = max_header_clusters
         self.enable_privacy_filters = enable_privacy_filters
 
+        self._handle_privacy_filters()
+        self.validate()
+
+    def _handle_privacy_filters(self):
         if not self.enable_privacy_filters:
             logging.warning("Privacy filters disabled. Enable with the `enable_privacy_filters` param.")
             self.update_params({"outliers": None, "similarity": None})
-
-        self.validate()
 
     def update_params(self, params: dict):
         """Convenience function to update model specific parameters from the base config by key value.
@@ -115,13 +117,13 @@ class GretelLSTM(_BaseConfig):
         enable_privacy_filters (bool, optional): Default: False
     """
     _max_header_clusters_limit: int = 30
-    _max_rows_limit: int = 5000000
+    _max_rows_limit: int = 5_000_000
     _model_slug: str = "synthetics"
 
     def __init__(
         self,
         config="synthetics/default",
-        max_rows=50000,
+        max_rows=50_000,
         max_header_clusters=20,
         enable_privacy_filters=False,
     ):
@@ -135,7 +137,7 @@ class GretelLSTM(_BaseConfig):
 
 class GretelCTGAN(_BaseConfig):
     """
-    This model works well for high dimensional, largely numeric data. Use for datasets with more than 20 columns and/or 50,000 rows.  
+    This model works well for high dimensional, largely numeric data. Use for datasets with more than 20 columns and/or 50,000 rows.
 
     Not ideal if dataset contains free text field
 
@@ -145,14 +147,14 @@ class GretelCTGAN(_BaseConfig):
         max_header_clusters (int, optional): Default: 20
         enable_privacy_filters (bool, optional): Default: False
     """
-    _max_header_clusters_limit: int = 1000
-    _max_rows_limit: int = 5000000
+    _max_header_clusters_limit: int = 1_000
+    _max_rows_limit: int = 5_000_000
     _model_slug: str = "ctgan"
 
     def __init__(
         self,
         config="synthetics/high-dimensionality",
-        max_rows=50000,
+        max_rows=50_000,
         max_header_clusters=500,
         enable_privacy_filters=False,
     ):
@@ -162,3 +164,28 @@ class GretelCTGAN(_BaseConfig):
             max_header_clusters=max_header_clusters,
             enable_privacy_filters=enable_privacy_filters,
         )
+
+
+class GretelAmplify(_BaseConfig):
+
+    _max_header_clusters_limit: int = 1_000
+    _max_rows_limit: int = 1_000_000_000
+    _model_slug: str = "amplify"
+
+    def __init__(
+        self,
+        config="synthetics/amplify",
+        max_rows=50_000,
+        max_header_clusters=500,
+    ):
+        super().__init__(
+            config=config,
+            max_rows=max_rows,
+            max_header_clusters=max_header_clusters,
+            enable_privacy_filters=False,
+        )
+
+    def _handle_privacy_filters(self) -> None:
+        # Currently amplify doesn't support privacy filtering
+        pass
+
