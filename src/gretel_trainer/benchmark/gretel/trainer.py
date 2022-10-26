@@ -3,6 +3,7 @@ from typing import Callable, Optional
 from typing_extensions import Protocol
 
 import gretel_trainer
+import gretel_trainer.benchmark.gretel.compatibility as compatibility
 import pandas as pd
 
 from gretel_trainer.benchmark.core import DataSource
@@ -62,11 +63,7 @@ class GretelTrainerExecutor:
         return self.model.name
 
     def runnable(self, source: DataSource) -> bool:
-        if self.model_key is not None and self.model_key in ("lstm", "synthetics"):
-            if source.column_count > 150:
-                return False
-
-        return True
+        return compatibility.is_runnable(self.model_key, source)
 
     def train(self, source: str, **kwargs) -> None:
         Path(self.benchmark_dir).mkdir(exist_ok=True)

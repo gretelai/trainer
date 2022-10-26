@@ -8,6 +8,7 @@ from gretel_trainer.benchmark.core import DataSource, Datatype, Evaluator
 from gretel_trainer.benchmark.gretel.models import GretelModel, GretelModelConfig
 
 import gretel_client.helpers
+import gretel_trainer.benchmark.gretel.compatibility as compatibility
 
 from gretel_client.evaluation.quality_report import QualityReport
 from gretel_client.projects.projects import create_or_get_unique_project, search_projects
@@ -92,11 +93,7 @@ class GretelSDKExecutor:
         return self.model.name
 
     def runnable(self, source: DataSource) -> bool:
-        if self.model_key == "gpt_x":
-            if source.column_count > 1 or source.datatype != Datatype.NATURAL_LANGUAGE:
-                return False
-
-        return True
+        return compatibility.is_runnable(self.model_key, source)
 
     def train(self, source: str, **kwargs) -> None:
         project = self.sdk.create_project(self.project_name)
