@@ -17,7 +17,7 @@ LOW_RECORD_THRESHOLD = 1000
 
 def determine_best_model(df: pd.DataFrame):
     """
-    Determine which Gretel model would best suited for generating synthetic data
+    Determine the Gretel model best suited for generating synthetic data
     for your dataset. 
 
     Args:
