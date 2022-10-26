@@ -21,7 +21,7 @@ def determine_best_model(df: pd.DataFrame):
     for your dataset. 
 
     Args:
-        df (pd.DataFrame): Pandas DataFrame containing the data you intend to synthesize.
+        df (pd.DataFrame): Pandas DataFrame containing the data used to train a synthetic model.
 
     Returns:
         A Gretel Model object preconfigured for your use case.
