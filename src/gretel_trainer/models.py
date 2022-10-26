@@ -24,7 +24,7 @@ def determine_best_model(df: pd.DataFrame):
         df (pd.DataFrame): Pandas DataFrame containing the data you intend to synthesize.
 
     Returns:
-        A Gretel Model object preconfigured suited for your use case.
+        A Gretel Model object preconfigured for your use case.
     """
     row_count, column_count = df.shape
 
