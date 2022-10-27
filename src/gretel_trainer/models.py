@@ -16,6 +16,16 @@ LOW_RECORD_THRESHOLD = 1000
 
 
 def determine_best_model(df: pd.DataFrame):
+    """
+    Determine the Gretel model best suited for generating synthetic data
+    for your dataset. 
+
+    Args:
+        df (pd.DataFrame): Pandas DataFrame containing the data used to train a synthetic model.
+
+    Returns:
+        A Gretel Model object preconfigured for your use case.
+    """
     row_count, column_count = df.shape
 
     if row_count > HIGH_RECORD_THRESHOLD or column_count > HIGH_COLUMN_THRESHOLD:
@@ -93,7 +103,17 @@ class _BaseConfig:
 
 
 class GretelLSTM(_BaseConfig):
+    """
+    This model works for a variety of synthetic data tasks including time-series, tabular, and text data. Generally useful for a few thousand records and upward. Dataset generally has a mix of categorical, continuous, and numerical values
 
+    Source data should have <150 columns.
+
+    Args:
+        config (str/dict, optional): Either a string representing the path to the config on the local filesystem, a string representing a path to the default Gretel configurations, or a dictionary containing the configurations. Default: "synthetics/default", a default Gretel configuration
+        max_rows (int, optional): The number of rows of synthetic data to generate. Defaults to 50000
+        max_header_clusters (int, optional): Default: 20
+        enable_privacy_filters (bool, optional): Default: False
+    """
     _max_header_clusters_limit: int = 30
     _max_rows_limit: int = 5000000
     _model_slug: str = "synthetics"
@@ -114,7 +134,17 @@ class GretelLSTM(_BaseConfig):
 
 
 class GretelCTGAN(_BaseConfig):
+    """
+    This model works well for high dimensional, largely numeric data. Use for datasets with more than 20 columns and/or 50,000 rows.  
 
+    Not ideal if dataset contains free text field
+
+    Args:
+        config (str/dict, optional): Either a string representing the path to the config on the local filesystem, a string representing a path to the default Gretel configurations, or a dictionary containing the configurations. Default: "synthetics/default", a default Gretel configuration
+        max_rows (int, optional): The number of rows of synthetic data to generate. Defaults to 50000
+        max_header_clusters (int, optional): Default: 20
+        enable_privacy_filters (bool, optional): Default: False
+    """
     _max_header_clusters_limit: int = 1000
     _max_rows_limit: int = 5000000
     _model_slug: str = "ctgan"
