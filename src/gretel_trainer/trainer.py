@@ -241,7 +241,7 @@ class Trainer:
 
         manifest = self.project.get_artifact_manifest(artifact_id)
 
-        if manifest.get(["data"], {}).get(["status"], "") == "success":
+        if manifest.get("data", {}).get("status", "") == "success":
             return manifest["data"]["manifest"]
         else:
             return {"record_count": df.shape[0], "field_count": df.shape[1]}
