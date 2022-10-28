@@ -121,7 +121,9 @@ def _maybe_submit_job(
             logger.warning(
                 "Rate limiting: Max jobs created, skipping new job for now..."
             )
-        return None
+            return None
+        else:
+            raise
 
     return job
 
