@@ -177,16 +177,19 @@ class Trainer:
 
             model_config = self.model_type.config
 
-            header_clusters = cluster(
-                df,
-                maxsize=self.model_type.max_header_clusters,
-                header_prefix=seed_fields,
-                plot=False,
-            )
-            logger.info(
-                f"Header clustering created {len(header_clusters)} cluster(s) "
-                f"of length(s) {[len(x) for x in header_clusters]}"
-            )
+            if "synthetics" in model_config["models"][0].keys():
+                header_clusters = cluster(
+                    df,
+                    maxsize=self.model_type.max_header_clusters,
+                    header_prefix=seed_fields,
+                    plot=False,
+                )
+                logger.info(
+                    f"Header clustering created {len(header_clusters)} cluster(s) "
+                    f"of length(s) {[len(x) for x in header_clusters]}"
+                )
+            else:
+                header_clusters = None
 
             constraints = strategy.PartitionConstraints(
                 header_clusters=header_clusters,
@@ -214,7 +217,10 @@ class Trainer:
             target_file = str(Path(tmp) / "trainer-original.csv")
             df.to_csv(target_file, index=False)
             artifact_id = self.project.upload_artifact(target_file)
-
+            
         manifest = self.project.get_artifact_manifest(artifact_id)
 
-        return manifest["data"]["manifest"]
+        if manifest.get(["data"], {}).get(["status"], "") == "success":
+            return manifest["data"]["manifest"]
+        else:
+            return {"record_count": df.shape[0], "field_count": df.shape[1]}
