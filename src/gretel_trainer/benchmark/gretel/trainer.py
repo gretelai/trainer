@@ -27,7 +27,7 @@ def _get_trainer_model_type(
     elif model_name == "ctgan":
         model_class = models.GretelCTGAN
     else:
-        raise Exception(f"Unexpected model name 'f{model_name}' in config")
+        raise Exception(f"Unexpected model name '{model_name}' in config")
 
     return model_class(config=config_dict)
 
