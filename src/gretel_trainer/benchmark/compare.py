@@ -157,6 +157,8 @@ def compare(
     gretel_sdk: GretelSDK,
     gretel_trainer_factory: Callable[..., Trainer],
 ) -> Comparison:
+    gretel_sdk.configure_session()
+
     gretel_model_runs: List[Run[GretelExecutor]] = []
     custom_model_runs: List[Run[CustomExecutor]] = []
 
