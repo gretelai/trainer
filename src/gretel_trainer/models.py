@@ -142,9 +142,9 @@ class GretelCTGAN(_BaseConfig):
     Not ideal if dataset contains free text field
 
     Args:
-        config (str/dict, optional): Either a string representing the path to the config on the local filesystem, a string representing a path to the default Gretel configurations, or a dictionary containing the configurations. Default: "synthetics/default", a default Gretel configuration
+        config (str/dict, optional): Either a string representing the path to the config on the local filesystem, a string representing a path to the default Gretel configurations, or a dictionary containing the configurations. Default: "synthetics/high-dimensionality", a default Gretel configuration
         max_rows (int, optional): The number of rows of synthetic data to generate. Defaults to 50000
-        max_header_clusters (int, optional): Default: 20
+        max_header_clusters (int, optional): Default: 500
         enable_privacy_filters (bool, optional): Default: False
     """
     _max_header_clusters_limit: int = 1_000
@@ -167,7 +167,16 @@ class GretelCTGAN(_BaseConfig):
 
 
 class GretelAmplify(_BaseConfig):
+    """
+    This model is able to generate large quantities of data from real-world data or synthetic data.
 
+    Note: this model doesn't currently support privacy filtering.
+
+    Args:
+        config (str/dict, optional): Either a string representing the path to the config on the local filesystem, a string representing a path to the default Gretel configurations, or a dictionary containing the configurations. Default: "synthetics/amplify", a default Gretel configuration for Amplify.
+        max_rows (int, optional): The number of rows of synthetic data to generate. Defaults to 50000
+        max_header_clusters (int, optional): Default: 50
+    """
     _max_header_clusters_limit: int = 1_000
     _max_rows_limit: int = 1_000_000_000
     _model_slug: str = "amplify"
@@ -188,4 +197,3 @@ class GretelAmplify(_BaseConfig):
     def _handle_privacy_filters(self) -> None:
         # Currently amplify doesn't support privacy filtering
         pass
-
