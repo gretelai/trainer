@@ -9,6 +9,7 @@ from gretel_trainer.benchmark.gretel.models import GretelModel, GretelModelConfi
 
 import gretel_client.helpers
 
+from gretel_client import configure_session
 from gretel_client.evaluation.quality_report import QualityReport
 from gretel_client.projects.projects import create_or_get_unique_project, search_projects
 
@@ -46,10 +47,15 @@ Poll = Callable[[GretelSDKJob], None]
 
 @dataclass
 class GretelSDK:
-    create_project: Callable[..., GretelSDKProject]
-    search_projects: Callable[..., List[GretelSDKProject]]
+    configure_session: Callable[[], None]
+    create_project: Callable[[str], GretelSDKProject]
+    search_projects: Callable[[str], List[GretelSDKProject]]
     evaluate: Evaluator
     poll: Poll
+
+
+def _configure_session() -> None:
+    return configure_session(api_key="prompt", cache="yes", validate=True)
 
 
 def _create_project(name: str) -> GretelSDKProject:
@@ -67,6 +73,7 @@ def _evaluate(synthetic: pd.DataFrame, reference: str) -> int:
 
 
 ActualGretelSDK = GretelSDK(
+    configure_session=_configure_session,
     create_project=_create_project,
     search_projects=_search_projects,
     evaluate=_evaluate,

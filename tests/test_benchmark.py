@@ -68,8 +68,9 @@ def _make_dataset(
     )
 
 
-def _make_gretel_sdk(create_project=None, search_projects=None, evaluate=None, poll=None) -> GretelSDK:
+def _make_gretel_sdk(configure_session=None, create_project=None, search_projects=None, evaluate=None, poll=None) -> GretelSDK:
     return GretelSDK(
+        configure_session=configure_session or Mock(),
         create_project=create_project or Mock(),
         search_projects=search_projects or Mock(return_value=[Mock()]),
         evaluate=evaluate or Mock(return_value=42),
@@ -446,3 +447,24 @@ def test_skip_cleanup_when_requested():
     assert not mock_project.delete.called
     assert len(os.listdir(TEST_BENCHMARK_DIR)) > 0
     shutil.rmtree(TEST_BENCHMARK_DIR)
+
+
+def test_exits_early_when_session_is_misconfigured(csv):
+    def mock_configure_session():
+        raise Exception("invalid creds")
+
+    mock_trainer_factory = Mock()
+    mock_project_factory = Mock()
+    csv_dataset = _make_dataset([csv])
+
+    with pytest.raises(Exception):
+        compare(
+            datasets=[csv_dataset],
+            models=[GretelLSTM],
+            runtime_config=TEST_RUNTIME_CONFIG,
+            gretel_sdk=_make_gretel_sdk(configure_session=mock_configure_session, create_project=mock_project_factory),
+            gretel_trainer_factory=mock_trainer_factory,
+        )
+
+    mock_trainer_factory.assert_not_called()
+    mock_project_factory.assert_not_called()
