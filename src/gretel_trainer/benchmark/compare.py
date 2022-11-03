@@ -170,6 +170,7 @@ def compare(
                 model = model_factory()
                 if isinstance(model, GretelModel):
                     project_name = f"{runtime_config.project_prefix}-{gretel_run_id}"
+                    run_identifier = f"gretel-{gretel_run_id}"
                     gretel_run_id = gretel_run_id + 1
                     executor = _create_gretel_executor(
                         model=model,
@@ -180,7 +181,7 @@ def compare(
                     )
                     gretel_model_runs.append(
                         Run(
-                            identifier=f"gretel-{gretel_run_id}",
+                            identifier=run_identifier,
                             source=source,
                             executor=executor,
                         )
