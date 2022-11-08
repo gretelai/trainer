@@ -187,12 +187,14 @@ def compare(
                         )
                     )
                 else:
+                    run_identifier = f"custom-{custom_run_id}"
                     custom_run_id = custom_run_id + 1
+                    executor = CustomExecutor(model=model, evaluate=gretel_sdk.evaluate)
                     custom_model_runs.append(
                         Run(
-                            identifier=f"custom-{custom_run_id}",
+                            identifier=run_identifier,
                             source=source,
-                            executor=CustomExecutor(model=model, evaluate=gretel_sdk.evaluate),
+                            executor=executor,
                         )
                     )
 
