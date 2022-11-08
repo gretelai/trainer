@@ -24,8 +24,15 @@ class GretelLSTM(GretelModel):
     config = _config("synthetics/default", "GretelLSTM")
 
 
-class GretelCTGAN(GretelModel):
-    config = _config("synthetics/high-dimensionality", "GretelCTGAN")
+class GretelACTGAN(GretelModel):
+    config = _config("synthetics/high-dimensionality", "GretelACTGAN")
+
+
+class GretelCTGAN(GretelACTGAN):
+    """
+    Deprecated, please use GretelACTGAN instead.
+    """
+    ...
 
 
 class GretelAuto(GretelModel):

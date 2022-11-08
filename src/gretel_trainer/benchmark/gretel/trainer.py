@@ -23,8 +23,9 @@ def _get_trainer_model_type(
 
     if model_name == "synthetics":
         model_class = models.GretelLSTM
-    elif model_name == "ctgan":
-        model_class = models.GretelCTGAN
+    elif model_name == "ctgan" or model_name == "actgan":
+        # ctgan is now replaced with actgan, leaving "ctgan" condition here for backward compatibility
+        model_class = models.GretelACTGAN
     else:
         raise Exception(f"Unexpected model name 'f{model_name}' in config")
 

@@ -9,6 +9,8 @@ if TYPE_CHECKING:
 from gretel_client.projects.models import read_model_config
 
 
+logger = logging.getLogger(__name__)
+
 HIGH_COLUMN_THRESHOLD = 20
 HIGH_RECORD_THRESHOLD = 50_000
 LOW_COLUMN_THRESHOLD = 4
@@ -29,9 +31,9 @@ def determine_best_model(df: pd.DataFrame) -> _BaseConfig:
     row_count, column_count = df.shape
 
     if row_count > HIGH_RECORD_THRESHOLD or column_count > HIGH_COLUMN_THRESHOLD:
-        return GretelCTGAN(config="synthetics/high-dimensionality")
+        return GretelACTGAN(config="synthetics/high-dimensionality")
     elif row_count < LOW_RECORD_THRESHOLD or column_count < LOW_COLUMN_THRESHOLD:
-        return GretelCTGAN(config="synthetics/low-record-count")
+        return GretelACTGAN(config="synthetics/low-record-count")
     else:
         return GretelLSTM(config="synthetics/default")
 
@@ -68,7 +70,9 @@ class _BaseConfig:
 
     def _handle_privacy_filters(self):
         if not self.enable_privacy_filters:
-            logging.warning("Privacy filters disabled. Enable with the `enable_privacy_filters` param.")
+            logger.warning(
+                "Privacy filters disabled. Enable with the `enable_privacy_filters` param."
+            )
             self.update_params({"outliers": None, "similarity": None})
 
     def update_params(self, params: dict):
@@ -80,16 +84,20 @@ class _BaseConfig:
         # Update default config settings with params by key
         for key, value in params.items():
             self.config = self._replace_nested_key(self.config, key, value)
-        
+
     def validate(self):
-        if self._model_slug not in list(self.config['models'][0].keys()):
+        if self._model_slug not in list(self.config["models"][0].keys()):
             raise ValueError("Invalid configuration file selected for this model type")
 
         if self.max_rows > self._max_rows_limit:
-            raise ValueError(f"max_rows must be less than {self._max_rows_limit} for this model type.")
+            raise ValueError(
+                f"max_rows must be less than {self._max_rows_limit} for this model type."
+            )
 
         if self.max_header_clusters > self._max_header_clusters_limit:
-            raise ValueError(f"max_header_clusters must be less than {self._max_header_clusters_limit} for this model type.")
+            raise ValueError(
+                f"max_header_clusters must be less than {self._max_header_clusters_limit} for this model type."
+            )
 
     def _replace_nested_key(self, data, key, value) -> dict:
         """Replace nested keys"""
@@ -116,6 +124,7 @@ class GretelLSTM(_BaseConfig):
         max_header_clusters (int, optional): Default: 20
         enable_privacy_filters (bool, optional): Default: False
     """
+
     _max_header_clusters_limit: int = 30
     _max_rows_limit: int = 5_000_000
     _model_slug: str = "synthetics"
@@ -135,7 +144,7 @@ class GretelLSTM(_BaseConfig):
         )
 
 
-class GretelCTGAN(_BaseConfig):
+class GretelACTGAN(_BaseConfig):
     """
     This model works well for high dimensional, largely numeric data. Use for datasets with more than 20 columns and/or 50,000 rows.
 
@@ -147,6 +156,7 @@ class GretelCTGAN(_BaseConfig):
         max_header_clusters (int, optional): Default: 500
         enable_privacy_filters (bool, optional): Default: False
     """
+
     _max_header_clusters_limit: int = 1_000
     _max_rows_limit: int = 5_000_000
     _model_slug: str = "ctgan"
@@ -166,6 +176,21 @@ class GretelCTGAN(_BaseConfig):
         )
 
 
+class GretelCTGAN(GretelACTGAN):
+    """
+    Deprecated, please use GretelACTGAN.
+
+    This model is a predecessor of GretelACTGAN, is now deprecated and will be
+    removed in future versions.
+    """
+
+    def __init__(self, *args, **kwargs):
+        logger.warning(
+            "GretelCTGAN is now deprecated and will be removed in future versions. Please use GretelACTGAN instead"
+        )
+        super().__init__(*args, **kwargs)
+
+
 class GretelAmplify(_BaseConfig):
     """
     This model is able to generate large quantities of data from real-world data or synthetic data.
@@ -177,6 +202,7 @@ class GretelAmplify(_BaseConfig):
         max_rows (int, optional): The number of rows of synthetic data to generate. Defaults to 50000
         max_header_clusters (int, optional): Default: 50
     """
+
     _max_header_clusters_limit: int = 1_000
     _max_rows_limit: int = 1_000_000_000
     _model_slug: str = "amplify"

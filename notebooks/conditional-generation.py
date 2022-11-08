@@ -1,10 +1,10 @@
 import pandas as pd
 
 from gretel_trainer import trainer
-from gretel_trainer.models import GretelLSTM, GretelCTGAN
+from gretel_trainer.models import GretelLSTM, GretelACTGAN
 
 DATASET_PATH = 'https://gretel-public-website.s3.amazonaws.com/datasets/mitre-synthea-health.csv'
-MODEL_TYPE = [GretelLSTM(), GretelCTGAN()][1]
+MODEL_TYPE = [GretelLSTM(), GretelACTGAN()][1]
 
 # Create dataset to autocomplete values for
 seed_df = pd.DataFrame(data=[
