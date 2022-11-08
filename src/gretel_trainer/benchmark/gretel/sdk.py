@@ -4,7 +4,7 @@ from typing_extensions import Protocol
 
 import pandas as pd
 
-from gretel_trainer.benchmark.core import DataSource, Datatype, Evaluator
+from gretel_trainer.benchmark.core import Evaluator
 from gretel_trainer.benchmark.gretel.models import GretelModel, GretelModelConfig
 
 import gretel_client.helpers
@@ -86,24 +86,11 @@ class GretelSDKExecutor:
         self,
         project_name: str,
         model: GretelModel,
-        model_key: str,
         sdk: GretelSDK,
     ):
         self.project_name = project_name
         self.model = model
-        self.model_key = model_key
         self.sdk = sdk
-
-    @property
-    def model_name(self) -> str:
-        return self.model.name
-
-    def runnable(self, source: DataSource) -> bool:
-        if self.model_key == "gpt_x":
-            if source.column_count > 1 or source.datatype != Datatype.NATURAL_LANGUAGE:
-                return False
-
-        return True
 
     def train(self, source: str, **kwargs) -> None:
         project = self.sdk.create_project(self.project_name)

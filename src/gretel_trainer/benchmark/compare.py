@@ -23,14 +23,12 @@ from gretel_trainer.benchmark.core import (
     Skipped,
 )
 from gretel_trainer.benchmark.custom.models import CustomExecutor
+from gretel_trainer.benchmark.gretel.executor import GretelExecutor
 from gretel_trainer.benchmark.gretel.models import GretelModel
-from gretel_trainer.benchmark.gretel.sdk import GretelSDK, GretelSDKExecutor
-from gretel_trainer.benchmark.gretel.trainer import GretelTrainerExecutor, Trainer
+from gretel_trainer.benchmark.gretel.sdk import GretelSDK
+from gretel_trainer.benchmark.gretel.trainer import Trainer
 
-from gretel_client.projects.exceptions import ModelConfigError
 from gretel_client.projects.models import read_model_config
-
-GretelExecutor = Union[GretelSDKExecutor, GretelTrainerExecutor]
 
 
 @dataclass
@@ -172,11 +170,11 @@ def compare(
                     project_name = f"{runtime_config.project_prefix}-{gretel_run_id}"
                     run_identifier = f"gretel-{gretel_run_id}"
                     gretel_run_id = gretel_run_id + 1
-                    executor = _create_gretel_executor(
+                    executor = GretelExecutor(
                         model=model,
                         project_name=project_name,
-                        gretel_sdk=gretel_sdk,
-                        gretel_trainer_factory=gretel_trainer_factory,
+                        sdk=gretel_sdk,
+                        trainer_factory=gretel_trainer_factory,
                         benchmark_dir=runtime_config.local_dir,
                     )
                     gretel_model_runs.append(
@@ -204,42 +202,3 @@ def compare(
         runtime_config=runtime_config,
         gretel_sdk=gretel_sdk,
     ).execute()
-
-
-def _create_gretel_executor(
-    model: GretelModel,
-    project_name: str,
-    gretel_sdk: GretelSDK,
-    gretel_trainer_factory: Callable[..., Trainer],
-    benchmark_dir: str,
-) -> GretelExecutor:
-    if model.config == "AUTO":
-        return GretelTrainerExecutor(
-            model=model,
-            model_key=None,
-            project_name=project_name,
-            trainer_factory=gretel_trainer_factory,
-            benchmark_dir=benchmark_dir,
-        )
-
-    try:
-        config_dict = read_model_config(model.config)
-        model_key = list(config_dict["models"][0])[0]
-    except (ModelConfigError, KeyError):
-        raise BenchmarkException(f"Invalid Gretel model config for {model.name}")
-
-    if model_key in ("ctgan", "lstm", "synthetics"):
-        return GretelTrainerExecutor(
-            model=model,
-            model_key=model_key,
-            project_name=project_name,
-            trainer_factory=gretel_trainer_factory,
-            benchmark_dir=benchmark_dir,
-        )
-
-    return GretelSDKExecutor(
-        project_name=project_name,
-        model=model,
-        model_key=model_key,
-        sdk=gretel_sdk,
-    )

@@ -177,11 +177,12 @@ def test_failures_during_cleanup_are_ignored(csv):
         (GretelCTGAN, tm.GretelACTGAN),
         (GretelACTGAN, tm.GretelACTGAN),
         (GretelLSTM, tm.GretelLSTM),
+        (GretelAmplify, tm.GretelAmplify),
         (DictConfigGretelModel, tm.GretelLSTM),
         (LocalFileConfigGretelModel, tm.GretelLSTM),
     ],
 )
-def test_auto_lstm_ctgan_models_use_trainer_executor(model, expected_model_type, csv):
+def test_models_using_trainer_executor(model, expected_model_type, csv):
     mock_gretel_trainer = MockGretelTrainer()
 
     csv_dataset = _make_dataset([csv])
@@ -253,44 +254,6 @@ def test_gptx_uses_sdk_executor(csv):
     assert mock_poll.call_count == 2
     assert comparison.results["Status"].values.tolist() == ["Completed"]
     assert comparison.results["SQS"].values.tolist() == [94]
-
-
-def test_amplify_uses_sdk_executor_and_evaluate(csv):
-    mock_trainer_factory = Mock()
-
-    mock_record_handler = Mock()
-    mock_record_handler.get_artifact_link = Mock()
-    mock_model = Mock()
-    mock_model.create_record_handler_obj = Mock(return_value=mock_record_handler)
-    mock_model.peek_report = Mock(return_value=None)
-    mock_project = Mock()
-    mock_project.create_model_obj = Mock(return_value=mock_model)
-    mock_project_factory = Mock(return_value=mock_project)
-    mock_poll = Mock()
-
-    csv_dataset = _make_dataset([csv])
-
-    with patch("pandas.read_csv") as patched_read_csv:
-        patched_read_csv.return_value = pd.DataFrame()
-        comparison = compare(
-            datasets=[csv_dataset],
-            models=[GretelAmplify],
-            runtime_config=TEST_RUNTIME_CONFIG,
-            gretel_sdk=_make_gretel_sdk(
-                create_project=mock_project_factory,
-                poll=mock_poll,
-            ),
-            gretel_trainer_factory=mock_trainer_factory,
-        ).wait()
-
-    mock_trainer_factory.assert_not_called()
-    mock_project_factory.assert_called_with("benchmark-proj-0")
-    mock_model.submit_cloud.assert_called_once()
-    mock_record_handler.submit_cloud.assert_called_once()
-    mock_record_handler.get_artifact_link.assert_called_once_with("data")
-    assert mock_poll.call_count == 2
-    assert comparison.results["Status"].values.tolist() == ["Completed"]
-    assert comparison.results["SQS"].values.tolist() == [42]
 
 
 def test_gretel_model_with_bad_custom_config_fails_before_execution_starts(csv):
