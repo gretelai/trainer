@@ -1,13 +1,12 @@
 from __future__ import annotations
 
 import logging
-from typing import TYPE_CHECKING, Union
+from typing import TYPE_CHECKING, Union, Optional
 
 if TYPE_CHECKING:
     import pandas as pd
 
 from gretel_client.projects.models import read_model_config
-
 
 logger = logging.getLogger(__name__)
 
@@ -126,6 +125,7 @@ class GretelLSTM(_BaseConfig):
         max_header_clusters=20,
         enable_privacy_filters=None,
     ):
+        _enable_privacy_filters_deprecation_warning(enable_privacy_filters)
         super().__init__(
             config=config,
             max_rows=max_rows,
@@ -157,6 +157,7 @@ class GretelACTGAN(_BaseConfig):
         max_header_clusters=1_000,
         enable_privacy_filters=None,
     ):
+        _enable_privacy_filters_deprecation_warning(enable_privacy_filters)
         super().__init__(
             config=config,
             max_rows=max_rows,
@@ -177,6 +178,15 @@ class GretelCTGAN(GretelACTGAN):
             "GretelCTGAN is now deprecated and will be removed in future versions. Please use GretelACTGAN instead"
         )
         super().__init__(*args, **kwargs)
+
+
+def _enable_privacy_filters_deprecation_warning(value: Optional[bool]) -> None:
+    if value is not None:
+        logger.warning(
+            "Privacy filters are now configured as `auto` and `enable_privacy_filters` "
+            "parameter is deprecated and will be removed in future versions. "
+            "See https://docs.gretel.ai/gretel.ai/synthetics/synthetics-faqs/privacy-protection#primary-protection-filters for more information"
+        )
 
 
 class GretelAmplify(_BaseConfig):
