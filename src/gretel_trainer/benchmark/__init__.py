@@ -11,6 +11,7 @@ from gretel_trainer.benchmark.gretel.datasets import GretelDataset, GretelPublic
 from gretel_trainer.benchmark.gretel.models import (
     GretelAmplify,
     GretelAuto,
+    GretelACTGAN,
     GretelCTGAN,
     GretelGPTX,
     GretelLSTM,

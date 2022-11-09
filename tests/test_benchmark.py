@@ -16,6 +16,7 @@ from gretel_trainer.benchmark import (
     Datatype,
     GretelAmplify,
     GretelAuto,
+    GretelACTGAN,
     GretelCTGAN,
     GretelGPTX,
     GretelLSTM,
@@ -68,7 +69,13 @@ def _make_dataset(
     )
 
 
-def _make_gretel_sdk(configure_session=None, create_project=None, search_projects=None, evaluate=None, poll=None) -> GretelSDK:
+def _make_gretel_sdk(
+    configure_session=None,
+    create_project=None,
+    search_projects=None,
+    evaluate=None,
+    poll=None,
+) -> GretelSDK:
     return GretelSDK(
         configure_session=configure_session or Mock(),
         create_project=create_project or Mock(),
@@ -167,7 +174,8 @@ def test_failures_during_cleanup_are_ignored(csv):
     "model,expected_model_type",
     [
         (GretelAuto, None),
-        (GretelCTGAN, tm.GretelCTGAN),
+        (GretelCTGAN, tm.GretelACTGAN),
+        (GretelACTGAN, tm.GretelACTGAN),
         (GretelLSTM, tm.GretelLSTM),
         (DictConfigGretelModel, tm.GretelLSTM),
         (LocalFileConfigGretelModel, tm.GretelLSTM),
@@ -192,7 +200,10 @@ def test_auto_lstm_ctgan_models_use_trainer_executor(model, expected_model_type,
 
     factory_args = mock_gretel_trainer.called_with["_factory_args"]
     assert factory_args["project_name"] == "benchmark-proj-0"
-    assert factory_args["cache_file"] == f"{TEST_BENCHMARK_DIR}/benchmark-proj-0-runner.json"
+    assert (
+        factory_args["cache_file"]
+        == f"{TEST_BENCHMARK_DIR}/benchmark-proj-0-runner.json"
+    )
     if expected_model_type is None:
         assert factory_args["model_type"] is None
     else:
@@ -411,7 +422,9 @@ def test_runs_with_gptx_are_skipped_when_too_many_columns_or_wrong_datatype():
 
 
 def test_runs_with_lstm_are_skipped_when_over_150_columns():
-    too_many_columns = _make_dataset([pd.DataFrame(index=range(151), columns=range(151))])
+    too_many_columns = _make_dataset(
+        [pd.DataFrame(index=range(151), columns=range(151))]
+    )
 
     comparison = compare(
         datasets=[too_many_columns],
@@ -462,7 +475,10 @@ def test_exits_early_when_session_is_misconfigured(csv):
             datasets=[csv_dataset],
             models=[GretelLSTM],
             runtime_config=TEST_RUNTIME_CONFIG,
-            gretel_sdk=_make_gretel_sdk(configure_session=mock_configure_session, create_project=mock_project_factory),
+            gretel_sdk=_make_gretel_sdk(
+                configure_session=mock_configure_session,
+                create_project=mock_project_factory,
+            ),
             gretel_trainer_factory=mock_trainer_factory,
         )
 

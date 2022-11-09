@@ -39,7 +39,7 @@ class Trainer:
 
     Args:
         project_name (str, optional): Gretel project name. Defaults to "trainer".
-        model_type (_BaseConfig, optional): Options include GretelLSTM(), GretelCTGAN(). If unspecified, the best option will be chosen at train time based on the training dataset.
+        model_type (_BaseConfig, optional): Options include GretelLSTM(), GretelACTGAN(). If unspecified, the best option will be chosen at train time based on the training dataset.
         cache_file (str, optional): Select a path to save or load the cache file. Default is `[project_name]-runner.json`.
         overwrite (bool, optional): Overwrite previous progress. Defaults to True.
     """
