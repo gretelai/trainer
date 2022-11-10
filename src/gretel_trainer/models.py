@@ -148,7 +148,7 @@ class GretelACTGAN(_BaseConfig):
 
     _max_header_clusters_limit: int = 5_000
     _max_rows_limit: int = 5_000_000
-    _model_slug: str = "ctgan"
+    _model_slug: str = "actgan"
 
     def __init__(
         self,
