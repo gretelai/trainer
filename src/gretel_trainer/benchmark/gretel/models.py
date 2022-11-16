@@ -22,7 +22,7 @@ TRAINER_MODEL_TYPE_CONSTRUCTORS = {
 }
 
 
-def _is_compatible(model_key: Optional[str], source: DataSource) -> bool:
+def _is_compatible(model_key: str, source: DataSource) -> bool:
     if model_key == "synthetics":
         return source.column_count <= 150
     elif model_key == "gpt_x":
