@@ -2,10 +2,10 @@ import os
 import pandas as pd
 from pathlib import Path
 import random
+from typing import Any, Dict, List, Optional
 
 from gretel_trainer import Trainer
-from gretel_trainer.models import GretelCTGAN
-from gretel_trainer.relational.connectors import SQLite
+from gretel_trainer.relational.core import Source
 
 
 WORKING_DIR = "working"
@@ -17,33 +17,33 @@ class MultiTable:
     Relational data support for the Trainer SDK
 
     Args:
-        db_path (str): connection string for database path
+        config (dict): source metadata and tables
         project_name (str, optional): Gretel project name. Defaults to "multi-table".
     """
 
     def __init__(
         self,
-        db_path: str,
-        project_prefix: str = "relational",
+        config: Dict[str, Any],
+        source: Source,
+        tables_not_to_synthesize: Optional[List[str]] = None,
+        project_prefix: str = "multi-table",
+        working_dir: str = "working",
     ):
-        print("Initializing connection to database")
         self.project_prefix = project_prefix
-        self.db = SQLite(db_path=db_path, working_dir=WORKING_DIR)
-        self.db.crawl_db()
+        self.config = config
+        self.source = source
+        self.tables_not_to_synthesize = tables_not_to_synthesize or []
+        self.working_dir = Path(working_dir)
         self.synthetic_tables = {}
         self.models = {}
+        os.makedirs(self.working_dir, exist_ok=True)
 
-        if not os.path.exists(WORKING_DIR):
-            os.makedirs(WORKING_DIR)
-
-    def _prepare_training_data(self, rdb_config: dict) -> dict:
+    def _prepare_training_data(self, rdb_config: Dict[str, Any]) -> dict:
         # Remove all primary and foreign key fields from the training data
         # Start by gathering the columns for each table
-        table_fields = {}
         table_fields_use = {}
         for table in rdb_config["table_data"]:
-            table_fields[table] = list(rdb_config["table_data"][table].columns)
-            table_fields_use[table] = list(table_fields[table])
+            table_fields_use[table] = list(rdb_config["table_data"][table].columns)
 
         # Now, loop through the primary/foreign key relations and gather those columns
         primary_keys_processed = []
@@ -64,34 +64,33 @@ class MultiTable:
         training_data = {}
         for table in rdb_config["table_data"]:
             train_df = rdb_config["table_data"][table].filter(table_fields_use[table])
-            training_path = Path.cwd() / WORKING_DIR / f"{table}-train.csv"
+            training_path = self.working_dir / f"{table}-train.csv"
             train_df.head(MAX_ROWS).to_csv(training_path, index=False)
             training_data[table] = training_path
 
         return training_data
 
-    def fit(self, overwrite=False):
+    # nee fit
+    def train(self):
         """Train synthetic data models on each table in the relational dataset"""
 
-        training_data = self._prepare_training_data(self.db.config)
+        training_data = self._prepare_training_data(self.config)
         for table, training_csv in training_data.items():
-            model_cache = Path.cwd() / WORKING_DIR / f"{table}-runner.json"
+            model_cache = self.working_dir / f"{table}-runner.json"
             model_name = str(model_cache)
             self.models[table] = model_name
 
             print(f"Fitting model: {table}")
-            model_type = GretelCTGAN(
-                config="synthetics/high-dimensionality",
-            )
             trainer = Trainer(
-                model_type=model_type,
+                model_type=None,
                 project_name=f"{self.project_prefix}-{table.replace('_', '-')}",
                 cache_file=model_cache,
                 overwrite=False,
             )
             trainer.train(training_csv)
 
-    def sample(self, record_size_ratio=1) -> dict:
+    # nee sample
+    def generate(self, record_size_ratio: float = 1.0) -> dict:
         """Sample synthetic data from trained models
 
         Args:
@@ -101,25 +100,27 @@ class MultiTable:
             dict(pd.DataFrame): Return a dictionary of table names and synthetic data.
         """
         # Compute the number of records needed for each table
-        self.db.config["synth_record_size_ratio"] = record_size_ratio
-        self.synth_record_counts = {}
+        synth_record_counts = {}
         synthetic_tables = {}
 
-        for table in self.db.config["table_data"]:
-            df = self.db.config["table_data"][table]
-            train_size = len(df)
-            synth_size = train_size * self.db.config["synth_record_size_ratio"]
-            self.synth_record_counts[table] = synth_size
+        for table in self.config["table_data"]:
+            source_df = self.config["table_data"][table]
+            if table in self.tables_not_to_synthesize:
+                synthetic_tables[table] = source_df
+            else:
+                train_size = len(source_df)
+                synth_size = train_size * record_size_ratio
+                synth_record_counts[table] = synth_size
 
-            print(f"Sampling {synth_size} rows from {table}")
-            model = Trainer.load(
-                cache_file=self.models[table],
-                project_name=f"{self.project_prefix}-{table.replace('_', '-')}",
-            )
-            data = model.generate(num_records=self.synth_record_counts[table])
-            synthetic_tables[table] = data
+                print(f"Sampling {synth_size} rows from {table}")
+                model = Trainer.load(
+                    cache_file=self.models[table],
+                    project_name=f"{self.project_prefix}-{table.replace('_', '-')}",
+                )
+                data = model.generate(num_records=synth_record_counts[table])
+                synthetic_tables[table] = data
 
-        synthetic_tables = self._synthesize_keys(synthetic_tables, self.db.config)
+        synthetic_tables = self._synthesize_keys(synthetic_tables, self.config)
 
         return synthetic_tables
 
@@ -153,17 +154,35 @@ class MultiTable:
                 if rel_field==rdb_config["primary_keys"][rel_table]:
                     primary_key_values = synth_primary_keys[rel_table]
                 else:
-                    # Find the average number of records with the same foreign key value
+                    # Now recreate the foreign key values using the primary key values while
+                    # preserving the number of records with the same foreign key value
+                    # Primary key values range from 0 to size of table holding primary key
+
+                    # Get the frequency distribution of this foreign key
+                    table_df = rdb_config["table_data"][rel_table]
+                    freqs = table_df.groupby([rel_field]).size().reset_index()
+
                     synth_size = synth_record_counts[rel_table]
-                    avg_cnt_key = int(synth_size / len(primary_key_values))
                     key_values = []
                     key_cnt = 0
-                    # Now recreate the foreign key values using the primary key values while
-                    # preserving the avg number of records with the same foreign key value
+
+                    # Process one primary key at a time. Keep an index on the foreign key freq values
+                    # and repeat the primary key as a foreign key for the next freq value.  If we're
+                    # increasing the size of the tables, we'll have to loop through the foreign key
+                    # values multiple times
+
+                    next_freq_index = 0
                     for i in range(len(primary_key_values)):
-                        for j in range(avg_cnt_key):
+                        if next_freq_index == len(freqs):
+                            next_freq_index = 0
+                        freq = freqs.loc[next_freq_index][0]
+                        for j in range(freq):
                             key_values.append(i)
                             key_cnt += 1
+                        next_freq_index += 1
+
+                    # Make sure we have reached the desired size of the foreign key table
+                    # If not, loop back through the primary keys filling it in.
                     i = 0
                     while key_cnt < synth_size:
                         key_values.append(i)
