@@ -8,7 +8,7 @@ import gretel_trainer
 from gretel_trainer.benchmark.core import DataSource
 from gretel_trainer.benchmark.gretel.models import GretelModel
 from gretel_trainer.benchmark.gretel.sdk import GretelSDK
-from gretel_trainer.benchmark.gretel.trainer import Trainer
+from gretel_trainer.benchmark.gretel.trainer import TrainerFactory
 
 
 class _GretelTrainerExecutor:
@@ -16,7 +16,7 @@ class _GretelTrainerExecutor:
         self,
         project_name: str,
         trainer_model_type: Optional[gretel_trainer.models._BaseConfig],
-        trainer_factory: Callable[..., Trainer],
+        trainer_factory: TrainerFactory,
         benchmark_dir: str,
     ):
         self.project_name = project_name
@@ -83,7 +83,7 @@ class GretelExecutor:
         project_name: str,
         model: GretelModel,
         sdk: GretelSDK,
-        trainer_factory: Callable[..., Trainer],
+        trainer_factory: TrainerFactory,
         benchmark_dir: str,
     ):
         self._project_name = project_name
@@ -111,7 +111,7 @@ def _choose_executor(
     project_name: str,
     model: GretelModel,
     sdk: GretelSDK,
-    trainer_factory: Callable[..., Trainer],
+    trainer_factory: TrainerFactory,
     benchmark_dir: str,
 ) -> Union[_GretelTrainerExecutor, _GretelSDKExecutor]:
     if model.use_trainer:

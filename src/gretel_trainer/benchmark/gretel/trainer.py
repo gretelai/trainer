@@ -1,10 +1,12 @@
-from typing import Optional
+from typing import Callable, Optional
 from typing_extensions import Protocol
 
 import pandas as pd
 
+from gretel_trainer import trainer
 
-class Trainer(Protocol):
+
+class GretelTrainer(Protocol):
     def train(self, source: str, delimiter: Optional[str]) -> None:
         ...
 
@@ -13,3 +15,8 @@ class Trainer(Protocol):
 
     def get_sqs_score(self) -> int:
         ...
+
+
+TrainerFactory = Callable[..., GretelTrainer]
+
+ActualGretelTrainer: TrainerFactory = trainer.Trainer

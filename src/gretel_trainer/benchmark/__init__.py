@@ -18,7 +18,7 @@ from gretel_trainer.benchmark.gretel.models import (
     GretelModel,
 )
 from gretel_trainer.benchmark.gretel.sdk import ActualGretelSDK
-from gretel_trainer import trainer
+from gretel_trainer.benchmark.gretel.trainer import ActualGretelTrainer
 
 BENCHMARK_DIR = "./.benchmark"
 
@@ -76,7 +76,7 @@ def compare(
             auto_clean=auto_clean,
         ),
         gretel_sdk=ActualGretelSDK,
-        gretel_trainer_factory=trainer.Trainer,
+        gretel_trainer_factory=ActualGretelTrainer,
     )
 
 

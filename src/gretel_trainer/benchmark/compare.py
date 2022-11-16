@@ -26,7 +26,7 @@ from gretel_trainer.benchmark.custom.models import CustomExecutor
 from gretel_trainer.benchmark.gretel.executor import GretelExecutor
 from gretel_trainer.benchmark.gretel.models import GretelModel
 from gretel_trainer.benchmark.gretel.sdk import GretelSDK
-from gretel_trainer.benchmark.gretel.trainer import Trainer
+from gretel_trainer.benchmark.gretel.trainer import TrainerFactory
 
 from gretel_client.projects.models import read_model_config
 
@@ -153,7 +153,7 @@ def compare(
     models: List[Union[ModelFactory, Type[GretelModel]]],
     runtime_config: RuntimeConfig,
     gretel_sdk: GretelSDK,
-    gretel_trainer_factory: Callable[..., Trainer],
+    gretel_trainer_factory: TrainerFactory,
 ) -> Comparison:
     gretel_sdk.configure_session()
 
