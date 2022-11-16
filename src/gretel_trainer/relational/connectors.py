@@ -5,6 +5,11 @@ from sqlalchemy import MetaData, text
 from sqlalchemy import create_engine
 from sqlalchemy.exc import OperationalError
 from collections import defaultdict
+from pathlib import Path
+
+from typing import Any, Dict, Union, Tuple
+
+from gretel_trainer.relational.core import MultiTableException, PrimaryKey, Table, SyntheticTables, Source
 
 
 class _Connection:
@@ -18,68 +23,61 @@ class _Connection:
             for additional configuration. In some cases a file path is accepted.
     """
 
-    def __init__(self, db_path: int, working_dir: str):
+    def __init__(self, db_path: str, out_dir: str):
         self.db_path = db_path
-        self.working_dir = working_dir
+        self.out_dir = Path(out_dir)
         self.engine = None
-        self.config = None
 
-    def connect(self):
+    def connect(self) -> None:
+        if self.engine is None:
+            raise MultiTableException("Missing sqlalchemy engine")
         try:
             self.engine.connect()
             print("Successfully connected to db")
         except OperationalError as e:
             print(f"{e}, {e.__cause__}")
 
-    def crawl_db(self):
-
-        base_path = "./"
-
+    def crawl_db(self) -> Tuple[Dict[str, Any], Source]:
         metadata = MetaData()
         metadata.reflect(self.engine)
 
-        rdb_config = {}
-        rdb_config["table_data"] = {}
-        rdb_config["table_files"] = {}
+        table_data = {}
+        table_files = {}
+        primary_keys = {}
+        rels_by_pkey = defaultdict(list) # Dict[Tuple[str, str], List[Tuple[str, str]]]  # where tuple elements are (tablename, columnname)
+        relationships = [] # List[List[Tuple[str, str]]]
+        tables = {}
+        # relationships_typed = ...
 
-        for name, table in metadata.tables.items():
-            df = pd.read_sql_table(name, self.engine)
-            rdb_config["table_data"][name] = df
-            filename = name + ".csv"
-            df.to_csv(filename, index=False, header=True)
-            rdb_config["table_files"][name] = base_path + filename
-
-        # Extract primary/foriegn key relationshihps
-        rels_by_pkey = defaultdict(list)
-
-        for name, table in metadata.tables.items():
-            for col in table.columns:
-                for f_key in col.foreign_keys:
-                    rels_by_pkey[(f_key.column.table.name, f_key.column.name)].append(
-                        (name, col.name)
-                    )
-
-        list_of_rels_by_pkey = []
+        for table_name, table in metadata.tables.items():
+            df = pd.read_sql_table(table_name, self.engine)
+            table_data[table_name] = df
+            filepath = self.out_dir / f"{table_name}.csv"
+            table_files[table_name] = filepath
+            primary_key = None
+            for column in table.columns:
+                if column.primary_key:
+                    primary_key = PrimaryKey(table_name=table_name, column_name=column.name)
+                    primary_keys[table_name] = column.name
+                for f_key in column.foreign_keys:
+                    rels_by_pkey[(f_key.column.table.name, f_key.column.name)].append((table_name, column.name))
+            tables[table_name] = Table(name=table_name, data=df, path=filepath, primary_key=primary_key)
 
         for p_key, f_keys in rels_by_pkey.items():
-            list_of_rels_by_pkey.append([p_key] + f_keys)
+            relationships.append([p_key] + f_keys)
 
-        rdb_config["relationships"] = list_of_rels_by_pkey
+        rdb_config = {
+            "table_data": table_data,
+            "table_files": table_files,
+            "primary_keys": primary_keys,
+            "relationships": relationships,
+        }
+        source = Source(tables=tables)
+        return (rdb_config, source)
 
-        # Extract each table's primary key
-        rdb_config["primary_keys"] = {}
-
-        for name, table in metadata.tables.items():
-            for col in table.columns:
-                if col.primary_key:
-                    rdb_config["primary_keys"][name] = col.name
-
-        self.config = rdb_config
-
-    def save_to_rdb(
-        self, orig_db: str, new_db: str, transformed_tables: dict, engine, type="sqlite"
-    ):
-        print("Type " + type + " is not supported yet")
+    # TODO: constrain type to just SyntheticTables post-refactor
+    def save_to_db(self, synthetic_tables: Union[SyntheticTables, Dict[str, pd.DataFrame]]) -> None:
+        pass
 
 
 class SQLite(_Connection):
@@ -87,8 +85,8 @@ class SQLite(_Connection):
     Connector to load data from SQLite databases
     """
 
-    def __init__(self, db_path: str, working_dir: str):
-        super().__init__(db_path=db_path, working_dir=working_dir)
+    def __init__(self, db_path: str, out_dir: str):
+        super().__init__(db_path=db_path, out_dir=out_dir)
 
         print("Connecting to database")
         self.engine = create_engine(self.db_path)
@@ -100,8 +98,8 @@ class PostgreSQL(_Connection):
     Connector to load data from Postgres databases
     """
 
-    def __init__(self, db_path: str, working_dir: str):
-        super().__init__(db_path=db_path, working_dir=working_dir)
+    def __init__(self, db_path: str, out_dir: str):
+        super().__init__(db_path=db_path, out_dir=out_dir)
 
         print("Connecting to database")
         self.engine = create_engine(self.db_path)
