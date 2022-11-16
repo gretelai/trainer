@@ -22,7 +22,7 @@ from gretel_trainer.benchmark.core import (
     Run,
     Skipped,
 )
-from gretel_trainer.benchmark.custom.models import CustomExecutor
+from gretel_trainer.benchmark.custom.executor import CustomExecutor
 from gretel_trainer.benchmark.gretel.executor import GretelExecutor
 from gretel_trainer.benchmark.gretel.models import GretelModel
 from gretel_trainer.benchmark.gretel.sdk import GretelSDK
