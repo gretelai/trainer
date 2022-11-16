@@ -5,7 +5,7 @@ from typing_extensions import Protocol
 import pandas as pd
 
 from gretel_trainer.benchmark.core import Evaluator
-from gretel_trainer.benchmark.gretel.models import GretelModel, GretelModelConfig
+from gretel_trainer.benchmark.gretel.models import GretelModelConfig
 
 import gretel_client.helpers
 
@@ -79,39 +79,3 @@ ActualGretelSDK = GretelSDK(
     evaluate=_evaluate,
     poll=gretel_client.helpers.poll,
 )
-
-
-class GretelSDKExecutor:
-    def __init__(
-        self,
-        project_name: str,
-        model: GretelModel,
-        sdk: GretelSDK,
-    ):
-        self.project_name = project_name
-        self.model = model
-        self.sdk = sdk
-
-    def train(self, source: str, **kwargs) -> None:
-        project = self.sdk.create_project(self.project_name)
-        self.model_obj = project.create_model_obj(
-            model_config=self.model.config, data_source=source
-        )
-        self.model_obj.submit_cloud()
-        self.sdk.poll(self.model_obj)
-
-    def generate(self, **kwargs) -> pd.DataFrame:
-        record_handler = self.model_obj.create_record_handler_obj(
-            params={"num_records": kwargs["training_row_count"]}
-        )
-        record_handler.submit_cloud()
-        self.sdk.poll(record_handler)
-        return pd.read_csv(record_handler.get_artifact_link("data"), compression="gzip")
-
-    def get_sqs_score(self, synthetic: pd.DataFrame, reference: str) -> int:
-        report = self.model_obj.peek_report()
-        if report is None:
-            return self.sdk.evaluate(
-                synthetic=synthetic, reference=reference
-            )
-        return report["synthetic_data_quality_score"]["score"]
