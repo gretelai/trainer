@@ -140,7 +140,7 @@ class GretelACTGAN(_BaseConfig):
     Not ideal if dataset contains free text field
 
     Args:
-        config (str/dict, optional): Either a string representing the path to the config on the local filesystem, a string representing a path to the default Gretel configurations, or a dictionary containing the configurations. Default: "synthetics/high-dimensionality", a default Gretel configuration
+        config (str/dict, optional): Either a string representing the path to the config on the local filesystem, a string representing a path to the default Gretel configurations, or a dictionary containing the configurations. Default: "synthetics/tabular-actgan", a default Gretel configuration
         max_rows (int, optional): The number of rows of synthetic data to generate. Defaults to 50000
         max_header_clusters (int, optional): Default: 500
         enable_privacy_filters (bool, optional): This parameter is deprecated and will be removed in future versions.
@@ -152,7 +152,7 @@ class GretelACTGAN(_BaseConfig):
 
     def __init__(
         self,
-        config="synthetics/high-dimensionality",
+        config="synthetics/tabular-actgan",
         max_rows=1_000_000,
         max_header_clusters=1_000,
         enable_privacy_filters=None,

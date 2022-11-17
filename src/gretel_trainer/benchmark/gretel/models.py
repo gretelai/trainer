@@ -70,7 +70,7 @@ class GretelAuto(GretelModel):
     config = "AUTO"
 
 class GretelACTGAN(GretelModel):
-    config = "synthetics/high-dimensionality"
+    config = "synthetics/tabular-actgan"
 
 class GretelGPTX(GretelModel):
     config = "synthetics/natural-language"
