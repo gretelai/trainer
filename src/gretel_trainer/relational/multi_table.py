@@ -39,35 +39,21 @@ class MultiTable:
         self.models = {}
         os.makedirs(self.working_dir, exist_ok=True)
 
-    def _prepare_training_data(self, rdb_config: Dict[str, Any]) -> dict:
-        # Remove all primary and foreign key fields from the training data
-        # Start by gathering the columns for each table
-        table_fields_use = {}
-        for table in rdb_config["table_data"]:
-            table_fields_use[table] = list(rdb_config["table_data"][table].columns)
-
-        # Now, loop through the primary/foreign key relations and gather those columns
-        primary_keys_processed = []
-        for key_set in rdb_config["relationships"]:
-            for table_field_pair in key_set:
-                table, field = table_field_pair
-                if field==rdb_config["primary_keys"][table]:
-                    primary_keys_processed.append(table)
-                table_fields_use[table].remove(field)
-
-        # Gather the remaining primary keys
-        for table in rdb_config["primary_keys"]:
-            if table not in primary_keys_processed:
-                field = rdb_config["primary_keys"][table]
-                table_fields_use[table].remove(field)
-
-        # Remove the key fields from the training data
+    def _prepare_training_data(self) -> Dict[str, Path]:
+        """
+        Exports a copy of each table with all primary and foreign key columns removed
+        to the working directory. Returns a dict with table names as keys and Paths
+        to the CSVs as values.
+        """
         training_data = {}
-        for table in rdb_config["table_data"]:
-            train_df = rdb_config["table_data"][table].filter(table_fields_use[table])
-            training_path = self.working_dir / f"{table}-train.csv"
-            train_df.head(MAX_ROWS).to_csv(training_path, index=False)
-            training_data[table] = training_path
+        for name, table in self.source.tables.items():
+            columns_to_drop = []
+            if table.primary_key is not None:
+                columns_to_drop.append(table.primary_key.column_name)
+            columns_to_drop.extend([foreign_key.column_name for foreign_key in table.foreign_keys])
+            training_path = self.working_dir / f"{name}-train.csv"
+            table.data.drop(columns=columns_to_drop).to_csv(training_path, index=False)
+            training_data[name] = training_path
 
         return training_data
 
@@ -75,7 +61,7 @@ class MultiTable:
     def train(self):
         """Train synthetic data models on each table in the relational dataset"""
 
-        training_data = self._prepare_training_data(self.config)
+        training_data = self._prepare_training_data()
         for table, training_csv in training_data.items():
             model_cache = self.working_dir / f"{table}-runner.json"
             model_name = str(model_cache)

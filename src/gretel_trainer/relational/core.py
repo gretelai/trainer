@@ -28,6 +28,7 @@ class Table:
     data: pd.DataFrame
     path: Path
     primary_key: Optional[PrimaryKey]
+    foreign_keys: List[ForeignKey]
 
 
 # rdb_config: Dict[str, Any]
