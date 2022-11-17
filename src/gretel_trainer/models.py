@@ -16,6 +16,14 @@ LOW_COLUMN_THRESHOLD = 4
 LOW_RECORD_THRESHOLD = 1_000
 
 
+def _actgan_is_best(rows: int, cols: int) -> bool:
+    return \
+        rows > HIGH_RECORD_THRESHOLD or \
+        cols > HIGH_COLUMN_THRESHOLD or \
+        rows < LOW_RECORD_THRESHOLD or \
+        cols < LOW_COLUMN_THRESHOLD
+
+
 def determine_best_model(df: pd.DataFrame) -> _BaseConfig:
     """
     Determine the Gretel model best suited for generating synthetic data
@@ -29,12 +37,10 @@ def determine_best_model(df: pd.DataFrame) -> _BaseConfig:
     """
     row_count, column_count = df.shape
 
-    if row_count > HIGH_RECORD_THRESHOLD or column_count > HIGH_COLUMN_THRESHOLD:
-        return GretelACTGAN(config="synthetics/high-dimensionality")
-    elif row_count < LOW_RECORD_THRESHOLD or column_count < LOW_COLUMN_THRESHOLD:
-        return GretelACTGAN(config="synthetics/low-record-count")
+    if _actgan_is_best(row_count, column_count):
+        return GretelACTGAN()
     else:
-        return GretelLSTM(config="synthetics/default")
+        return GretelLSTM()
 
 
 class _BaseConfig:
