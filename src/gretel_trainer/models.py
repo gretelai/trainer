@@ -16,6 +16,14 @@ LOW_COLUMN_THRESHOLD = 4
 LOW_RECORD_THRESHOLD = 1_000
 
 
+def _actgan_is_best(rows: int, cols: int) -> bool:
+    return \
+        rows > HIGH_RECORD_THRESHOLD or \
+        cols > HIGH_COLUMN_THRESHOLD or \
+        rows < LOW_RECORD_THRESHOLD or \
+        cols < LOW_COLUMN_THRESHOLD
+
+
 def determine_best_model(df: pd.DataFrame) -> _BaseConfig:
     """
     Determine the Gretel model best suited for generating synthetic data
@@ -29,12 +37,10 @@ def determine_best_model(df: pd.DataFrame) -> _BaseConfig:
     """
     row_count, column_count = df.shape
 
-    if row_count > HIGH_RECORD_THRESHOLD or column_count > HIGH_COLUMN_THRESHOLD:
-        return GretelACTGAN(config="synthetics/high-dimensionality")
-    elif row_count < LOW_RECORD_THRESHOLD or column_count < LOW_COLUMN_THRESHOLD:
-        return GretelACTGAN(config="synthetics/low-record-count")
+    if _actgan_is_best(row_count, column_count):
+        return GretelACTGAN()
     else:
-        return GretelLSTM(config="synthetics/default")
+        return GretelLSTM()
 
 
 class _BaseConfig:
@@ -140,7 +146,7 @@ class GretelACTGAN(_BaseConfig):
     Not ideal if dataset contains free text field
 
     Args:
-        config (str/dict, optional): Either a string representing the path to the config on the local filesystem, a string representing a path to the default Gretel configurations, or a dictionary containing the configurations. Default: "synthetics/high-dimensionality", a default Gretel configuration
+        config (str/dict, optional): Either a string representing the path to the config on the local filesystem, a string representing a path to the default Gretel configurations, or a dictionary containing the configurations. Default: "synthetics/tabular-actgan", a default Gretel configuration
         max_rows (int, optional): The number of rows of synthetic data to generate. Defaults to 50000
         max_header_clusters (int, optional): Default: 500
         enable_privacy_filters (bool, optional): This parameter is deprecated and will be removed in future versions.
@@ -148,11 +154,11 @@ class GretelACTGAN(_BaseConfig):
 
     _max_header_clusters_limit: int = 5_000
     _max_rows_limit: int = 5_000_000
-    _model_slug: str = "ctgan"
+    _model_slug: str = "actgan"
 
     def __init__(
         self,
-        config="synthetics/high-dimensionality",
+        config="synthetics/tabular-actgan",
         max_rows=1_000_000,
         max_header_clusters=1_000,
         enable_privacy_filters=None,
@@ -163,21 +169,6 @@ class GretelACTGAN(_BaseConfig):
             max_rows=max_rows,
             max_header_clusters=max_header_clusters,
         )
-
-
-class GretelCTGAN(GretelACTGAN):
-    """
-    Deprecated, please use GretelACTGAN.
-
-    This model is a predecessor of GretelACTGAN, is now deprecated and will be
-    removed in future versions.
-    """
-
-    def __init__(self, *args, **kwargs):
-        logger.warning(
-            "GretelCTGAN is now deprecated and will be removed in future versions. Please use GretelACTGAN instead"
-        )
-        super().__init__(*args, **kwargs)
 
 
 def _enable_privacy_filters_deprecation_warning(value: Optional[bool]) -> None:

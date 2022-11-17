@@ -12,7 +12,7 @@ This module is designed to provide a simple interface to help users successfully
     * Privacy filters and optional differential privacy support.
 * Multiple [model types supported](https://docs.gretel.ai/synthetics/models):
     * `Gretel-LSTM` model type supports text, tabular, time-series, and conditional data generation.
-    * `Gretel-CTGAN` model type supports tabular and conditional data generation.
+    * `Gretel-ACTGAN` model type supports tabular and conditional data generation.
     * `Gretel-GPT` natural language synthesis based on an open-source implementation of GPT-3 (coming soon).
     * `Gretel-DGAN` multi-variate time series based on DoppelGANger (coming soon).
 
