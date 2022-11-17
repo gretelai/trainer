@@ -165,21 +165,6 @@ class GretelACTGAN(_BaseConfig):
         )
 
 
-class GretelCTGAN(GretelACTGAN):
-    """
-    Deprecated, please use GretelACTGAN.
-
-    This model is a predecessor of GretelACTGAN, is now deprecated and will be
-    removed in future versions.
-    """
-
-    def __init__(self, *args, **kwargs):
-        logger.warning(
-            "GretelCTGAN is now deprecated and will be removed in future versions. Please use GretelACTGAN instead"
-        )
-        super().__init__(*args, **kwargs)
-
-
 def _enable_privacy_filters_deprecation_warning(value: Optional[bool]) -> None:
     if value is not None:
         logger.warning(

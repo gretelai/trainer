@@ -12,7 +12,6 @@ from gretel_trainer.benchmark.gretel.models import (
     GretelAmplify,
     GretelAuto,
     GretelACTGAN,
-    GretelCTGAN,
     GretelGPTX,
     GretelLSTM,
     GretelModel,

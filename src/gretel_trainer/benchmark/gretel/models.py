@@ -14,7 +14,6 @@ GretelModelConfig = Union[str, Path, Dict]
 TRAINER_MODEL_TYPE_CONSTRUCTORS = {
     "actgan": models.GretelACTGAN,
     "amplify": models.GretelAmplify,
-    "ctgan": models.GretelACTGAN,
     "synthetics": models.GretelLSTM,
 
     # Benchmark GretelAuto sends None model_type to Trainer to trigger dynamic model selection
@@ -72,12 +71,6 @@ class GretelAuto(GretelModel):
 
 class GretelACTGAN(GretelModel):
     config = "synthetics/high-dimensionality"
-
-class GretelCTGAN(GretelACTGAN):
-    """
-    Deprecated, please use GretelACTGAN instead.
-    """
-    ...
 
 class GretelGPTX(GretelModel):
     config = "synthetics/natural-language"

@@ -17,7 +17,6 @@ from gretel_trainer.benchmark import (
     GretelAmplify,
     GretelAuto,
     GretelACTGAN,
-    GretelCTGAN,
     GretelGPTX,
     GretelLSTM,
     GretelModel,
@@ -174,7 +173,6 @@ def test_failures_during_cleanup_are_ignored(csv):
     "model,expected_model_type",
     [
         (GretelAuto, None),
-        (GretelCTGAN, tm.GretelACTGAN),
         (GretelACTGAN, tm.GretelACTGAN),
         (GretelLSTM, tm.GretelLSTM),
         (GretelAmplify, tm.GretelAmplify),
