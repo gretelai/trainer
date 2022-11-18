@@ -82,45 +82,39 @@ class MultiTable:
         training_data = self._prepare_training_data()
         self._create_trainer_models(training_data)
 
-    def generate(self, record_size_ratio: float = 1.0) -> dict:
+    def generate(self, record_size_ratio: float = 1.0) -> Dict[str, pd.DataFrame]:
         """Sample synthetic data from trained models
 
         Args:
-            record_size_ratio (int, optional): Ratio to upsample real world data size with. Defaults to 1.
+            record_size_ratio (float, optional): Ratio to upsample real world data size with. Defaults to 1.
 
         Returns:
             dict(pd.DataFrame): Return a dictionary of table names and synthetic data.
         """
         # Compute the number of records needed for each table
-        synth_record_counts = {}
         synthetic_tables = {}
 
-        for table in self.config["table_data"]:
-            source_df = self.config["table_data"][table]
-            if table in self.tables_not_to_synthesize:
-                synthetic_tables[table] = source_df
+        for table_name, table in self.source.tables.items():
+            if table_name in self.tables_not_to_synthesize:
+                synthetic_tables[table] = table.data
             else:
-                train_size = len(source_df)
-                synth_size = train_size * record_size_ratio
-                synth_record_counts[table] = synth_size
-
-                print(f"Sampling {synth_size} rows from {table}")
+                synth_size = int(len(table.data) * record_size_ratio)
+                print(f"Sampling {synth_size} rows from {table_name}")
                 model = Trainer.load(
-                    cache_file=str(self.model_cache_files[table]),
-                    project_name=f"{self.project_prefix}-{table.replace('_', '-')}",
+                    cache_file=str(self.model_cache_files[table_name]),
+                    project_name=f"{self.project_prefix}-{table_name.replace('_', '-')}",
                 )
-                data = model.generate(num_records=synth_record_counts[table])
+                data = model.generate(num_records=synth_size)
                 synthetic_tables[table] = data
 
-        synthetic_tables = self._synthesize_keys(synthetic_tables, self.config)
+        synthetic_tables = self._synthesize_keys(synthetic_tables)
 
         return synthetic_tables
 
     def _synthesize_keys(
         self,
-        synthetic_tables: dict,
-        rdb_config: dict,
-    ) -> dict:
+        synthetic_tables: Dict[str, pd.DataFrame],
+    ) -> Dict[str, pd.DataFrame]:
         # Recompute the number of records needed for each table
         synth_primary_keys = {}
         synth_foreign_keys = {}
@@ -130,7 +124,7 @@ class MultiTable:
             synth_foreign_keys[table_name] = {}
 
         # Synthesize primary keys by assigning a new unique int
-        for table_name, field_name in rdb_config["primary_keys"].items():
+        for table_name, field_name in self.config["primary_keys"].items():
             df = synthetic_tables[table_name]
             synth_size = synth_record_counts[table_name]
             new_key = [i for i in range(synth_size)]
@@ -139,11 +133,11 @@ class MultiTable:
             synthetic_tables[table_name] = df
 
         # Synthesize foreign keys
-        for relationship in rdb_config["relationships"]:
+        for relationship in self.config["relationships"]:
             for table_field_pair in relationship:
                 rel_table, rel_field = table_field_pair
                 # Check if the table/field pair is the primary key
-                if rel_field == rdb_config["primary_keys"][rel_table]:
+                if rel_field == self.config["primary_keys"][rel_table]:
                     primary_key_values = synth_primary_keys[rel_table]
                 else:
                     # Now recreate the foreign key values using the primary key values while
@@ -151,7 +145,7 @@ class MultiTable:
                     # Primary key values range from 0 to size of table holding primary key
 
                     # Get the frequency distribution of this foreign key
-                    table_df = rdb_config["table_data"][rel_table]
+                    table_df = self.config["table_data"][rel_table]
                     freqs = table_df.groupby([rel_field]).size().reset_index()
 
                     synth_size = synth_record_counts[rel_table]
