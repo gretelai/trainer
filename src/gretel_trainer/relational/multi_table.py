@@ -36,7 +36,7 @@ class MultiTable:
         self.tables_not_to_synthesize = tables_not_to_synthesize or []
         self.working_dir = Path(working_dir)
         self.synthetic_tables = {}
-        self.models = {}
+        self.model_cache_files: Dict[str, Path] = {}
         os.makedirs(self.working_dir, exist_ok=True)
 
     def _prepare_training_data(self) -> Dict[str, Path]:
@@ -57,26 +57,29 @@ class MultiTable:
 
         return training_data
 
-    # nee fit
-    def train(self):
-        """Train synthetic data models on each table in the relational dataset"""
+    def _create_trainer_models(self, training_data: Dict[str, Path]) -> None:
+        """
+        Submits each training CSV in the working directory to Trainer for model creation/training.
+        Stores each model's Trainer cache file for Trainer to load later.
+        """
+        for table_name, training_csv in training_data.items():
+            model_cache = self.working_dir / f"{table_name}-runner.json"
+            self.model_cache_files[table_name] = model_cache
 
-        training_data = self._prepare_training_data()
-        for table, training_csv in training_data.items():
-            model_cache = self.working_dir / f"{table}-runner.json"
-            model_name = str(model_cache)
-            self.models[table] = model_name
-
-            print(f"Fitting model: {table}")
+            print(f"Fitting model: {table_name}")
             trainer = Trainer(
                 model_type=GretelACTGAN(),
-                project_name=f"{self.project_prefix}-{table.replace('_', '-')}",
+                project_name=f"{self.project_prefix}-{table_name.replace('_', '-')}",
                 cache_file=model_cache,
                 overwrite=False,
             )
             trainer.train(training_csv)
 
-    # nee sample
+    def train(self):
+        """Train synthetic data models on each table in the relational dataset"""
+        training_data = self._prepare_training_data()
+        self._create_trainer_models(training_data)
+
     def generate(self, record_size_ratio: float = 1.0) -> dict:
         """Sample synthetic data from trained models
 
@@ -101,7 +104,7 @@ class MultiTable:
 
                 print(f"Sampling {synth_size} rows from {table}")
                 model = Trainer.load(
-                    cache_file=self.models[table],
+                    cache_file=str(self.model_cache_files[table]),
                     project_name=f"{self.project_prefix}-{table.replace('_', '-')}",
                 )
                 data = model.generate(num_records=synth_record_counts[table])
