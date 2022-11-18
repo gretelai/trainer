@@ -5,6 +5,7 @@ import random
 from typing import Any, Dict, List, Optional
 
 from gretel_trainer import Trainer
+from gretel_trainer.models import GretelACTGAN
 from gretel_trainer.relational.core import Source
 
 
@@ -82,7 +83,7 @@ class MultiTable:
 
             print(f"Fitting model: {table}")
             trainer = Trainer(
-                model_type=None,
+                model_type=GretelACTGAN(),
                 project_name=f"{self.project_prefix}-{table.replace('_', '-')}",
                 cache_file=model_cache,
                 overwrite=False,
