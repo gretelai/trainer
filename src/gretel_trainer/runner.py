@@ -441,9 +441,6 @@ class StrategyRunner:
                     "attrs": {"fields": partition.columns.seed_headers},
                 }
 
-        elif "actgan" in model_config["models"][0].keys():
-            pass
-
         model = self._project.create_model_obj(
             data_source=artifact.id, model_config=model_config,
         )
