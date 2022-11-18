@@ -33,21 +33,17 @@ class _Connection:
     def __init__(self, db_path: str, out_dir: str):
         self.db_path = db_path
         self.out_dir = Path(out_dir)
-        self.engine = None
-
-    def connect(self) -> None:
-        if self.engine is None:
-            raise MultiTableException("Missing sqlalchemy engine")
+        self.engine = create_engine(self.db_path)
+        print("Connecting to database")
         try:
             self.engine.connect()
-            print("Successfully connected to db")
         except OperationalError as e:
             print(f"{e}, {e.__cause__}")
+        print("Successfully connected to db")
+        self.metadata = MetaData()
+        self.metadata.reflect(self.engine)
 
     def crawl_db(self) -> Tuple[Dict[str, Any], Source]:
-        metadata = MetaData()
-        metadata.reflect(self.engine)
-
         table_data = {}
         table_files = {}
         primary_keys = {}
@@ -57,7 +53,7 @@ class _Connection:
         tables = {}
         # relationships_typed = ...
 
-        for table_name, table in metadata.tables.items():
+        for table_name, table in self.metadata.tables.items():
             df = pd.read_sql_table(table_name, self.engine)
             table_data[table_name] = df
             filepath = self.out_dir / f"{table_name}.csv"
@@ -116,22 +112,8 @@ class SQLite(_Connection):
     Connector to load data from SQLite databases
     """
 
-    def __init__(self, db_path: str, out_dir: str):
-        super().__init__(db_path=db_path, out_dir=out_dir)
-
-        print("Connecting to database")
-        self.engine = create_engine(self.db_path)
-        self.connect()
-
 
 class PostgreSQL(_Connection):
     """
     Connector to load data from Postgres databases
     """
-
-    def __init__(self, db_path: str, out_dir: str):
-        super().__init__(db_path=db_path, out_dir=out_dir)
-
-        print("Connecting to database")
-        self.engine = create_engine(self.db_path)
-        self.connect()
