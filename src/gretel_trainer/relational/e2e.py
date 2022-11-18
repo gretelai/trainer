@@ -3,6 +3,7 @@ from typing import List, Optional
 from gretel_trainer.relational.connectors import _Connection, PostgreSQL, SQLite
 from gretel_trainer.relational.core import MultiTableException
 from gretel_trainer.relational.multi_table import MultiTable
+
 # This is a helper class that orchestrates an end-to-end workflow in Trainer.
 #
 # Long term, we anticipate connecters being Java components,
@@ -41,7 +42,9 @@ class MultiTableEndToEnd:
             tables_not_to_synthesize=self.tables_not_to_synthesize,
         )
         model.train()
-        synthetic_tables = model.generate(record_size_ratio=self.synth_record_size_ratio)
+        synthetic_tables = model.generate(
+            record_size_ratio=self.synth_record_size_ratio
+        )
         # synthetic_metadata_path = synthetic_tables.export_to_filesystem(self.out_dir)
 
         # synthetic_tables = self.dest_connector.parse(synthetic_metadata_path)

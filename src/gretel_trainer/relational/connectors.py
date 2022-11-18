@@ -9,7 +9,14 @@ from pathlib import Path
 
 from typing import Any, Dict, Union, Tuple
 
-from gretel_trainer.relational.core import ForeignKey, MultiTableException, PrimaryKey, Table, SyntheticTables, Source
+from gretel_trainer.relational.core import (
+    ForeignKey,
+    MultiTableException,
+    PrimaryKey,
+    Table,
+    SyntheticTables,
+    Source,
+)
 
 
 class _Connection:
@@ -44,8 +51,9 @@ class _Connection:
         table_data = {}
         table_files = {}
         primary_keys = {}
-        rels_by_pkey = defaultdict(list) # Dict[Tuple[str, str], List[Tuple[str, str]]]  # where tuple elements are (tablename, columnname)
-        relationships = [] # List[List[Tuple[str, str]]]
+        # Dict[Tuple[str, str], List[Tuple[str, str]]]  # where tuple elements are (tablename, columnname)
+        rels_by_pkey = defaultdict(list)
+        relationships = []  # List[List[Tuple[str, str]]]
         tables = {}
         # relationships_typed = ...
 
@@ -58,17 +66,30 @@ class _Connection:
             foreign_keys = []
             for column in table.columns:
                 if column.primary_key:
-                    primary_key = PrimaryKey(table_name=table_name, column_name=column.name)
+                    primary_key = PrimaryKey(
+                        table_name=table_name, column_name=column.name
+                    )
                     primary_keys[table_name] = column.name
                 for f_key in column.foreign_keys:
-                    rels_by_pkey[(f_key.column.table.name, f_key.column.name)].append((table_name, column.name))
-                    foreign_keys.append(ForeignKey(table_name=table_name, column_name=column.name, references=PrimaryKey(table_name=f_key.column.table.name, column_name=f_key.column.name)))
+                    rels_by_pkey[(f_key.column.table.name, f_key.column.name)].append(
+                        (table_name, column.name)
+                    )
+                    foreign_keys.append(
+                        ForeignKey(
+                            table_name=table_name,
+                            column_name=column.name,
+                            references=PrimaryKey(
+                                table_name=f_key.column.table.name,
+                                column_name=f_key.column.name,
+                            ),
+                        )
+                    )
             tables[table_name] = Table(
                 name=table_name,
                 data=df,
                 path=filepath,
                 primary_key=primary_key,
-                foreign_keys=foreign_keys
+                foreign_keys=foreign_keys,
             )
 
         for p_key, f_keys in rels_by_pkey.items():
@@ -84,7 +105,9 @@ class _Connection:
         return (rdb_config, source)
 
     # TODO: constrain type to just SyntheticTables post-refactor
-    def save_to_db(self, synthetic_tables: Union[SyntheticTables, Dict[str, pd.DataFrame]]) -> None:
+    def save_to_db(
+        self, synthetic_tables: Union[SyntheticTables, Dict[str, pd.DataFrame]]
+    ) -> None:
         pass
 
 

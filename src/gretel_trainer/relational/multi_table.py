@@ -50,7 +50,9 @@ class MultiTable:
             columns_to_drop = []
             if table.primary_key is not None:
                 columns_to_drop.append(table.primary_key.column_name)
-            columns_to_drop.extend([foreign_key.column_name for foreign_key in table.foreign_keys])
+            columns_to_drop.extend(
+                [foreign_key.column_name for foreign_key in table.foreign_keys]
+            )
             training_path = self.working_dir / f"{name}-train.csv"
             table.data.drop(columns=columns_to_drop).to_csv(training_path, index=False)
             training_data[name] = training_path
@@ -141,7 +143,7 @@ class MultiTable:
             for table_field_pair in relationship:
                 rel_table, rel_field = table_field_pair
                 # Check if the table/field pair is the primary key
-                if rel_field==rdb_config["primary_keys"][rel_table]:
+                if rel_field == rdb_config["primary_keys"][rel_table]:
                     primary_key_values = synth_primary_keys[rel_table]
                 else:
                     # Now recreate the foreign key values using the primary key values while
