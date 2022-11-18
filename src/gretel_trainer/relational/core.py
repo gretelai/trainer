@@ -1,7 +1,7 @@
 from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 import pandas as pd
 
@@ -19,8 +19,7 @@ class PrimaryKey:
 class ForeignKey:
     table_name: str
     column_name: str
-    parent_table_name: str
-    parent_column_name: str
+    references: PrimaryKey
 
 
 @dataclass
@@ -60,6 +59,43 @@ class Source:
         Construct a Source instance using the JSON metadata located at `metadata_path`.
         """
         pass
+
+    @classmethod
+    def from_rdb_config(cls, rdb_config: Dict[str, Any]) -> Source:
+        """
+        Likely temporary, construct a Source instance from the rdb_config dict.
+        """
+        tables = {}
+        for table_name, df in rdb_config["table_data"].items():
+            pk = PrimaryKey(
+                table_name=table_name,
+                column_name=rdb_config["primary_keys"][table_name]
+            )
+
+            fks = []
+            for relationship in rdb_config["relationships"]:
+                primary_key = relationship[0]
+                foreign_keys = relationship[1:]
+                for foreign_key in foreign_keys:
+                    if foreign_key[0] == table_name:
+                        fks.append(ForeignKey(
+                            table_name=table_name,
+                            column_name=foreign_key[1],
+                            references=PrimaryKey(
+                                table_name=primary_key[0],
+                                column_name=primary_key[1]
+                            )
+                        ))
+
+            tables[table_name] = Table(
+                name=table_name,
+                data=df,
+                path=rdb_config["table_files"][table_name],
+                primary_key=pk,
+                foreign_keys=fks,
+            )
+
+        return cls(tables=tables)
 
 
 @dataclass
