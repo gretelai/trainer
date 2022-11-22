@@ -14,7 +14,6 @@ from gretel_trainer.relational.core import (
     MultiTableException,
     PrimaryKey,
     Table,
-    SyntheticTables,
     Source,
 )
 from gretel_trainer.relational.relationships import RelationalData
@@ -123,10 +122,7 @@ class _Connection:
         source = Source(tables=tables)
         return (rdb_config, source)
 
-    # TODO: constrain type to just SyntheticTables post-refactor
-    def save_to_db(
-        self, synthetic_tables: Union[SyntheticTables, Dict[str, pd.DataFrame]]
-    ) -> None:
+    def save_to_db(self, synthetic_tables: Dict[str, pd.DataFrame]) -> None:
         pass
 
 
