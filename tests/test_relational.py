@@ -52,6 +52,22 @@ def test_ecommerce_relational_data():
     restored_inventory_items = ecom.drop_ancestral_data(inventory_items_with_ancestors)
     assert set(restored_inventory_items.columns) == {"id", "sold_at", "cost", "product_id", "product_distribution_center_id"}
 
+    # seed dataframes
+    assert ecom.build_seed_data_for_table("users", {}) is None
+
+    events_seed = ecom.build_seed_data_for_table("events", {"users": users_with_ancestors})
+    assert events_seed is not None and set(events_seed.columns) == {
+        "self.user_id|id", "self.user_id|first_name", "self.user_id|last_name",
+    }
+
+    # inventory_items_seed = ecom.build_seed_data_for_table("inventory_items", {
+    #     "products": ecom.get_table_data_with_ancestors("products"),
+    #     "distribution_center": ecom.get_table_data_with_ancestors("distribution_center"),
+    # })
+    # assert set(inventory_items_seed.columns) == {
+    # # TODO
+    # }
+
 
 def test_mutagenesis_relational_data():
     mutagenesis = RelationalData()

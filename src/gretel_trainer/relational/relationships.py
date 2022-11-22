@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import List, Optional, Tuple
+from typing import Dict, List, Optional, Tuple
 
 import networkx
 import pandas as pd
@@ -71,6 +71,24 @@ class RelationalData:
         root_columns = [col for col in df.columns if col.startswith(f"self{delim}")]
         mapper = { col: col.removeprefix(f"self{delim}") for col in root_columns }
         return df[root_columns].rename(columns=mapper)
+
+    def build_seed_data_for_table(self, table: str, ancestor_data: Dict[str, pd.DataFrame]) -> Optional[pd.DataFrame]:
+        foreign_keys = self.get_foreign_keys(table)
+        # TODO: check and raise if ancestor_data is missing any parents?
+
+        if len(foreign_keys) == 0:
+            return None
+        elif len(foreign_keys) == 1:
+            foreign_key = foreign_keys[0]
+            parent_df = ancestor_data[foreign_key.parent_table_name]
+            mapper = {
+                col: col.replace("self", f"self.{foreign_key.column_name}", 1)
+                for col in parent_df.columns
+            }
+            return parent_df.rename(columns=mapper)
+        else:
+            # TODO: determine what seed should look like when table has multiple FKs
+            return None
 
 
 def _join_parents(
