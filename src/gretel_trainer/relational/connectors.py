@@ -7,7 +7,7 @@ from sqlalchemy.exc import OperationalError
 from collections import defaultdict
 from pathlib import Path
 
-from typing import Any, Dict, Union, Tuple
+from typing import Any, Dict, List, Union, Tuple
 
 from gretel_trainer.relational.core import (
     ForeignKey,
@@ -17,6 +17,7 @@ from gretel_trainer.relational.core import (
     SyntheticTables,
     Source,
 )
+from gretel_trainer.relational.relationships import RelationalData
 
 
 class _Connection:
@@ -42,6 +43,28 @@ class _Connection:
         print("Successfully connected to db")
         self.metadata = MetaData()
         self.metadata.reflect(self.engine)
+
+    def extract(self) -> RelationalData:
+        relational_data = RelationalData()
+        foreign_keys: List[Tuple[str, str]] = []
+
+        for table_name, table in self.metadata.tables.items():
+            df = pd.read_sql_table(table_name, self.engine)
+            primary_key = None
+            for column in table.columns:
+                if column.primary_key:
+                    primary_key = column.name
+                for f_key in column.foreign_keys:
+                    referenced_table = f_key.column.table.name
+                    referenced_column = f_key.column.name
+                    foreign_keys.append((f"{table_name}.{column.name}", f"{referenced_table}.{referenced_column}"))
+            relational_data.add_table(table_name, primary_key, df)
+
+        for foreign_key_tuple in foreign_keys:
+            foreign_key, referencing = foreign_key_tuple
+            relational_data.add_foreign_key(foreign_key, referencing)
+
+        return relational_data
 
     def crawl_db(self) -> Tuple[Dict[str, Any], Source]:
         table_data = {}
