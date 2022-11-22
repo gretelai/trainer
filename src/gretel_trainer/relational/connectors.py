@@ -7,15 +7,8 @@ from sqlalchemy.exc import OperationalError
 from collections import defaultdict
 from pathlib import Path
 
-from typing import Any, Dict, List, Union, Tuple
+from typing import Any, Dict, List, Tuple
 
-from gretel_trainer.relational.core import (
-    ForeignKey,
-    MultiTableException,
-    PrimaryKey,
-    Table,
-    Source,
-)
 from gretel_trainer.relational.relationships import RelationalData
 
 
@@ -65,7 +58,7 @@ class _Connection:
 
         return relational_data
 
-    def crawl_db(self) -> Tuple[Dict[str, Any], Source]:
+    def crawl_db(self) -> Dict[str, Any]:
         table_data = {}
         table_files = {}
         primary_keys = {}
@@ -80,35 +73,13 @@ class _Connection:
             table_data[table_name] = df
             filepath = self.out_dir / f"{table_name}.csv"
             table_files[table_name] = filepath
-            primary_key = None
-            foreign_keys = []
             for column in table.columns:
                 if column.primary_key:
-                    primary_key = PrimaryKey(
-                        table_name=table_name, column_name=column.name
-                    )
                     primary_keys[table_name] = column.name
                 for f_key in column.foreign_keys:
                     rels_by_pkey[(f_key.column.table.name, f_key.column.name)].append(
                         (table_name, column.name)
                     )
-                    foreign_keys.append(
-                        ForeignKey(
-                            table_name=table_name,
-                            column_name=column.name,
-                            references=PrimaryKey(
-                                table_name=f_key.column.table.name,
-                                column_name=f_key.column.name,
-                            ),
-                        )
-                    )
-            tables[table_name] = Table(
-                name=table_name,
-                data=df,
-                path=filepath,
-                primary_key=primary_key,
-                foreign_keys=foreign_keys,
-            )
 
         for p_key, f_keys in rels_by_pkey.items():
             relationships.append([p_key] + f_keys)
@@ -119,8 +90,7 @@ class _Connection:
             "primary_keys": primary_keys,
             "relationships": relationships,
         }
-        source = Source(tables=tables)
-        return (rdb_config, source)
+        return rdb_config
 
     def save_to_db(self, synthetic_tables: Dict[str, pd.DataFrame]) -> None:
         pass

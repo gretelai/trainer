@@ -6,7 +6,7 @@ from typing import Any, Dict, List, Optional
 
 from gretel_trainer import Trainer
 from gretel_trainer.models import GretelACTGAN
-from gretel_trainer.relational.core import Source
+from gretel_trainer.relational.relationships import RelationalData
 
 
 WORKING_DIR = "working"
@@ -25,14 +25,14 @@ class MultiTable:
     def __init__(
         self,
         config: Dict[str, Any],
-        source: Source,
+        relational_data: RelationalData,
         tables_not_to_synthesize: Optional[List[str]] = None,
         project_prefix: str = "multi-table",
         working_dir: str = "working",
     ):
         self.project_prefix = project_prefix
         self.config = config
-        self.source = source
+        self.relational_data = relational_data
         self.tables_not_to_synthesize = tables_not_to_synthesize or []
         self.working_dir = Path(working_dir)
         self.synthetic_tables = {}
@@ -46,16 +46,19 @@ class MultiTable:
         to the CSVs as values.
         """
         training_data = {}
-        for name, table in self.source.tables.items():
+        for table_name in self.relational_data.list_all_tables():
             columns_to_drop = []
-            if table.primary_key is not None:
-                columns_to_drop.append(table.primary_key.column_name)
+            primary_key = self.relational_data.get_primary_key(table_name)
+            if primary_key is not None:
+                columns_to_drop.append(primary_key)
+            foreign_keys = self.relational_data.get_foreign_keys(table_name)
             columns_to_drop.extend(
-                [foreign_key.column_name for foreign_key in table.foreign_keys]
+                [foreign_key.column_name for foreign_key in foreign_keys]
             )
-            training_path = self.working_dir / f"{name}-train.csv"
-            table.data.drop(columns=columns_to_drop).to_csv(training_path, index=False)
-            training_data[name] = training_path
+            training_path = self.working_dir / f"{table_name}-train.csv"
+            data = self.relational_data.get_table_data(table_name)
+            data.drop(columns=columns_to_drop).to_csv(training_path, index=False)
+            training_data[table_name] = training_path
 
         return training_data
 
@@ -94,18 +97,19 @@ class MultiTable:
         # Compute the number of records needed for each table
         synthetic_tables = {}
 
-        for table_name, table in self.source.tables.items():
+        for table_name in self.relational_data.list_all_tables():
+            source_data = self.relational_data.get_table_data(table_name)
             if table_name in self.tables_not_to_synthesize:
-                synthetic_tables[table] = table.data
+                synthetic_tables[table_name] = source_data
             else:
-                synth_size = int(len(table.data) * record_size_ratio)
+                synth_size = int(len(source_data) * record_size_ratio)
                 print(f"Sampling {synth_size} rows from {table_name}")
                 model = Trainer.load(
                     cache_file=str(self.model_cache_files[table_name]),
                     project_name=f"{self.project_prefix}-{table_name.replace('_', '-')}",
                 )
                 data = model.generate(num_records=synth_size)
-                synthetic_tables[table] = data
+                synthetic_tables[table_name] = data
 
         self._synthesize_keys(synthetic_tables)
 
