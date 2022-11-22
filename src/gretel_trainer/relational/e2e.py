@@ -34,9 +34,9 @@ class MultiTableEndToEnd:
     def execute(self):
         config = self.src_connector.crawl_db()
         relational_data = self.src_connector.extract()
-        # relational_data.to_filesystem(self.out_dir)
+        # source_metadata_path = relational_data.to_filesystem(self.out_dir)
 
-        # relational_data = RelationalData.from_filesystem(f"{self.out_dir}/metadata.json")
+        # relational_data = RelationalData.from_filesystem(source_metadata_path)
         model = MultiTable(
             config=config,
             relational_data=relational_data,
@@ -46,8 +46,9 @@ class MultiTableEndToEnd:
         synthetic_tables = model.generate(
             record_size_ratio=self.synth_record_size_ratio
         )
-        # write synthetic dataframes to filesystem
+        # synthetic_metadata_path = write_synthetic_data_to_filesystem(synthetic_tables)
 
+        # self.dest_connector.import(synthetic_metadata_path)  # would presumably replace the line below
         self.dest_connector.save_to_db(synthetic_tables)
 
 

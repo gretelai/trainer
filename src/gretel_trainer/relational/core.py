@@ -121,12 +121,14 @@ class RelationalData:
             d["foreign_keys"].extend(keys)
         return d
 
-    def to_filesystem(self, out_dir: str) -> None:
+    def to_filesystem(self, out_dir: str) -> str:
         d = self.as_dict(out_dir)
         for table_name, details in d["tables"].items():
             self.get_table_data(table_name).to_csv(details["csv_path"], index=False)
-        with open(f"{out_dir}/metadata.json", "w") as metadata_file:
+        metadata_path = f"{out_dir}/metadata.json"
+        with open(metadata_path, "w") as metadata_file:
             json.dump(d, metadata_file)
+        return metadata_path
 
     @classmethod
     def from_filesystem(cls, metadata_filepath: str) -> RelationalData:
