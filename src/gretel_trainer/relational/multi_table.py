@@ -111,21 +111,6 @@ class MultiTable:
 
         return synthetic_tables
 
-    def _synthesize_keys_from_source(
-        self,
-        synthetic_tables: Dict[str, pd.DataFrame],
-    ) -> None:
-        for table_name, df in synthetic_tables.items():
-            if table_name in self.tables_not_to_synthesize:
-                continue
-
-            pk = self.source.tables[table_name].primary_key
-            if pk is not None:
-                df[pk.column_name] = [i for i in range(len(df))]
-
-            for fk in self.source.tables[table_name].foreign_keys:
-                df[fk.column_name] = ["TODO"]
-
     def _synthesize_keys(
         self,
         synthetic_tables: Dict[str, pd.DataFrame],
