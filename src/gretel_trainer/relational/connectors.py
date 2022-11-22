@@ -1,7 +1,7 @@
 import os
 
 import pandas as pd
-from sqlalchemy import MetaData, text
+from sqlalchemy import MetaData
 from sqlalchemy import create_engine
 from sqlalchemy.exc import OperationalError
 from collections import defaultdict
@@ -65,8 +65,6 @@ class _Connection:
         # Dict[Tuple[str, str], List[Tuple[str, str]]]  # where tuple elements are (tablename, columnname)
         rels_by_pkey = defaultdict(list)
         relationships = []  # List[List[Tuple[str, str]]]
-        tables = {}
-        # relationships_typed = ...
 
         for table_name, table in self.metadata.tables.items():
             df = pd.read_sql_table(table_name, self.engine)

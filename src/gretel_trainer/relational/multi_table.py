@@ -9,17 +9,16 @@ from gretel_trainer.models import GretelACTGAN
 from gretel_trainer.relational.core import RelationalData
 
 
-WORKING_DIR = "working"
-MAX_ROWS = 1000  # FIXME FOR TEST/DEV ONLY
-
-
 class MultiTable:
     """
     Relational data support for the Trainer SDK
 
     Args:
-        config (dict): source metadata and tables
-        project_name (str, optional): Gretel project name. Defaults to "multi-table".
+        config (dict): Source metadata and tables
+        relational_data (RelationalData): Core data structure representing the source tables and their relationships.
+        tables_not_to_synthesize (list[str], optional): List of tables to skip sampling and leave as they are.
+        project_prefix (str, optional): Common prefix for Gretel projects created by this model. Defaults to "multi-table".
+        working_dir (str, optional): Directory in which temporary assets should be cached. Defaults to "working".
     """
 
     def __init__(
