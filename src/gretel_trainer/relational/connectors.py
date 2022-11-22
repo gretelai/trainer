@@ -9,7 +9,7 @@ from pathlib import Path
 
 from typing import Any, Dict, List, Tuple
 
-from gretel_trainer.relational.relationships import RelationalData
+from gretel_trainer.relational.core import RelationalData
 
 
 class _Connection:

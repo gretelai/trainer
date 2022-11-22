@@ -1,6 +1,6 @@
 from typing import List
 
-from gretel_trainer.relational.relationships import RelationalData
+from gretel_trainer.relational.core import RelationalData
 
 
 class TableProgress:

@@ -3,8 +3,8 @@ import tempfile
 
 import pandas as pd
 
+from gretel_trainer.relational.core import RelationalData
 from gretel_trainer.relational.progress import TableProgress
-from gretel_trainer.relational.relationships import RelationalData
 
 
 def _setup_ecommerce():

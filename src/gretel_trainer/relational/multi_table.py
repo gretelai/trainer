@@ -6,7 +6,7 @@ from typing import Any, Dict, List, Optional
 
 from gretel_trainer import Trainer
 from gretel_trainer.models import GretelACTGAN
-from gretel_trainer.relational.relationships import RelationalData
+from gretel_trainer.relational.core import RelationalData
 
 
 WORKING_DIR = "working"
