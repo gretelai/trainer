@@ -1,23 +1,37 @@
+import os
+import tempfile
+
 import pandas as pd
 
 from gretel_trainer.relational.relationships import RelationalData, TableProgress
 
 
 def _setup_ecommerce():
-    ecom = RelationalData()
-    ecom.add_table("events", "id", pd.DataFrame(columns=["id", "browser", "traffic_source", "user_id"]))
-    ecom.add_table("users", "id", pd.DataFrame(columns=["id", "first_name", "last_name"]))
-    ecom.add_table("inventory_items", "id", pd.DataFrame(columns=["id", "sold_at", "cost", "product_id", "product_distribution_center_id"]))
-    ecom.add_table("products", "id", pd.DataFrame(columns=["id", "name", "brand", "distribution_center_id"]))
-    ecom.add_table("distribution_center", "id", pd.DataFrame(columns=["id", "name"]))
-    ecom.add_table("order_items", "id", pd.DataFrame(columns=["id", "sale_price", "status", "user_id", "inventory_item_id"]))
-    ecom.add_foreign_key("events.user_id", "users.id")
-    ecom.add_foreign_key("order_items.user_id", "users.id")
-    ecom.add_foreign_key("order_items.inventory_item_id", "inventory_items.id")
-    ecom.add_foreign_key("inventory_items.product_id", "products.id")
-    ecom.add_foreign_key("inventory_items.product_distribution_center_id", "distribution_center.id")
-    ecom.add_foreign_key("products.distribution_center_id", "distribution_center.id")
-    return ecom
+    ecommerce = RelationalData()
+    ecommerce.add_table("events", "id", pd.DataFrame(columns=["id", "browser", "traffic_source", "user_id"]))
+    ecommerce.add_table("users", "id", pd.DataFrame(columns=["id", "first_name", "last_name"]))
+    ecommerce.add_table("inventory_items", "id", pd.DataFrame(columns=["id", "sold_at", "cost", "product_id", "product_distribution_center_id"]))
+    ecommerce.add_table("products", "id", pd.DataFrame(columns=["id", "name", "brand", "distribution_center_id"]))
+    ecommerce.add_table("distribution_center", "id", pd.DataFrame(columns=["id", "name"]))
+    ecommerce.add_table("order_items", "id", pd.DataFrame(columns=["id", "sale_price", "status", "user_id", "inventory_item_id"]))
+    ecommerce.add_foreign_key("events.user_id", "users.id")
+    ecommerce.add_foreign_key("order_items.user_id", "users.id")
+    ecommerce.add_foreign_key("order_items.inventory_item_id", "inventory_items.id")
+    ecommerce.add_foreign_key("inventory_items.product_id", "products.id")
+    ecommerce.add_foreign_key("inventory_items.product_distribution_center_id", "distribution_center.id")
+    ecommerce.add_foreign_key("products.distribution_center_id", "distribution_center.id")
+    return ecommerce
+
+
+def _setup_mutagenesis():
+    mutagenesis = RelationalData()
+    mutagenesis.add_table("bond", None, pd.DataFrame(columns=["type", "atom1_id", "atom2_id"]))
+    mutagenesis.add_table("atom", "atom_id", pd.DataFrame(columns=["atom_id", "element", "charge", "molecule_id"]))
+    mutagenesis.add_table("molecule", "molecule_id", pd.DataFrame(columns=["molecule_id", "mutagenic"]))
+    mutagenesis.add_foreign_key("bond.atom1_id", "atom.atom_id")
+    mutagenesis.add_foreign_key("bond.atom2_id", "atom.atom_id")
+    mutagenesis.add_foreign_key("atom.molecule_id", "molecule.molecule_id")
+    return mutagenesis
 
 
 def test_ecommerce_relational_data():
@@ -70,13 +84,7 @@ def test_ecommerce_relational_data():
 
 
 def test_mutagenesis_relational_data():
-    mutagenesis = RelationalData()
-    mutagenesis.add_table("bond", None, pd.DataFrame(columns=["type", "atom1_id", "atom2_id"]))
-    mutagenesis.add_table("atom", "atom_id", pd.DataFrame(columns=["atom_id", "element", "charge", "molecule_id"]))
-    mutagenesis.add_table("molecule", "molecule_id", pd.DataFrame(columns=["molecule_id", "mutagenic"]))
-    mutagenesis.add_foreign_key("bond.atom1_id", "atom.atom_id")
-    mutagenesis.add_foreign_key("bond.atom2_id", "atom.atom_id")
-    mutagenesis.add_foreign_key("atom.molecule_id", "molecule.molecule_id")
+    mutagenesis = _setup_mutagenesis()
 
     assert mutagenesis.get_parents("bond") == ["atom"]
     assert mutagenesis.get_parents("atom") == ["molecule"]
@@ -94,6 +102,62 @@ def test_mutagenesis_relational_data():
     }
     restored_bond = mutagenesis.drop_ancestral_data(bond_with_ancestors)
     assert set(restored_bond.columns) == {"type", "atom1_id", "atom2_id"}
+
+
+def test_relational_data_as_dict():
+    ecom = _setup_ecommerce()
+    as_dict = ecom.as_dict("test_out")
+
+    assert as_dict["tables"] == {
+        "users": {"primary_key": "id", "csv_path": "test_out/users.csv"},
+        "events": {"primary_key": "id", "csv_path": "test_out/events.csv"},
+        "distribution_center": {"primary_key": "id", "csv_path": "test_out/distribution_center.csv"},
+        "products": {"primary_key": "id", "csv_path": "test_out/products.csv"},
+        "inventory_items": {"primary_key": "id", "csv_path": "test_out/inventory_items.csv"},
+        "order_items": {"primary_key": "id", "csv_path": "test_out/order_items.csv"},
+    }
+    assert set(as_dict["foreign_keys"]) == {
+        ("events.user_id", "users.id"),
+        ("order_items.user_id", "users.id"),
+        ("order_items.inventory_item_id", "inventory_items.id"),
+        ("inventory_items.product_id", "products.id"),
+        ("inventory_items.product_distribution_center_id", "distribution_center.id"),
+        ("products.distribution_center_id", "distribution_center.id"),
+    }
+
+
+def test_ecommerce_filesystem_serde():
+    ecom = _setup_ecommerce()
+
+    with tempfile.TemporaryDirectory() as tmp:
+        ecom.to_filesystem(tmp)
+
+        expected_files = [
+            f"{tmp}/metadata.json",
+            f"{tmp}/events.csv",
+            f"{tmp}/users.csv",
+            f"{tmp}/distribution_center.csv",
+            f"{tmp}/products.csv",
+            f"{tmp}/inventory_items.csv",
+            f"{tmp}/order_items.csv",
+        ]
+        for expected_file in expected_files:
+            assert os.path.exists(expected_file)
+
+        from_json = RelationalData.from_filesystem(f"{tmp}/metadata.json")
+
+    assert len(from_json.list_all_tables()) == 6
+
+
+def test_filesystem_serde_accepts_missing_primary_keys():
+    mutagenesis = _setup_mutagenesis()
+
+    with tempfile.TemporaryDirectory() as tmp:
+        mutagenesis.to_filesystem(tmp)
+        from_json = RelationalData.from_filesystem(f"{tmp}/metadata.json")
+
+    assert from_json.get_primary_key("bond") is None
+    assert from_json.get_primary_key("atom") == "atom_id"
 
 
 def test_walk_ecommerce():

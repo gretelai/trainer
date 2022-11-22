@@ -1,5 +1,11 @@
+from __future__ import annotations
+
+import json
+import os
+
 from dataclasses import dataclass
-from typing import Dict, List, Optional, Tuple
+from pathlib import Path
+from typing import Any, Dict, List, Optional, Tuple
 
 import networkx
 import pandas as pd
@@ -89,6 +95,43 @@ class RelationalData:
         else:
             # TODO: determine what seed should look like when table has multiple FKs
             return None
+
+    def as_dict(self, out_dir: str) -> Dict[str, Any]:
+        d = {"tables": {}, "foreign_keys": []}
+        for table in self.list_all_tables():
+            d["tables"][table] = {
+                "primary_key": self.get_primary_key(table),
+                "csv_path": f"{out_dir}/{table}.csv",
+            }
+            keys = [
+                (f"{table}.{key.column_name}", f"{key.parent_table_name}.{key.parent_column_name}")
+                for key in self.get_foreign_keys(table)
+            ]
+            d["foreign_keys"].extend(keys)
+        return d
+
+    def to_filesystem(self, out_dir: str) -> None:
+        d = self.as_dict(out_dir)
+        for table_name, details in d["tables"].items():
+            self.get_table_data(table_name).to_csv(details["csv_path"], index=False)
+        with open(f"{out_dir}/metadata.json", "w") as metadata_file:
+            json.dump(d, metadata_file)
+
+    @classmethod
+    def from_filesystem(cls, metadata_filepath: str) -> RelationalData:
+        with open(metadata_filepath, "r") as metadata_file:
+            d = json.load(metadata_file)
+        relational_data = RelationalData()
+
+        for table_name, details in d["tables"].items():
+            primary_key = details["primary_key"]
+            data = pd.read_csv(details["csv_path"])
+            relational_data.add_table(table_name, primary_key, data)
+        for foreign_key_tuple in d["foreign_keys"]:
+            foreign_key, referencing = foreign_key_tuple
+            relational_data.add_foreign_key(foreign_key, referencing)
+
+        return relational_data
 
 
 def _join_parents(
