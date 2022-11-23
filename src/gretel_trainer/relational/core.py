@@ -15,13 +15,6 @@ class MultiTableException(Exception):
     pass
 
 
-# rdb_config: Dict[str, Any]
-#   table_data: Dict[str, pd.DataFrame]
-#   table_files: Dict[str, str]
-#   primary_keys: Dict[str, str]
-#   relationships: List[List[Tuple[str, str]]]
-
-
 @dataclass
 class ForeignKey:
     column_name: str

@@ -32,13 +32,11 @@ class MultiTableEndToEnd:
         self.tables_not_to_synthesize = tables_not_to_synthesize
 
     def execute(self):
-        config = self.src_connector.crawl_db()
         relational_data = self.src_connector.extract()
         # source_metadata_path = relational_data.to_filesystem(self.out_dir)
 
         # relational_data = RelationalData.from_filesystem(source_metadata_path)
         model = MultiTable(
-            config=config,
             relational_data=relational_data,
             tables_not_to_synthesize=self.tables_not_to_synthesize,
         )

@@ -14,7 +14,6 @@ class MultiTable:
     Relational data support for the Trainer SDK
 
     Args:
-        config (dict): Source metadata and tables
         relational_data (RelationalData): Core data structure representing the source tables and their relationships.
         tables_not_to_synthesize (list[str], optional): List of tables to skip sampling and leave as they are.
         project_prefix (str, optional): Common prefix for Gretel projects created by this model. Defaults to "multi-table".
@@ -23,14 +22,12 @@ class MultiTable:
 
     def __init__(
         self,
-        config: Dict[str, Any],
         relational_data: RelationalData,
         tables_not_to_synthesize: Optional[List[str]] = None,
         project_prefix: str = "multi-table",
         working_dir: str = "working",
     ):
         self.project_prefix = project_prefix
-        self.config = config
         self.relational_data = relational_data
         self.tables_not_to_synthesize = tables_not_to_synthesize or []
         self.working_dir = Path(working_dir)

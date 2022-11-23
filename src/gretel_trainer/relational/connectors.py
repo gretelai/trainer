@@ -64,12 +64,13 @@ class _Connection:
         return relational_data
 
     def crawl_db(self) -> Dict[str, Any]:
-        table_data = {}
-        table_files = {}
-        primary_keys = {}
-        # Dict[Tuple[str, str], List[Tuple[str, str]]]  # where tuple elements are (tablename, columnname)
-        rels_by_pkey = defaultdict(list)
-        relationships = []  # List[List[Tuple[str, str]]]
+        table_data: Dict[str, pd.DataFrame] = {}
+        table_files: Dict[str, Path] = {}
+        primary_keys: Dict[str, str] = {}
+        rels_by_pkey: Dict[Tuple[str, str], List[Tuple[str, str]]] = defaultdict(
+            list
+        )  # tuple elements are (tablename, columnname)
+        relationships: List[List[Tuple[str, str]]] = []
 
         for table_name, table in self.metadata.tables.items():
             df = pd.read_sql_table(table_name, self.engine)
