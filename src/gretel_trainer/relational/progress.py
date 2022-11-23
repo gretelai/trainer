@@ -7,8 +7,7 @@ class TableProgress:
     def __init__(self, relational_data: RelationalData):
         self.relational_data = relational_data
         self.table_statuses = {
-            table: False
-            for table in relational_data.list_all_tables()
+            table: False for table in relational_data.list_all_tables()
         }
 
     def mark_complete(self, table: str) -> None:

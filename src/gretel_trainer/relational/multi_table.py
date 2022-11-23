@@ -156,13 +156,25 @@ class MultiTable:
             for foreign_key in self.relational_data.get_foreign_keys(table_name):
                 out_df = output_tables[table_name]
 
-                valid_values = list(output_tables[foreign_key.parent_table_name][foreign_key.parent_column_name])
+                valid_values = list(
+                    output_tables[foreign_key.parent_table_name][
+                        foreign_key.parent_column_name
+                    ]
+                )
 
                 original_table_data = self.relational_data.get_table_data(table_name)
-                original_fk_frequencies = original_table_data.groupby(foreign_key.column_name).size().reset_index()
-                frequencies_descending = sorted(list(original_fk_frequencies[0]), reverse=True)
+                original_fk_frequencies = (
+                    original_table_data.groupby(foreign_key.column_name)
+                    .size()
+                    .reset_index()
+                )
+                frequencies_descending = sorted(
+                    list(original_fk_frequencies[0]), reverse=True
+                )
 
-                new_fk_values = _collect_new_foreign_key_values(valid_values, frequencies_descending, len(out_df))
+                new_fk_values = _collect_new_foreign_key_values(
+                    valid_values, frequencies_descending, len(out_df)
+                )
 
                 out_df[foreign_key.column_name] = new_fk_values
 

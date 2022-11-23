@@ -49,7 +49,12 @@ class _Connection:
                 for f_key in column.foreign_keys:
                     referenced_table = f_key.column.table.name
                     referenced_column = f_key.column.name
-                    foreign_keys.append((f"{table_name}.{column.name}", f"{referenced_table}.{referenced_column}"))
+                    foreign_keys.append(
+                        (
+                            f"{table_name}.{column.name}",
+                            f"{referenced_table}.{referenced_column}",
+                        )
+                    )
             relational_data.add_table(table_name, primary_key, df)
 
         for foreign_key_tuple in foreign_keys:

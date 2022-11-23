@@ -34,7 +34,9 @@ class RelationalData:
         self.graph = networkx.DiGraph()
         self.lineage_column_delimiter = "|"
 
-    def add_table(self, table: str, primary_key: Optional[str], data: pd.DataFrame) -> None:
+    def add_table(
+        self, table: str, primary_key: Optional[str], data: pd.DataFrame
+    ) -> None:
         self.graph.add_node(table, primary_key=primary_key, data=data)
 
     def add_foreign_key(self, foreign_key: str, referencing: str) -> None:
@@ -44,11 +46,13 @@ class RelationalData:
         self.graph.add_edge(fk_table, referenced_table)
         edge = self.graph.edges[fk_table, referenced_table]
         via = edge.get("via", [])
-        via.append(ForeignKey(
-            column_name=fk_column,
-            parent_column_name=referenced_column,
-            parent_table_name=referenced_table,
-        ))
+        via.append(
+            ForeignKey(
+                column_name=fk_column,
+                parent_column_name=referenced_column,
+                parent_table_name=referenced_table,
+            )
+        )
         edge["via"] = via
 
     def list_all_tables(self) -> List[str]:
@@ -86,10 +90,12 @@ class RelationalData:
     def drop_ancestral_data(self, df: pd.DataFrame) -> pd.DataFrame:
         delim = self.lineage_column_delimiter
         root_columns = [col for col in df.columns if col.startswith(f"self{delim}")]
-        mapper = { col: col.removeprefix(f"self{delim}") for col in root_columns }
+        mapper = {col: col.removeprefix(f"self{delim}") for col in root_columns}
         return df[root_columns].rename(columns=mapper)
 
-    def build_seed_data_for_table(self, table: str, ancestor_data: Dict[str, pd.DataFrame]) -> Optional[pd.DataFrame]:
+    def build_seed_data_for_table(
+        self, table: str, ancestor_data: Dict[str, pd.DataFrame]
+    ) -> Optional[pd.DataFrame]:
         foreign_keys = self.get_foreign_keys(table)
         # TODO: check and raise if ancestor_data is missing any parents?
 
@@ -115,7 +121,10 @@ class RelationalData:
                 "csv_path": f"{out_dir}/{table}.csv",
             }
             keys = [
-                (f"{table}.{key.column_name}", f"{key.parent_table_name}.{key.parent_column_name}")
+                (
+                    f"{table}.{key.column_name}",
+                    f"{key.parent_table_name}.{key.parent_column_name}",
+                )
                 for key in self.get_foreign_keys(table)
             ]
             d["foreign_keys"].extend(keys)
@@ -148,10 +157,7 @@ class RelationalData:
 
 
 def _join_parents(
-    df: pd.DataFrame,
-    table: str,
-    lineage: str,
-    relational_data: RelationalData
+    df: pd.DataFrame, table: str, lineage: str, relational_data: RelationalData
 ) -> pd.DataFrame:
     delim = relational_data.lineage_column_delimiter
     for foreign_key in relational_data.get_foreign_keys(table):
