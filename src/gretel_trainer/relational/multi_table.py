@@ -94,12 +94,12 @@ class MultiTable:
             dict(pd.DataFrame): Return a dictionary of table names and synthetic data.
         """
         # Compute the number of records needed for each table
-        synthetic_tables = {}
+        output_tables = {}
 
         for table_name in self.relational_data.list_all_tables():
             source_data = self.relational_data.get_table_data(table_name)
             if table_name in self.tables_not_to_synthesize:
-                synthetic_tables[table_name] = source_data
+                output_tables[table_name] = source_data
             else:
                 synth_size = int(len(source_data) * record_size_ratio)
                 print(f"Sampling {synth_size} rows from {table_name}")
@@ -108,82 +108,95 @@ class MultiTable:
                     project_name=f"{self.project_prefix}-{table_name.replace('_', '-')}",
                 )
                 data = model.generate(num_records=synth_size)
-                synthetic_tables[table_name] = data
+                output_tables[table_name] = data
 
-        self._synthesize_keys(synthetic_tables)
-
-        return synthetic_tables
+        return self._synthesize_keys(output_tables)
 
     def _synthesize_keys(
         self,
-        synthetic_tables: Dict[str, pd.DataFrame],
+        output_tables: Dict[str, pd.DataFrame],
     ) -> Dict[str, pd.DataFrame]:
-        # Recompute the number of records needed for each table
-        synth_primary_keys = {}
-        synth_foreign_keys = {}
-        synth_record_counts = {}
-        for table_name, df in synthetic_tables.items():
-            synth_record_counts[table_name] = len(df)
-            synth_foreign_keys[table_name] = {}
+        output_tables = self._synthesize_primary_keys(output_tables)
+        output_tables = self._synthesize_foreign_keys(output_tables)
+        return output_tables
 
-        # Synthesize primary keys by assigning a new unique int
-        for table_name, field_name in self.config["primary_keys"].items():
-            df = synthetic_tables[table_name]
-            synth_size = synth_record_counts[table_name]
-            new_key = [i for i in range(synth_size)]
-            synth_primary_keys[table_name] = new_key
-            df[field_name] = new_key
-            synthetic_tables[table_name] = df
+    def _synthesize_primary_keys(
+        self,
+        output_tables: Dict[str, pd.DataFrame],
+    ) -> Dict[str, pd.DataFrame]:
+        """
+        Alters primary key columns on all tables *except* those flagged by the user as
+        not to be synthesized. Assumes the primary key column is of type integer.
+        """
+        for table_name, out_data in output_tables.items():
+            if table_name in self.tables_not_to_synthesize:
+                continue
 
-        # Synthesize foreign keys
-        for relationship in self.config["relationships"]:
-            for table_field_pair in relationship:
-                rel_table, rel_field = table_field_pair
-                # Check if the table/field pair is the primary key
-                if rel_field == self.config["primary_keys"][rel_table]:
-                    primary_key_values = synth_primary_keys[rel_table]
-                else:
-                    # Now recreate the foreign key values using the primary key values while
-                    # preserving the number of records with the same foreign key value
-                    # Primary key values range from 0 to size of table holding primary key
+            primary_key = self.relational_data.get_primary_key(table_name)
+            if primary_key is None:
+                continue
 
-                    # Get the frequency distribution of this foreign key
-                    table_df = self.config["table_data"][rel_table]
-                    freqs = table_df.groupby([rel_field]).size().reset_index()
+            out_df = output_tables[table_name]
+            out_df[primary_key] = [i for i in range(len(out_data))]
+            output_tables[table_name] = out_df
 
-                    synth_size = synth_record_counts[rel_table]
-                    key_values = []
-                    key_cnt = 0
+        return output_tables
 
-                    # Process one primary key at a time. Keep an index on the foreign key freq values
-                    # and repeat the primary key as a foreign key for the next freq value.  If we're
-                    # increasing the size of the tables, we'll have to loop through the foreign key
-                    # values multiple times
+    def _synthesize_foreign_keys(
+        self,
+        output_tables: Dict[str, pd.DataFrame],
+    ) -> Dict[str, pd.DataFrame]:
+        """
+        Alters foreign key columns on all tables (*including* those flagged as not to
+        be synthesized to ensure joining to a synthesized parent table continues to work)
+        by replacing foreign key column values with valid values from the parent table column
+        being referenced.
+        """
+        for table_name, out_data in output_tables.items():
+            for foreign_key in self.relational_data.get_foreign_keys(table_name):
+                out_df = output_tables[table_name]
 
-                    next_freq_index = 0
-                    for i in range(len(primary_key_values)):
-                        if next_freq_index == len(freqs):
-                            next_freq_index = 0
-                        freq = freqs.loc[next_freq_index][0]
-                        for j in range(freq):
-                            key_values.append(i)
-                            key_cnt += 1
-                        next_freq_index += 1
+                valid_values = list(output_tables[foreign_key.parent_table_name][foreign_key.parent_column_name])
 
-                    # Make sure we have reached the desired size of the foreign key table
-                    # If not, loop back through the primary keys filling it in.
-                    i = 0
-                    while key_cnt < synth_size:
-                        key_values.append(i)
-                        key_cnt += 1
-                        i += 1
-                    random.shuffle(key_values)
-                    synth_foreign_keys[rel_table][rel_field] = key_values
+                original_table_data = self.relational_data.get_table_data(table_name)
+                original_fk_frequencies = original_table_data.groupby(foreign_key.column_name).size().reset_index()
+                frequencies_descending = sorted(list(original_fk_frequencies[0]), reverse=True)
 
-        for table_name, foreign_keys in synth_foreign_keys.items():
-            df = synthetic_tables[table_name]
-            for key_name, synthetic_keys in foreign_keys.items():
-                df[key_name] = synthetic_keys[0 : len(df)]
-            synthetic_tables[table_name] = df
+                new_fk_values = _collect_new_foreign_key_values(valid_values, frequencies_descending, len(out_df))
 
-        return synthetic_tables
+                out_df[foreign_key.column_name] = new_fk_values
+
+        return output_tables
+
+
+def _collect_new_foreign_key_values(
+    values: List[Any],
+    frequencies: List[int],
+    total: int,
+) -> List[Any]:
+    """
+    Uses `random.choices` to select `k=total` elements from `values`,
+    weighted according to `frequencies`.
+    """
+    v_len = len(values)
+    f_len = len(frequencies)
+    f_iter = iter(frequencies)
+
+    if v_len == f_len:
+        # Unlikely but convenient exact match
+        weights = frequencies
+
+    elif v_len < f_len:
+        # Add as many frequencies as necessary, in descending order
+        weights = []
+        while len(weights) < v_len:
+            weights.append(next(f_iter))
+
+    else:
+        # Add all frequencies to start, then fill in more as necessary in descending order
+        weights = frequencies
+        while len(weights) < v_len:
+            weights.append(next(f_iter))
+
+    random.shuffle(weights)
+    return random.choices(values, weights=weights, k=total)
