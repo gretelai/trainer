@@ -42,14 +42,14 @@ class MultiTable:
         self.thread_pool = ThreadPoolExecutor(max_threads)
         self.futures = []
 
-    def _prepare_training_data(self) -> Dict[str, Path]:
+    def _prepare_training_data(self, tables: List[str]) -> Dict[str, Path]:
         """
         Exports a copy of each table with all primary and foreign key columns removed
         to the working directory. Returns a dict with table names as keys and Paths
         to the CSVs as values.
         """
         training_data = {}
-        for table_name in self.relational_data.list_all_tables():
+        for table_name in tables:
             columns_to_drop = []
             primary_key = self.relational_data.get_primary_key(table_name)
             if primary_key is not None:
@@ -86,7 +86,19 @@ class MultiTable:
 
     def train(self):
         """Train synthetic data models on each table in the relational dataset"""
-        training_data = self._prepare_training_data()
+        training_data = self._prepare_training_data(self.relational_data.list_all_tables())
+        self._create_trainer_models(training_data)
+
+    def retrain_with_table(self, table: str, primary_key: Optional[str], data: pd.DataFrame):
+        """
+        Provide updated table information and retrain. This method overwrites the table data in the
+        `RelationalData` instance. It should be used when initial training fails and source data
+        needs to be altered, but progress on other tables can be left as-is.
+        """
+        # TODO: once we do training with ancestral data, retrain all child tables as well.
+        self.relational_data.add_table(table, primary_key, data)
+        self.model_cache_files[table].unlink(missing_ok=True)
+        training_data = self._prepare_training_data([table])
         self._create_trainer_models(training_data)
 
     def generate(self, record_size_ratio: float = 1.0) -> Dict[str, pd.DataFrame]:
