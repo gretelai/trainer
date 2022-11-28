@@ -82,13 +82,17 @@ class MultiTable:
             self.futures.append(self.thread_pool.submit(trainer.train, training_csv))
         [future.result() for future in self.futures]
 
-    def train(self):
+    def train(self) -> None:
         """Train synthetic data models on each table in the relational dataset"""
         configure_session(api_key="prompt", cache="yes", validate=True)
-        training_data = self._prepare_training_data(self.relational_data.list_all_tables())
+        training_data = self._prepare_training_data(
+            self.relational_data.list_all_tables()
+        )
         self._create_trainer_models(training_data)
 
-    def retrain_with_table(self, table: str, primary_key: Optional[str], data: pd.DataFrame):
+    def retrain_with_table(
+        self, table: str, primary_key: Optional[str], data: pd.DataFrame
+    ) -> None:
         """
         Provide updated table information and retrain. This method overwrites the table data in the
         `RelationalData` instance. It should be used when initial training fails and source data
