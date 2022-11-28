@@ -19,7 +19,6 @@ class MultiTable:
 
     Args:
         relational_data (RelationalData): Core data structure representing the source tables and their relationships.
-        tables_not_to_synthesize (list[str], optional): List of tables to skip sampling and leave as they are.
         project_prefix (str, optional): Common prefix for Gretel projects created by this model. Defaults to "multi-table".
         working_dir (str, optional): Directory in which temporary assets should be cached. Defaults to "working".
         max_threads (int, optional): Max number of Trainer jobs (train, generate) to run at once. Defaults to 5.
@@ -28,14 +27,12 @@ class MultiTable:
     def __init__(
         self,
         relational_data: RelationalData,
-        tables_not_to_synthesize: Optional[List[str]] = None,
         project_prefix: str = "multi-table",
         working_dir: str = "working",
         max_threads: int = 5,
     ):
         self.project_prefix = project_prefix
         self.relational_data = relational_data
-        self.tables_not_to_synthesize = tables_not_to_synthesize or []
         self.working_dir = Path(working_dir)
         self.synthetic_tables = {}
         self.model_cache_files: Dict[str, Path] = {}
@@ -103,20 +100,26 @@ class MultiTable:
         training_data = self._prepare_training_data([table])
         self._create_trainer_models(training_data)
 
-    def generate(self, record_size_ratio: float = 1.0) -> Dict[str, pd.DataFrame]:
+    def generate(
+        self,
+        record_size_ratio: float = 1.0,
+        preserve_tables: Optional[List[str]] = None,
+    ) -> Dict[str, pd.DataFrame]:
         """Sample synthetic data from trained models
 
         Args:
             record_size_ratio (float, optional): Ratio to upsample real world data size with. Defaults to 1.
+            preserve_tables (list[str], optional): List of tables to skip sampling and leave as they are.
 
         Returns:
             dict(pd.DataFrame): Return a dictionary of table names and synthetic data.
         """
         output_tables = {}
+        preserve_tables = preserve_tables or []
 
         for table_name in self.relational_data.list_all_tables():
             source_data = self.relational_data.get_table_data(table_name)
-            if table_name in self.tables_not_to_synthesize:
+            if table_name in preserve_tables:
                 output_tables[table_name] = source_data
             else:
                 synth_size = int(len(source_data) * record_size_ratio)
@@ -128,26 +131,28 @@ class MultiTable:
                 data = model.generate(num_records=synth_size)
                 output_tables[table_name] = data
 
-        return self._synthesize_keys(output_tables)
+        return self._synthesize_keys(output_tables, preserve_tables)
 
     def _synthesize_keys(
         self,
         output_tables: Dict[str, pd.DataFrame],
+        preserve_tables: List[str],
     ) -> Dict[str, pd.DataFrame]:
-        output_tables = self._synthesize_primary_keys(output_tables)
+        output_tables = self._synthesize_primary_keys(output_tables, preserve_tables)
         output_tables = self._synthesize_foreign_keys(output_tables)
         return output_tables
 
     def _synthesize_primary_keys(
         self,
         output_tables: Dict[str, pd.DataFrame],
+        preserve_tables: List[str],
     ) -> Dict[str, pd.DataFrame]:
         """
         Alters primary key columns on all tables *except* those flagged by the user as
         not to be synthesized. Assumes the primary key column is of type integer.
         """
         for table_name, out_data in output_tables.items():
-            if table_name in self.tables_not_to_synthesize:
+            if table_name in preserve_tables:
                 continue
 
             primary_key = self.relational_data.get_primary_key(table_name)

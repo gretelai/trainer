@@ -38,11 +38,11 @@ class MultiTableEndToEnd:
         # relational_data = RelationalData.from_filesystem(source_metadata_path)
         model = MultiTable(
             relational_data=relational_data,
-            tables_not_to_synthesize=self.tables_not_to_synthesize,
         )
         model.train()
         synthetic_tables = model.generate(
-            record_size_ratio=self.synth_record_size_ratio
+            record_size_ratio=self.synth_record_size_ratio,
+            preserve_tables=self.tables_not_to_synthesize,
         )
         # synthetic_metadata_path = write_synthetic_data_to_filesystem(synthetic_tables)
 
