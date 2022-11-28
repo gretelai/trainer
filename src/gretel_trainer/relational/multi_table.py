@@ -90,7 +90,6 @@ class MultiTable:
         Returns:
             dict(pd.DataFrame): Return a dictionary of table names and synthetic data.
         """
-        # Compute the number of records needed for each table
         output_tables = {}
 
         for table_name in self.relational_data.list_all_tables():
