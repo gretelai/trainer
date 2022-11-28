@@ -1,8 +1,11 @@
 import os
-import pandas as pd
-from pathlib import Path
 import random
+
+from concurrent.futures import ThreadPoolExecutor
+from pathlib import Path
 from typing import Any, Dict, List, Optional
+
+import pandas as pd
 
 from gretel_trainer import Trainer
 from gretel_trainer.models import GretelACTGAN
@@ -18,6 +21,7 @@ class MultiTable:
         tables_not_to_synthesize (list[str], optional): List of tables to skip sampling and leave as they are.
         project_prefix (str, optional): Common prefix for Gretel projects created by this model. Defaults to "multi-table".
         working_dir (str, optional): Directory in which temporary assets should be cached. Defaults to "working".
+        max_threads (int, optional): Max number of Trainer jobs (train, generate) to run at once. Defaults to 5.
     """
 
     def __init__(
@@ -26,6 +30,7 @@ class MultiTable:
         tables_not_to_synthesize: Optional[List[str]] = None,
         project_prefix: str = "multi-table",
         working_dir: str = "working",
+        max_threads: int = 5,
     ):
         self.project_prefix = project_prefix
         self.relational_data = relational_data
@@ -34,6 +39,8 @@ class MultiTable:
         self.synthetic_tables = {}
         self.model_cache_files: Dict[str, Path] = {}
         os.makedirs(self.working_dir, exist_ok=True)
+        self.thread_pool = ThreadPoolExecutor(max_threads)
+        self.futures = []
 
     def _prepare_training_data(self) -> Dict[str, Path]:
         """
@@ -74,7 +81,8 @@ class MultiTable:
                 cache_file=model_cache,
                 overwrite=False,
             )
-            trainer.train(training_csv)
+            self.futures.append(self.thread_pool.submit(trainer.train, training_csv))
+        [future.result() for future in self.futures]
 
     def train(self):
         """Train synthetic data models on each table in the relational dataset"""
