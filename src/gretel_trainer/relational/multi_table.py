@@ -7,6 +7,7 @@ from typing import Any, Dict, List, Optional
 
 import pandas as pd
 
+from gretel_client import configure_session
 from gretel_trainer import Trainer
 from gretel_trainer.models import GretelACTGAN
 from gretel_trainer.relational.core import RelationalData
@@ -86,6 +87,7 @@ class MultiTable:
 
     def train(self):
         """Train synthetic data models on each table in the relational dataset"""
+        configure_session(api_key="prompt", cache="yes", validate=True)
         training_data = self._prepare_training_data(self.relational_data.list_all_tables())
         self._create_trainer_models(training_data)
 
