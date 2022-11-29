@@ -3,14 +3,21 @@ import random
 
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Union
 
 import pandas as pd
+from sklearn import preprocessing
 
 from gretel_client import configure_session
+from gretel_client.helpers import poll
+from gretel_client.projects import create_or_get_unique_project
+
 from gretel_trainer import Trainer
 from gretel_trainer.models import GretelACTGAN
 from gretel_trainer.relational.core import RelationalData
+
+
+GretelModelConfig = Union[str, Path, Dict]
 
 
 class MultiTable:
@@ -38,6 +45,77 @@ class MultiTable:
         self.model_cache_files: Dict[str, Path] = {}
         os.makedirs(self.working_dir, exist_ok=True)
         self.thread_pool = ThreadPoolExecutor(max_threads)
+
+    def transform(
+        self,
+        configs: Dict[str, GretelModelConfig],
+        in_place: bool,
+        project_name: Optional[str] = None,
+    ) -> Dict[str, pd.DataFrame]:
+        """
+        Applies supplied transform model configurations to tables. Returned dictionary includes all transformed
+        tables, which may not include all known tables (i.e. if a transform config was not provided).
+
+        Args:
+            configs (dict[str, GretelModelConfig]): keys are table names and values are Transform model configs.
+            in_place (bool): If True, overwrites internal source dataframes with transformed dataframes,
+            which means subsequent synthetic model training would be performed on the transform results.
+            project_name (str, optional): Name of project to hold transforms models; if unset, defaults
+            to `{self.project_prefix}-transforms`
+
+        Returns:
+            dict[str, pd.DataFrame]: keys are table names and values are transformed tables
+        """
+        transforms_futures = {}
+        project_name = project_name or f"{self.project_prefix}-transforms"
+        project = create_or_get_unique_project(name=project_name)
+
+        for table_name, config in configs.items():
+            table_data = self.relational_data.get_table_data(table_name)
+            transforms_futures[table_name] = self.thread_pool.submit(
+                _transform,
+                project,
+                table_data,
+                config,
+            )
+
+        output_tables = {
+            table_name: future.result()
+            for table_name, future in transforms_futures.items()
+        }
+        output_tables = self._transform_keys(output_tables)
+
+        if in_place:
+            for table_name, transformed_table in output_tables:
+                self.relational_data.update_table_data(table_name, transformed_table)
+
+        return output_tables
+
+    def _transform_keys(
+        self, tables: Dict[str, pd.DataFrame]
+    ) -> Dict[str, pd.DataFrame]:
+        """
+        Crawls tables for all key columns (primary and foreign) and runs each through a LabelEncoder.
+        """
+        all_keys = set()
+        for table_name in tables:
+            primary_key = self.relational_data.get_primary_key(table_name)
+            if primary_key is not None:
+                all_keys.add((table_name, primary_key))
+            for foreign_key in self.relational_data.get_foreign_keys(table_name):
+                all_keys.add(
+                    (foreign_key.parent_table_name, foreign_key.parent_column_name)
+                )
+
+        for key in all_keys:
+            table, column = key
+            column_data = self.relational_data.get_table_data(table)[column]
+            values = list(set(column_data))
+            le = preprocessing.LabelEncoder()
+            le.fit(values)
+            tables[table][column] = le.transform(column_data)
+
+        return tables
 
     def _prepare_training_data(self, tables: List[str]) -> Dict[str, Path]:
         """
@@ -237,3 +315,21 @@ def _collect_new_foreign_key_values(
 
     random.shuffle(weights)
     return random.choices(values, weights=weights, k=total)
+
+
+def _transform(
+    project,
+    table_data: pd.DataFrame,
+    config: GretelModelConfig,
+) -> pd.DataFrame:
+    model = project.create_model_obj(model_config=config, data_source=table_data)
+    model.submit_cloud()
+
+    poll(model)
+
+    record_handler = model.create_record_handler_obj(data_source=table_data)
+    record_handler.submit_cloud()
+
+    poll(record_handler)
+
+    return pd.read_csv(record_handler.get_artifact_link("data"), compression="gzip")
