@@ -9,6 +9,7 @@ from typing import Optional
 import pandas as pd
 from gretel_client import configure_session
 from gretel_client.projects import create_or_get_unique_project
+from gretel_client.projects.models import Status
 from gretel_synthetics.utils.header_clusters import cluster
 
 from gretel_trainer import runner, strategy
@@ -110,6 +111,20 @@ class Trainer:
             df=self.df, overwrite=self.overwrite, seed_fields=seed_fields
         )
         self.run.train_all_partitions()
+
+    def trained_successfully(self) -> bool:
+        """
+        Returns `True` if model training completed successfully and `generate` can safely be called.
+        Returns `False` in all other cases, including if training has not yet begun.
+        """
+        if self.run is None:
+            return False
+
+        partition_results = self.run.partition_results()
+        if partition_results is None:
+            return False
+
+        return all([result == Status.COMPLETED for result in partition_results])
 
     def generate(
         self, num_records: int = 500, seed_df: pd.DataFrame = None
