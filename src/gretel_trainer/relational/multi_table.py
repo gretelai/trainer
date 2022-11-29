@@ -38,7 +38,6 @@ class MultiTable:
         self.model_cache_files: Dict[str, Path] = {}
         os.makedirs(self.working_dir, exist_ok=True)
         self.thread_pool = ThreadPoolExecutor(max_threads)
-        self.futures = []
 
     def _prepare_training_data(self, tables: List[str]) -> Dict[str, Path]:
         """
@@ -68,6 +67,7 @@ class MultiTable:
         Submits each training CSV in the working directory to Trainer for model creation/training.
         Stores each model's Trainer cache file for Trainer to load later.
         """
+        train_futures = []
         for table_name, training_csv in training_data.items():
             model_cache = self.working_dir / f"{table_name}-runner.json"
             self.model_cache_files[table_name] = model_cache
@@ -79,8 +79,8 @@ class MultiTable:
                 cache_file=model_cache,
                 overwrite=False,
             )
-            self.futures.append(self.thread_pool.submit(trainer.train, training_csv))
-        [future.result() for future in self.futures]
+            train_futures.append(self.thread_pool.submit(trainer.train, training_csv))
+        [future.result() for future in train_futures]
 
     def train(self) -> None:
         """Train synthetic data models on each table in the relational dataset"""
