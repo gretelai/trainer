@@ -48,6 +48,14 @@ class RelationalData:
         )
         edge["via"] = via
 
+    def update_table_data(self, table: str, data: pd.DataFrame) -> None:
+        try:
+            self.graph.nodes[table]["data"] = data
+        except KeyError:
+            raise MultiTableException(
+                f"Unrecognized table name: {table}. If this is a new table to add, use `add_table`."
+            )
+
     def list_all_tables(self) -> List[str]:
         return list(self.graph.nodes)
 
