@@ -2,8 +2,9 @@ import os
 import random
 
 from concurrent.futures import ThreadPoolExecutor
+from enum import Enum
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Dict, List, Optional, Tuple, Union
 
 import pandas as pd
 from sklearn import preprocessing
@@ -18,6 +19,21 @@ from gretel_trainer.relational.core import RelationalData
 
 
 GretelModelConfig = Union[str, Path, Dict]
+
+
+class TrainStatus(str, Enum):
+    NotStarted = "NotStarted"
+    InProgress = "InProgress"
+    Completed = "Completed"
+    Failed = "Failed"
+
+
+class GenerateStatus(str, Enum):
+    NotStarted = "NotStarted"
+    InProgress = "InProgress"
+    Completed = "Completed"
+    ModelUnavailable = "ModelUnavailable"
+    SourcePreserved = "SourcePreserved"
 
 
 class MultiTable:
@@ -45,6 +61,14 @@ class MultiTable:
         self.model_cache_files: Dict[str, Path] = {}
         os.makedirs(self.working_dir, exist_ok=True)
         self.thread_pool = ThreadPoolExecutor(max_threads)
+        self.train_statuses = {
+            table_name: TrainStatus.NotStarted
+            for table_name in self.relational_data.list_all_tables()
+        }
+        self.generate_statuses = {
+            table_name: GenerateStatus.NotStarted
+            for table_name in self.relational_data.list_all_tables()
+        }
 
     def transform(
         self,
@@ -157,8 +181,15 @@ class MultiTable:
                 cache_file=model_cache,
                 overwrite=False,
             )
-            train_futures.append(self.thread_pool.submit(trainer.train, training_csv))
-        [future.result() for future in train_futures]
+            self.train_statuses[table_name] = TrainStatus.InProgress
+            train_futures.append(self.thread_pool.submit(_train, trainer, training_csv, table_name))
+
+        for future in train_futures:
+            table_name, successful = future.result()
+            if successful:
+                self.train_statuses[table_name] = TrainStatus.Completed
+            else:
+                self.train_statuses[table_name] = TrainStatus.Failed
 
     def train(self) -> None:
         """Train synthetic data models on each table in the relational dataset"""
@@ -186,14 +217,18 @@ class MultiTable:
         record_size_ratio: float = 1.0,
         preserve_tables: Optional[List[str]] = None,
     ) -> Dict[str, pd.DataFrame]:
-        """Sample synthetic data from trained models
+        """
+        Sample synthetic data from trained models.
+        Tables that did not train successfully will be omitted from the output dictionary.
+        Tables listed in `preserve_tables` *may differ* from source tables in foreign key columns, to ensure
+        joining to parent tables (which may have been synthesized) continues to work properly.
 
         Args:
             record_size_ratio (float, optional): Ratio to upsample real world data size with. Defaults to 1.
             preserve_tables (list[str], optional): List of tables to skip sampling and leave as they are.
 
         Returns:
-            dict(pd.DataFrame): Return a dictionary of table names and synthetic data.
+            dict[str, pd.DataFrame]: Return a dictionary of table names and output data.
         """
         output_tables = {}
         preserve_tables = preserve_tables or []
@@ -201,7 +236,11 @@ class MultiTable:
         for table_name in self.relational_data.list_all_tables():
             source_data = self.relational_data.get_table_data(table_name)
             if table_name in preserve_tables:
+                self.generate_statuses[table_name] = GenerateStatus.SourcePreserved
                 output_tables[table_name] = source_data
+            elif self.train_statuses[table_name] != TrainStatus.Completed:
+                self.generate_statuses[table_name] = GenerateStatus.ModelUnavailable
+                continue
             else:
                 synth_size = int(len(source_data) * record_size_ratio)
                 print(f"Sampling {synth_size} rows from {table_name}")
@@ -209,7 +248,9 @@ class MultiTable:
                     cache_file=str(self.model_cache_files[table_name]),
                     project_name=f"{self.project_prefix}-{table_name.replace('_', '-')}",
                 )
+                self.generate_statuses[table_name] = GenerateStatus.InProgress
                 data = model.generate(num_records=synth_size)
+                self.generate_statuses[table_name] = GenerateStatus.Completed
                 output_tables[table_name] = data
 
         return self._synthesize_keys(output_tables, preserve_tables)
@@ -334,3 +375,12 @@ def _transform(
     poll(record_handler)
 
     return pd.read_csv(record_handler.get_artifact_link("data"), compression="gzip")
+
+
+def _train(
+    trainer,
+    training_csv: Path,
+    table_name: str,
+) -> Tuple[str, bool]:
+    trainer.train(training_csv)
+    return (table_name, trainer.trained_successfully())
