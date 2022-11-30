@@ -168,16 +168,17 @@ class MultiTable:
         )
         self._create_trainer_models(training_data)
 
-    def retrain_with_table(self, table: str, data: pd.DataFrame) -> None:
+    def retrain_tables(self, tables: Dict[str, pd.DataFrame]) -> None:
         """
         Provide updated table data and retrain. This method overwrites the table data in the
         `RelationalData` instance. It should be used when initial training fails and source data
         needs to be altered, but progress on other tables can be left as-is.
         """
         # TODO: once we do training with ancestral data, retrain all child tables as well.
-        self.relational_data.update_table_data(table, data)
-        self.model_cache_files[table].unlink(missing_ok=True)
-        training_data = self._prepare_training_data([table])
+        for table_name, table_data in tables.items():
+            self.relational_data.update_table_data(table_name, table_data)
+            self.model_cache_files[table_name].unlink(missing_ok=True)
+        training_data = self._prepare_training_data(list(tables.keys()))
         self._create_trainer_models(training_data)
 
     def generate(
