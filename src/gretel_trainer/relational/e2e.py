@@ -21,19 +21,17 @@ class MultiTableEndToEnd:
         synth_record_size_ratio: float,
         dest_db_path: Optional[str] = None,
         tables_not_to_synthesize: Optional[List[str]] = None,
-        out_dir: str = "out",
     ):
         if dest_db_path is None:
             dest_db_path = src_db_path
-        self.src_connector = _make_connector(src_db_path, out_dir)
-        self.dest_connector = _make_connector(dest_db_path, out_dir)
-        self.out_dir = out_dir
+        self.src_connector = _make_connector(src_db_path)
+        self.dest_connector = _make_connector(dest_db_path)
         self.synth_record_size_ratio = synth_record_size_ratio
         self.tables_not_to_synthesize = tables_not_to_synthesize
 
     def execute(self):
         relational_data = self.src_connector.extract()
-        # source_metadata_path = relational_data.to_filesystem(self.out_dir)
+        # source_metadata_path = relational_data.to_filesystem()
 
         # relational_data = RelationalData.from_filesystem(source_metadata_path)
         model = MultiTable(
@@ -50,10 +48,10 @@ class MultiTableEndToEnd:
         self.dest_connector.save_to_db(synthetic_tables)
 
 
-def _make_connector(db_path: str, out_dir: str) -> _Connection:
+def _make_connector(db_path: str) -> _Connection:
     if "sqlite://" in db_path:
-        return SQLite(db_path=db_path, out_dir=out_dir)
+        return SQLite(db_path)
     elif "postgres://" in db_path:
-        return PostgreSQL(db_path=db_path, out_dir=out_dir)
+        return PostgreSQL(db_path)
     else:
         raise MultiTableException("Unrecognized db path string")

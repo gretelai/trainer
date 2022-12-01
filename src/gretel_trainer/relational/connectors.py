@@ -26,9 +26,8 @@ class _Connection:
             for additional configuration. In some cases a file path is accepted.
     """
 
-    def __init__(self, db_path: str, out_dir: str):
+    def __init__(self, db_path: str):
         self.db_path = db_path
-        self.out_dir = Path(out_dir)
         self.engine = create_engine(self.db_path)
         logger.info("Connecting to database")
         try:
@@ -67,39 +66,6 @@ class _Connection:
             relational_data.add_foreign_key(foreign_key, referencing)
 
         return relational_data
-
-    def crawl_db(self) -> Dict[str, Any]:
-        table_data: Dict[str, pd.DataFrame] = {}
-        table_files: Dict[str, Path] = {}
-        primary_keys: Dict[str, str] = {}
-        rels_by_pkey: Dict[Tuple[str, str], List[Tuple[str, str]]] = defaultdict(
-            list
-        )  # tuple elements are (tablename, columnname)
-        relationships: List[List[Tuple[str, str]]] = []
-
-        for table_name, table in self.metadata.tables.items():
-            df = pd.read_sql_table(table_name, self.engine)
-            table_data[table_name] = df
-            filepath = self.out_dir / f"{table_name}.csv"
-            table_files[table_name] = filepath
-            for column in table.columns:
-                if column.primary_key:
-                    primary_keys[table_name] = column.name
-                for f_key in column.foreign_keys:
-                    rels_by_pkey[(f_key.column.table.name, f_key.column.name)].append(
-                        (table_name, column.name)
-                    )
-
-        for p_key, f_keys in rels_by_pkey.items():
-            relationships.append([p_key] + f_keys)
-
-        rdb_config = {
-            "table_data": table_data,
-            "table_files": table_files,
-            "primary_keys": primary_keys,
-            "relationships": relationships,
-        }
-        return rdb_config
 
     def save_to_db(self, synthetic_tables: Dict[str, pd.DataFrame]) -> None:
         pass
