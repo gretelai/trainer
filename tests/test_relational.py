@@ -4,7 +4,7 @@ import tempfile
 import pandas as pd
 
 from gretel_trainer.relational.core import RelationalData
-from gretel_trainer.relational.progress import TableProgress
+from gretel_trainer.relational.multi_table import GenerateStatus, MultiTable, TrainStatus
 
 
 def _setup_ecommerce():
@@ -161,31 +161,69 @@ def test_filesystem_serde_accepts_missing_primary_keys():
     assert from_json.get_primary_key("atom") == "atom_id"
 
 
-def test_walk_ecommerce():
+def test_ecommerce_table_generation_progress_happy_path():
     ecom = _setup_ecommerce()
-    t = TableProgress(ecom)
+    multitable = MultiTable(ecom)
+
+    for table_name in multitable.train_statuses:
+        multitable.train_statuses[table_name] = TrainStatus.Completed
 
     # To start, "eldest generation" tables (those with no parents / outbound foreign keys) are ready
-    assert set(t.ready()) == {"users", "distribution_center"}
+    assert set(multitable._ready_to_generate()) == {"users", "distribution_center"}
 
-    t.mark_complete("users")
+    # Once a table has been started, it is no longer ready
+    multitable.generate_statuses["users"] = GenerateStatus.InProgress
+    assert set(multitable._ready_to_generate()) == {"distribution_center"}
 
-    # `events` was only blocked by `users`, and so now is ready
-    assert set(t.ready()) == {"events", "distribution_center"}
+    # It's possible to be in a state where work is happening but nothing is ready
+    multitable.generate_statuses["distribution_center"] = GenerateStatus.InProgress
+    assert set(multitable._ready_to_generate()) == set()
 
-    t.mark_complete("distribution_center")
+    # `events` was only blocked by `users`; once the latter completes, the former is ready,
+    # regardless of the state of the unrelated `distribution_center` table
+    multitable.generate_statuses["users"] = GenerateStatus.Completed
+    assert set(multitable._ready_to_generate()) == {"events"}
 
-    assert set(t.ready()) == {"events", "products"}
+    # Similarly, the completion of `distribution_center` unblocks `products`,
+    # regardless of progress on `events`
+    multitable.generate_statuses["distribution_center"] = GenerateStatus.Completed
+    assert set(multitable._ready_to_generate()) == {"events", "products"}
 
-    t.mark_complete("events")
-    t.mark_complete("products")
+    multitable.generate_statuses["events"] = GenerateStatus.Completed
+    multitable.generate_statuses["products"] = GenerateStatus.Completed
 
-    assert set(t.ready()) == {"inventory_items"}
+    assert set(multitable._ready_to_generate()) == {"inventory_items"}
 
-    t.mark_complete("inventory_items")
+    multitable.generate_statuses["inventory_items"] = GenerateStatus.Completed
 
-    assert set(t.ready()) == {"order_items"}
+    assert set(multitable._ready_to_generate()) == {"order_items"}
 
-    t.mark_complete("order_items")
+    multitable.generate_statuses["order_items"] = GenerateStatus.Completed
 
-    assert set(t.ready()) == set()
+    assert set(multitable._ready_to_generate()) == set()
+
+
+def test_table_generation_progress_training_error():
+    ecom = _setup_ecommerce()
+    multitable = MultiTable(ecom)
+
+    for table_name in multitable.train_statuses:
+        multitable.train_statuses[table_name] = TrainStatus.Completed
+
+    # `users` does not have a functional model, so it will never be ready for generation
+    # `events` is a child of users, and so also will never be ready
+    multitable.train_statuses["users"] = TrainStatus.Failed
+    assert set(multitable._ready_to_generate()) == {"distribution_center"}
+
+
+def test_table_generation_progress_with_user_configured_preserve_table():
+    ecom = _setup_ecommerce()
+    multitable = MultiTable(ecom)
+
+    for table_name in multitable.train_statuses:
+        multitable.train_statuses[table_name] = TrainStatus.Completed
+
+    # The user has elected not to synthesize the `distribution_center` table, so it is never
+    # ready for generation, but it does not block child tables (`products`) from generation
+    multitable.generate_statuses["distribution_center"] = GenerateStatus.SourcePreserved
+    assert set(multitable._ready_to_generate()) == {"users", "products"}

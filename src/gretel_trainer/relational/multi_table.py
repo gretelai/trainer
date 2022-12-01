@@ -1,5 +1,6 @@
 import os
 import random
+import time
 
 from concurrent.futures import ThreadPoolExecutor
 from enum import Enum
@@ -234,24 +235,31 @@ class MultiTable:
         preserve_tables = preserve_tables or []
 
         for table_name in self.relational_data.list_all_tables():
-            source_data = self.relational_data.get_table_data(table_name)
             if table_name in preserve_tables:
                 self.generate_statuses[table_name] = GenerateStatus.SourcePreserved
-                output_tables[table_name] = source_data
+                output_tables[table_name] = self.relational_data.get_table_data(table_name)
             elif self.train_statuses[table_name] != TrainStatus.Completed:
                 self.generate_statuses[table_name] = GenerateStatus.ModelUnavailable
-                continue
-            else:
-                synth_size = int(len(source_data) * record_size_ratio)
+
+        generate_futures = []
+        while self._more_to_do():
+            ready_tables = self._ready_to_generate()
+            for table_name in ready_tables:
+                source_data_size = len(self.relational_data.get_table_data(table_name))
+                synth_size = int(source_data_size * record_size_ratio)
                 print(f"Sampling {synth_size} rows from {table_name}")
                 model = Trainer.load(
                     cache_file=str(self.model_cache_files[table_name]),
                     project_name=f"{self.project_prefix}-{table_name.replace('_', '-')}",
                 )
-                self.generate_statuses[table_name] = GenerateStatus.InProgress
-                data = model.generate(num_records=synth_size)
-                self.generate_statuses[table_name] = GenerateStatus.Completed
-                output_tables[table_name] = data
+                generate_futures.append(
+                    self.thread_pool.submit(_generate, model, table_name, synth_size, self.generate_statuses)
+                )
+            time.sleep(10)
+
+        for future in generate_futures:
+            table_name, data = future.result()
+            output_tables[table_name] = data
 
         return self._synthesize_keys(output_tables, preserve_tables)
 
@@ -325,6 +333,42 @@ class MultiTable:
 
         return output_tables
 
+    def _ready_to_generate(self) -> List[str]:
+        ready = []
+
+        for table in self.relational_data.list_all_tables():
+            if self.generate_statuses[table] == GenerateStatus.Completed:
+                continue
+
+            if not self._table_ok(table):
+                continue
+
+            parents = self.relational_data.get_parents(table)
+            if len(parents) == 0:
+                ready.append(table)
+            elif self._all_parents_ok(parents):
+                ready.append(table)
+
+        return ready
+
+    def _all_parents_ok(self, parents: List[str]) -> bool:
+        return all(
+            [
+                self.generate_statuses[parent]
+                in (GenerateStatus.Completed, GenerateStatus.SourcePreserved)
+                for parent in parents
+            ]
+        )
+
+    def _table_ok(self, table: str) -> bool:
+        return (
+            self.train_statuses[table] == TrainStatus.Completed
+            and self.generate_statuses[table] == GenerateStatus.NotStarted
+        )
+
+    def _more_to_do(self) -> bool:
+        return any([status == GenerateStatus.NotStarted for status in self.generate_statuses.values()])
+
 
 def _collect_new_foreign_key_values(
     values: List[Any],
@@ -384,3 +428,16 @@ def _train(
 ) -> Tuple[str, bool]:
     trainer.train(training_csv)
     return (table_name, trainer.trained_successfully())
+
+
+def _generate(
+    model,
+    table_name: str,
+    synth_size: int,
+    generate_statuses: Dict[str, GenerateStatus],
+) -> Tuple[str, pd.DataFrame]:
+    generate_statuses[table_name] = GenerateStatus.InProgress
+    data = model.generate(num_records=synth_size)
+    generate_statuses[table_name] = GenerateStatus.Completed
+
+    return (table_name, data)
