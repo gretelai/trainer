@@ -1,3 +1,4 @@
+import logging
 import os
 
 import pandas as pd
@@ -10,6 +11,8 @@ from pathlib import Path
 from typing import Any, Dict, List, Tuple
 
 from gretel_trainer.relational.core import RelationalData
+
+logger = logging.getLogger(__name__)
 
 
 class _Connection:
@@ -27,16 +30,18 @@ class _Connection:
         self.db_path = db_path
         self.out_dir = Path(out_dir)
         self.engine = create_engine(self.db_path)
-        print("Connecting to database")
+        logger.info("Connecting to database")
         try:
             self.engine.connect()
         except OperationalError as e:
-            print(f"{e}, {e.__cause__}")
-        print("Successfully connected to db")
+            logger.error(f"{e}, {e.__cause__}")
+            raise e
+        logger.info("Successfully connected to db")
         self.metadata = MetaData()
         self.metadata.reflect(self.engine)
 
     def extract(self) -> RelationalData:
+        """Extracts table data and relationships from the database."""
         relational_data = RelationalData()
         foreign_keys: List[Tuple[str, str]] = []
 

@@ -1,3 +1,4 @@
+import logging
 import os
 import random
 import time
@@ -20,6 +21,8 @@ from gretel_trainer.relational.core import RelationalData
 
 
 GretelModelConfig = Union[str, Path, Dict]
+
+logger = logging.getLogger(__name__)
 
 
 class TrainStatus(str, Enum):
@@ -175,7 +178,7 @@ class MultiTable:
             model_cache = self.working_dir / f"{table_name}-runner.json"
             self.model_cache_files[table_name] = model_cache
 
-            print(f"Fitting model: {table_name}")
+            logger.info(f"Training model for table: {table_name}")
             trainer = Trainer(
                 model_type=GretelACTGAN(),
                 project_name=f"{self.project_prefix}-{table_name.replace('_', '-')}",
@@ -243,11 +246,13 @@ class MultiTable:
 
         generate_futures = []
         while self._more_to_do():
+            logger.debug("Checking for more tables ready to generate")
             ready_tables = self._ready_to_generate()
+            logger.debug(f"Ready tables: {ready_tables}")
             for table_name in ready_tables:
                 source_data_size = len(self.relational_data.get_table_data(table_name))
                 synth_size = int(source_data_size * record_size_ratio)
-                print(f"Sampling {synth_size} rows from {table_name}")
+                logger.info(f"Generating {synth_size} rows for table: {table_name}")
                 model = Trainer.load(
                     cache_file=str(self.model_cache_files[table_name]),
                     project_name=f"{self.project_prefix}-{table_name.replace('_', '-')}",
