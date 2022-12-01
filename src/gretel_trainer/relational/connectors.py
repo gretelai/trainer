@@ -34,15 +34,16 @@ class _Connection:
             logger.error(f"{e}, {e.__cause__}")
             raise e
         logger.info("Successfully connected to db")
-        self.metadata = MetaData()
-        self.metadata.reflect(self.engine)
 
     def extract(self) -> RelationalData:
         """Extracts table data and relationships from the database."""
+        metadata = MetaData()
+        metadata.reflect(self.engine)
+
         relational_data = RelationalData()
         foreign_keys: List[Tuple[str, str]] = []
 
-        for table_name, table in self.metadata.tables.items():
+        for table_name, table in metadata.tables.items():
             df = pd.read_sql_table(table_name, self.engine)
             primary_key = None
             for column in table.columns:
@@ -65,17 +66,20 @@ class _Connection:
 
         return relational_data
 
-    def save_to_db(self, synthetic_tables: Dict[str, pd.DataFrame]) -> None:
-        pass
-
 
 class SQLite(_Connection):
     """
-    Connector to load data from SQLite databases
+    Connector to/from SQLite databases
     """
+    def save(self, tables: Dict[str, pd.DataFrame], prefix: str = "") -> None:
+        for name, data in tables.items():
+            data.to_sql(f"{prefix}{name}", con=self.engine, if_exists="replace", index=False)
+
 
 
 class PostgreSQL(_Connection):
     """
-    Connector to load data from Postgres databases
+    Connector to/from Postgres databases
     """
+    def save(self, tables: Dict[str, pd.DataFrame], prefix: str = "") -> None:
+        pass

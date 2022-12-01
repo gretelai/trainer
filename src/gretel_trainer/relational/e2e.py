@@ -47,7 +47,7 @@ class MultiTableEndToEnd:
         # synthetic_metadata_path = write_synthetic_data_to_filesystem(synthetic_tables)
 
         # self.dest_connector.import(synthetic_metadata_path)  # would presumably replace the line below
-        self.dest_connector.save_to_db(synthetic_tables)
+        self.dest_connector.save(synthetic_tables)
 
 
 def _make_connector(db_path: str) -> _Connection:
