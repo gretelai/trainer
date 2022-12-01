@@ -66,20 +66,18 @@ class _Connection:
 
         return relational_data
 
+    def save(self, tables: Dict[str, pd.DataFrame], prefix: str = "") -> None:
+        for name, data in tables.items():
+            data.to_sql(f"{prefix}{name}", con=self.engine, if_exists="replace", index=False)
+
 
 class SQLite(_Connection):
     """
     Connector to/from SQLite databases
     """
-    def save(self, tables: Dict[str, pd.DataFrame], prefix: str = "") -> None:
-        for name, data in tables.items():
-            data.to_sql(f"{prefix}{name}", con=self.engine, if_exists="replace", index=False)
-
 
 
 class PostgreSQL(_Connection):
     """
     Connector to/from Postgres databases
     """
-    def save(self, tables: Dict[str, pd.DataFrame], prefix: str = "") -> None:
-        pass

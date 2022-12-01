@@ -53,7 +53,7 @@ class MultiTableEndToEnd:
 def _make_connector(db_path: str) -> _Connection:
     if "sqlite://" in db_path:
         return SQLite(db_path)
-    elif "postgres://" in db_path:
+    elif "postgresql://" in db_path:
         return PostgreSQL(db_path)
     else:
         raise MultiTableException("Unrecognized db path string")
