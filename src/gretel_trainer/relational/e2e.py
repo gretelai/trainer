@@ -1,8 +1,10 @@
 from typing import List, Optional
 
-from gretel_trainer.relational.connectors import _Connection, PostgreSQL, SQLite
+from gretel_trainer.relational.connectors import (PostgreSQL, SQLite,
+                                                  _Connection)
 from gretel_trainer.relational.core import MultiTableException
 from gretel_trainer.relational.multi_table import MultiTable
+
 
 # This is a helper class that orchestrates an end-to-end workflow in Trainer.
 #

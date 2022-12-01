@@ -2,23 +2,20 @@ import logging
 import os
 import random
 import time
-
 from concurrent.futures import ThreadPoolExecutor
 from enum import Enum
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple, Union
 
 import pandas as pd
-from sklearn import preprocessing
-
 from gretel_client import configure_session
 from gretel_client.helpers import poll
 from gretel_client.projects import create_or_get_unique_project
+from sklearn import preprocessing
 
 from gretel_trainer import Trainer
 from gretel_trainer.models import GretelACTGAN
 from gretel_trainer.relational.core import RelationalData
-
 
 GretelModelConfig = Union[str, Path, Dict]
 
@@ -186,7 +183,9 @@ class MultiTable:
                 overwrite=False,
             )
             self.train_statuses[table_name] = TrainStatus.InProgress
-            train_futures.append(self.thread_pool.submit(_train, trainer, training_csv, table_name))
+            train_futures.append(
+                self.thread_pool.submit(_train, trainer, training_csv, table_name)
+            )
 
         for future in train_futures:
             table_name, successful = future.result()
@@ -240,7 +239,9 @@ class MultiTable:
         for table_name in self.relational_data.list_all_tables():
             if table_name in preserve_tables:
                 self.generate_statuses[table_name] = GenerateStatus.SourcePreserved
-                output_tables[table_name] = self.relational_data.get_table_data(table_name)
+                output_tables[table_name] = self.relational_data.get_table_data(
+                    table_name
+                )
             elif self.train_statuses[table_name] != TrainStatus.Completed:
                 self.generate_statuses[table_name] = GenerateStatus.ModelUnavailable
 
@@ -258,7 +259,9 @@ class MultiTable:
                     project_name=f"{self.project_prefix}-{table_name.replace('_', '-')}",
                 )
                 generate_futures.append(
-                    self.thread_pool.submit(_generate, model, table_name, synth_size, self.generate_statuses)
+                    self.thread_pool.submit(
+                        _generate, model, table_name, synth_size, self.generate_statuses
+                    )
                 )
             time.sleep(10)
 
@@ -372,7 +375,12 @@ class MultiTable:
         )
 
     def _more_to_do(self) -> bool:
-        return any([status == GenerateStatus.NotStarted for status in self.generate_statuses.values()])
+        return any(
+            [
+                status == GenerateStatus.NotStarted
+                for status in self.generate_statuses.values()
+            ]
+        )
 
 
 def _collect_new_foreign_key_values(

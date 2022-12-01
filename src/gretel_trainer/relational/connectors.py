@@ -1,14 +1,12 @@
 import logging
 import os
-
-import pandas as pd
-from sqlalchemy import MetaData
-from sqlalchemy import create_engine
-from sqlalchemy.exc import OperationalError
 from collections import defaultdict
 from pathlib import Path
-
 from typing import Any, Dict, List, Tuple
+
+import pandas as pd
+from sqlalchemy import MetaData, create_engine
+from sqlalchemy.exc import OperationalError
 
 from gretel_trainer.relational.core import RelationalData
 
