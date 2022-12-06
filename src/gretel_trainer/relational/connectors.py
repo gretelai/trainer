@@ -2,10 +2,11 @@ import logging
 import os
 from collections import defaultdict
 from pathlib import Path
-from typing import Any, Dict, List, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 import pandas as pd
 from sqlalchemy import MetaData, create_engine
+from sqlalchemy.engine.base import Engine
 from sqlalchemy.exc import OperationalError
 
 from gretel_trainer.relational.core import RelationalData
@@ -13,20 +14,24 @@ from gretel_trainer.relational.core import RelationalData
 logger = logging.getLogger(__name__)
 
 
-class _Connection:
+class Connection:
     """
-    Class to wrap connections to relational databases and backups.
-    Connectors should be derived from this class
+    Wraps connections to relational databases and backups.
 
     Args:
-        db_path (str): This URL follows RFC-1738, and usually can include username,
-            password, hostname, database name as well as optional keyword arguments
-            for additional configuration. In some cases a file path is accepted.
+        engine (sqlalchemy.engine.base.Engine): A SQLAlchemy engine configured
+            to connect to some database. A variety of helper functions exist to
+            assist with creating engines for some popular databases, but these
+            should not be considered exhaustive. You may need to install
+            additional dialect/adapter packages via pip, such as psycopg2 for
+            connecting to postgres.
+
+            For more detail, see the SQLAlchemy docs:
+            https://docs.sqlalchemy.org/en/20/core/engines.html
     """
 
-    def __init__(self, db_path: str):
-        self.db_path = db_path
-        self.engine = create_engine(self.db_path)
+    def __init__(self, engine: Engine):
+        self.engine = engine
         logger.info("Connecting to database")
         try:
             self.engine.connect()
@@ -71,13 +76,45 @@ class _Connection:
             data.to_sql(f"{prefix}{name}", con=self.engine, if_exists="replace", index=False)
 
 
-class SQLite(_Connection):
-    """
-    Connector to/from SQLite databases
-    """
+def sqlite_conn(path: str) -> Connection:
+    engine = create_engine(f"sqlite:///{path}")
+    return Connection(engine)
 
 
-class PostgreSQL(_Connection):
-    """
-    Connector to/from Postgres databases
-    """
+def postgres_conn(user: str, password: str, host: str, port: int) -> Connection:
+    engine = create_engine(f"postgresql://{user}:{password}@{host}:{port}")
+    return Connection(engine)
+
+
+def bigquery_conn(
+    project: Optional[str] = None,
+) -> Connection:
+    engine = create_engine(f"bigquery://{project}")
+    return Connection(engine)
+
+
+def snowflake_conn(
+    user: str,
+    password: str,
+    account_identifier: str,
+    database: Optional[str] = None,
+    schema: Optional[str] = None,
+    warehouse: Optional[str] = None,
+    role: Optional[str] = None,
+) -> Connection:
+    conn_string = f"snowflake:///{user}:{password}@{account_identifier}"
+
+    if database is not None:
+        conn_string = f"{conn_string}/{database}"
+        if schema is not None:
+            conn_string = f"{conn_string}/{schema}"
+
+    next_sep = "?"
+    if warehouse is not None:
+        conn_string = f"{conn_string}{next_sep}warehouse={warehouse}"
+        next_sep = "&"
+    if role is not None:
+        conn_string = f"{conn_string}{next_sep}role={role}"
+
+    engine = create_engine(conn_string)
+    return Connection(engine)

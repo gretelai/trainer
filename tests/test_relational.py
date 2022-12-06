@@ -8,7 +8,7 @@ import pandas.testing as pdtest
 from botocore import UNSIGNED
 from botocore.client import Config
 
-from gretel_trainer.relational.connectors import SQLite
+from gretel_trainer.relational.connectors import sqlite_conn
 from gretel_trainer.relational.core import RelationalData
 from gretel_trainer.relational.multi_table import GenerateStatus, MultiTable, TrainStatus
 
@@ -45,7 +45,7 @@ def test_extracting_relational_data():
     s3 = boto3.client("s3", config=Config(signature_version=UNSIGNED))
     with tempfile.NamedTemporaryFile() as f:
         s3.download_fileobj("gretel-blueprints-pub", "rdb/ecom_xf.db", f)
-        sqlite = SQLite(db_path=f"sqlite:///{f.name}")
+        sqlite = sqlite_conn(f.name)
         extracted = sqlite.extract()
 
     all_tables = extracted.list_all_tables()

@@ -1,7 +1,6 @@
 from typing import List, Optional
 
-from gretel_trainer.relational.connectors import (PostgreSQL, SQLite,
-                                                  _Connection)
+from gretel_trainer.relational.connectors import Connection
 from gretel_trainer.relational.core import MultiTableException
 from gretel_trainer.relational.multi_table import MultiTable
 
@@ -19,15 +18,14 @@ from gretel_trainer.relational.multi_table import MultiTable
 class MultiTableEndToEnd:
     def __init__(
         self,
-        src_db_path: str,
+        src_connector: Connection,
         synth_record_size_ratio: float,
-        dest_db_path: Optional[str] = None,
+        dest_connector: Optional[Connection] = None,
         tables_not_to_synthesize: Optional[List[str]] = None,
     ):
-        if dest_db_path is None:
-            dest_db_path = src_db_path
-        self.src_connector = _make_connector(src_db_path)
-        self.dest_connector = _make_connector(dest_db_path)
+        self.src_connector = src_connector
+        if dest_connector is None:
+            self.dest_connector = src_connector
         self.synth_record_size_ratio = synth_record_size_ratio
         self.tables_not_to_synthesize = tables_not_to_synthesize
 
@@ -48,12 +46,3 @@ class MultiTableEndToEnd:
 
         # self.dest_connector.import(synthetic_metadata_path)  # would presumably replace the line below
         self.dest_connector.save(synthetic_tables)
-
-
-def _make_connector(db_path: str) -> _Connection:
-    if "sqlite://" in db_path:
-        return SQLite(db_path)
-    elif "postgresql://" in db_path:
-        return PostgreSQL(db_path)
-    else:
-        raise MultiTableException("Unrecognized db path string")
