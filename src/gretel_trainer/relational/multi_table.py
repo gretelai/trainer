@@ -66,7 +66,7 @@ class MultiTable:
             table_name: TrainStatus.NotStarted
             for table_name in self.relational_data.list_all_tables()
         }
-        self.reset_generation_statuses()
+        self._reset_generation_statuses()
 
     def transform(
         self,
@@ -230,22 +230,12 @@ class MultiTable:
         Returns:
             dict[str, pd.DataFrame]: Return a dictionary of table names and output data.
         """
-        all_tables = self.relational_data.list_all_tables()
-
-        if not all(
-            [
-                self.generate_statuses[table] == GenerateStatus.NotStarted
-                for table in all_tables
-            ]
-        ):
-            raise MultiTableException(
-                "Generate statuses are in a tainted state. Try calling `reset_generation_statuses`."
-            )
-
         output_tables = {}
         preserve_tables = preserve_tables or []
 
-        for table_name in all_tables:
+        self._reset_generation_statuses()
+
+        for table_name in self.relational_data.list_all_tables():
             if table_name in preserve_tables:
                 self.generate_statuses[table_name] = GenerateStatus.SourcePreserved
                 output_tables[table_name] = self.relational_data.get_table_data(
@@ -280,11 +270,9 @@ class MultiTable:
 
         return self._synthesize_keys(output_tables, preserve_tables)
 
-    def reset_generation_statuses(self) -> None:
+    def _reset_generation_statuses(self) -> None:
         """
         Sets the GenerateStatus for all known tables to NotStarted.
-        Call this method between multiple `generate` calls to produce synthetic
-        data multiple times.
         """
         self.generate_statuses = {
             table_name: GenerateStatus.NotStarted
