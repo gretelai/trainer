@@ -3,6 +3,7 @@ import tempfile
 
 import boto3
 import pandas as pd
+import pandas.testing as pdtest
 
 from botocore import UNSIGNED
 from botocore.client import Config
@@ -170,7 +171,10 @@ def test_ecommerce_filesystem_serde():
 
         from_json = RelationalData.from_filesystem(f"{tmp}/metadata.json")
 
-    assert len(from_json.list_all_tables()) == 6
+    for table in ecom.list_all_tables():
+        pdtest.assert_frame_equal(ecom.get_table_data(table), from_json.get_table_data(table))
+        assert ecom.get_parents(table) == from_json.get_parents(table)
+        assert ecom.get_foreign_keys(table) == from_json.get_foreign_keys(table)
 
 
 def test_filesystem_serde_accepts_missing_primary_keys():
