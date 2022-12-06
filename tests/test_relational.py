@@ -1,8 +1,13 @@
 import os
 import tempfile
 
+import boto3
 import pandas as pd
 
+from botocore import UNSIGNED
+from botocore.client import Config
+
+from gretel_trainer.relational.connectors import SQLite
 from gretel_trainer.relational.core import RelationalData
 from gretel_trainer.relational.multi_table import GenerateStatus, MultiTable, TrainStatus
 
@@ -33,6 +38,24 @@ def _setup_mutagenesis():
     mutagenesis.add_foreign_key("bond.atom2_id", "atom.atom_id")
     mutagenesis.add_foreign_key("atom.molecule_id", "molecule.molecule_id")
     return mutagenesis
+
+
+def test_extracting_relational_data():
+    s3 = boto3.client("s3", config=Config(signature_version=UNSIGNED))
+    with tempfile.NamedTemporaryFile() as f:
+        s3.download_fileobj("gretel-blueprints-pub", "rdb/ecom_xf.db", f)
+        sqlite = SQLite(db_path=f"sqlite:///{f.name}")
+        extracted = sqlite.extract()
+
+    all_tables = extracted.list_all_tables()
+    assert set(all_tables) == {"users", "events", "products", "distribution_center", "order_items", "inventory_items"}
+
+    manual = _setup_ecommerce()
+
+    for table in all_tables:
+        assert len(extracted.get_table_data(table)) > 1
+        assert extracted.get_parents(table) == manual.get_parents(table)
+        assert extracted.get_foreign_keys(table) == manual.get_foreign_keys(table)
 
 
 def test_ecommerce_relational_data():
