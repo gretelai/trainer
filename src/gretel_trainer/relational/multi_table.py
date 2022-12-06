@@ -291,7 +291,6 @@ class MultiTable:
             for table_name in self.relational_data.list_all_tables()
         }
 
-
     def _synthesize_keys(
         self,
         output_tables: Dict[str, pd.DataFrame],
