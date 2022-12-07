@@ -353,9 +353,6 @@ class MultiTable:
         ready = []
 
         for table in self.relational_data.list_all_tables():
-            if self.generate_statuses[table] == GenerateStatus.Completed:
-                continue
-
             if not self._table_ok(table):
                 continue
 
