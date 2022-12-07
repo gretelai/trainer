@@ -1,12 +1,15 @@
 import os
 import tempfile
 
+from pathlib import Path
+
 import boto3
 import pandas as pd
 import pandas.testing as pdtest
 
 from botocore import UNSIGNED
 from botocore.client import Config
+from unittest.mock import patch
 
 from gretel_trainer.relational.connectors import sqlite_conn
 from gretel_trainer.relational.core import RelationalData
@@ -186,6 +189,49 @@ def test_filesystem_serde_accepts_missing_primary_keys():
 
     assert from_json.get_primary_key("bond") is None
     assert from_json.get_primary_key("atom") == "atom_id"
+
+
+def test_training_removes_primary_and_foreign_keys_from_tables():
+    humans = pd.DataFrame(data={
+        "name": ["Mike", "Dan"],
+        "id": [1, 2],
+    })
+    pets = pd.DataFrame(data={
+        "name": ["Tapu", "Rolo", "Archie"],
+        "age": [6, 14, 8],
+        "id": [1, 2, 3],
+        "human_id": [1, 2, 2],
+    })
+    rel_data = RelationalData()
+    rel_data.add_table("humans", "id", humans)
+    rel_data.add_table("pets", "id", pets)
+    rel_data.add_foreign_key("pets.human_id", "humans.id")
+
+    with tempfile.TemporaryDirectory() as work_dir, patch(
+        "gretel_trainer.trainer.create_or_get_unique_project"
+    ), patch(
+        "gretel_trainer.trainer.Trainer.train"
+    ) as train, patch(
+        "gretel_trainer.trainer.Trainer.trained_successfully"
+    ) as trained_successfully:
+        trained_successfully.return_value = True
+        multitable = MultiTable(rel_data, working_dir=work_dir)
+        multitable.train()
+
+        expectations = [
+            ("humans", {"name"}),
+            ("pets", {"name", "age"}),
+        ]
+        for expectation in expectations:
+            table, expected_columns = expectation
+
+            training_csv = Path(f"{work_dir}/{table}-train.csv")
+            assert os.path.exists(training_csv)
+
+            training_data = pd.read_csv(training_csv)
+            assert set(training_data.columns) == expected_columns
+
+            train.assert_any_call(training_csv)
 
 
 def test_ecommerce_table_generation_progress_happy_path():
