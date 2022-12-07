@@ -748,6 +748,7 @@ class StrategyRunner:
         df = self._get_synthetic_data("run", "data")
         return self._maybe_restore_df_headers(df)
 
+    @_needs_load
     def get_sqs_information(self) -> List[dict]:
         return [
             partition.ctx[SQS]
