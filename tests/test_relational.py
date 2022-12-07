@@ -13,31 +13,77 @@ from unittest.mock import patch
 
 from gretel_trainer.relational.connectors import sqlite_conn
 from gretel_trainer.relational.core import RelationalData
-from gretel_trainer.relational.multi_table import GenerateStatus, MultiTable, TrainStatus
+from gretel_trainer.relational.multi_table import (
+    GenerateStatus,
+    MultiTable,
+    TrainStatus,
+)
 
 
 def _setup_ecommerce():
     ecommerce = RelationalData()
-    ecommerce.add_table("events", "id", pd.DataFrame(columns=["id", "browser", "traffic_source", "user_id"]))
-    ecommerce.add_table("users", "id", pd.DataFrame(columns=["id", "first_name", "last_name"]))
-    ecommerce.add_table("inventory_items", "id", pd.DataFrame(columns=["id", "sold_at", "cost", "product_id", "product_distribution_center_id"]))
-    ecommerce.add_table("products", "id", pd.DataFrame(columns=["id", "name", "brand", "distribution_center_id"]))
-    ecommerce.add_table("distribution_center", "id", pd.DataFrame(columns=["id", "name"]))
-    ecommerce.add_table("order_items", "id", pd.DataFrame(columns=["id", "sale_price", "status", "user_id", "inventory_item_id"]))
+    ecommerce.add_table(
+        "events",
+        "id",
+        pd.DataFrame(columns=["id", "browser", "traffic_source", "user_id"]),
+    )
+    ecommerce.add_table(
+        "users", "id", pd.DataFrame(columns=["id", "first_name", "last_name"])
+    )
+    ecommerce.add_table(
+        "inventory_items",
+        "id",
+        pd.DataFrame(
+            columns=[
+                "id",
+                "sold_at",
+                "cost",
+                "product_id",
+                "product_distribution_center_id",
+            ]
+        ),
+    )
+    ecommerce.add_table(
+        "products",
+        "id",
+        pd.DataFrame(columns=["id", "name", "brand", "distribution_center_id"]),
+    )
+    ecommerce.add_table(
+        "distribution_center", "id", pd.DataFrame(columns=["id", "name"])
+    )
+    ecommerce.add_table(
+        "order_items",
+        "id",
+        pd.DataFrame(
+            columns=["id", "sale_price", "status", "user_id", "inventory_item_id"]
+        ),
+    )
     ecommerce.add_foreign_key("events.user_id", "users.id")
     ecommerce.add_foreign_key("order_items.user_id", "users.id")
     ecommerce.add_foreign_key("order_items.inventory_item_id", "inventory_items.id")
     ecommerce.add_foreign_key("inventory_items.product_id", "products.id")
-    ecommerce.add_foreign_key("inventory_items.product_distribution_center_id", "distribution_center.id")
-    ecommerce.add_foreign_key("products.distribution_center_id", "distribution_center.id")
+    ecommerce.add_foreign_key(
+        "inventory_items.product_distribution_center_id", "distribution_center.id"
+    )
+    ecommerce.add_foreign_key(
+        "products.distribution_center_id", "distribution_center.id"
+    )
     return ecommerce
 
 
 def _setup_mutagenesis():
     mutagenesis = RelationalData()
-    mutagenesis.add_table("bond", None, pd.DataFrame(columns=["type", "atom1_id", "atom2_id"]))
-    mutagenesis.add_table("atom", "atom_id", pd.DataFrame(columns=["atom_id", "element", "charge", "molecule_id"]))
-    mutagenesis.add_table("molecule", "molecule_id", pd.DataFrame(columns=["molecule_id", "mutagenic"]))
+    mutagenesis.add_table(
+        "bond", None, pd.DataFrame(columns=["type", "atom1_id", "atom2_id"])
+    )
+    mutagenesis.add_table(
+        "atom",
+        "atom_id",
+        pd.DataFrame(columns=["atom_id", "element", "charge", "molecule_id"]),
+    )
+    mutagenesis.add_table(
+        "molecule", "molecule_id", pd.DataFrame(columns=["molecule_id", "mutagenic"])
+    )
     mutagenesis.add_foreign_key("bond.atom1_id", "atom.atom_id")
     mutagenesis.add_foreign_key("bond.atom2_id", "atom.atom_id")
     mutagenesis.add_foreign_key("atom.molecule_id", "molecule.molecule_id")
@@ -52,7 +98,14 @@ def test_extracting_relational_data():
         extracted = sqlite.extract()
 
     all_tables = extracted.list_all_tables()
-    assert set(all_tables) == {"users", "events", "products", "distribution_center", "order_items", "inventory_items"}
+    assert set(all_tables) == {
+        "users",
+        "events",
+        "products",
+        "distribution_center",
+        "order_items",
+        "inventory_items",
+    }
 
     manual = _setup_ecommerce()
 
@@ -67,39 +120,75 @@ def test_ecommerce_relational_data():
 
     assert ecom.get_parents("users") == []
     assert ecom.get_parents("events") == ["users"]
-    assert set(ecom.get_parents("inventory_items")) == {"products", "distribution_center"}
+    assert set(ecom.get_parents("inventory_items")) == {
+        "products",
+        "distribution_center",
+    }
 
     users_with_ancestors = ecom.get_table_data_with_ancestors("users")
     assert set(users_with_ancestors.columns) == {
-        "self|id", "self|first_name", "self|last_name"
+        "self|id",
+        "self|first_name",
+        "self|last_name",
     }
     restored_users = ecom.drop_ancestral_data(users_with_ancestors)
     assert set(restored_users.columns) == {"id", "first_name", "last_name"}
 
     events_with_ancestors = ecom.get_table_data_with_ancestors("events")
     assert set(events_with_ancestors.columns) == {
-        "self|id", "self|browser", "self|traffic_source", "self|user_id",
-        "self.user_id|id", "self.user_id|first_name", "self.user_id|last_name",
+        "self|id",
+        "self|browser",
+        "self|traffic_source",
+        "self|user_id",
+        "self.user_id|id",
+        "self.user_id|first_name",
+        "self.user_id|last_name",
     }
     restored_events = ecom.drop_ancestral_data(events_with_ancestors)
-    assert set(restored_events.columns) == {"id", "browser", "traffic_source", "user_id"}
+    assert set(restored_events.columns) == {
+        "id",
+        "browser",
+        "traffic_source",
+        "user_id",
+    }
 
-    inventory_items_with_ancestors = ecom.get_table_data_with_ancestors("inventory_items")
+    inventory_items_with_ancestors = ecom.get_table_data_with_ancestors(
+        "inventory_items"
+    )
     assert set(inventory_items_with_ancestors.columns) == {
-        "self|id", "self|sold_at", "self|cost", "self|product_id", "self|product_distribution_center_id",
-        "self.product_id|id", "self.product_id|name", "self.product_id|brand", "self.product_id|distribution_center_id",
-        "self.product_distribution_center_id|id", "self.product_distribution_center_id|name",
-        "self.product_id.distribution_center_id|id", "self.product_id.distribution_center_id|name",
+        "self|id",
+        "self|sold_at",
+        "self|cost",
+        "self|product_id",
+        "self|product_distribution_center_id",
+        "self.product_id|id",
+        "self.product_id|name",
+        "self.product_id|brand",
+        "self.product_id|distribution_center_id",
+        "self.product_distribution_center_id|id",
+        "self.product_distribution_center_id|name",
+        "self.product_id.distribution_center_id|id",
+        "self.product_id.distribution_center_id|name",
     }
     restored_inventory_items = ecom.drop_ancestral_data(inventory_items_with_ancestors)
-    assert set(restored_inventory_items.columns) == {"id", "sold_at", "cost", "product_id", "product_distribution_center_id"}
+    assert set(restored_inventory_items.columns) == {
+        "id",
+        "sold_at",
+        "cost",
+        "product_id",
+        "product_distribution_center_id",
+    }
 
     # seed dataframes
     assert ecom.build_seed_data_for_table("users", {}) is None
 
-    events_seed = ecom.build_seed_data_for_table("events", {"users": users_with_ancestors})
+    events_seed = ecom.build_seed_data_for_table(
+        "events", {"users": users_with_ancestors}
+    )
     assert events_seed is not None and set(events_seed.columns) == {
-        "self.user_id|id", "self.user_id|first_name", "self.user_id|last_name",
+        "self.user_id|id",
+        "self.user_id|first_name",
+        "self.user_id|last_name",
     }
 
     # inventory_items_seed = ecom.build_seed_data_for_table("inventory_items", {
@@ -122,11 +211,21 @@ def test_mutagenesis_relational_data():
 
     bond_with_ancestors = mutagenesis.get_table_data_with_ancestors("bond")
     assert set(bond_with_ancestors.columns) == {
-        "self|type", "self|atom1_id", "self|atom2_id",
-        "self.atom1_id|atom_id", "self.atom1_id|element", "self.atom1_id|charge", "self.atom1_id|molecule_id",
-        "self.atom2_id|atom_id", "self.atom2_id|element", "self.atom2_id|charge", "self.atom2_id|molecule_id",
-        "self.atom1_id.molecule_id|molecule_id", "self.atom1_id.molecule_id|mutagenic",
-        "self.atom2_id.molecule_id|molecule_id", "self.atom2_id.molecule_id|mutagenic",
+        "self|type",
+        "self|atom1_id",
+        "self|atom2_id",
+        "self.atom1_id|atom_id",
+        "self.atom1_id|element",
+        "self.atom1_id|charge",
+        "self.atom1_id|molecule_id",
+        "self.atom2_id|atom_id",
+        "self.atom2_id|element",
+        "self.atom2_id|charge",
+        "self.atom2_id|molecule_id",
+        "self.atom1_id.molecule_id|molecule_id",
+        "self.atom1_id.molecule_id|mutagenic",
+        "self.atom2_id.molecule_id|molecule_id",
+        "self.atom2_id.molecule_id|mutagenic",
     }
     restored_bond = mutagenesis.drop_ancestral_data(bond_with_ancestors)
     assert set(restored_bond.columns) == {"type", "atom1_id", "atom2_id"}
@@ -139,9 +238,15 @@ def test_relational_data_as_dict():
     assert as_dict["tables"] == {
         "users": {"primary_key": "id", "csv_path": "test_out/users.csv"},
         "events": {"primary_key": "id", "csv_path": "test_out/events.csv"},
-        "distribution_center": {"primary_key": "id", "csv_path": "test_out/distribution_center.csv"},
+        "distribution_center": {
+            "primary_key": "id",
+            "csv_path": "test_out/distribution_center.csv",
+        },
         "products": {"primary_key": "id", "csv_path": "test_out/products.csv"},
-        "inventory_items": {"primary_key": "id", "csv_path": "test_out/inventory_items.csv"},
+        "inventory_items": {
+            "primary_key": "id",
+            "csv_path": "test_out/inventory_items.csv",
+        },
         "order_items": {"primary_key": "id", "csv_path": "test_out/order_items.csv"},
     }
     assert set(as_dict["foreign_keys"]) == {
@@ -175,7 +280,9 @@ def test_ecommerce_filesystem_serde():
         from_json = RelationalData.from_filesystem(f"{tmp}/metadata.json")
 
     for table in ecom.list_all_tables():
-        pdtest.assert_frame_equal(ecom.get_table_data(table), from_json.get_table_data(table))
+        pdtest.assert_frame_equal(
+            ecom.get_table_data(table), from_json.get_table_data(table)
+        )
         assert ecom.get_parents(table) == from_json.get_parents(table)
         assert ecom.get_foreign_keys(table) == from_json.get_foreign_keys(table)
 
@@ -192,16 +299,20 @@ def test_filesystem_serde_accepts_missing_primary_keys():
 
 
 def test_training_removes_primary_and_foreign_keys_from_tables():
-    humans = pd.DataFrame(data={
-        "name": ["Mike", "Dan"],
-        "id": [1, 2],
-    })
-    pets = pd.DataFrame(data={
-        "name": ["Tapu", "Rolo", "Archie"],
-        "age": [6, 14, 8],
-        "id": [1, 2, 3],
-        "human_id": [1, 2, 2],
-    })
+    humans = pd.DataFrame(
+        data={
+            "name": ["Mike", "Dan"],
+            "id": [1, 2],
+        }
+    )
+    pets = pd.DataFrame(
+        data={
+            "name": ["Tapu", "Rolo", "Archie"],
+            "age": [6, 14, 8],
+            "id": [1, 2, 3],
+            "human_id": [1, 2, 2],
+        }
+    )
     rel_data = RelationalData()
     rel_data.add_table("humans", "id", humans)
     rel_data.add_table("pets", "id", pets)
@@ -209,9 +320,7 @@ def test_training_removes_primary_and_foreign_keys_from_tables():
 
     with tempfile.TemporaryDirectory() as work_dir, patch(
         "gretel_trainer.trainer.create_or_get_unique_project"
-    ), patch(
-        "gretel_trainer.trainer.Trainer.train"
-    ) as train, patch(
+    ), patch("gretel_trainer.trainer.Trainer.train") as train, patch(
         "gretel_trainer.trainer.Trainer.trained_successfully"
     ) as trained_successfully:
         trained_successfully.return_value = True
