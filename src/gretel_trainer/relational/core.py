@@ -74,7 +74,9 @@ class RelationalData:
             foreign_keys.extend(fks)
         return foreign_keys
 
-    def get_table_data_with_ancestors(self, table: str, tableset: Optional[Dict[str, pd.DataFrame]] = None) -> pd.DataFrame:
+    def get_table_data_with_ancestors(
+        self, table: str, tableset: Optional[Dict[str, pd.DataFrame]] = None
+    ) -> pd.DataFrame:
         """
         Returns a data frame with all ancestral data joined to each record.
         Column names are modified to the format `LINAGE|COLUMN_NAME`.
@@ -186,5 +188,7 @@ def _join_parents(
             right_on=f"{next_lineage}{delim}{foreign_key.parent_column_name}",
         )
 
-        df = _join_parents(df, parent_table_name, next_lineage, relational_data, tableset)
+        df = _join_parents(
+            df, parent_table_name, next_lineage, relational_data, tableset
+        )
     return df
