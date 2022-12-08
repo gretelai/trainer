@@ -59,7 +59,6 @@ class MultiTable:
         self.relational_data = relational_data
         self.working_dir = Path(working_dir)
         self.synthetic_tables = {}
-        self.model_cache_files: Dict[str, Path] = {}
         os.makedirs(self.working_dir, exist_ok=True)
         self.thread_pool = ThreadPoolExecutor(max_threads)
         self.train_statuses = {
@@ -169,14 +168,11 @@ class MultiTable:
         """
         train_futures = []
         for table_name, training_csv in training_data.items():
-            model_cache = self.working_dir / f"{table_name}-runner.json"
-            self.model_cache_files[table_name] = model_cache
-
             logger.info(f"Training model for table: {table_name}")
             trainer = Trainer(
                 model_type=GretelACTGAN(),
                 project_name=f"{self.project_prefix}-{table_name.replace('_', '-')}",
-                cache_file=model_cache,
+                cache_file=self._cache_file_for(table_name),
                 overwrite=False,
             )
             self.train_statuses[table_name] = TrainStatus.InProgress
@@ -208,7 +204,8 @@ class MultiTable:
         # TODO: once we do training with ancestral data, retrain all child tables as well.
         for table_name, table_data in tables.items():
             self.relational_data.update_table_data(table_name, table_data)
-            self.model_cache_files[table_name].unlink(missing_ok=True)
+            model_cache = self._cache_file_for(table_name)
+            model_cache.unlink(missing_ok=True)
         training_data = self._prepare_training_data(list(tables.keys()))
         self._create_trainer_models(training_data)
 
@@ -269,9 +266,12 @@ class MultiTable:
 
     def _load_trainer_model(self, table_name: str) -> Trainer:
         return Trainer.load(
-            cache_file=str(self.model_cache_files[table_name]),
+            cache_file=str(self._cache_file_for(table_name)),
             project_name=f"{self.project_prefix}-{table_name.replace('_', '-')}",
         )
+
+    def _cache_file_for(self, table_name: str) -> Path:
+        return self.working_dir / f"{table_name}-runner.json"
 
     def _reset_generation_statuses(self) -> None:
         """
