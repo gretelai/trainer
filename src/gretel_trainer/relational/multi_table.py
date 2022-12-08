@@ -253,10 +253,7 @@ class MultiTable:
                 source_data_size = len(self.relational_data.get_table_data(table_name))
                 synth_size = int(source_data_size * record_size_ratio)
                 logger.info(f"Generating {synth_size} rows for table: {table_name}")
-                model = Trainer.load(
-                    cache_file=str(self.model_cache_files[table_name]),
-                    project_name=f"{self.project_prefix}-{table_name.replace('_', '-')}",
-                )
+                model = self._load_trainer_model(table_name)
                 generate_futures.append(
                     self.thread_pool.submit(
                         _generate, model, table_name, synth_size, self.generate_statuses
@@ -269,6 +266,12 @@ class MultiTable:
             output_tables[table_name] = data
 
         return self._synthesize_keys(output_tables, preserve_tables)
+
+    def _load_trainer_model(self, table_name: str) -> Trainer:
+        return Trainer.load(
+            cache_file=str(self.model_cache_files[table_name]),
+            project_name=f"{self.project_prefix}-{table_name.replace('_', '-')}",
+        )
 
     def _reset_generation_statuses(self) -> None:
         """
