@@ -2,13 +2,16 @@ import logging
 import os
 import random
 import time
+from collections import defaultdict
 from concurrent.futures import ThreadPoolExecutor
+from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple, Union
 
 import pandas as pd
 from gretel_client import configure_session
+from gretel_client.evaluation.quality_report import QualityReport
 from gretel_client.helpers import poll
 from gretel_client.projects import create_or_get_unique_project
 from sklearn import preprocessing
@@ -35,6 +38,12 @@ class GenerateStatus(str, Enum):
     Completed = "Completed"
     ModelUnavailable = "ModelUnavailable"
     SourcePreserved = "SourcePreserved"
+
+
+@dataclass
+class TableEvaluation:
+    individual_sqs: int
+    ancestral_sqs: int
 
 
 class MultiTable:
@@ -264,6 +273,47 @@ class MultiTable:
 
         return self._synthesize_keys(output_tables, preserve_tables)
 
+    def evaluate(
+        self, synthetic_tables: Dict[str, pd.DataFrame]
+    ) -> Dict[str, TableEvaluation]:
+        evaluations = defaultdict(dict)
+        futures = []
+        for table_name, synthetic_data in synthetic_tables.items():
+            if self.train_statuses[table_name] != TrainStatus.Completed:
+                continue
+
+            model = self._load_trainer_model(table_name)
+            evaluations[table_name]["individual_sqs"] = model.get_sqs_score()
+
+            ancestral_synthetic_data = (
+                self.relational_data.get_table_data_with_ancestors(
+                    table_name, synthetic_tables
+                )
+            )
+            ancestral_reference_data = (
+                self.relational_data.get_table_data_with_ancestors(table_name)
+            )
+            futures.append(
+                self.thread_pool.submit(
+                    _get_sqs_via_evaluate,
+                    table_name,
+                    ancestral_synthetic_data,
+                    ancestral_reference_data,
+                )
+            )
+
+        for future in futures:
+            table_name, ancestral_sqs = future.result()
+            evaluations[table_name]["ancestral_sqs"] = ancestral_sqs
+
+        return {
+            table_name: TableEvaluation(
+                individual_sqs=scores["individual_sqs"],
+                ancestral_sqs=scores["ancestral_sqs"],
+            )
+            for table_name, scores in evaluations.items()
+        }
+
     def _load_trainer_model(self, table_name: str) -> Trainer:
         return Trainer.load(
             cache_file=str(self._cache_file_for(table_name)),
@@ -462,3 +512,11 @@ def _generate(
     generate_statuses[table_name] = GenerateStatus.Completed
 
     return (table_name, data)
+
+
+def _get_sqs_via_evaluate(
+    table_name: str, data_source: pd.DataFrame, ref_data: pd.DataFrame
+) -> Tuple[str, int]:
+    report = QualityReport(data_source=data_source, ref_data=ref_data)
+    report.run()
+    return table_name, report.peek()["score"]

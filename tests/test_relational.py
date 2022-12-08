@@ -9,15 +9,40 @@ import pandas.testing as pdtest
 
 from botocore import UNSIGNED
 from botocore.client import Config
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 from gretel_trainer.relational.connectors import sqlite_conn
 from gretel_trainer.relational.core import RelationalData
 from gretel_trainer.relational.multi_table import (
     GenerateStatus,
     MultiTable,
+    TableEvaluation,
     TrainStatus,
 )
+
+
+def _setup_nba(synthetic: bool = False):
+    if synthetic:
+        states = ["PA", "FL"]
+        cities = ["Philadelphia", "Miami"]
+        teams = ["Sixers", "Heat"]
+    else:
+        states = ["CA", "TN"]
+        cities = ["Los Angeles", "Memphis"]
+        teams = ["Lakers", "Grizzlies"]
+
+    states = pd.DataFrame(data={"name": states, "id": [1, 2]})
+    cities = pd.DataFrame(data={"name": cities, "id": [1, 2], "state_id": [1, 2]})
+    teams = pd.DataFrame(data={"name": teams, "id": [1, 2], "city_id": [1, 2]})
+
+    rel_data = RelationalData()
+    rel_data.add_table("states", "id", states)
+    rel_data.add_table("cities", "id", cities)
+    rel_data.add_table("teams", "id", teams)
+    rel_data.add_foreign_key("teams.city_id", "cities.id")
+    rel_data.add_foreign_key("cities.state_id", "states.id")
+
+    return rel_data, states, cities, teams
 
 
 def _setup_ecommerce():
@@ -232,48 +257,13 @@ def test_mutagenesis_relational_data():
 
 
 def test_ancestral_data_from_different_tablesets():
-    states = pd.DataFrame(data={"name": ["CA", "NY"], "id": [1, 2]})
-    cities = pd.DataFrame(
-        data={
-            "name": ["Los Angeles", "San Francisco", "New York", "Brooklyn"],
-            "id": [1, 2, 3, 4],
-            "state_id": [1, 1, 2, 2],
-        }
-    )
-    teams = pd.DataFrame(
-        data={
-            "name": ["Lakers", "Warriors", "Knicks", "Nets"],
-            "id": [1, 2, 3, 4],
-            "city_id": [1, 2, 3, 4],
-        }
-    )
-    rel_data = RelationalData()
-    rel_data.add_table("states", "id", states)
-    rel_data.add_table("cities", "id", cities)
-    rel_data.add_table("teams", "id", teams)
-    rel_data.add_foreign_key("teams.city_id", "cities.id")
-    rel_data.add_foreign_key("cities.state_id", "states.id")
+    rel_data, _, _, _ = _setup_nba()
 
     # By default, get data from source
     source_teams_with_ancestors = rel_data.get_table_data_with_ancestors("teams")
-    assert len(source_teams_with_ancestors) == 4
-    assert set(source_teams_with_ancestors["self|name"]) == {"Lakers", "Warriors", "Knicks", "Nets"}
+    assert set(source_teams_with_ancestors["self|name"]) == {"Lakers", "Grizzlies"}
 
-    custom_states = pd.DataFrame(data={"name": ["PA", "FL"], "id": [1, 2]})
-    custom_cities = pd.DataFrame(
-        data={
-            "name": ["Philadelphia", "Miami"],
-            "id": [1, 2],
-            "state_id": [1, 2],
-        }
-    )
-    custom_teams = pd.DataFrame(
-        data={
-            "name": ["Sixers", "Heat"],
-            "id": [1, 2],
-            "city_id": [1, 2],
-        }
-    )
+    _, custom_states, custom_cities, custom_teams = _setup_nba(synthetic=True)
     custom_tableset = {
         "states": custom_states,
         "cities": custom_cities,
@@ -282,7 +272,6 @@ def test_ancestral_data_from_different_tablesets():
 
     # Optionally provide a different tableset
     custom_teams_with_ancestors = rel_data.get_table_data_with_ancestors("teams", custom_tableset)
-    assert len(custom_teams_with_ancestors) == 2
     assert set(custom_teams_with_ancestors["self|name"]) == {"Sixers", "Heat"}
 
 
@@ -464,3 +453,30 @@ def test_table_generation_progress_with_user_configured_preserve_table():
     # ready for generation, but it does not block child tables (`products`) from generation
     multitable.generate_statuses["distribution_center"] = GenerateStatus.SourcePreserved
     assert set(multitable._ready_to_generate()) == {"users", "products"}
+
+
+def test_evaluate():
+    rel_data, _, _, _ = _setup_nba()
+    _, syn_states, syn_cities, syn_teams = _setup_nba(synthetic=True)
+
+    multitable = MultiTable(rel_data)
+
+    with patch("gretel_trainer.relational.multi_table.Trainer.load") as load_trainer, patch("gretel_trainer.relational.multi_table.QualityReport") as quality_report:
+        trainer = Mock()
+        trainer.get_sqs_score.return_value = 42
+        load_trainer.return_value = trainer
+
+        report = quality_report.return_value
+        report.run.return_value = None
+        report.peek = lambda: {"score": 84}
+
+        for table in rel_data.list_all_tables():
+            multitable.train_statuses[table] = TrainStatus.Completed
+
+        evaluations = multitable.evaluate({
+            "states": syn_states,
+            "cities": syn_cities,
+            "teams": syn_teams,
+        })
+
+    assert evaluations["states"] == TableEvaluation(individual_sqs=42, ancestral_sqs=84)
