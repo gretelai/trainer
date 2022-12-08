@@ -74,18 +74,23 @@ class RelationalData:
             foreign_keys.extend(fks)
         return foreign_keys
 
-    def get_table_data_with_ancestors(self, table: str) -> pd.DataFrame:
+    def get_table_data_with_ancestors(self, table: str, tableset: Optional[Dict[str, pd.DataFrame]] = None) -> pd.DataFrame:
         """
         Returns a data frame with all ancestral data joined to each record.
         Column names are modified to the format `LINAGE|COLUMN_NAME`.
         Lineage begins with `self` for the supplied `table`, and as older
         generations are joined, the foreign keys to those generations are appended,
         separated by periods.
+
+        If `tableset` is provided, use it in place of the source data in `self.graph`.
         """
         lineage = "self"
-        df = self.get_table_data(table)
+        if tableset is not None:
+            df = tableset[table]
+        else:
+            df = self.get_table_data(table)
         df = df.add_prefix(f"{lineage}{self.lineage_column_delimiter}")
-        return _join_parents(df, table, lineage, self)
+        return _join_parents(df, table, lineage, self, tableset)
 
     def drop_ancestral_data(self, df: pd.DataFrame) -> pd.DataFrame:
         delim = self.lineage_column_delimiter
@@ -157,14 +162,21 @@ class RelationalData:
 
 
 def _join_parents(
-    df: pd.DataFrame, table: str, lineage: str, relational_data: RelationalData
+    df: pd.DataFrame,
+    table: str,
+    lineage: str,
+    relational_data: RelationalData,
+    tableset: Optional[Dict[str, pd.DataFrame]],
 ) -> pd.DataFrame:
     delim = relational_data.lineage_column_delimiter
     for foreign_key in relational_data.get_foreign_keys(table):
         next_lineage = f"{lineage}.{foreign_key.column_name}"
 
         parent_table_name = foreign_key.parent_table_name
-        parent_data = relational_data.get_table_data(parent_table_name)
+        if tableset is not None:
+            parent_data = tableset[parent_table_name]
+        else:
+            parent_data = relational_data.get_table_data(parent_table_name)
         parent_data = parent_data.add_prefix(f"{next_lineage}{delim}")
 
         df = df.merge(
@@ -174,5 +186,5 @@ def _join_parents(
             right_on=f"{next_lineage}{delim}{foreign_key.parent_column_name}",
         )
 
-        df = _join_parents(df, parent_table_name, next_lineage, relational_data)
+        df = _join_parents(df, parent_table_name, next_lineage, relational_data, tableset)
     return df

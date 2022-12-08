@@ -231,6 +231,61 @@ def test_mutagenesis_relational_data():
     assert set(restored_bond.columns) == {"type", "atom1_id", "atom2_id"}
 
 
+def test_ancestral_data_from_different_tablesets():
+    states = pd.DataFrame(data={"name": ["CA", "NY"], "id": [1, 2]})
+    cities = pd.DataFrame(
+        data={
+            "name": ["Los Angeles", "San Francisco", "New York", "Brooklyn"],
+            "id": [1, 2, 3, 4],
+            "state_id": [1, 1, 2, 2],
+        }
+    )
+    teams = pd.DataFrame(
+        data={
+            "name": ["Lakers", "Warriors", "Knicks", "Nets"],
+            "id": [1, 2, 3, 4],
+            "city_id": [1, 2, 3, 4],
+        }
+    )
+    rel_data = RelationalData()
+    rel_data.add_table("states", "id", states)
+    rel_data.add_table("cities", "id", cities)
+    rel_data.add_table("teams", "id", teams)
+    rel_data.add_foreign_key("teams.city_id", "cities.id")
+    rel_data.add_foreign_key("cities.state_id", "states.id")
+
+    # By default, get data from source
+    source_teams_with_ancestors = rel_data.get_table_data_with_ancestors("teams")
+    assert len(source_teams_with_ancestors) == 4
+    assert set(source_teams_with_ancestors["self|name"]) == {"Lakers", "Warriors", "Knicks", "Nets"}
+
+    custom_states = pd.DataFrame(data={"name": ["PA", "FL"], "id": [1, 2]})
+    custom_cities = pd.DataFrame(
+        data={
+            "name": ["Philadelphia", "Miami"],
+            "id": [1, 2],
+            "state_id": [1, 2],
+        }
+    )
+    custom_teams = pd.DataFrame(
+        data={
+            "name": ["Sixers", "Heat"],
+            "id": [1, 2],
+            "city_id": [1, 2],
+        }
+    )
+    custom_tableset = {
+        "states": custom_states,
+        "cities": custom_cities,
+        "teams": custom_teams,
+    }
+
+    # Optionally provide a different tableset
+    custom_teams_with_ancestors = rel_data.get_table_data_with_ancestors("teams", custom_tableset)
+    assert len(custom_teams_with_ancestors) == 2
+    assert set(custom_teams_with_ancestors["self|name"]) == {"Sixers", "Heat"}
+
+
 def test_relational_data_as_dict():
     ecom = _setup_ecommerce()
     as_dict = ecom.as_dict("test_out")
