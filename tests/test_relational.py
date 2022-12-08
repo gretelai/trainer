@@ -271,7 +271,9 @@ def test_ancestral_data_from_different_tablesets():
     }
 
     # Optionally provide a different tableset
-    custom_teams_with_ancestors = rel_data.get_table_data_with_ancestors("teams", custom_tableset)
+    custom_teams_with_ancestors = rel_data.get_table_data_with_ancestors(
+        "teams", custom_tableset
+    )
     assert set(custom_teams_with_ancestors["self|name"]) == {"Sixers", "Heat"}
 
 
@@ -461,7 +463,11 @@ def test_evaluate():
 
     multitable = MultiTable(rel_data)
 
-    with patch("gretel_trainer.relational.multi_table.Trainer.load") as load_trainer, patch("gretel_trainer.relational.multi_table.QualityReport") as quality_report:
+    with patch(
+        "gretel_trainer.relational.multi_table.Trainer.load"
+    ) as load_trainer, patch(
+        "gretel_trainer.relational.multi_table.QualityReport"
+    ) as quality_report:
         trainer = Mock()
         trainer.get_sqs_score.return_value = 42
         load_trainer.return_value = trainer
@@ -470,13 +476,15 @@ def test_evaluate():
         report.run.return_value = None
         report.peek = lambda: {"score": 84}
 
-        for table in rel_data.list_all_tables():
-            multitable.train_statuses[table] = TrainStatus.Completed
+        multitable.train_statuses["cities"] = TrainStatus.Completed
 
-        evaluations = multitable.evaluate({
-            "states": syn_states,
-            "cities": syn_cities,
-            "teams": syn_teams,
-        })
+        evaluations = multitable.evaluate(
+            {
+                "states": syn_states,
+                "cities": syn_cities,
+                "teams": syn_teams,
+            }
+        )
 
-    assert evaluations["states"] == TableEvaluation(individual_sqs=42, ancestral_sqs=84)
+    assert evaluations["states"] == TableEvaluation(individual_sqs=84, ancestral_sqs=84)
+    assert evaluations["cities"] == TableEvaluation(individual_sqs=42, ancestral_sqs=84)

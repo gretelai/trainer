@@ -2,7 +2,6 @@ import logging
 import os
 import random
 import time
-from collections import defaultdict
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from enum import Enum
@@ -276,43 +275,52 @@ class MultiTable:
     def evaluate(
         self, synthetic_tables: Dict[str, pd.DataFrame]
     ) -> Dict[str, TableEvaluation]:
-        evaluations = defaultdict(dict)
+        evaluations = {}
         futures = []
         for table_name, synthetic_data in synthetic_tables.items():
-            if self.train_statuses[table_name] != TrainStatus.Completed:
-                continue
-
-            model = self._load_trainer_model(table_name)
-            evaluations[table_name]["individual_sqs"] = model.get_sqs_score()
-
-            ancestral_synthetic_data = (
-                self.relational_data.get_table_data_with_ancestors(
-                    table_name, synthetic_tables
-                )
-            )
-            ancestral_reference_data = (
-                self.relational_data.get_table_data_with_ancestors(table_name)
-            )
             futures.append(
                 self.thread_pool.submit(
-                    _get_sqs_via_evaluate,
+                    self._evaluate_table,
                     table_name,
-                    ancestral_synthetic_data,
-                    ancestral_reference_data,
+                    synthetic_tables,
                 )
             )
-
         for future in futures:
-            table_name, ancestral_sqs = future.result()
-            evaluations[table_name]["ancestral_sqs"] = ancestral_sqs
+            table_name, evaluation = future.result()
+            evaluations[table_name] = evaluation
 
-        return {
-            table_name: TableEvaluation(
-                individual_sqs=scores["individual_sqs"],
-                ancestral_sqs=scores["ancestral_sqs"],
+        return evaluations
+
+    def _evaluate_table(
+        self, table_name: str, synthetic_tables: Dict[str, pd.DataFrame]
+    ) -> Tuple[str, TableEvaluation]:
+        return table_name, TableEvaluation(
+            individual_sqs=self._get_individual_sqs_score(table_name, synthetic_tables),
+            ancestral_sqs=self._get_ancestral_sqs_score(table_name, synthetic_tables),
+        )
+
+    def _get_individual_sqs_score(
+        self, table_name: str, synthetic_tables: Dict[str, pd.DataFrame]
+    ) -> int:
+        if self.train_statuses[table_name] == TrainStatus.Completed:
+            model = self._load_trainer_model(table_name)
+            return model.get_sqs_score()
+        else:
+            return _get_sqs_via_evaluate(
+                synthetic_tables[table_name],
+                self.relational_data.get_table_data(table_name),
             )
-            for table_name, scores in evaluations.items()
-        }
+
+    def _get_ancestral_sqs_score(
+        self, table_name: str, synthetic_tables: Dict[str, pd.DataFrame]
+    ) -> int:
+        ancestral_synthetic_data = self.relational_data.get_table_data_with_ancestors(
+            table_name, synthetic_tables
+        )
+        ancestral_reference_data = self.relational_data.get_table_data_with_ancestors(
+            table_name
+        )
+        return _get_sqs_via_evaluate(ancestral_synthetic_data, ancestral_reference_data)
 
     def _load_trainer_model(self, table_name: str) -> Trainer:
         return Trainer.load(
@@ -514,9 +522,7 @@ def _generate(
     return (table_name, data)
 
 
-def _get_sqs_via_evaluate(
-    table_name: str, data_source: pd.DataFrame, ref_data: pd.DataFrame
-) -> Tuple[str, int]:
+def _get_sqs_via_evaluate(data_source: pd.DataFrame, ref_data: pd.DataFrame) -> int:
     report = QualityReport(data_source=data_source, ref_data=ref_data)
     report.run()
-    return table_name, report.peek()["score"]
+    return report.peek()["score"]
