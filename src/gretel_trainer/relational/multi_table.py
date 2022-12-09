@@ -2,7 +2,7 @@ import logging
 import os
 import random
 import time
-from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import as_completed, ThreadPoolExecutor
 from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
@@ -95,23 +95,27 @@ class MultiTable:
         Returns:
             dict[str, pd.DataFrame]: keys are table names and values are transformed tables
         """
-        transforms_futures = {}
+        output_tables = {}
+        transforms_futures = []
         project_name = project_name or f"{self.project_prefix}-transforms"
         project = create_or_get_unique_project(name=project_name)
 
         for table_name, config in configs.items():
             table_data = self.relational_data.get_table_data(table_name)
-            transforms_futures[table_name] = self.thread_pool.submit(
-                _transform,
-                project,
-                table_data,
-                config,
+            transforms_futures.append(
+                self.thread_pool.submit(
+                    _transform,
+                    table_name,
+                    project,
+                    table_data,
+                    config,
+                )
             )
 
-        output_tables = {
-            table_name: future.result()
-            for table_name, future in transforms_futures.items()
-        }
+        for future in as_completed(transforms_futures):
+            table_name, out_table = future.result()
+            output_tables[table_name] = out_table
+
         output_tables = self._transform_keys(output_tables)
 
         if in_place:
@@ -188,7 +192,7 @@ class MultiTable:
                 self.thread_pool.submit(_train, trainer, training_csv, table_name)
             )
 
-        for future in train_futures:
+        for future in as_completed(train_futures):
             table_name, successful = future.result()
             if successful:
                 self.train_statuses[table_name] = TrainStatus.Completed
@@ -266,7 +270,7 @@ class MultiTable:
                 )
             time.sleep(10)
 
-        for future in generate_futures:
+        for future in as_completed(generate_futures):
             table_name, data = future.result()
             output_tables[table_name] = data
 
@@ -276,16 +280,16 @@ class MultiTable:
         self, synthetic_tables: Dict[str, pd.DataFrame]
     ) -> Dict[str, TableEvaluation]:
         evaluations = {}
-        futures = []
+        evaluate_futures = []
         for table_name, synthetic_data in synthetic_tables.items():
-            futures.append(
+            evaluate_futures.append(
                 self.thread_pool.submit(
                     self._evaluate_table,
                     table_name,
                     synthetic_tables,
                 )
             )
-        for future in futures:
+        for future in as_completed(evaluate_futures):
             table_name, evaluation = future.result()
             evaluations[table_name] = evaluation
 
@@ -483,10 +487,11 @@ def _collect_new_foreign_key_values(
 
 
 def _transform(
+    table_name: str,
     project,
     table_data: pd.DataFrame,
     config: GretelModelConfig,
-) -> pd.DataFrame:
+) -> Tuple[str, pd.DataFrame]:
     model = project.create_model_obj(model_config=config, data_source=table_data)
     model.submit_cloud()
 
@@ -497,7 +502,7 @@ def _transform(
 
     poll(record_handler)
 
-    return pd.read_csv(record_handler.get_artifact_link("data"), compression="gzip")
+    return (table_name, pd.read_csv(record_handler.get_artifact_link("data"), compression="gzip"))
 
 
 def _train(
