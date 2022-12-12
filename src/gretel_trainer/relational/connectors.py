@@ -126,7 +126,7 @@ def snowflake_conn(
     warehouse: Optional[str] = None,
     role: Optional[str] = None,
 ) -> Connection:
-    conn_string = f"snowflake:///{user}:{password}@{account_identifier}"
+    conn_string = f"snowflake://{user}:{password}@{account_identifier}"
 
     if database is not None:
         conn_string = f"{conn_string}/{database}"
