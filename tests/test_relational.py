@@ -6,13 +6,14 @@ from pathlib import Path
 import boto3
 import pandas as pd
 import pandas.testing as pdtest
+import pytest
 
 from botocore import UNSIGNED
 from botocore.client import Config
 from unittest.mock import Mock, patch
 
 from gretel_trainer.relational.connectors import sqlite_conn
-from gretel_trainer.relational.core import RelationalData
+from gretel_trainer.relational.core import MultiTableException, RelationalData
 from gretel_trainer.relational.multi_table import (
     GenerateStatus,
     MultiTable,
@@ -138,6 +139,30 @@ def test_extracting_relational_data():
         assert len(extracted.get_table_data(table)) > 1
         assert extracted.get_parents(table) == manual.get_parents(table)
         assert extracted.get_foreign_keys(table) == manual.get_foreign_keys(table)
+
+
+def test_extract_subsets_of_relational_data():
+    s3 = boto3.client("s3", config=Config(signature_version=UNSIGNED))
+    with tempfile.NamedTemporaryFile() as f:
+        s3.download_fileobj("gretel-blueprints-pub", "rdb/ecom_xf.db", f)
+        sqlite = sqlite_conn(f.name)
+
+        with pytest.raises(MultiTableException):
+            sqlite.extract(only=["users"], ignore=["events"])
+
+        only = sqlite.extract(only=["users", "events", "products"])
+        ignore = sqlite.extract(
+            ignore=["distribution_center", "order_items", "inventory_items"]
+        )
+
+    expected_tables = {"users", "events", "products"}
+    assert set(only.list_all_tables()) == expected_tables
+    assert set(ignore.list_all_tables()) == expected_tables
+
+    # `products` has a foreign key to `distribution_center` in the source, but because the
+    # latter table was not extracted, the relationship is not recognized
+    assert only.get_parents("products") == []
+    assert ignore.get_parents("products") == []
 
 
 def test_ecommerce_relational_data():

@@ -6,7 +6,7 @@ from sqlalchemy import MetaData, create_engine
 from sqlalchemy.engine.base import Engine
 from sqlalchemy.exc import OperationalError
 
-from gretel_trainer.relational.core import RelationalData
+from gretel_trainer.relational.core import MultiTableException, RelationalData
 
 logger = logging.getLogger(__name__)
 
@@ -37,8 +37,16 @@ class Connection:
             raise e
         logger.info("Successfully connected to db")
 
-    def extract(self) -> RelationalData:
-        """Extracts table data and relationships from the database."""
+    def extract(
+        self, only: Optional[List[str]] = None, ignore: Optional[List[str]] = None
+    ) -> RelationalData:
+        """
+        Extracts table data and relationships from the database.
+        To scope to a subset of a database, use either `only` (inclusive) or `ignore` (exclusive).
+        """
+        if only is not None and ignore is not None:
+            raise MultiTableException("Cannot specify both `only` and `ignore`.")
+
         metadata = MetaData()
         metadata.reflect(self.engine)
 
@@ -46,6 +54,9 @@ class Connection:
         foreign_keys: List[Tuple[str, str]] = []
 
         for table_name, table in metadata.tables.items():
+            if _skip_table(table_name, only, ignore):
+                continue
+
             df = pd.read_sql_table(table_name, self.engine)
             primary_key = None
             for column in table.columns:
@@ -54,6 +65,8 @@ class Connection:
                 for f_key in column.foreign_keys:
                     referenced_table = f_key.column.table.name
                     referenced_column = f_key.column.name
+                    if _skip_table(referenced_table, only, ignore):
+                        continue
                     foreign_keys.append(
                         (
                             f"{table_name}.{column.name}",
@@ -73,6 +86,18 @@ class Connection:
             data.to_sql(
                 f"{prefix}{name}", con=self.engine, if_exists="replace", index=False
             )
+
+
+def _skip_table(
+    table: str, only: Optional[List[str]], ignore: Optional[List[str]]
+) -> bool:
+    skip = False
+    if only is not None and table not in only:
+        skip = True
+    if ignore is not None and table in ignore:
+        skip = True
+
+    return skip
 
 
 def sqlite_conn(path: str) -> Connection:
