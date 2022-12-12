@@ -502,7 +502,10 @@ def _transform(
 
     poll(record_handler)
 
-    return (table_name, pd.read_csv(record_handler.get_artifact_link("data"), compression="gzip"))
+    return (
+        table_name,
+        pd.read_csv(record_handler.get_artifact_link("data"), compression="gzip"),
+    )
 
 
 def _train(
