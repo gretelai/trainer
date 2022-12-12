@@ -396,7 +396,13 @@ def test_training_removes_primary_and_foreign_keys_from_tables():
     ) as trained_successfully:
         trained_successfully.return_value = True
         multitable = MultiTable(rel_data, working_dir=work_dir)
-        multitable.train()
+
+        # Need to patch two calls to configure_session because MultiTable calls it first
+        # (before any parallelization) and then each Trainer instance calls it internally
+        with patch("gretel_trainer.relational.multi_table.configure_session"), patch(
+            "gretel_trainer.trainer.configure_session"
+        ):
+            multitable.train()
 
         expectations = [
             ("humans", {"name"}),
