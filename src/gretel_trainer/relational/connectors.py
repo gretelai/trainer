@@ -11,7 +11,7 @@ from gretel_trainer.relational.core import MultiTableException, RelationalData
 logger = logging.getLogger(__name__)
 
 
-class Connection:
+class Connector:
     """
     Wraps connections to relational databases and backups.
 
@@ -100,21 +100,21 @@ def _skip_table(
     return skip
 
 
-def sqlite_conn(path: str) -> Connection:
+def sqlite_conn(path: str) -> Connector:
     engine = create_engine(f"sqlite:///{path}")
-    return Connection(engine)
+    return Connector(engine)
 
 
-def postgres_conn(user: str, password: str, host: str, port: int) -> Connection:
+def postgres_conn(user: str, password: str, host: str, port: int) -> Connector:
     engine = create_engine(f"postgresql://{user}:{password}@{host}:{port}")
-    return Connection(engine)
+    return Connector(engine)
 
 
 def bigquery_conn(
     project: Optional[str] = None,
-) -> Connection:
+) -> Connector:
     engine = create_engine(f"bigquery://{project}")
-    return Connection(engine)
+    return Connector(engine)
 
 
 def snowflake_conn(
@@ -125,7 +125,7 @@ def snowflake_conn(
     schema: Optional[str] = None,
     warehouse: Optional[str] = None,
     role: Optional[str] = None,
-) -> Connection:
+) -> Connector:
     conn_string = f"snowflake://{user}:{password}@{account_identifier}"
 
     if database is not None:
@@ -141,4 +141,4 @@ def snowflake_conn(
         conn_string = f"{conn_string}{next_sep}role={role}"
 
     engine = create_engine(conn_string)
-    return Connection(engine)
+    return Connector(engine)
