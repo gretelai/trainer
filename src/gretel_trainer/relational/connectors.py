@@ -105,15 +105,36 @@ def sqlite_conn(path: str) -> Connector:
     return Connector(engine)
 
 
-def postgres_conn(user: str, password: str, host: str, port: int) -> Connector:
-    engine = create_engine(f"postgresql://{user}:{password}@{host}:{port}")
+def postgres_conn(
+    user: str, password: str, host: str, port: int, database: Optional[str] = None
+) -> Connector:
+    conn_string = f"postgresql://{user}:{password}@{host}:{port}"
+    if database is not None:
+        conn_string = f"{conn_string}/{database}"
+
+    engine = create_engine(conn_string)
     return Connector(engine)
 
 
-def bigquery_conn(
-    project: Optional[str] = None,
-) -> Connector:
-    engine = create_engine(f"bigquery://{project}")
+def mysql_conn(
+    user: str, password: str, host: str, port: int, database: Optional[str] = None
+):
+    conn_string = f"mysql://{user}:{password}@{host}:{port}"
+    if database is not None:
+        conn_string = f"{conn_string}/{database}"
+
+    engine = create_engine(conn_string)
+    return Connector(engine)
+
+
+def mariadb_conn(
+    user: str, password: str, host: str, port: int, database: Optional[str] = None
+):
+    conn_string = f"mariadb://{user}:{password}@{host}:{port}"
+    if database is not None:
+        conn_string = f"{conn_string}/{database}"
+
+    engine = create_engine(conn_string)
     return Connector(engine)
 
 
