@@ -302,6 +302,20 @@ def test_ancestral_data_from_different_tablesets():
     assert set(custom_teams_with_ancestors["self|name"]) == {"Sixers", "Heat"}
 
 
+def test_list_ancestral_keys():
+    mutagenesis = _setup_mutagenesis()
+    assert set(mutagenesis.list_multigenerational_keys("bond")) == {
+        "self|atom1_id",
+        "self|atom2_id",
+        "self.atom1_id|atom_id",
+        "self.atom1_id|molecule_id",
+        "self.atom2_id|atom_id",
+        "self.atom2_id|molecule_id",
+        "self.atom1_id.molecule_id|molecule_id",
+        "self.atom2_id.molecule_id|molecule_id",
+    }
+
+
 def test_relational_data_as_dict():
     ecom = _setup_ecommerce()
     as_dict = ecom.as_dict("test_out")

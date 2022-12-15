@@ -94,6 +94,34 @@ class RelationalData:
         df = df.add_prefix(f"{lineage}{self.lineage_column_delimiter}")
         return _join_parents(df, table, lineage, self, tableset)
 
+    def list_multigenerational_keys(self, table: str) -> List[str]:
+        """
+        Returns a list of multigenerational column names (i.e. including lineage)
+        that are primary or foreign keys on the source tables.
+        """
+
+        def _add_multigenerational_keys(keys: List[str], lineage: str, table_name: str):
+            primary_key = self.get_primary_key(table_name)
+            if primary_key is not None:
+                keys.append(f"{lineage}{self.lineage_column_delimiter}{primary_key}")
+
+            foreign_keys = self.get_foreign_keys(table_name)
+            keys.extend(
+                [
+                    f"{lineage}{self.lineage_column_delimiter}{foreign_key.column_name}"
+                    for foreign_key in foreign_keys
+                ]
+            )
+
+            for foreign_key in foreign_keys:
+                next_lineage = f"{lineage}.{foreign_key.column_name}"
+                parent_table_name = foreign_key.parent_table_name
+                _add_multigenerational_keys(keys, next_lineage, parent_table_name)
+
+        keys = []
+        _add_multigenerational_keys(keys, "self", table)
+        return keys
+
     def drop_ancestral_data(self, df: pd.DataFrame) -> pd.DataFrame:
         delim = self.lineage_column_delimiter
         root_columns = [col for col in df.columns if col.startswith(f"self{delim}")]
