@@ -63,6 +63,19 @@ class RelationalData:
     def get_parents(self, table: str) -> List[str]:
         return list(self.graph.successors(table))
 
+    def get_descendants(self, table: str) -> List[str]:
+        def _add_children(descendants, table):
+            children = list(self.graph.predecessors(table))
+            if len(children) > 0:
+                descendants.update(children)
+                for child in children:
+                    _add_children(descendants, child)
+
+        descendants = set()
+        _add_children(descendants, table)
+
+        return list(descendants)
+
     def get_primary_key(self, table: str) -> Optional[str]:
         return self.graph.nodes[table]["primary_key"]
 

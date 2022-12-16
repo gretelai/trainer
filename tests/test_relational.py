@@ -20,6 +20,8 @@ from gretel_trainer.relational.multi_table import (
     TableEvaluation,
     TrainStatus,
 )
+from gretel_trainer.relational.strategies.ancestral import AncestralStrategy
+from gretel_trainer.relational.strategies.single_table import SingleTableStrategy
 
 
 def _setup_nba(synthetic: bool = False):
@@ -388,6 +390,22 @@ def test_filesystem_serde_accepts_missing_primary_keys():
 
     assert from_json.get_primary_key("bond") is None
     assert from_json.get_primary_key("atom") == "atom_id"
+
+
+def test_single_table_strategy_retrains_same_tables_only():
+    ecom = _setup_ecommerce()
+    strategy = SingleTableStrategy()
+    assert set(strategy.tables_to_retrain(["users"], ecom)) == {"users"}
+    assert set(strategy.tables_to_retrain(["users", "events"], ecom)) == {"users", "events"}
+    assert set(strategy.tables_to_retrain(["products"], ecom)) == {"products"}
+
+
+def test_ancestral_strategy_retrains_tables_and_their_children():
+    ecom = _setup_ecommerce()
+    strategy = AncestralStrategy()
+    assert set(strategy.tables_to_retrain(["users"], ecom)) == {"users", "events", "order_items"}
+    assert set(strategy.tables_to_retrain(["products"], ecom)) == {"products", "inventory_items", "order_items"}
+    assert set(strategy.tables_to_retrain(["users", "products"], ecom)) == {"users", "events", "products", "inventory_items", "order_items"}
 
 
 def test_training_removes_primary_and_foreign_keys_from_tables():

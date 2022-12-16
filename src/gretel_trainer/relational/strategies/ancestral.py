@@ -1,3 +1,5 @@
+from typing import List
+
 import pandas as pd
 
 from pandas.api.types import is_string_dtype
@@ -22,6 +24,19 @@ class AncestralStrategy:
                 columns_to_drop.append(column)
 
         return data.drop(columns=columns_to_drop)
+
+    def tables_to_retrain(
+        self, tables: List[str], rel_data: RelationalData
+    ) -> List[str]:
+        """
+        Given a set of tables requested to retrain, returns those tables with all their
+        descendants, because those descendant tables were trained with data from their
+        parents appended.
+        """
+        retrain = set(tables)
+        for table in tables:
+            retrain.update(rel_data.get_descendants(table))
+        return list(retrain)
 
 
 def _is_highly_unique_categorical(col: str, df: pd.DataFrame) -> bool:

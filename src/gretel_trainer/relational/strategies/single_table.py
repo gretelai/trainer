@@ -1,3 +1,5 @@
+from typing import List
+
 import pandas as pd
 
 from gretel_trainer.relational.core import RelationalData
@@ -22,3 +24,11 @@ class SingleTableStrategy:
         )
 
         return data.drop(columns=columns_to_drop)
+
+    def tables_to_retrain(
+        self, tables: List[str], rel_data: RelationalData
+    ) -> List[str]:
+        """
+        Returns the provided tables requested to retrain, unaltered.
+        """
+        return tables
