@@ -18,6 +18,7 @@ from sklearn import preprocessing
 from gretel_trainer import Trainer
 from gretel_trainer.models import GretelACTGAN
 from gretel_trainer.relational.core import RelationalData
+from gretel_trainer.relational.strategies.single_table import SingleTableStrategy
 
 GretelModelConfig = Union[str, Path, Dict]
 
@@ -66,7 +67,7 @@ class MultiTable:
         self.project_prefix = project_prefix
         self.relational_data = relational_data
         self.working_dir = Path(working_dir)
-        self.synthetic_tables = {}
+        self._strategy = SingleTableStrategy()
         os.makedirs(self.working_dir, exist_ok=True)
         self.thread_pool = ThreadPoolExecutor(max_threads)
         self.train_statuses = {
@@ -152,23 +153,15 @@ class MultiTable:
 
     def _prepare_training_data(self, tables: List[str]) -> Dict[str, Path]:
         """
-        Exports a copy of each table with all primary and foreign key columns removed
+        Exports a copy of each table prepared for training by the configured strategy
         to the working directory. Returns a dict with table names as keys and Paths
         to the CSVs as values.
         """
         training_data = {}
         for table_name in tables:
-            columns_to_drop = []
-            primary_key = self.relational_data.get_primary_key(table_name)
-            if primary_key is not None:
-                columns_to_drop.append(primary_key)
-            foreign_keys = self.relational_data.get_foreign_keys(table_name)
-            columns_to_drop.extend(
-                [foreign_key.column_name for foreign_key in foreign_keys]
-            )
             training_path = self.working_dir / f"{table_name}-train.csv"
-            data = self.relational_data.get_table_data(table_name)
-            data.drop(columns=columns_to_drop).to_csv(training_path, index=False)
+            data = self._strategy.prepare_training_data(table_name, self.relational_data)
+            data.to_csv(training_path, index=False)
             training_data[table_name] = training_path
 
         return training_data
@@ -213,12 +206,16 @@ class MultiTable:
         `RelationalData` instance. It should be used when initial training fails and source data
         needs to be altered, but progress on other tables can be left as-is.
         """
-        # TODO: once we do training with ancestral data, retrain all child tables as well.
         for table_name, table_data in tables.items():
             self.relational_data.update_table_data(table_name, table_data)
+
+        tables_to_retrain = list(tables.keys())
+        # TODO: once we do training with ancestral data, retrain all child tables as well.
+
+        for table_name in tables_to_retrain:
             model_cache = self._cache_file_for(table_name)
             model_cache.unlink(missing_ok=True)
-        training_data = self._prepare_training_data(list(tables.keys()))
+        training_data = self._prepare_training_data(tables_to_retrain)
         self._create_trainer_models(training_data)
 
     def generate(
