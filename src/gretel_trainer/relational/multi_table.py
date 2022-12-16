@@ -160,7 +160,9 @@ class MultiTable:
         training_data = {}
         for table_name in tables:
             training_path = self.working_dir / f"{table_name}-train.csv"
-            data = self._strategy.prepare_training_data(table_name, self.relational_data)
+            data = self._strategy.prepare_training_data(
+                table_name, self.relational_data
+            )
             data.to_csv(training_path, index=False)
             training_data[table_name] = training_path
 
@@ -209,7 +211,9 @@ class MultiTable:
         for table_name, table_data in tables.items():
             self.relational_data.update_table_data(table_name, table_data)
 
-        tables_to_retrain = self._strategy.tables_to_retrain(list(tables.keys()), self.relational_data)
+        tables_to_retrain = self._strategy.tables_to_retrain(
+            list(tables.keys()), self.relational_data
+        )
 
         for table_name in tables_to_retrain:
             model_cache = self._cache_file_for(table_name)

@@ -20,7 +20,9 @@ class AncestralStrategy:
 
         columns_to_drop.extend(rel_data.list_multigenerational_keys(table_name))
         for column in data.columns:
-            if rel_data.is_ancestral_column(column) and _is_highly_unique_categorical(column, data):
+            if rel_data.is_ancestral_column(column) and _is_highly_unique_categorical(
+                column, data
+            ):
                 columns_to_drop.append(column)
 
         return data.drop(columns=columns_to_drop)
