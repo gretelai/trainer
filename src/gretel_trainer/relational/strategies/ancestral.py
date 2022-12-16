@@ -46,6 +46,6 @@ def _is_highly_unique_categorical(col: str, df: pd.DataFrame) -> bool:
 def _percent_unique(col: str, df: pd.DataFrame) -> float:
     col_no_nan = df[col].dropna()
     total = len(col_no_nan)
-    distinct = col_no_nan.unique()
+    distinct = col_no_nan.nunique()
 
     return distinct / total

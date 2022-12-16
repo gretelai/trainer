@@ -24,6 +24,29 @@ from gretel_trainer.relational.strategies.ancestral import AncestralStrategy
 from gretel_trainer.relational.strategies.single_table import SingleTableStrategy
 
 
+def _setup_pets():
+    humans = pd.DataFrame(
+        data={
+            "name": ["John", "Paul", "George", "Ringo", "Billy"],
+            "city": ["Liverpool", "Liverpool", "Liverpool", "Liverpool", "Houston"],
+            "id": [1, 2, 3, 4, 5],
+        }
+    )
+    pets = pd.DataFrame(
+        data={
+            "name": ["Lennon", "McCartney", "Harrison", "Starr", "Preston"],
+            "age": [6, 14, 8, 7, 2],
+            "id": [1, 2, 3, 4, 5],
+            "human_id": [1, 2, 3, 4, 5],
+        }
+    )
+    rel_data = RelationalData()
+    rel_data.add_table("humans", "id", humans)
+    rel_data.add_table("pets", "id", pets)
+    rel_data.add_foreign_key("pets.human_id", "humans.id")
+    return rel_data
+
+
 def _setup_nba(synthetic: bool = False):
     if synthetic:
         states = ["PA", "FL"]
@@ -392,41 +415,67 @@ def test_filesystem_serde_accepts_missing_primary_keys():
     assert from_json.get_primary_key("atom") == "atom_id"
 
 
+def test_single_table_strategy_removes_primary_and_foreign_keys_for_training():
+    pets = _setup_pets()
+    strategy = SingleTableStrategy()
+
+    training_pets = strategy.prepare_training_data("pets", pets)
+
+    assert set(training_pets.columns) == {"name", "age"}
+
+
 def test_single_table_strategy_retrains_same_tables_only():
     ecom = _setup_ecommerce()
     strategy = SingleTableStrategy()
     assert set(strategy.tables_to_retrain(["users"], ecom)) == {"users"}
-    assert set(strategy.tables_to_retrain(["users", "events"], ecom)) == {"users", "events"}
+    assert set(strategy.tables_to_retrain(["users", "events"], ecom)) == {
+        "users",
+        "events",
+    }
     assert set(strategy.tables_to_retrain(["products"], ecom)) == {"products"}
+
+
+def test_ancestral_strategy_prepares_multigenerational_data_without_keys_or_highly_unique_categorial_fields():
+    pets = _setup_pets()
+    strategy = AncestralStrategy()
+
+    training_pets = strategy.prepare_training_data("pets", pets)
+
+    assert set(training_pets.columns) == {
+        "self|name",
+        "self|age",
+        "self.human_id|city",
+        # self|id rejected (primary key)
+        # self|human_id rejected (foreign key)
+        # self.human_id|id rejected (primary key)
+        # self.human_id|name rejected (highly unique categorical)
+    }
 
 
 def test_ancestral_strategy_retrains_tables_and_their_children():
     ecom = _setup_ecommerce()
     strategy = AncestralStrategy()
-    assert set(strategy.tables_to_retrain(["users"], ecom)) == {"users", "events", "order_items"}
-    assert set(strategy.tables_to_retrain(["products"], ecom)) == {"products", "inventory_items", "order_items"}
-    assert set(strategy.tables_to_retrain(["users", "products"], ecom)) == {"users", "events", "products", "inventory_items", "order_items"}
+    assert set(strategy.tables_to_retrain(["users"], ecom)) == {
+        "users",
+        "events",
+        "order_items",
+    }
+    assert set(strategy.tables_to_retrain(["products"], ecom)) == {
+        "products",
+        "inventory_items",
+        "order_items",
+    }
+    assert set(strategy.tables_to_retrain(["users", "products"], ecom)) == {
+        "users",
+        "events",
+        "products",
+        "inventory_items",
+        "order_items",
+    }
 
 
-def test_training_removes_primary_and_foreign_keys_from_tables():
-    humans = pd.DataFrame(
-        data={
-            "name": ["Mike", "Dan"],
-            "id": [1, 2],
-        }
-    )
-    pets = pd.DataFrame(
-        data={
-            "name": ["Tapu", "Rolo", "Archie"],
-            "age": [6, 14, 8],
-            "id": [1, 2, 3],
-            "human_id": [1, 2, 2],
-        }
-    )
-    rel_data = RelationalData()
-    rel_data.add_table("humans", "id", humans)
-    rel_data.add_table("pets", "id", pets)
-    rel_data.add_foreign_key("pets.human_id", "humans.id")
+def test_training_through_trainer():
+    pets = _setup_pets()
 
     with tempfile.TemporaryDirectory() as work_dir, patch(
         "gretel_trainer.trainer.create_or_get_unique_project"
@@ -434,28 +483,18 @@ def test_training_removes_primary_and_foreign_keys_from_tables():
         "gretel_trainer.trainer.Trainer.trained_successfully"
     ) as trained_successfully:
         trained_successfully.return_value = True
-        multitable = MultiTable(rel_data, working_dir=work_dir)
+        multitable = MultiTable(pets, working_dir=work_dir)
 
-        # Need to patch two calls to configure_session because MultiTable calls it first
+        # Need to patch configure_session in two spots because MultiTable calls it first
         # (before any parallelization) and then each Trainer instance calls it internally
         with patch("gretel_trainer.relational.multi_table.configure_session"), patch(
             "gretel_trainer.trainer.configure_session"
         ):
             multitable.train()
 
-        expectations = [
-            ("humans", {"name"}),
-            ("pets", {"name", "age"}),
-        ]
-        for expectation in expectations:
-            table, expected_columns = expectation
-
+        for table in ["humans", "pets"]:
             training_csv = Path(f"{work_dir}/{table}-train.csv")
             assert os.path.exists(training_csv)
-
-            training_data = pd.read_csv(training_csv)
-            assert set(training_data.columns) == expected_columns
-
             train.assert_any_call(training_csv)
 
 
