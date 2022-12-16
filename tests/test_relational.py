@@ -316,6 +316,13 @@ def test_list_ancestral_keys():
     }
 
 
+def test_whether_column_is_ancestral():
+    mutagenesis = _setup_mutagenesis()
+    assert mutagenesis.is_ancestral_column("self|atom1_id") is False
+    assert mutagenesis.is_ancestral_column("self.atom1_id|atom1_id")
+    assert mutagenesis.is_ancestral_column("self.atom1_id.molecule_id|atom1_id")
+
+
 def test_relational_data_as_dict():
     ecom = _setup_ecommerce()
     as_dict = ecom.as_dict("test_out")

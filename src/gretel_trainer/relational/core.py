@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
@@ -24,7 +25,8 @@ class ForeignKey:
 class RelationalData:
     def __init__(self):
         self.graph = networkx.DiGraph()
-        self.lineage_column_delimiter = "|"
+        self._lineage_column_delimiter = "|"
+        self._generation_delimiter = "."
 
     def add_table(
         self, table: str, primary_key: Optional[str], data: pd.DataFrame
@@ -91,7 +93,7 @@ class RelationalData:
             df = tableset[table]
         else:
             df = self.get_table_data(table)
-        df = df.add_prefix(f"{lineage}{self.lineage_column_delimiter}")
+        df = df.add_prefix(f"{lineage}{self._lineage_column_delimiter}")
         return _join_parents(df, table, lineage, self, tableset)
 
     def list_multigenerational_keys(self, table: str) -> List[str]:
@@ -103,18 +105,20 @@ class RelationalData:
         def _add_multigenerational_keys(keys: List[str], lineage: str, table_name: str):
             primary_key = self.get_primary_key(table_name)
             if primary_key is not None:
-                keys.append(f"{lineage}{self.lineage_column_delimiter}{primary_key}")
+                keys.append(f"{lineage}{self._lineage_column_delimiter}{primary_key}")
 
             foreign_keys = self.get_foreign_keys(table_name)
             keys.extend(
                 [
-                    f"{lineage}{self.lineage_column_delimiter}{foreign_key.column_name}"
+                    f"{lineage}{self._lineage_column_delimiter}{foreign_key.column_name}"
                     for foreign_key in foreign_keys
                 ]
             )
 
             for foreign_key in foreign_keys:
-                next_lineage = f"{lineage}.{foreign_key.column_name}"
+                next_lineage = (
+                    f"{lineage}{self._generation_delimiter}{foreign_key.column_name}"
+                )
                 parent_table_name = foreign_key.parent_table_name
                 _add_multigenerational_keys(keys, next_lineage, parent_table_name)
 
@@ -122,8 +126,16 @@ class RelationalData:
         _add_multigenerational_keys(keys, "self", table)
         return keys
 
+    def is_ancestral_column(self, column: str) -> bool:
+        """
+        Returns True if the provided column name corresponds to an elder-generation ancestor.
+        """
+        regex_string = rf"\{self._generation_delimiter}[^\{self._lineage_column_delimiter}]+\{self._lineage_column_delimiter}"
+        regex = re.compile(regex_string)
+        return bool(regex.search(column))
+
     def drop_ancestral_data(self, df: pd.DataFrame) -> pd.DataFrame:
-        delim = self.lineage_column_delimiter
+        delim = self._lineage_column_delimiter
         root_columns = [col for col in df.columns if col.startswith(f"self{delim}")]
         mapper = {col: col.removeprefix(f"self{delim}") for col in root_columns}
         return df[root_columns].rename(columns=mapper)
@@ -140,7 +152,11 @@ class RelationalData:
             foreign_key = foreign_keys[0]
             parent_df = ancestor_data[foreign_key.parent_table_name]
             mapper = {
-                col: col.replace("self", f"self.{foreign_key.column_name}", 1)
+                col: col.replace(
+                    "self",
+                    f"self{self._generation_delimiter}{foreign_key.column_name}",
+                    1,
+                )
                 for col in parent_df.columns
             }
             return parent_df.rename(columns=mapper)
@@ -198,9 +214,11 @@ def _join_parents(
     relational_data: RelationalData,
     tableset: Optional[Dict[str, pd.DataFrame]],
 ) -> pd.DataFrame:
-    delim = relational_data.lineage_column_delimiter
+    delim = relational_data._lineage_column_delimiter
     for foreign_key in relational_data.get_foreign_keys(table):
-        next_lineage = f"{lineage}.{foreign_key.column_name}"
+        next_lineage = (
+            f"{lineage}{relational_data._generation_delimiter}{foreign_key.column_name}"
+        )
 
         parent_table_name = foreign_key.parent_table_name
         if tableset is not None:
