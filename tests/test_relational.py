@@ -547,9 +547,10 @@ def test_table_generation_progress_training_error():
     for table_name in multitable.train_statuses:
         multitable.train_statuses[table_name] = TrainStatus.Completed
 
+    multitable.train_statuses["users"] = TrainStatus.Failed
+
     # `users` does not have a functional model, so it will never be ready for generation
     # `events` is a child of users, and so also will never be ready
-    multitable.train_statuses["users"] = TrainStatus.Failed
     assert set(multitable._ready_to_generate()) == {"distribution_center"}
 
 
