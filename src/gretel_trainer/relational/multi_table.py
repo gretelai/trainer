@@ -71,10 +71,8 @@ class MultiTable:
         self._strategy = SingleTableStrategy()
         os.makedirs(self.working_dir, exist_ok=True)
         self.thread_pool = ThreadPoolExecutor(max_threads)
-        self.train_statuses = {
-            table_name: TrainStatus.NotStarted
-            for table_name in self.relational_data.list_all_tables()
-        }
+        self.train_statuses = {}
+        self._reset_train_statuses(self.relational_data.list_all_tables())
         self._reset_generation_statuses()
 
     def transform(
@@ -197,9 +195,10 @@ class MultiTable:
 
     def train(self) -> None:
         """Train synthetic data models on each table in the relational dataset"""
-        training_data = self._prepare_training_data(
-            self.relational_data.list_all_tables()
-        )
+        tables = self.relational_data.list_all_tables()
+        self._reset_train_statuses(tables)
+
+        training_data = self._prepare_training_data(tables)
         self._create_trainer_models(training_data)
 
     def retrain_tables(self, tables: Dict[str, pd.DataFrame]) -> None:
@@ -215,11 +214,14 @@ class MultiTable:
             list(tables.keys()), self.relational_data
         )
 
-        for table_name in tables_to_retrain:
-            model_cache = self._cache_file_for(table_name)
-            model_cache.unlink(missing_ok=True)
+        self._reset_train_statuses(tables_to_retrain)
         training_data = self._prepare_training_data(tables_to_retrain)
         self._create_trainer_models(training_data)
+
+    def _reset_train_statuses(self, tables: List[str]) -> None:
+        for table in tables:
+            self.train_statuses[table] = TrainStatus.NotStarted
+            self._cache_file_for(table).unlink(missing_ok=True)
 
     def generate(
         self,
