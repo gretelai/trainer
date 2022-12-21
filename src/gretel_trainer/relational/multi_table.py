@@ -2,7 +2,7 @@ import logging
 import os
 import random
 import time
-from concurrent.futures import as_completed, ThreadPoolExecutor
+from concurrent.futures import as_completed, Future, ThreadPoolExecutor, wait
 from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
@@ -74,6 +74,7 @@ class MultiTable:
         self.train_statuses = {}
         self._reset_train_statuses(self.relational_data.list_all_tables())
         self._reset_generation_statuses()
+        self._reset_output_tables()
 
     def transform(
         self,
@@ -236,51 +237,42 @@ class MultiTable:
 
         Args:
             record_size_ratio (float, optional): Ratio to upsample real world data size with. Defaults to 1.
-            preserve_tables (list[str], optional): List of tables to skip sampling and leave as they are.
+            preserve_tables (list[str], optional): List of tables to skip sampling and leave (mostly) identical to source.
 
         Returns:
             dict[str, pd.DataFrame]: Return a dictionary of table names and output data.
         """
-        output_tables = {}
-        preserve_tables = preserve_tables or []
-
         self._reset_generation_statuses()
+        self._reset_output_tables()
 
-        for table_name in self.relational_data.list_all_tables():
-            if table_name in preserve_tables:
-                self.generate_statuses[table_name] = GenerateStatus.SourcePreserved
-                output_tables[table_name] = self.relational_data.get_table_data(
-                    table_name
-                )
-            elif self.train_statuses[table_name] != TrainStatus.Completed:
-                self.generate_statuses[table_name] = GenerateStatus.ModelUnavailable
+        preserve_tables = preserve_tables or []
+        self._skip_some_tables(preserve_tables)
 
-        generate_futures = []
+        futures: Dict[str, List[Future]] = {}
         while self._more_to_do():
-            logger.debug("Checking for more tables ready to generate")
-            ready_tables = self._ready_to_generate()
-            logger.debug(f"Ready tables: {ready_tables}")
-            for table_name in ready_tables:
-                source_data_size = len(self.relational_data.get_table_data(table_name))
-                synth_size = int(source_data_size * record_size_ratio)
-                logger.info(f"Generating {synth_size} rows for table: {table_name}")
-                model = self._load_trainer_model(table_name)
-                generate_futures.append(
-                    self.thread_pool.submit(
-                        _generate, model, table_name, synth_size, self.generate_statuses
-                    )
-                )
+            self._update_generate_statuses(futures)
+
+            for table_name in self._ready_to_generate():
+                self._start_generation_jobs(table_name, futures, record_size_ratio)
+
             time.sleep(10)
 
-        for future in as_completed(generate_futures):
-            table_name, data = future.result()
-            output_tables[table_name] = data
+        # The while loop above ends when there are no jobs remaining with NotStarted status,
+        # but some jobs could still be InProgress, so now we wait for everything to finish.
+        all_futures_flattened = [future for list_of_futures in futures.values() for future in list_of_futures]
+        wait(all_futures_flattened)
 
-        return self._synthesize_keys(output_tables, preserve_tables)
+        # One last call to update state now that all jobs are complete.
+        self._update_generate_statuses(futures)
+
+        self._synthesize_keys(preserve_tables)
+
+        return self.output_tables
 
     def evaluate(
-        self, synthetic_tables: Dict[str, pd.DataFrame]
+        self, synthetic_tables: Optional[Dict[str, pd.DataFrame]] = None
     ) -> Dict[str, TableEvaluation]:
+        synthetic_tables = synthetic_tables or self.output_tables
         evaluations = {}
         evaluate_futures = []
         for table_name, synthetic_data in synthetic_tables.items():
@@ -346,25 +338,76 @@ class MultiTable:
             for table_name in self.relational_data.list_all_tables()
         }
 
-    def _synthesize_keys(
-        self,
-        output_tables: Dict[str, pd.DataFrame],
-        preserve_tables: List[str],
-    ) -> Dict[str, pd.DataFrame]:
-        output_tables = self._synthesize_primary_keys(output_tables, preserve_tables)
-        output_tables = self._synthesize_foreign_keys(output_tables)
-        return output_tables
+    def _reset_output_tables(self) -> None:
+        "Clears all output tables"
+        self.output_tables = {}
 
-    def _synthesize_primary_keys(
+    def _skip_some_tables(self, preserve_tables: List[str]) -> None:
+        "Updates state for tables being preserved and tables lacking trained models."
+        for table in self.relational_data.list_all_tables():
+            if table in preserve_tables:
+                self.generate_statuses[table] = GenerateStatus.SourcePreserved
+                self.output_tables[table] = self.relational_data.get_table_data(table)
+            elif self.train_statuses[table] != TrainStatus.Completed:
+                logger.info(f"No model available for table `{table}`")
+                self.generate_statuses[table] = GenerateStatus.ModelUnavailable
+                for descendant in self.relational_data.get_descendants(table):
+                    logger.info(f"Skipping generation for `{descendant}` because it depends on `{table}`")
+                    self.generate_statuses[descendant] = GenerateStatus.ModelUnavailable
+
+    def _start_generation_jobs(
         self,
-        output_tables: Dict[str, pd.DataFrame],
-        preserve_tables: List[str],
-    ) -> Dict[str, pd.DataFrame]:
+        table_name: str,
+        futures: Dict[str, List[Future]],
+        record_size_ratio: float,
+    ) -> None:
+        logger.info(f"Starting generation jobs for table: {table_name}")
+        model = self._load_trainer_model(table_name)
+        table_jobs = self._strategy.get_generation_jobs(
+            table_name,
+            self.relational_data,
+            record_size_ratio,
+            self.output_tables,
+        )
+        table_job_futures = []
+        for job_kwargs in table_jobs:
+            table_job_futures.append(
+                self.thread_pool.submit(
+                    _generate, model, job_kwargs
+                )
+            )
+        self.generate_statuses[table_name] = GenerateStatus.InProgress
+        futures[table_name] = table_job_futures
+
+    def _update_generate_statuses(
+        self,
+        futures: Dict[str, List[Future]],
+    ) -> None:
+        for table_name in self.relational_data.list_all_tables():
+            if not self._table_in_progress(table_name):
+                continue
+
+            table_job_futures = futures[table_name]
+
+            if all([future.done() for future in table_job_futures]):
+                self.generate_statuses[table_name] = GenerateStatus.Completed
+                component_dataframes = []
+                for future in as_completed(futures[table_name]):
+                    dataframe = future.result()
+                    component_dataframes.append(dataframe)
+                self.output_tables[table_name] = pd.concat(component_dataframes)
+
+    def _synthesize_keys(self, preserve_tables: List[str]) -> Dict[str, pd.DataFrame]:
+        self.output_tables = self._synthesize_primary_keys(preserve_tables)
+        self.output_tables = self._synthesize_foreign_keys()
+        return self.output_tables
+
+    def _synthesize_primary_keys(self, preserve_tables: List[str]) -> Dict[str, pd.DataFrame]:
         """
         Alters primary key columns on all tables *except* those flagged by the user as
         not to be synthesized. Assumes the primary key column is of type integer.
         """
-        for table_name, out_data in output_tables.items():
+        for table_name, out_data in self.output_tables.items():
             if table_name in preserve_tables:
                 continue
 
@@ -372,28 +415,25 @@ class MultiTable:
             if primary_key is None:
                 continue
 
-            out_df = output_tables[table_name]
+            out_df = self.output_tables[table_name]
             out_df[primary_key] = [i for i in range(len(out_data))]
-            output_tables[table_name] = out_df
+            self.output_tables[table_name] = out_df
 
-        return output_tables
+        return self.output_tables
 
-    def _synthesize_foreign_keys(
-        self,
-        output_tables: Dict[str, pd.DataFrame],
-    ) -> Dict[str, pd.DataFrame]:
+    def _synthesize_foreign_keys(self) -> Dict[str, pd.DataFrame]:
         """
         Alters foreign key columns on all tables (*including* those flagged as not to
         be synthesized to ensure joining to a synthesized parent table continues to work)
         by replacing foreign key column values with valid values from the parent table column
         being referenced.
         """
-        for table_name, out_data in output_tables.items():
+        for table_name, out_data in self.output_tables.items():
             for foreign_key in self.relational_data.get_foreign_keys(table_name):
-                out_df = output_tables[table_name]
+                out_df = self.output_tables[table_name]
 
                 valid_values = list(
-                    output_tables[foreign_key.parent_table_name][
+                    self.output_tables[foreign_key.parent_table_name][
                         foreign_key.parent_column_name
                     ]
                 )
@@ -414,37 +454,29 @@ class MultiTable:
 
                 out_df[foreign_key.column_name] = new_fk_values
 
-        return output_tables
+        return self.output_tables
 
     def _ready_to_generate(self) -> List[str]:
+        logger.debug("Checking for more tables ready to generate")
         ready = []
 
         for table in self.relational_data.list_all_tables():
-            if not self._table_ok(table):
+            if self._table_in_progress(table) or self._table_in_terminal_state(table):
                 continue
 
             parents = self.relational_data.get_parents(table)
             if len(parents) == 0:
                 ready.append(table)
-            elif self._all_parents_ok(parents):
+            elif all([self._table_in_terminal_state(parent) for parent in parents]):
                 ready.append(table)
 
         return ready
 
-    def _all_parents_ok(self, parents: List[str]) -> bool:
-        return all(
-            [
-                self.generate_statuses[parent]
-                in (GenerateStatus.Completed, GenerateStatus.SourcePreserved)
-                for parent in parents
-            ]
-        )
+    def _table_in_progress(self, table: str) -> bool:
+        return self.generate_statuses[table] == GenerateStatus.InProgress
 
-    def _table_ok(self, table: str) -> bool:
-        return (
-            self.train_statuses[table] == TrainStatus.Completed
-            and self.generate_statuses[table] == GenerateStatus.NotStarted
-        )
+    def _table_in_terminal_state(self, table: str) -> bool:
+        return self.generate_statuses[table] in [GenerateStatus.Completed, GenerateStatus.SourcePreserved, GenerateStatus.ModelUnavailable]
 
     def _more_to_do(self) -> bool:
         return any(
@@ -521,15 +553,9 @@ def _train(
 
 def _generate(
     model,
-    table_name: str,
-    synth_size: int,
-    generate_statuses: Dict[str, GenerateStatus],
-) -> Tuple[str, pd.DataFrame]:
-    generate_statuses[table_name] = GenerateStatus.InProgress
-    data = model.generate(num_records=synth_size)
-    generate_statuses[table_name] = GenerateStatus.Completed
-
-    return (table_name, data)
+    job_kwargs: Dict[str, Any],
+) -> pd.DataFrame:
+    return model.generate(**job_kwargs)
 
 
 def _get_sqs_via_evaluate(data_source: pd.DataFrame, ref_data: pd.DataFrame) -> int:

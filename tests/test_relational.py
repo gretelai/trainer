@@ -548,6 +548,7 @@ def test_table_generation_progress_training_error():
         multitable.train_statuses[table_name] = TrainStatus.Completed
 
     multitable.train_statuses["users"] = TrainStatus.Failed
+    multitable._skip_some_tables([])
 
     # `users` does not have a functional model, so it will never be ready for generation
     # `events` is a child of users, and so also will never be ready
@@ -561,9 +562,10 @@ def test_table_generation_progress_with_user_configured_preserve_table():
     for table_name in multitable.train_statuses:
         multitable.train_statuses[table_name] = TrainStatus.Completed
 
+    multitable._skip_some_tables(["distribution_center"])
+
     # The user has elected not to synthesize the `distribution_center` table, so it is never
     # ready for generation, but it does not block child tables (`products`) from generation
-    multitable.generate_statuses["distribution_center"] = GenerateStatus.SourcePreserved
     assert set(multitable._ready_to_generate()) == {"users", "products"}
 
 
