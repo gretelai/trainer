@@ -64,6 +64,7 @@ class MultiTable:
         working_dir: str = "working",
         max_threads: int = 5,
     ):
+        configure_session(api_key="prompt", cache="yes", validate=True)
         self.project_prefix = project_prefix
         self.relational_data = relational_data
         self.working_dir = Path(working_dir)
@@ -196,7 +197,6 @@ class MultiTable:
 
     def train(self) -> None:
         """Train synthetic data models on each table in the relational dataset"""
-        configure_session(api_key="prompt", cache="yes", validate=True)
         training_data = self._prepare_training_data(
             self.relational_data.list_all_tables()
         )
