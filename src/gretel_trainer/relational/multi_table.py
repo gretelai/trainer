@@ -76,6 +76,28 @@ class MultiTable:
         self._reset_generation_statuses()
         self._reset_output_tables()
 
+    @property
+    def state_by_action(self) -> Dict[str, Dict[str, Any]]:
+        return {
+            "train": self.train_statuses,
+            "generate": self.generate_statuses,
+            "output": self.output_tables,
+        }
+
+    @property
+    def state_by_table(self) -> Dict[str, Dict[str, Any]]:
+        return {
+            table_name: self._table_state(table_name)
+            for table_name in self.relational_data.list_all_tables()
+        }
+
+    def _table_state(self, table_name: str) -> Dict[str, Any]:
+        return {
+            "train": self.train_statuses[table_name],
+            "generate": self.generate_statuses[table_name],
+            "output": self.output_tables.get(table_name),
+        }
+
     def transform(
         self,
         configs: Dict[str, GretelModelConfig],
