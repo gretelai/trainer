@@ -1,4 +1,4 @@
-from typing import List
+from typing import Any, Dict, List
 
 import pandas as pd
 
@@ -7,6 +7,9 @@ from gretel_trainer.relational.core import RelationalData
 
 
 class AncestralStrategy:
+    def __init__(self, model_type: str = "Amplify"):
+        self._model_type = model_type
+
     def prepare_training_data(
         self, table_name: str, rel_data: RelationalData
     ) -> pd.DataFrame:
@@ -39,6 +42,25 @@ class AncestralStrategy:
         for table in tables:
             retrain.update(rel_data.get_descendants(table))
         return list(retrain)
+
+    def get_generation_jobs(
+        self, table: str, rel_data: RelationalData, record_size_ratio: float, output_tables: Dict[str, pd.DataFrame]
+    ) -> List[Dict[str, Any]]:
+        if self._model_type == "ACTGAN":
+            return [
+                {"num_records": 1_000_000}
+                for i in range(20)
+            ]
+        else:
+            seed_df = _build_seed_df()
+            return [
+                {"seed_df": seed_df}
+            ]
+
+
+def _build_seed_df() -> pd.DataFrame:
+    # TODO
+    return pd.DataFrame()
 
 
 def _is_highly_unique_categorical(col: str, df: pd.DataFrame) -> bool:

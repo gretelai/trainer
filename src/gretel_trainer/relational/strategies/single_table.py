@@ -1,4 +1,4 @@
-from typing import List
+from typing import Any, Dict, List
 
 import pandas as pd
 
@@ -32,3 +32,12 @@ class SingleTableStrategy:
         Returns the provided tables requested to retrain, unaltered.
         """
         return tables
+
+    def get_generation_jobs(
+        self, table: str, rel_data: RelationalData, record_size_ratio: float, output_tables: Dict[str, pd.DataFrame]
+    ) -> List[Dict[str, Any]]:
+        source_data_size = len(rel_data.get_table_data(table))
+        synth_size = int(source_data_size * record_size_ratio)
+        return [
+            {"num_records": synth_size}
+        ]
