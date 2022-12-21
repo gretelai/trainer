@@ -41,3 +41,8 @@ class SingleTableStrategy:
         return [
             {"num_records": synth_size}
         ]
+
+    def collect_generation_results(
+        self, results: List[pd.DataFrame], table_name: str, rel_data: RelationalData
+    ) -> pd.DataFrame:
+        return pd.concat(results)

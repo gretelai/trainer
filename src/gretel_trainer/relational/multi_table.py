@@ -417,7 +417,7 @@ class MultiTable:
                 for future in as_completed(futures[table_name]):
                     dataframe = future.result()
                     component_dataframes.append(dataframe)
-                self.output_tables[table_name] = pd.concat(component_dataframes)
+                self.output_tables[table_name] = self._strategy.collect_generation_results(component_dataframes, table_name, self.relational_data)
 
     def _synthesize_keys(self, preserve_tables: List[str]) -> Dict[str, pd.DataFrame]:
         self.output_tables = self._synthesize_primary_keys(preserve_tables)

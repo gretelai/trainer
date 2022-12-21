@@ -57,10 +57,23 @@ class AncestralStrategy:
                 {"seed_df": seed_df}
             ]
 
+    def collect_generation_results(
+        self, results: List[pd.DataFrame], table_name: str, rel_data: RelationalData
+    ) -> pd.DataFrame:
+        if self._model_type == "ACTGAN":
+            return _trim(results, table_name, rel_data)
+        else:
+            return pd.concat(results)
+
 
 def _build_seed_df() -> pd.DataFrame:
     # TODO
     return pd.DataFrame()
+
+
+def _trim(results: List[pd.DataFrame], table_name: str, rel_data: RelationalData) -> pd.DataFrame:
+    # TODO
+    return pd.concat(results)
 
 
 def _is_highly_unique_categorical(col: str, df: pd.DataFrame) -> bool:
