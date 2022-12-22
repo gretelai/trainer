@@ -38,6 +38,7 @@ class GenerateStatus(str, Enum):
     Completed = "Completed"
     ModelUnavailable = "ModelUnavailable"
     SourcePreserved = "SourcePreserved"
+    Failed = "Failed"
 
 
 @dataclass
@@ -431,12 +432,16 @@ class MultiTable:
                 component_dataframes = []
                 for future in as_completed(futures[table_name]):
                     dataframe = future.result()
-                    component_dataframes.append(dataframe)
-                self.output_tables[
-                    table_name
-                ] = self._strategy.collect_generation_results(
-                    component_dataframes, table_name, self.relational_data
-                )
+                    if dataframe is not None:
+                        component_dataframes.append(dataframe)
+                if len(component_dataframes) > 0:
+                    self.output_tables[
+                        table_name
+                    ] = self._strategy.collect_generation_results(
+                        component_dataframes, table_name, self.relational_data
+                    )
+                else:
+                    self.generate_statuses[table_name] = GenerateStatus.Failed
 
     def _synthesize_keys(self, preserve_tables: List[str]) -> Dict[str, pd.DataFrame]:
         self.output_tables = self._synthesize_primary_keys(preserve_tables)
@@ -507,6 +512,7 @@ class MultiTable:
             GenerateStatus.Completed,
             GenerateStatus.SourcePreserved,
             GenerateStatus.ModelUnavailable,
+            GenerateStatus.Failed,
         ]
 
     def _more_to_do(self) -> bool:
@@ -586,7 +592,10 @@ def _generate(
     model,
     job_kwargs: Dict[str, Any],
 ) -> pd.DataFrame:
-    return model.generate(**job_kwargs)
+    try:
+        return model.generate(**job_kwargs)
+    except:
+        return None
 
 
 def _get_sqs_via_evaluate(data_source: pd.DataFrame, ref_data: pd.DataFrame) -> int:
