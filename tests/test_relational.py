@@ -498,77 +498,6 @@ def test_training_through_trainer():
             train.assert_any_call(training_csv)
 
 
-def test_ecommerce_table_generation_progress_happy_path():
-    ecom = _setup_ecommerce()
-    multitable = MultiTable(ecom)
-
-    for table_name in multitable.train_statuses:
-        multitable.train_statuses[table_name] = TrainStatus.Completed
-
-    # To start, "eldest generation" tables (those with no parents / outbound foreign keys) are ready
-    assert set(multitable._ready_to_generate()) == {"users", "distribution_center"}
-
-    # Once a table has been started, it is no longer ready
-    multitable.generate_statuses["users"] = GenerateStatus.InProgress
-    assert set(multitable._ready_to_generate()) == {"distribution_center"}
-
-    # It's possible to be in a state where work is happening but nothing is ready
-    multitable.generate_statuses["distribution_center"] = GenerateStatus.InProgress
-    assert set(multitable._ready_to_generate()) == set()
-
-    # `events` was only blocked by `users`; once the latter completes, the former is ready,
-    # regardless of the state of the unrelated `distribution_center` table
-    multitable.generate_statuses["users"] = GenerateStatus.Completed
-    assert set(multitable._ready_to_generate()) == {"events"}
-
-    # Similarly, the completion of `distribution_center` unblocks `products`,
-    # regardless of progress on `events`
-    multitable.generate_statuses["distribution_center"] = GenerateStatus.Completed
-    assert set(multitable._ready_to_generate()) == {"events", "products"}
-
-    multitable.generate_statuses["events"] = GenerateStatus.Completed
-    multitable.generate_statuses["products"] = GenerateStatus.Completed
-
-    assert set(multitable._ready_to_generate()) == {"inventory_items"}
-
-    multitable.generate_statuses["inventory_items"] = GenerateStatus.Completed
-
-    assert set(multitable._ready_to_generate()) == {"order_items"}
-
-    multitable.generate_statuses["order_items"] = GenerateStatus.Completed
-
-    assert set(multitable._ready_to_generate()) == set()
-
-
-def test_table_generation_progress_training_error():
-    ecom = _setup_ecommerce()
-    multitable = MultiTable(ecom)
-
-    for table_name in multitable.train_statuses:
-        multitable.train_statuses[table_name] = TrainStatus.Completed
-
-    multitable.train_statuses["users"] = TrainStatus.Failed
-    multitable._skip_some_tables([])
-
-    # `users` does not have a functional model, so it will never be ready for generation
-    # `events` is a child of users, and so also will never be ready
-    assert set(multitable._ready_to_generate()) == {"distribution_center"}
-
-
-def test_table_generation_progress_with_user_configured_preserve_table():
-    ecom = _setup_ecommerce()
-    multitable = MultiTable(ecom)
-
-    for table_name in multitable.train_statuses:
-        multitable.train_statuses[table_name] = TrainStatus.Completed
-
-    multitable._skip_some_tables(["distribution_center"])
-
-    # The user has elected not to synthesize the `distribution_center` table, so it is never
-    # ready for generation, but it does not block child tables (`products`) from generation
-    assert set(multitable._ready_to_generate()) == {"users", "products"}
-
-
 def test_evaluate():
     rel_data, _, _, _ = _setup_nba()
     _, syn_states, syn_cities, syn_teams = _setup_nba(synthetic=True)
@@ -600,3 +529,121 @@ def test_evaluate():
 
     assert evaluations["states"] == TableEvaluation(individual_sqs=84, ancestral_sqs=84)
     assert evaluations["cities"] == TableEvaluation(individual_sqs=42, ancestral_sqs=84)
+
+
+def test_single_table_generation_readiness():
+    ecom = _setup_ecommerce()
+    strategy = SingleTableStrategy()
+
+    # All tables are immediately ready for generation
+    assert set(strategy.ready_to_generate(ecom, [], [])) == {
+        "users",
+        "events",
+        "distribution_center",
+        "products",
+        "inventory_items",
+        "order_items",
+    }
+
+    # Tables that are in progress or finished are no longer ready
+    assert set(strategy.ready_to_generate(ecom, ["users"], ["events"])) == {
+        "distribution_center",
+        "products",
+        "inventory_items",
+        "order_items",
+    }
+
+
+def test_ancestral_generation_readiness():
+    ecom = _setup_ecommerce()
+    strategy = AncestralStrategy()
+
+    # To start, "eldest generation" tables (those with no parents / outbound foreign keys) are ready
+    assert set(strategy.ready_to_generate(ecom, [], [])) == {
+        "users",
+        "distribution_center",
+    }
+
+    # Once a table has been started, it is no longer ready
+    assert set(strategy.ready_to_generate(ecom, ["users"], [])) == {
+        "distribution_center"
+    }
+
+    # It's possible to be in a state where work is happening but nothing is ready
+    assert (
+        set(strategy.ready_to_generate(ecom, ["users", "distribution_center"], []))
+        == set()
+    )
+
+    # `events` was only blocked by `users`; once the latter completes, the former is ready,
+    # regardless of the state of the unrelated `distribution_center` table
+    assert set(
+        strategy.ready_to_generate(ecom, ["distribution_center"], ["users"])
+    ) == {"events"}
+
+    # Similarly, the completion of `distribution_center` unblocks `products`,
+    # regardless of progress on `events`
+    assert set(
+        strategy.ready_to_generate(ecom, [], ["users", "distribution_center"])
+    ) == {"events", "products"}
+
+    # Remaining tables become ready as their parents complete
+    assert set(
+        strategy.ready_to_generate(
+            ecom, [], ["users", "distribution_center", "events", "products"]
+        )
+    ) == {"inventory_items"}
+
+    # As above, being in progress is not enough! Work is happening but nothing new is ready
+    assert (
+        set(
+            strategy.ready_to_generate(
+                ecom,
+                ["inventory_items"],
+                ["users", "distribution_center", "events", "products"],
+            )
+        )
+        == set()
+    )
+
+    assert set(
+        strategy.ready_to_generate(
+            ecom,
+            [],
+            ["users", "distribution_center", "events", "products", "inventory_items"],
+        )
+    ) == {"order_items"}
+
+    assert (
+        set(
+            strategy.ready_to_generate(
+                ecom,
+                ["order_items"],
+                [
+                    "users",
+                    "distribution_center",
+                    "events",
+                    "products",
+                    "inventory_items",
+                ],
+            )
+        )
+        == set()
+    )
+    assert (
+        set(
+            strategy.ready_to_generate(
+                ecom,
+                [],
+                [
+                    "users",
+                    "distribution_center",
+                    "events",
+                    "products",
+                    "inventory_items",
+                    "order_items",
+                ],
+            )
+        )
+        == set()
+    )

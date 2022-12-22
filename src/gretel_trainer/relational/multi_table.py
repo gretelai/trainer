@@ -274,7 +274,20 @@ class MultiTable:
         while self._more_to_do():
             self._update_generate_statuses(futures)
 
-            for table_name in self._ready_to_generate():
+            in_progress_tables = [
+                table
+                for table in self.relational_data.list_all_tables()
+                if self._table_in_progress(table)
+            ]
+            finished_tables = [
+                table
+                for table in self.relational_data.list_all_tables()
+                if self._table_in_terminal_state(table)
+            ]
+            ready_tables = self._strategy.ready_to_generate(
+                self.relational_data, in_progress_tables, finished_tables
+            )
+            for table_name in ready_tables:
                 self._start_generation_jobs(table_name, futures, record_size_ratio)
 
             time.sleep(10)
@@ -477,22 +490,6 @@ class MultiTable:
                 out_df[foreign_key.column_name] = new_fk_values
 
         return self.output_tables
-
-    def _ready_to_generate(self) -> List[str]:
-        logger.debug("Checking for more tables ready to generate")
-        ready = []
-
-        for table in self.relational_data.list_all_tables():
-            if self._table_in_progress(table) or self._table_in_terminal_state(table):
-                continue
-
-            parents = self.relational_data.get_parents(table)
-            if len(parents) == 0:
-                ready.append(table)
-            elif all([self._table_in_terminal_state(parent) for parent in parents]):
-                ready.append(table)
-
-        return ready
 
     def _table_in_progress(self, table: str) -> bool:
         return self.generate_statuses[table] == GenerateStatus.InProgress

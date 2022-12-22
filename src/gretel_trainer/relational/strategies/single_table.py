@@ -33,6 +33,18 @@ class SingleTableStrategy:
         """
         return tables
 
+    def ready_to_generate(
+        self,
+        rel_data: RelationalData,
+        in_progress: List[str],
+        finished: List[str],
+    ) -> List[str]:
+        return [
+            table
+            for table in rel_data.list_all_tables()
+            if table not in in_progress and table not in finished
+        ]
+
     def get_generation_jobs(
         self, table: str, rel_data: RelationalData, record_size_ratio: float, output_tables: Dict[str, pd.DataFrame]
     ) -> List[Dict[str, Any]]:

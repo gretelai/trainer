@@ -43,6 +43,26 @@ class AncestralStrategy:
             retrain.update(rel_data.get_descendants(table))
         return list(retrain)
 
+    def ready_to_generate(
+        self,
+        rel_data: RelationalData,
+        in_progress: List[str],
+        finished: List[str],
+    ) -> List[str]:
+        ready = []
+
+        for table in rel_data.list_all_tables():
+            if table in in_progress or table in finished:
+                continue
+
+            parents = rel_data.get_parents(table)
+            if len(parents) == 0:
+                ready.append(table)
+            elif all([parent in finished for parent in parents]):
+                ready.append(table)
+
+        return ready
+
     def get_generation_jobs(
         self, table: str, rel_data: RelationalData, record_size_ratio: float, output_tables: Dict[str, pd.DataFrame]
     ) -> List[Dict[str, Any]]:
