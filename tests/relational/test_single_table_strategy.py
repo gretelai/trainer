@@ -1,3 +1,5 @@
+import pandas.testing as pdtest
+
 from gretel_trainer.relational.strategies.single_table import SingleTableStrategy
 
 
@@ -39,3 +41,20 @@ def test_table_generation_readiness(ecom):
         "inventory_items",
         "order_items",
     }
+
+
+def test_yields_one_generation_job_using_num_records_param(pets):
+    strategy = SingleTableStrategy()
+
+    jobs = strategy.get_generation_jobs("pets", pets, 2.0, {})
+
+    assert jobs == [{"num_records": 10}]
+
+
+def test_collect_generation_results_returns_the_lone_output_dataframe(pets):
+    strategy = SingleTableStrategy()
+    pets_data = pets.get_table_data("pets")
+
+    result = strategy.collect_generation_results([pets_data], "pets", pets)
+
+    pdtest.assert_frame_equal(result, pets_data)

@@ -1,3 +1,6 @@
+import pandas.testing as pdtest
+import pytest
+
 from gretel_trainer.relational.strategies.ancestral import AncestralStrategy
 
 
@@ -132,3 +135,31 @@ def test_table_generation_readiness(ecom):
         )
         == set()
     )
+
+
+def test_twenty_generation_jobs_for_actgan(pets):
+    strategy = AncestralStrategy(model_type="ACTGAN")
+
+    jobs = strategy.get_generation_jobs("pets", pets, 2.0, {})
+
+    assert len(jobs) == 20
+    assert all(job == {"num_records": 1_000_000} for job in jobs)
+
+
+@pytest.mark.skip("TODO: seed df implementation")
+def test_seed_df_generation_jobs_for_amplify(pets):
+    ...
+
+
+@pytest.mark.skip("TODO: nearest neighbor implementation")
+def test_collecting_results_trims_actgan_results(pets):
+    ...
+
+
+def test_collecting_results_returns_lone_amplify_result(pets):
+    strategy = AncestralStrategy()
+    pets_data = pets.get_table_data("pets")
+
+    result = strategy.collect_generation_results([pets_data], "pets", pets)
+
+    pdtest.assert_frame_equal(result, pets_data)
