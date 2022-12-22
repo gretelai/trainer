@@ -8,5 +8,5 @@ type:
 
 .PHONY: multi
 multi:
-	-python -m pyright src/gretel_trainer/relational tests/test_relational.py
-	python -m pytest tests/test_relational.py
+	-python -m pyright src/gretel_trainer/relational tests/relational/
+	python -m pytest tests/relational/
