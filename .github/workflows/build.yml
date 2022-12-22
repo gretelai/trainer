@@ -1,4 +1,4 @@
-name: type
+name: build
 
 on: [push]
 
