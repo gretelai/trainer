@@ -10,7 +10,7 @@ from gretel_trainer.relational.multi_table import (
 )
 
 
-def test_training_through_trainer(pets):
+def test_training_through_trainer(pets, configured_session):
     with tempfile.TemporaryDirectory() as work_dir, patch(
         "gretel_trainer.trainer.create_or_get_unique_project"
     ), patch("gretel_trainer.trainer.Trainer.train") as train, patch(
@@ -19,12 +19,7 @@ def test_training_through_trainer(pets):
         trained_successfully.return_value = True
         multitable = MultiTable(pets, working_dir=work_dir)
 
-        # Need to patch configure_session in two spots because MultiTable calls it first
-        # (before any parallelization) and then each Trainer instance calls it internally
-        with patch("gretel_trainer.relational.multi_table.configure_session"), patch(
-            "gretel_trainer.trainer.configure_session"
-        ):
-            multitable.train()
+        multitable.train()
 
         for table in ["humans", "pets"]:
             training_csv = Path(f"{work_dir}/{table}-train.csv")
@@ -32,7 +27,7 @@ def test_training_through_trainer(pets):
             train.assert_any_call(training_csv)
 
 
-def test_evaluate(source_nba, synthetic_nba):
+def test_evaluate(source_nba, synthetic_nba, configured_session):
     rel_data, _, _, _ = source_nba
     _, syn_states, syn_cities, syn_teams = synthetic_nba
 
