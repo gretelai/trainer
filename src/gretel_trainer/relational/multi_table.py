@@ -294,7 +294,9 @@ class MultiTable:
 
         # The while loop above ends when there are no jobs remaining with NotStarted status,
         # but some jobs could still be InProgress, so now we wait for everything to finish.
-        all_futures_flattened = [future for list_of_futures in futures.values() for future in list_of_futures]
+        all_futures_flattened = [
+            future for list_of_futures in futures.values() for future in list_of_futures
+        ]
         wait(all_futures_flattened)
 
         # One last call to update state now that all jobs are complete.
@@ -387,7 +389,9 @@ class MultiTable:
                 logger.info(f"No model available for table `{table}`")
                 self.generate_statuses[table] = GenerateStatus.ModelUnavailable
                 for descendant in self.relational_data.get_descendants(table):
-                    logger.info(f"Skipping generation for `{descendant}` because it depends on `{table}`")
+                    logger.info(
+                        f"Skipping generation for `{descendant}` because it depends on `{table}`"
+                    )
                     self.generate_statuses[descendant] = GenerateStatus.ModelUnavailable
 
     def _start_generation_jobs(
@@ -407,9 +411,7 @@ class MultiTable:
         table_job_futures = []
         for job_kwargs in table_jobs:
             table_job_futures.append(
-                self.thread_pool.submit(
-                    _generate, model, job_kwargs
-                )
+                self.thread_pool.submit(_generate, model, job_kwargs)
             )
         self.generate_statuses[table_name] = GenerateStatus.InProgress
         futures[table_name] = table_job_futures
@@ -430,14 +432,20 @@ class MultiTable:
                 for future in as_completed(futures[table_name]):
                     dataframe = future.result()
                     component_dataframes.append(dataframe)
-                self.output_tables[table_name] = self._strategy.collect_generation_results(component_dataframes, table_name, self.relational_data)
+                self.output_tables[
+                    table_name
+                ] = self._strategy.collect_generation_results(
+                    component_dataframes, table_name, self.relational_data
+                )
 
     def _synthesize_keys(self, preserve_tables: List[str]) -> Dict[str, pd.DataFrame]:
         self.output_tables = self._synthesize_primary_keys(preserve_tables)
         self.output_tables = self._synthesize_foreign_keys()
         return self.output_tables
 
-    def _synthesize_primary_keys(self, preserve_tables: List[str]) -> Dict[str, pd.DataFrame]:
+    def _synthesize_primary_keys(
+        self, preserve_tables: List[str]
+    ) -> Dict[str, pd.DataFrame]:
         """
         Alters primary key columns on all tables *except* those flagged by the user as
         not to be synthesized. Assumes the primary key column is of type integer.
@@ -495,7 +503,11 @@ class MultiTable:
         return self.generate_statuses[table] == GenerateStatus.InProgress
 
     def _table_in_terminal_state(self, table: str) -> bool:
-        return self.generate_statuses[table] in [GenerateStatus.Completed, GenerateStatus.SourcePreserved, GenerateStatus.ModelUnavailable]
+        return self.generate_statuses[table] in [
+            GenerateStatus.Completed,
+            GenerateStatus.SourcePreserved,
+            GenerateStatus.ModelUnavailable,
+        ]
 
     def _more_to_do(self) -> bool:
         return any(

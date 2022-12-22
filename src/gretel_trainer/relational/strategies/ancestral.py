@@ -64,18 +64,17 @@ class AncestralStrategy:
         return ready
 
     def get_generation_jobs(
-        self, table: str, rel_data: RelationalData, record_size_ratio: float, output_tables: Dict[str, pd.DataFrame]
+        self,
+        table: str,
+        rel_data: RelationalData,
+        record_size_ratio: float,
+        output_tables: Dict[str, pd.DataFrame],
     ) -> List[Dict[str, Any]]:
         if self._model_type == "ACTGAN":
-            return [
-                {"num_records": 1_000_000}
-                for i in range(20)
-            ]
+            return [{"num_records": 1_000_000} for i in range(20)]
         else:
             seed_df = _build_seed_df()
-            return [
-                {"seed_df": seed_df}
-            ]
+            return [{"seed_df": seed_df}]
 
     def collect_generation_results(
         self, results: List[pd.DataFrame], table_name: str, rel_data: RelationalData
@@ -91,7 +90,9 @@ def _build_seed_df() -> pd.DataFrame:
     return pd.DataFrame()
 
 
-def _trim(results: List[pd.DataFrame], table_name: str, rel_data: RelationalData) -> pd.DataFrame:
+def _trim(
+    results: List[pd.DataFrame], table_name: str, rel_data: RelationalData
+) -> pd.DataFrame:
     # TODO
     return pd.concat(results)
 
