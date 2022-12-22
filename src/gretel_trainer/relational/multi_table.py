@@ -2,7 +2,7 @@ import logging
 import os
 import random
 import time
-from concurrent.futures import as_completed, Future, ThreadPoolExecutor, wait
+from concurrent.futures import Future, ThreadPoolExecutor, as_completed, wait
 from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path

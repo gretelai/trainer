@@ -1,6 +1,5 @@
 import matplotlib.pyplot as plt
 import networkx as nx
-
 from networkx.drawing.nx_agraph import graphviz_layout
 
 from gretel_trainer.relational.core import RelationalData

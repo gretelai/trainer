@@ -1,8 +1,8 @@
 from typing import Any, Dict, List
 
 import pandas as pd
-
 from pandas.api.types import is_string_dtype
+
 from gretel_trainer.relational.core import RelationalData
 
 
