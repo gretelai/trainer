@@ -3,7 +3,7 @@ name: build
 on: [push]
 
 jobs:
-  type:
+  build:
     runs-on: ubuntu-latest
     strategy:
       matrix:
