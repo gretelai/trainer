@@ -72,8 +72,11 @@ class AncestralStrategy:
     ) -> List[Dict[str, Any]]:
         if self._model_type == "ACTGAN":
             return [{"num_records": 1_000_000} for i in range(20)]
+        elif len(rel_data.get_parents(table)) == 0:
+            requested_synth_count = len(rel_data.get_table_data(table)) * record_size_ratio
+            return [{"num_records": requested_synth_count}]
         else:
-            seed_df = _build_seed_df()
+            seed_df = rel_data.build_seed_data_for_table(table, output_tables)
             return [{"seed_df": seed_df}]
 
     def collect_generation_results(
@@ -83,11 +86,6 @@ class AncestralStrategy:
             return _trim(results, table_name, rel_data)
         else:
             return pd.concat(results)
-
-
-def _build_seed_df() -> pd.DataFrame:
-    # TODO
-    return pd.DataFrame()
 
 
 def _trim(
