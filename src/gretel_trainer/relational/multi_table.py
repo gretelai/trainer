@@ -1,3 +1,4 @@
+import json
 import logging
 import os
 import random
@@ -71,6 +72,8 @@ class MultiTable:
         self.working_dir = Path(working_dir)
         self._strategy = SingleTableStrategy()
         os.makedirs(self.working_dir, exist_ok=True)
+        with open(self._debug_summary_path(), "w") as dbg:
+            json.dump(self.relational_data.debug_summary(), dbg)
         self.thread_pool = ThreadPoolExecutor(max_threads)
         self.train_statuses = {}
         self._reset_train_statuses(self.relational_data.list_all_tables())
@@ -99,6 +102,13 @@ class MultiTable:
             "output": self.output_tables.get(table_name),
         }
 
+    def _debug_summary_path(self) -> Path:
+        return self.working_dir / "_gretel_debug_summary.json"
+
+    def _upload_debug_summary(self, project_name: str) -> None:
+        project = create_or_get_unique_project(name=project_name)
+        project.upload_artifact(str(self._debug_summary_path()))
+
     def transform(
         self,
         configs: Dict[str, GretelModelConfig],
@@ -123,6 +133,7 @@ class MultiTable:
         transforms_futures = []
         project_name = project_name or f"{self.project_prefix}-transforms"
         project = create_or_get_unique_project(name=project_name)
+        self._upload_debug_summary(project_name)
 
         for table_name, config in configs.items():
             table_data = self.relational_data.get_table_data(table_name)
@@ -199,12 +210,14 @@ class MultiTable:
         train_futures = []
         for table_name, training_csv in training_data.items():
             logger.info(f"Training model for table: {table_name}")
+            project_name = f"{self.project_prefix}-{table_name.replace('_', '-')}"
             trainer = Trainer(
                 model_type=GretelACTGAN(),
-                project_name=f"{self.project_prefix}-{table_name.replace('_', '-')}",
+                project_name=project_name,
                 cache_file=self._cache_file_for(table_name),
                 overwrite=False,
             )
+            self._upload_debug_summary(project_name)
             self.train_statuses[table_name] = TrainStatus.InProgress
             train_futures.append(
                 self.thread_pool.submit(_train, trainer, training_csv, table_name)
