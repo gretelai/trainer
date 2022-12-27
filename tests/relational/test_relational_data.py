@@ -232,7 +232,7 @@ def test_debug_summary(ecom, mutagenesis):
             "products": {"foreign_key_count": 1, "primary_key": "id"},
             "inventory_items": {"foreign_key_count": 2, "primary_key": "id"},
             "order_items": {"foreign_key_count": 2, "primary_key": "id"},
-        }
+        },
     }
 
     assert mutagenesis.debug_summary() == {
@@ -243,5 +243,5 @@ def test_debug_summary(ecom, mutagenesis):
             "bond": {"foreign_key_count": 2, "primary_key": None},
             "atom": {"foreign_key_count": 1, "primary_key": "atom_id"},
             "molecule": {"foreign_key_count": 0, "primary_key": "molecule_id"},
-        }
+        },
     }

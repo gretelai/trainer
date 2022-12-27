@@ -73,7 +73,9 @@ class AncestralStrategy:
         if self._model_type == "ACTGAN":
             return [{"num_records": 1_000_000} for i in range(20)]
         elif len(rel_data.get_parents(table)) == 0:
-            requested_synth_count = len(rel_data.get_table_data(table)) * record_size_ratio
+            requested_synth_count = (
+                len(rel_data.get_table_data(table)) * record_size_ratio
+            )
             return [{"num_records": requested_synth_count}]
         else:
             seed_df = rel_data.build_seed_data_for_table(table, output_tables)

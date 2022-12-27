@@ -157,18 +157,48 @@ def test_seed_df_generation_jobs_for_amplify(pets):
     assert parent_table_jobs[0] == {"num_records": 10}
 
     # Table with ancestors
-    synthetic_humans = pd.DataFrame(data={
-        "self|name": ["Miles Davis", "Wayne Shorter", "Herbie Hancock", "Ron Carter", "Tony Williams"],
-        "self|city": ["New York", "New York", "New York", "New York", "Los Angeles"],
-        "self|id": [1, 2, 3, 4, 5],
-    })
-    child_table_jobs = strategy.get_generation_jobs("pets", pets, 2.0, {"humans": synthetic_humans})
+    synthetic_humans = pd.DataFrame(
+        data={
+            "self|name": [
+                "Miles Davis",
+                "Wayne Shorter",
+                "Herbie Hancock",
+                "Ron Carter",
+                "Tony Williams",
+            ],
+            "self|city": [
+                "New York",
+                "New York",
+                "New York",
+                "New York",
+                "Los Angeles",
+            ],
+            "self|id": [1, 2, 3, 4, 5],
+        }
+    )
+    child_table_jobs = strategy.get_generation_jobs(
+        "pets", pets, 2.0, {"humans": synthetic_humans}
+    )
 
-    expected_seed_df = pd.DataFrame(data={
-        "self.human_id|name": ["Miles Davis", "Wayne Shorter", "Herbie Hancock", "Ron Carter", "Tony Williams"],
-        "self.human_id|city": ["New York", "New York", "New York", "New York", "Los Angeles"],
-        "self.human_id|id": [1, 2, 3, 4, 5],
-    })
+    expected_seed_df = pd.DataFrame(
+        data={
+            "self.human_id|name": [
+                "Miles Davis",
+                "Wayne Shorter",
+                "Herbie Hancock",
+                "Ron Carter",
+                "Tony Williams",
+            ],
+            "self.human_id|city": [
+                "New York",
+                "New York",
+                "New York",
+                "New York",
+                "Los Angeles",
+            ],
+            "self.human_id|id": [1, 2, 3, 4, 5],
+        }
+    )
 
     assert len(child_table_jobs) == 1
     pdtest.assert_frame_equal(child_table_jobs[0]["seed_df"], expected_seed_df)

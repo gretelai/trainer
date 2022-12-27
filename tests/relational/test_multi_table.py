@@ -1,7 +1,7 @@
 import os
 import tempfile
 from pathlib import Path
-from unittest.mock import call, Mock, patch
+from unittest.mock import Mock, call, patch
 
 from gretel_trainer.relational.multi_table import (
     MultiTable,

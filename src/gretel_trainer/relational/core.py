@@ -9,7 +9,6 @@ from typing import Any, Dict, List, Optional, Tuple
 
 import networkx
 import pandas as pd
-
 from networkx.algorithms.dag import dag_longest_path_length
 
 

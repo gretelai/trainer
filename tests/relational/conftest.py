@@ -1,9 +1,9 @@
 import sqlite3
 import tempfile
+from unittest.mock import Mock, patch
 
 import pandas as pd
 import pytest
-from unittest.mock import Mock, patch
 
 from gretel_trainer.relational.core import RelationalData
 
