@@ -218,3 +218,30 @@ def test_filesystem_serde_accepts_missing_primary_keys(mutagenesis):
 
     assert from_json.get_primary_key("bond") is None
     assert from_json.get_primary_key("atom") == "atom_id"
+
+
+def test_debug_summary(ecom, mutagenesis):
+    assert ecom.debug_summary() == {
+        "foreign_key_count": 6,
+        "max_depth": 3,
+        "table_count": 6,
+        "tables": {
+            "users": {"foreign_key_count": 0, "primary_key": "id"},
+            "events": {"foreign_key_count": 1, "primary_key": "id"},
+            "distribution_center": {"foreign_key_count": 0, "primary_key": "id"},
+            "products": {"foreign_key_count": 1, "primary_key": "id"},
+            "inventory_items": {"foreign_key_count": 2, "primary_key": "id"},
+            "order_items": {"foreign_key_count": 2, "primary_key": "id"},
+        }
+    }
+
+    assert mutagenesis.debug_summary() == {
+        "foreign_key_count": 3,
+        "max_depth": 2,
+        "table_count": 3,
+        "tables": {
+            "bond": {"foreign_key_count": 2, "primary_key": None},
+            "atom": {"foreign_key_count": 1, "primary_key": "atom_id"},
+            "molecule": {"foreign_key_count": 0, "primary_key": "molecule_id"},
+        }
+    }

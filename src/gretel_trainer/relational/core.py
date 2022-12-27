@@ -10,6 +10,8 @@ from typing import Any, Dict, List, Optional, Tuple
 import networkx
 import pandas as pd
 
+from networkx.algorithms.dag import dag_longest_path_length
+
 
 class MultiTableException(Exception):
     pass
@@ -176,6 +178,28 @@ class RelationalData:
         else:
             # TODO: determine what seed should look like when table has multiple FKs
             return None
+
+    def debug_summary(self) -> Dict[str, Any]:
+        max_depth = dag_longest_path_length(self.graph)
+        all_tables = self.list_all_tables()
+        table_count = len(all_tables)
+        total_foreign_key_count = 0
+        tables = {}
+        for table in all_tables:
+            this_table_foreign_key_count = 0
+            for key in self.get_foreign_keys(table):
+                total_foreign_key_count = total_foreign_key_count + 1
+                this_table_foreign_key_count = this_table_foreign_key_count + 1
+            tables[table] = {
+                "foreign_key_count": this_table_foreign_key_count,
+                "primary_key": self.get_primary_key(table),
+            }
+        return {
+            "foreign_key_count": total_foreign_key_count,
+            "max_depth": max_depth,
+            "table_count": table_count,
+            "tables": tables,
+        }
 
     def as_dict(self, out_dir: str) -> Dict[str, Any]:
         d = {"tables": {}, "foreign_keys": []}
