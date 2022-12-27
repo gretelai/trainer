@@ -1,3 +1,6 @@
+import sqlite3
+import tempfile
+
 import pandas as pd
 import pytest
 from unittest.mock import Mock, patch
@@ -143,3 +146,69 @@ def _setup_nba(synthetic: bool):
     rel_data.add_foreign_key("cities.state_id", "states.id")
 
     return rel_data, states, cities, teams
+
+
+# Same ecommerce schema as `ecom`, but written to a temporary local sqlite db
+@pytest.fixture()
+def local_db():
+    commands = [
+        """
+create table users (
+  id integer primary key,
+  first_name varchar(30) not null,
+  last_name varchar(30) not null
+);
+        """,
+        """
+create table events (
+  id integer primary key,
+  browser varchar(30) not null,
+  traffic_source varchar(30) not null,
+  user_id integer not null,
+  foreign key (user_id) references users (id)
+);
+        """,
+        """
+create table distribution_center (
+  id integer primary key,
+  name varchar(30) not null
+);
+        """,
+        """
+create table products (
+  id integer primary key,
+  name varchar(30) not null,
+  brand varchar(30) not null,
+  distribution_center_id integer not null,
+  foreign key (distribution_center_id) references distribution_center (id)
+)
+        """,
+        """
+create table inventory_items (
+  id integer primary key,
+  sold_at text not null,
+  cost integer not null,
+  product_id integer not null,
+  product_distribution_center_id integer not null,
+  foreign key (product_id) references products (id)
+  foreign key (product_distribution_center_id) references distribution_center (id)
+)
+        """,
+        """
+create table order_items (
+  id integer primary key,
+  sale_price integer not null,
+  status varchar(30) not null,
+  user_id integer not null,
+  inventory_item_id integer not null,
+  foreign key (user_id) references users (id)
+  foreign key (inventory_item_id) references inventory_items (id)
+)
+        """,
+    ]
+    with tempfile.NamedTemporaryFile() as f:
+        con = sqlite3.connect(f.name)
+        cur = con.cursor()
+        for command in commands:
+            cur.execute(command)
+        yield f.name
