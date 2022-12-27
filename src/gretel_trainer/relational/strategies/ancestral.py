@@ -49,6 +49,11 @@ class AncestralStrategy:
         in_progress: List[str],
         finished: List[str],
     ) -> List[str]:
+        """
+        Tables with no parents are immediately ready for generation.
+        Tables with parents are ready once their parents are finished.
+        All tables are no longer considered ready once they are at least in progress.
+        """
         ready = []
 
         for table in rel_data.list_all_tables():
@@ -70,6 +75,14 @@ class AncestralStrategy:
         record_size_ratio: float,
         output_tables: Dict[str, pd.DataFrame],
     ) -> List[Dict[str, Any]]:
+        """
+        For ACTGAN, returns a list of 20 jobs, each to generate 1 million records.
+
+        For Amplify, if the table does not have any parents, returns a single job
+        requesting an output record count based on the initial table data size and
+        the record size ratio. If the table does have parents, builds a seed dataframe
+        to use in generation.
+        """
         if self._model_type == "ACTGAN":
             return [{"num_records": 1_000_000} for i in range(20)]
         elif len(rel_data.get_parents(table)) == 0:
@@ -84,6 +97,11 @@ class AncestralStrategy:
     def collect_generation_results(
         self, results: List[pd.DataFrame], table_name: str, rel_data: RelationalData
     ) -> pd.DataFrame:
+        """
+        For ACTGAN: TODO.
+
+        For Amplify, concatenates all results, which should just be a list of one element.
+        """
         if self._model_type == "ACTGAN":
             return _trim(results, table_name, rel_data)
         else:

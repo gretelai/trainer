@@ -39,6 +39,10 @@ class SingleTableStrategy:
         in_progress: List[str],
         finished: List[str],
     ) -> List[str]:
+        """
+        All tables are immediately ready for generation. Once they are
+        at least in progress, they are no longer ready.
+        """
         return [
             table
             for table in rel_data.list_all_tables()
@@ -52,6 +56,10 @@ class SingleTableStrategy:
         record_size_ratio: float,
         output_tables: Dict[str, pd.DataFrame],
     ) -> List[Dict[str, Any]]:
+        """
+        Returns one job requesting an output record count based on
+        the initial table data size and the record size ratio.
+        """
         source_data_size = len(rel_data.get_table_data(table))
         synth_size = int(source_data_size * record_size_ratio)
         return [{"num_records": synth_size}]
@@ -59,4 +67,7 @@ class SingleTableStrategy:
     def collect_generation_results(
         self, results: List[pd.DataFrame], table_name: str, rel_data: RelationalData
     ) -> pd.DataFrame:
+        """
+        Concatenates all results, which should just be a list of one element.
+        """
         return pd.concat(results)

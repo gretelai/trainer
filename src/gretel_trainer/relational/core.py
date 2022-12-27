@@ -149,6 +149,10 @@ class RelationalData:
         return bool(regex.search(column))
 
     def drop_ancestral_data(self, df: pd.DataFrame) -> pd.DataFrame:
+        """
+        Drops ancestral columns from the given dataframe and removes the lineage prefix
+        from the remaining columns, restoring them to their original source names.
+        """
         delim = self._lineage_column_delimiter
         root_columns = [col for col in df.columns if col.startswith(f"self{delim}")]
         mapper = {col: col.removeprefix(f"self{delim}") for col in root_columns}
