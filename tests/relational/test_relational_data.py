@@ -1,6 +1,7 @@
 import os
 import tempfile
 
+import pandas as pd
 import pandas.testing as pdtest
 
 from gretel_trainer.relational.core import RelationalData
@@ -67,26 +68,6 @@ def test_ecommerce_relational_data(ecom):
         "product_id",
         "product_distribution_center_id",
     }
-
-    # seed dataframes
-    assert ecom.build_seed_data_for_table("users", {}) is None
-
-    events_seed = ecom.build_seed_data_for_table(
-        "events", {"users": users_with_ancestors}
-    )
-    assert events_seed is not None and set(events_seed.columns) == {
-        "self.user_id|id",
-        "self.user_id|first_name",
-        "self.user_id|last_name",
-    }
-
-    # inventory_items_seed = ecom.build_seed_data_for_table("inventory_items", {
-    #     "products": ecom.get_table_data_with_ancestors("products"),
-    #     "distribution_center": ecom.get_table_data_with_ancestors("distribution_center"),
-    # })
-    # assert set(inventory_items_seed.columns) == {
-    # # TODO
-    # }
 
 
 def test_mutagenesis_relational_data(mutagenesis):
@@ -244,4 +225,48 @@ def test_debug_summary(ecom, mutagenesis):
             "atom": {"foreign_key_count": 1, "primary_key": "atom_id"},
             "molecule": {"foreign_key_count": 0, "primary_key": "molecule_id"},
         },
+    }
+
+
+def test_building_seeds(source_nba, synthetic_nba):
+    source_nba = source_nba[0]
+    synthetic_nba = synthetic_nba[0]
+
+    # Cannot build seed data for tables with no parents
+    assert source_nba.build_seed_data_for_table("states") is None
+    assert source_nba.build_seed_data_for_table("states", {}) is None
+
+    # When no specific ancestor data is provided, uses source data
+    nba_source_city_seed = source_nba.build_seed_data_for_table("cities")
+    pdtest.assert_frame_equal(
+        nba_source_city_seed,
+        pd.DataFrame(
+            data={
+                "self.state_id|name": ["CA", "TN"],
+                "self.state_id|id": [1, 2],
+            }
+        ),
+    )
+
+    # When ancestor data is provided, uses that tableset
+    synth_tables = {"states": synthetic_nba.get_table_data_with_ancestors("states")}
+    nba_synth_city_seed = source_nba.build_seed_data_for_table("cities", synth_tables)
+    pdtest.assert_frame_equal(
+        nba_synth_city_seed,
+        pd.DataFrame(
+            data={
+                "self.state_id|name": ["PA", "FL"],
+                "self.state_id|id": [1, 2],
+            }
+        ),
+    )
+
+    # Seeds go back multiple generations
+    teams_seed = source_nba.build_seed_data_for_table("teams")
+    assert set(teams_seed.columns) == {
+        "self.city_id|id",
+        "self.city_id|name",
+        "self.city_id|state_id",
+        "self.city_id.state_id|id",
+        "self.city_id.state_id|name",
     }

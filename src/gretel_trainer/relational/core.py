@@ -159,28 +159,39 @@ class RelationalData:
         return df[root_columns].rename(columns=mapper)
 
     def build_seed_data_for_table(
-        self, table: str, ancestor_data: Dict[str, pd.DataFrame]
+        self, table: str, ancestor_data: Optional[Dict[str, pd.DataFrame]] = None
     ) -> Optional[pd.DataFrame]:
-        foreign_keys = self.get_foreign_keys(table)
-        # TODO: check and raise if ancestor_data is missing any parents?
+        """
+        Returns a multigenerational dataframe composed exclusively of ancestral columns;
+        columns from the provided table are excluded. If ancestor_data is provided, will
+        use that tableset; otherwise uses source data. The ancestor_data dict MAY include
+        a key/value pair for for the provided table, but it is not necessary because those
+        columns are not included in the output dataframe.
 
-        if len(foreign_keys) == 0:
+        Returns None if table has no parents.
+        """
+        if len(self.get_parents(table)) == 0:
             return None
-        elif len(foreign_keys) == 1:
-            foreign_key = foreign_keys[0]
-            parent_df = ancestor_data[foreign_key.parent_table_name]
-            mapper = {
-                col: col.replace(
-                    "self",
-                    f"self{self._generation_delimiter}{foreign_key.column_name}",
-                    1,
-                )
-                for col in parent_df.columns
-            }
-            return parent_df.rename(columns=mapper)
         else:
-            # TODO: determine what seed should look like when table has multiple FKs
-            return None
+            if ancestor_data is not None:
+                # TODO: check and raise if ancestor_data is missing any parents?
+
+                # Ensure provided data is not multigenerational; columns should match source
+                # TODO: do we need to be defensive here and explicitly check for lineage prefixes?
+                for name, data in ancestor_data.items():
+                    ancestor_data[name] = self.drop_ancestral_data(data)
+
+                # Data from supplied `table` must be present for the call to `get_table_data_with_ancestors`,
+                # but those columns are not included in the output so it's OK to add source data to an
+                # otherwise synthetic tableset
+                if ancestor_data.get(table) is None:
+                    ancestor_data.update({table: self.get_table_data(table)})
+
+            df = self.get_table_data_with_ancestors(table, ancestor_data)
+            ancestral_columns = [
+                col for col in df.columns if self.is_ancestral_column(col)
+            ]
+            return df.filter(ancestral_columns)
 
     def debug_summary(self) -> Dict[str, Any]:
         max_depth = dag_longest_path_length(self.graph)
