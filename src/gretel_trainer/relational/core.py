@@ -90,6 +90,22 @@ class RelationalData:
             foreign_keys.extend(fks)
         return foreign_keys
 
+    def get_ancestral_foreign_key_maps(self, table: str) -> List[Tuple[str, str]]:
+        def _ancestral_fk_map(fk: ForeignKey) -> Tuple[str, str]:
+            gen_delim = self._generation_delimiter
+            lineage_delim = self._lineage_column_delimiter
+            fk_col = fk.column_name
+            ref_col = fk.parent_column_name
+
+            ancestral_foreign_key = f"self{lineage_delim}{fk_col}"
+            ancestral_referenced_col = (
+                f"self{gen_delim}{fk_col}{lineage_delim}{ref_col}"
+            )
+
+            return (ancestral_foreign_key, ancestral_referenced_col)
+
+        return [_ancestral_fk_map(fk) for fk in self.get_foreign_keys(table)]
+
     def get_table_data_with_ancestors(
         self, table: str, tableset: Optional[Dict[str, pd.DataFrame]] = None
     ) -> pd.DataFrame:

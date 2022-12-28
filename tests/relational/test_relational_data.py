@@ -228,6 +228,20 @@ def test_debug_summary(ecom, mutagenesis):
     }
 
 
+def test_ancestral_foreign_key_maps(ecom):
+    events_afk_maps = ecom.get_ancestral_foreign_key_maps("events")
+    assert events_afk_maps == [("self|user_id", "self.user_id|id")]
+
+    inventory_items_afk_maps = ecom.get_ancestral_foreign_key_maps("inventory_items")
+    assert set(inventory_items_afk_maps) == {
+        ("self|product_id", "self.product_id|id"),
+        (
+            "self|product_distribution_center_id",
+            "self.product_distribution_center_id|id",
+        ),
+    }
+
+
 def test_building_seeds(source_nba, synthetic_nba):
     source_nba = source_nba[0]
     synthetic_nba = synthetic_nba[0]
