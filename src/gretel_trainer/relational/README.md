@@ -43,3 +43,20 @@ see the [SQLAlchemy dialects docs](https://docs.sqlalchemy.org/en/14/dialects/in
 This is the interface to working with `RelationalData`, including running transforms
 on it, training synthetic models on it and generating data from those models, and
 evaluating synthetic results.
+
+The `MultiTable` object is primarily concerned with the orchestration, execution, and
+state-tracking of Gretel Cloud jobs. While it does also contain some "business logic,"
+most of those details are defined in the `Strategy` protocol. A `MultiTable` instance
+depends on one `Strategy`.
+
+
+### `Strategy` (protocol)
+
+`Strategy` instances capture low-level business logic, including but not limited to:
+- how source data is modified prior to training
+- sequencing of table generation jobs
+- how many generation jobs are run and their parameters
+
+There are currently two strategies:
+- `SingleTableStrategy`, in which models are trained on individual tables
+- `AncestralStrategy`, in which models are trained on multi-generational data via joined tables
