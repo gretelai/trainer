@@ -3,11 +3,15 @@ from typing import Any, Dict, List
 import pandas as pd
 from pandas.api.types import is_string_dtype
 
-from gretel_trainer.relational.core import RelationalData
+from gretel_trainer.relational.core import MultiTableException, RelationalData
 
 
 class AncestralStrategy:
     def __init__(self, model_type: str = "Amplify"):
+        if model_type not in ("ACTGAN", "Amplify"):
+            raise MultiTableException(
+                f"Unsupported model type: {model_type}. Supported model types are `ACTGAN` and `Amplify`."
+            )
         self._model_type = model_type
 
     def prepare_training_data(
