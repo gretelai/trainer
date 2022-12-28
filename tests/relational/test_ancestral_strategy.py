@@ -138,16 +138,23 @@ def test_table_generation_readiness(ecom):
     )
 
 
-def test_twenty_generation_jobs_for_actgan(pets):
+def test_generation_jobs_for_actgan(pets):
     strategy = AncestralStrategy(model_type="ACTGAN")
 
-    jobs = strategy.get_generation_jobs("pets", pets, 2.0, {})
+    # Table with no ancestors
+    parent_table_jobs = strategy.get_generation_jobs("humans", pets, 2.0, {})
 
-    assert len(jobs) == 20
-    assert all(job == {"num_records": 1_000_000} for job in jobs)
+    assert len(parent_table_jobs) == 1
+    assert parent_table_jobs[0] == {"num_records": 10}
+
+    # Table with ancestors
+    child_table_jobs = strategy.get_generation_jobs("pets", pets, 2.0, {})
+
+    assert len(child_table_jobs) == 20
+    assert all(job == {"num_records": 1_000_000} for job in child_table_jobs)
 
 
-def test_seed_df_generation_jobs_for_amplify(pets):
+def test_generation_jobs_for_amplify(pets):
     strategy = AncestralStrategy(model_type="Amplify")
 
     # Table with no ancestors

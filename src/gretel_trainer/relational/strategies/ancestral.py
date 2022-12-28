@@ -80,20 +80,20 @@ class AncestralStrategy:
         output_tables: Dict[str, pd.DataFrame],
     ) -> List[Dict[str, Any]]:
         """
-        For ACTGAN, returns a list of 20 jobs, each to generate 1 million records.
+        If the table does not have any parents, returns a single job requesting an output
+        record count based on the initial table data size and the record size ratio.
 
-        For Amplify, if the table does not have any parents, returns a single job
-        requesting an output record count based on the initial table data size and
-        the record size ratio. If the table does have parents, builds a seed dataframe
-        to use in generation.
+        If the table does have parents, jobs depend on model type.
+        For ACTGAN, returns a list of 20 jobs, each to generate 1 million records.
+        For Amplify, builds a seed dataframe to use in generation.
         """
-        if self._model_type == "ACTGAN":
-            return [{"num_records": 1_000_000} for i in range(20)]
-        elif len(rel_data.get_parents(table)) == 0:
+        if len(rel_data.get_parents(table)) == 0:
             requested_synth_count = (
                 len(rel_data.get_table_data(table)) * record_size_ratio
             )
             return [{"num_records": requested_synth_count}]
+        elif self._model_type == "ACTGAN":
+            return [{"num_records": 1_000_000} for i in range(20)]
         else:
             seed_df = rel_data.build_seed_data_for_table(table, output_tables)
             return [{"seed_df": seed_df}]
