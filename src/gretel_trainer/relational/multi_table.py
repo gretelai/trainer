@@ -19,6 +19,7 @@ from sklearn import preprocessing
 from gretel_trainer import Trainer
 from gretel_trainer.models import GretelAmplify, GretelLSTM
 from gretel_trainer.relational.core import MultiTableException, RelationalData
+from gretel_trainer.relational.strategies.ancestral import AncestralStrategy
 from gretel_trainer.relational.strategies.single_table import SingleTableStrategy
 
 GretelModelConfig = Union[str, Path, Dict]
@@ -56,6 +57,7 @@ class MultiTable:
         relational_data (RelationalData): Core data structure representing the source tables and their relationships.
         project_prefix (str, optional): Common prefix for Gretel projects created by this model. Defaults to "multi-table".
         gretel_model (str, optional): The underlying Gretel model to use. Supports "Amplify" (default) and "LSTM".
+        correlation_strategy (str, optional): The strategy to use. Supports "cross-table" (default) and "single-table".
         working_dir (str, optional): Directory in which temporary assets should be cached. Defaults to "working".
         max_threads (int, optional): Max number of Trainer jobs (train, generate) to run at once. Defaults to 5.
     """
@@ -65,15 +67,16 @@ class MultiTable:
         relational_data: RelationalData,
         project_prefix: str = "multi-table",
         gretel_model: str = "Amplify",
+        correlation_strategy: str = "cross-table",
         working_dir: str = "working",
         max_threads: int = 5,
     ):
         configure_session(api_key="prompt", cache="yes", validate=True)
         self.project_prefix = project_prefix
         self._gretel_model = _select_gretel_model(gretel_model)
+        self._strategy = _select_strategy(correlation_strategy)
         self.relational_data = relational_data
         self.working_dir = Path(working_dir)
-        self._strategy = SingleTableStrategy()
         os.makedirs(self.working_dir, exist_ok=True)
         with open(self._debug_summary_path(), "w") as dbg:
             json.dump(self.relational_data.debug_summary(), dbg)
@@ -629,4 +632,16 @@ def _select_gretel_model(model: str) -> Union[GretelAmplify, GretelLSTM]:
     else:
         raise MultiTableException(
             f"Unrecognized gretel model requested: {model}. Supported models are `Amplify` and `LSTM`."
+        )
+
+
+def _select_strategy(strategy: str) -> Union[SingleTableStrategy, AncestralStrategy]:
+    strategy = strategy.lower()
+    if strategy == "cross-table":
+        return AncestralStrategy()
+    elif strategy == "single-table":
+        return SingleTableStrategy()
+    else:
+        raise MultiTableException(
+            f"Unrecognized correlation strategy requested: {strategy}. Supported strategies are `cross-table` and `single-table`."
         )
