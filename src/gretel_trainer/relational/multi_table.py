@@ -192,7 +192,7 @@ class MultiTable:
         """
         training_data = {}
         for table_name in tables:
-            training_path = self.working_dir / f"{table_name}-train.csv"
+            training_path = self.working_dir / f"{table_name}.csv"
             data = self._strategy.prepare_training_data(
                 table_name, self.relational_data
             )

@@ -36,7 +36,7 @@ def test_training_through_trainer(pets, configured_session):
         )
 
         for table in ["humans", "pets"]:
-            training_csv = Path(f"{work_dir}/{table}-train.csv")
+            training_csv = Path(f"{work_dir}/{table}.csv")
             assert os.path.exists(training_csv)
             train.assert_any_call(training_csv)
 
