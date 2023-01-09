@@ -31,8 +31,9 @@ def test_training_through_trainer(pets, configured_session):
 
         multitable.train()
 
-        expected_call = call(f"{work_dir}/_gretel_debug_summary.json")
-        mock_upload_artifact.assert_has_calls([expected_call, expected_call])
+        mock_upload_artifact.assert_called_once_with(
+            f"{work_dir}/_gretel_debug_summary.json"
+        )
 
         for table in ["humans", "pets"]:
             training_csv = Path(f"{work_dir}/{table}-train.csv")
@@ -44,7 +45,10 @@ def test_evaluate(source_nba, synthetic_nba, configured_session):
     rel_data, _, _, _ = source_nba
     _, syn_states, syn_cities, syn_teams = synthetic_nba
 
-    multitable = MultiTable(rel_data)
+    with tempfile.TemporaryDirectory() as work_dir, patch(
+        "gretel_trainer.relational.multi_table.create_or_get_unique_project"
+    ) as create_or_get_unique_project:
+        multitable = MultiTable(rel_data)
 
     with patch(
         "gretel_trainer.relational.multi_table.Trainer.load"

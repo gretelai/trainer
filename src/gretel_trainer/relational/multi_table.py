@@ -55,7 +55,7 @@ class MultiTable:
 
     Args:
         relational_data (RelationalData): Core data structure representing the source tables and their relationships.
-        project_prefix (str, optional): Common prefix for Gretel projects created by this model. Defaults to "multi-table".
+        project_name (str, optional): Name for the Gretel project holding models and artifacts. Defaults to "multi-table".
         gretel_model (str, optional): The underlying Gretel model to use. Supports "Amplify" (default) and "LSTM".
         correlation_strategy (str, optional): The strategy to use. Supports "cross-table" (default) and "single-table".
         working_dir (str, optional): Directory in which temporary assets should be cached. Defaults to "working".
@@ -65,21 +65,21 @@ class MultiTable:
     def __init__(
         self,
         relational_data: RelationalData,
-        project_prefix: str = "multi-table",
+        project_name: str = "multi-table",
         gretel_model: str = "Amplify",
         correlation_strategy: str = "cross-table",
         working_dir: str = "working",
         max_threads: int = 5,
     ):
         configure_session(api_key="prompt", cache="yes", validate=True)
-        self.project_prefix = project_prefix
+        self._project_name = project_name
+        self._project = create_or_get_unique_project(name=self._project_name)
         self._gretel_model = _select_gretel_model(gretel_model)
         self._strategy = _select_strategy(correlation_strategy)
         self.relational_data = relational_data
         self.working_dir = Path(working_dir)
         os.makedirs(self.working_dir, exist_ok=True)
-        with open(self._debug_summary_path(), "w") as dbg:
-            json.dump(self.relational_data.debug_summary(), dbg)
+        self._create_debug_summary()
         self.thread_pool = ThreadPoolExecutor(max_threads)
         self.train_statuses = {}
         self._reset_train_statuses(self.relational_data.list_all_tables())
@@ -108,18 +108,16 @@ class MultiTable:
             "output": self.output_tables.get(table_name),
         }
 
-    def _debug_summary_path(self) -> Path:
-        return self.working_dir / "_gretel_debug_summary.json"
-
-    def _upload_debug_summary(self, project_name: str) -> None:
-        project = create_or_get_unique_project(name=project_name)
-        project.upload_artifact(str(self._debug_summary_path()))
+    def _create_debug_summary(self) -> None:
+        debug_summary_path = self.working_dir / "_gretel_debug_summary.json"
+        with open(debug_summary_path, "w") as dbg:
+            json.dump(self.relational_data.debug_summary(), dbg)
+        self._project.upload_artifact(str(debug_summary_path))
 
     def transform(
         self,
         configs: Dict[str, GretelModelConfig],
         in_place: bool,
-        project_name: Optional[str] = None,
     ) -> Dict[str, pd.DataFrame]:
         """
         Applies supplied transform model configurations to tables. Returned dictionary includes all transformed
@@ -129,17 +127,12 @@ class MultiTable:
             configs (dict[str, GretelModelConfig]): keys are table names and values are Transform model configs.
             in_place (bool): If True, overwrites internal source dataframes with transformed dataframes,
             which means subsequent synthetic model training would be performed on the transform results.
-            project_name (str, optional): Name of project to hold transforms models; if unset, defaults
-            to `{self.project_prefix}-transforms`
 
         Returns:
             dict[str, pd.DataFrame]: keys are table names and values are transformed tables
         """
         output_tables = {}
         transforms_futures = []
-        project_name = project_name or f"{self.project_prefix}-transforms"
-        project = create_or_get_unique_project(name=project_name)
-        self._upload_debug_summary(project_name)
 
         for table_name, config in configs.items():
             table_data = self.relational_data.get_table_data(table_name)
@@ -147,7 +140,7 @@ class MultiTable:
                 self.thread_pool.submit(
                     _transform,
                     table_name,
-                    project,
+                    self._project,
                     table_data,
                     config,
                 )
@@ -216,14 +209,12 @@ class MultiTable:
         train_futures = []
         for table_name, training_csv in training_data.items():
             logger.info(f"Training model for table: {table_name}")
-            project_name = f"{self.project_prefix}-{table_name.replace('_', '-')}"
             trainer = Trainer(
                 model_type=self._gretel_model,
-                project_name=project_name,
+                project_name=self._project_name,
                 cache_file=self._cache_file_for(table_name),
                 overwrite=False,
             )
-            self._upload_debug_summary(project_name)
             self.train_statuses[table_name] = TrainStatus.InProgress
             train_futures.append(
                 self.thread_pool.submit(_train, trainer, training_csv, table_name)
@@ -380,7 +371,7 @@ class MultiTable:
     def _load_trainer_model(self, table_name: str) -> Trainer:
         return Trainer.load(
             cache_file=str(self._cache_file_for(table_name)),
-            project_name=f"{self.project_prefix}-{table_name.replace('_', '-')}",
+            project_name=self._project_name,
         )
 
     def _cache_file_for(self, table_name: str) -> Path:
