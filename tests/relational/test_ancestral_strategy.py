@@ -138,23 +138,7 @@ def test_table_generation_readiness(ecom):
     )
 
 
-def test_generation_jobs_for_actgan(pets):
-    strategy = AncestralStrategy(model_type="ACTGAN")
-
-    # Table with no ancestors
-    parent_table_jobs = strategy.get_generation_jobs("humans", pets, 2.0, {})
-
-    assert len(parent_table_jobs) == 1
-    assert parent_table_jobs[0] == {"num_records": 10}
-
-    # Table with ancestors
-    child_table_jobs = strategy.get_generation_jobs("pets", pets, 2.0, {})
-
-    assert len(child_table_jobs) == 20
-    assert all(job == {"num_records": 1_000_000} for job in child_table_jobs)
-
-
-def test_generation_jobs_for_amplify(pets):
+def test_generation_jobs(pets):
     strategy = AncestralStrategy(model_type="Amplify")
 
     # Table with no ancestors
@@ -211,12 +195,7 @@ def test_generation_jobs_for_amplify(pets):
     pdtest.assert_frame_equal(child_table_jobs[0]["seed_df"], expected_seed_df)
 
 
-@pytest.mark.skip("TODO: nearest neighbor implementation")
-def test_collecting_results_trims_actgan_results(pets):
-    ...
-
-
-def test_collecting_results_returns_lone_amplify_result(pets):
+def test_collecting_results_returns_lone_result(pets):
     strategy = AncestralStrategy()
     pets_data = pets.get_table_data("pets")
 
