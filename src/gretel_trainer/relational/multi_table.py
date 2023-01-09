@@ -17,8 +17,8 @@ from gretel_client.projects import create_or_get_unique_project
 from sklearn import preprocessing
 
 from gretel_trainer import Trainer
-from gretel_trainer.models import GretelACTGAN
-from gretel_trainer.relational.core import RelationalData
+from gretel_trainer.models import GretelAmplify, GretelLSTM
+from gretel_trainer.relational.core import MultiTableException, RelationalData
 from gretel_trainer.relational.strategies.single_table import SingleTableStrategy
 
 GretelModelConfig = Union[str, Path, Dict]
@@ -55,6 +55,7 @@ class MultiTable:
     Args:
         relational_data (RelationalData): Core data structure representing the source tables and their relationships.
         project_prefix (str, optional): Common prefix for Gretel projects created by this model. Defaults to "multi-table".
+        gretel_model (str, optional): The underlying Gretel model to use. Supports "Amplify" (default) and "LSTM".
         working_dir (str, optional): Directory in which temporary assets should be cached. Defaults to "working".
         max_threads (int, optional): Max number of Trainer jobs (train, generate) to run at once. Defaults to 5.
     """
@@ -63,11 +64,13 @@ class MultiTable:
         self,
         relational_data: RelationalData,
         project_prefix: str = "multi-table",
+        gretel_model: str = "Amplify",
         working_dir: str = "working",
         max_threads: int = 5,
     ):
         configure_session(api_key="prompt", cache="yes", validate=True)
         self.project_prefix = project_prefix
+        self._gretel_model = _select_gretel_model(gretel_model)
         self.relational_data = relational_data
         self.working_dir = Path(working_dir)
         self._strategy = SingleTableStrategy()
@@ -212,7 +215,7 @@ class MultiTable:
             logger.info(f"Training model for table: {table_name}")
             project_name = f"{self.project_prefix}-{table_name.replace('_', '-')}"
             trainer = Trainer(
-                model_type=GretelACTGAN(),
+                model_type=self._gretel_model,
                 project_name=project_name,
                 cache_file=self._cache_file_for(table_name),
                 overwrite=False,
@@ -615,3 +618,15 @@ def _get_sqs_via_evaluate(data_source: pd.DataFrame, ref_data: pd.DataFrame) -> 
     report = QualityReport(data_source=data_source, ref_data=ref_data)
     report.run()
     return report.peek()["score"]
+
+
+def _select_gretel_model(model: str) -> Union[GretelAmplify, GretelLSTM]:
+    model = model.lower()
+    if model == "amplify":
+        return GretelAmplify()
+    elif model == "lstm":
+        return GretelLSTM()
+    else:
+        raise MultiTableException(
+            f"Unrecognized gretel model requested: {model}. Supported models are `Amplify` and `LSTM`."
+        )
