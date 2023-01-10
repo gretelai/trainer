@@ -117,4 +117,7 @@ def _percent_unique(col: str, df: pd.DataFrame) -> float:
     total = len(col_no_nan)
     distinct = col_no_nan.nunique()
 
-    return distinct / total
+    if total == 0:
+        return 0.0
+    else:
+        return distinct / total
