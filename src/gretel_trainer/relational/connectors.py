@@ -57,6 +57,7 @@ class Connector:
             if _skip_table(table_name, only, ignore):
                 continue
 
+            logger.debug(f"Extracting source data from `{table_name}`")
             df = pd.read_sql_table(table_name, self.engine)
             primary_key = None
             for column in table.columns:

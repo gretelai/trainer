@@ -135,6 +135,7 @@ class MultiTable:
         transforms_futures = []
 
         for table_name, config in configs.items():
+            logger.info(f"Queueing transforms job for `{table_name}`")
             table_data = self.relational_data.get_table_data(table_name)
             transforms_futures.append(
                 self.thread_pool.submit(
@@ -148,6 +149,7 @@ class MultiTable:
 
         for future in as_completed(transforms_futures):
             table_name, out_table = future.result()
+            logger.info(f"Transforms job for `{table_name}` completed")
             output_tables[table_name] = out_table
 
         output_tables = self._transform_keys(output_tables)
@@ -208,7 +210,7 @@ class MultiTable:
         """
         train_futures = []
         for table_name, training_csv in training_data.items():
-            logger.info(f"Training model for table: {table_name}")
+            logger.info(f"Starting model training for `{table_name}`")
             trainer = Trainer(
                 model_type=self._gretel_model,
                 project_name=self._project_name,
@@ -223,8 +225,10 @@ class MultiTable:
         for future in as_completed(train_futures):
             table_name, successful = future.result()
             if successful:
+                logger.info(f"Training successfully completed for `{table_name}`")
                 self.train_statuses[table_name] = TrainStatus.Completed
             else:
+                logger.info(f"Training failed for `{table_name}`")
                 self.train_statuses[table_name] = TrainStatus.Failed
 
     def train(self) -> None:
@@ -397,11 +401,13 @@ class MultiTable:
                 self.generate_statuses[table] = GenerateStatus.SourcePreserved
                 self.output_tables[table] = self.relational_data.get_table_data(table)
             elif self.train_statuses[table] != TrainStatus.Completed:
-                logger.info(f"No model available for table `{table}`")
+                logger.info(
+                    f"Skipping synthetic data generation for `{table}` because it does not have a trained model"
+                )
                 self.generate_statuses[table] = GenerateStatus.ModelUnavailable
                 for descendant in self.relational_data.get_descendants(table):
                     logger.info(
-                        f"Skipping generation for `{descendant}` because it depends on `{table}`"
+                        f"Skipping synthetic data generation for `{descendant}` because it depends on `{table}`"
                     )
                     self.generate_statuses[descendant] = GenerateStatus.ModelUnavailable
 
@@ -411,7 +417,7 @@ class MultiTable:
         futures: Dict[str, List[Future]],
         record_size_ratio: float,
     ) -> None:
-        logger.info(f"Starting generation jobs for table: {table_name}")
+        logger.info(f"Starting synthetic data generation for `{table_name}`")
         model = self._load_trainer_model(table_name)
         table_jobs = self._strategy.get_generation_jobs(
             table_name,
@@ -445,12 +451,16 @@ class MultiTable:
                     if dataframe is not None:
                         component_dataframes.append(dataframe)
                 if len(component_dataframes) > 0:
+                    logger.info(
+                        f"Synthetic data generation completed for `{table_name}`"
+                    )
                     self.output_tables[
                         table_name
                     ] = self._strategy.collect_generation_results(
                         component_dataframes, table_name, self.relational_data
                     )
                 else:
+                    logger.info(f"Synthetic data generation failed for `{table_name}`")
                     self.generate_statuses[table_name] = GenerateStatus.Failed
 
     def _synthesize_keys(self, preserve_tables: List[str]) -> Dict[str, pd.DataFrame]:
