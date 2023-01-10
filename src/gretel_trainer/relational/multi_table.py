@@ -59,7 +59,7 @@ class MultiTable:
         self,
         relational_data: RelationalData,
         project_name: str = "multi-table",
-        gretel_model: str = "Amplify",
+        gretel_model: str = "amplify",
         correlation_strategy: str = "cross-table",
         working_dir: str = "working",
         max_threads: int = 5,
@@ -67,8 +67,10 @@ class MultiTable:
         configure_session(api_key="prompt", cache="yes", validate=True)
         self._project_name = project_name
         self._project = create_or_get_unique_project(name=self._project_name)
+        gretel_model = gretel_model.lower()
+        strategy = strategy.lower()
         self._gretel_model = _select_gretel_model(gretel_model)
-        self._strategy = _select_strategy(correlation_strategy)
+        self._strategy = _select_strategy(correlation_strategy, gretel_model)
         self.relational_data = relational_data
         self.working_dir = Path(working_dir)
         os.makedirs(self.working_dir, exist_ok=True)
@@ -618,7 +620,6 @@ def _get_sqs_via_evaluate(data_source: pd.DataFrame, ref_data: pd.DataFrame) -> 
 
 
 def _select_gretel_model(model: str) -> Union[GretelAmplify, GretelLSTM]:
-    model = model.lower()
     if model == "amplify":
         return GretelAmplify()
     elif model == "lstm":
@@ -629,10 +630,9 @@ def _select_gretel_model(model: str) -> Union[GretelAmplify, GretelLSTM]:
         )
 
 
-def _select_strategy(strategy: str) -> Union[SingleTableStrategy, AncestralStrategy]:
-    strategy = strategy.lower()
+def _select_strategy(strategy: str, model: str) -> Union[SingleTableStrategy, AncestralStrategy]:
     if strategy == "cross-table":
-        return AncestralStrategy()
+        return AncestralStrategy(model)
     elif strategy == "single-table":
         return SingleTableStrategy()
     else:
