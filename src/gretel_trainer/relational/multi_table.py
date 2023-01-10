@@ -17,7 +17,11 @@ from sklearn import preprocessing
 
 from gretel_trainer import Trainer
 from gretel_trainer.models import GretelAmplify, GretelLSTM
-from gretel_trainer.relational.core import MultiTableException, RelationalData, TableEvaluation
+from gretel_trainer.relational.core import (
+    MultiTableException,
+    RelationalData,
+    TableEvaluation,
+)
 from gretel_trainer.relational.strategies.ancestral import AncestralStrategy
 from gretel_trainer.relational.strategies.single_table import SingleTableStrategy
 
@@ -630,7 +634,9 @@ def _select_gretel_model(model: str) -> Union[GretelAmplify, GretelLSTM]:
         )
 
 
-def _select_strategy(strategy: str, model: str) -> Union[SingleTableStrategy, AncestralStrategy]:
+def _select_strategy(
+    strategy: str, model: str
+) -> Union[SingleTableStrategy, AncestralStrategy]:
     if strategy == "cross-table":
         return AncestralStrategy(model)
     elif strategy == "single-table":
