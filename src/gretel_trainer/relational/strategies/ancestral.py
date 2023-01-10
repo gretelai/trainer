@@ -8,7 +8,7 @@ from gretel_trainer.relational.core import MultiTableException, RelationalData
 
 
 class AncestralStrategy:
-    def __init__(self, model_type: str):
+    def __init__(self, model_type: str = "amplify"):
         if model_type not in ("amplify", "lstm"):
             raise MultiTableException(
                 f"Unsupported model type: {model_type}. Supported model types are `Amplify` and `LSTM`."

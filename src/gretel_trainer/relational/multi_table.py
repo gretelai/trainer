@@ -72,7 +72,7 @@ class MultiTable:
         self._project_name = project_name
         self._project = create_or_get_unique_project(name=self._project_name)
         gretel_model = gretel_model.lower()
-        strategy = strategy.lower()
+        strategy = correlation_strategy.lower()
         self._gretel_model = _select_gretel_model(gretel_model)
         self._strategy = _select_strategy(correlation_strategy, gretel_model)
         self.relational_data = relational_data

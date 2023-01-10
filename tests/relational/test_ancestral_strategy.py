@@ -139,7 +139,7 @@ def test_table_generation_readiness(ecom):
 
 
 def test_generation_jobs(pets):
-    strategy = AncestralStrategy(model_type="Amplify")
+    strategy = AncestralStrategy()
 
     # Table with no ancestors
     parent_table_jobs = strategy.get_generation_jobs("humans", pets, 2.0, {})
