@@ -1,3 +1,6 @@
+from unittest.mock import patch
+
+import pandas as pd
 import pandas.testing as pdtest
 
 from gretel_trainer.relational.strategies.single_table import SingleTableStrategy
@@ -58,3 +61,19 @@ def test_collect_generation_results_returns_the_lone_output_dataframe(pets):
     result = strategy.collect_generation_results([pets_data], "pets", pets)
 
     pdtest.assert_frame_equal(result, pets_data)
+
+
+def test_evalute(ecom):
+    strategy = SingleTableStrategy()
+    synthetic_tables = {"users": pd.DataFrame()}
+
+    with patch(
+        "gretel_trainer.relational.strategies.single_table.get_sqs_via_evaluate"
+    ) as get_sqs:
+        get_sqs.return_value = 80
+        table_evaluation = strategy.evaluate("users", ecom, 90, synthetic_tables)
+
+    # The model is trained on individaul table data, so its SQS score is the individual SQS
+    assert table_evaluation.individual_sqs == 90
+    # The ancestral score comes from the Evaluate API
+    assert table_evaluation.ancestral_sqs == 80

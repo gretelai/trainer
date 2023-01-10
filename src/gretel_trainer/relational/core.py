@@ -9,6 +9,7 @@ from typing import Any, Dict, List, Optional, Tuple
 
 import networkx
 import pandas as pd
+from gretel_client.evaluation.quality_report import QualityReport
 from networkx.algorithms.dag import dag_longest_path_length
 
 
@@ -27,6 +28,12 @@ class ForeignKey:
     column_name: str
     parent_column_name: str
     parent_table_name: str
+
+
+def get_sqs_via_evaluate(data_source: pd.DataFrame, ref_data: pd.DataFrame) -> int:
+    report = QualityReport(data_source=data_source, ref_data=ref_data)
+    report.run()
+    return report.peek()["score"]
 
 
 class RelationalData:

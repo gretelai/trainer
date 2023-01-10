@@ -1,3 +1,5 @@
+from unittest.mock import patch
+
 import pandas as pd
 import pandas.testing as pdtest
 import pytest
@@ -202,3 +204,19 @@ def test_collecting_results_returns_lone_result(pets):
     result = strategy.collect_generation_results([pets_data], "pets", pets)
 
     pdtest.assert_frame_equal(result, pets_data)
+
+
+def test_evalute(ecom):
+    strategy = AncestralStrategy()
+    synthetic_tables = {"users": pd.DataFrame()}
+
+    with patch(
+        "gretel_trainer.relational.strategies.ancestral.get_sqs_via_evaluate"
+    ) as get_sqs:
+        get_sqs.return_value = 80
+        table_evaluation = strategy.evaluate("users", ecom, 90, synthetic_tables)
+
+    # The model is trained on ancestral data, so its SQS score is the ancestral SQS
+    assert table_evaluation.ancestral_sqs == 90
+    # The individual score comes from the Evaluate API
+    assert table_evaluation.individual_sqs == 80

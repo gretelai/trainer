@@ -39,39 +39,3 @@ def test_training_through_trainer(pets, configured_session):
             training_csv = Path(f"{work_dir}/{table}.csv")
             assert os.path.exists(training_csv)
             train.assert_any_call(training_csv)
-
-
-def test_evaluate(source_nba, synthetic_nba, configured_session):
-    rel_data, _, _, _ = source_nba
-    _, syn_states, syn_cities, syn_teams = synthetic_nba
-
-    with tempfile.TemporaryDirectory() as work_dir, patch(
-        "gretel_trainer.relational.multi_table.create_or_get_unique_project"
-    ) as create_or_get_unique_project:
-        multitable = MultiTable(rel_data)
-
-    with patch(
-        "gretel_trainer.relational.multi_table.Trainer.load"
-    ) as load_trainer, patch(
-        "gretel_trainer.relational.multi_table.QualityReport"
-    ) as quality_report:
-        trainer = Mock()
-        trainer.get_sqs_score.return_value = 42
-        load_trainer.return_value = trainer
-
-        report = quality_report.return_value
-        report.run.return_value = None
-        report.peek = lambda: {"score": 84}
-
-        multitable.train_statuses["cities"] = TrainStatus.Completed
-
-        evaluations = multitable.evaluate(
-            {
-                "states": syn_states,
-                "cities": syn_cities,
-                "teams": syn_teams,
-            }
-        )
-
-    assert evaluations["states"] == TableEvaluation(individual_sqs=84, ancestral_sqs=84)
-    assert evaluations["cities"] == TableEvaluation(individual_sqs=42, ancestral_sqs=84)

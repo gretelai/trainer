@@ -10,7 +10,6 @@ from typing import Any, Dict, List, Optional, Tuple, Union
 
 import pandas as pd
 from gretel_client import configure_session
-from gretel_client.evaluation.quality_report import QualityReport
 from gretel_client.helpers import poll
 from gretel_client.projects import create_or_get_unique_project
 from sklearn import preprocessing
@@ -343,33 +342,13 @@ class MultiTable:
     def _evaluate_table(
         self, table_name: str, synthetic_tables: Dict[str, pd.DataFrame]
     ) -> Tuple[str, TableEvaluation]:
-        return table_name, TableEvaluation(
-            individual_sqs=self._get_individual_sqs_score(table_name, synthetic_tables),
-            ancestral_sqs=self._get_ancestral_sqs_score(table_name, synthetic_tables),
+        model = self._load_trainer_model(table_name)
+        model_score = model.get_sqs_score()
+        evaluation = self._strategy.evaluate(
+            table_name, self.relational_data, model_score, synthetic_tables
         )
 
-    def _get_individual_sqs_score(
-        self, table_name: str, synthetic_tables: Dict[str, pd.DataFrame]
-    ) -> int:
-        if self.train_statuses[table_name] == TrainStatus.Completed:
-            model = self._load_trainer_model(table_name)
-            return model.get_sqs_score()
-        else:
-            return _get_sqs_via_evaluate(
-                synthetic_tables[table_name],
-                self.relational_data.get_table_data(table_name),
-            )
-
-    def _get_ancestral_sqs_score(
-        self, table_name: str, synthetic_tables: Dict[str, pd.DataFrame]
-    ) -> int:
-        ancestral_synthetic_data = self.relational_data.get_table_data_with_ancestors(
-            table_name, synthetic_tables
-        )
-        ancestral_reference_data = self.relational_data.get_table_data_with_ancestors(
-            table_name
-        )
-        return _get_sqs_via_evaluate(ancestral_synthetic_data, ancestral_reference_data)
+        return (table_name, evaluation)
 
     def _load_trainer_model(self, table_name: str) -> Trainer:
         return Trainer.load(
@@ -615,12 +594,6 @@ def _generate(
         return model.generate(**job_kwargs)
     except:
         return None
-
-
-def _get_sqs_via_evaluate(data_source: pd.DataFrame, ref_data: pd.DataFrame) -> int:
-    report = QualityReport(data_source=data_source, ref_data=ref_data)
-    report.run()
-    return report.peek()["score"]
 
 
 def _select_gretel_model(model: str) -> Union[GretelAmplify, GretelLSTM]:

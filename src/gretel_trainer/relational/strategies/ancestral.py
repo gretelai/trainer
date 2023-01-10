@@ -4,7 +4,12 @@ from typing import Any, Dict, List, Tuple
 import pandas as pd
 from pandas.api.types import is_string_dtype
 
-from gretel_trainer.relational.core import MultiTableException, RelationalData
+from gretel_trainer.relational.core import (
+    MultiTableException,
+    RelationalData,
+    TableEvaluation,
+    get_sqs_via_evaluate,
+)
 
 
 class AncestralStrategy:
@@ -100,6 +105,23 @@ class AncestralStrategy:
         Concatenates all results, which should just be a list of one element.
         """
         return pd.concat(results)
+
+    def evaluate(
+        self,
+        table: str,
+        rel_data: RelationalData,
+        model_score: int,
+        synthetic_tables: Dict[str, pd.DataFrame],
+    ) -> TableEvaluation:
+        individual_synthetic_data = synthetic_tables[table]
+        individual_reference_data = rel_data.get_table_data(table)
+        individual_score = get_sqs_via_evaluate(
+            individual_synthetic_data, individual_reference_data
+        )
+
+        return TableEvaluation(
+            individual_sqs=individual_score, ancestral_sqs=model_score
+        )
 
 
 def _is_highly_unique_categorical(col: str, df: pd.DataFrame) -> bool:

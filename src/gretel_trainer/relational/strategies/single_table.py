@@ -2,7 +2,11 @@ from typing import Any, Dict, List
 
 import pandas as pd
 
-from gretel_trainer.relational.core import RelationalData
+from gretel_trainer.relational.core import (
+    RelationalData,
+    TableEvaluation,
+    get_sqs_via_evaluate,
+)
 
 
 class SingleTableStrategy:
@@ -71,3 +75,22 @@ class SingleTableStrategy:
         Concatenates all results, which should just be a list of one element.
         """
         return pd.concat(results)
+
+    def evaluate(
+        self,
+        table: str,
+        rel_data: RelationalData,
+        model_score: int,
+        synthetic_tables: Dict[str, pd.DataFrame],
+    ) -> TableEvaluation:
+        ancestral_synthetic_data = rel_data.get_table_data_with_ancestors(
+            table, synthetic_tables
+        )
+        ancestral_reference_data = rel_data.get_table_data_with_ancestors(table)
+        ancestral_score = get_sqs_via_evaluate(
+            ancestral_synthetic_data, ancestral_reference_data
+        )
+
+        return TableEvaluation(
+            individual_sqs=model_score, ancestral_sqs=ancestral_score
+        )
