@@ -1,12 +1,8 @@
 from collections import defaultdict
 from typing import Any, Dict, List, Tuple
 
-import category_encoders as ce
-import faiss
-import numpy as np
 import pandas as pd
 from pandas.api.types import is_string_dtype
-from sklearn.preprocessing import StandardScaler
 
 from gretel_trainer.relational.core import MultiTableException, RelationalData
 
