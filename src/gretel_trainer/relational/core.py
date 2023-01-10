@@ -17,6 +17,12 @@ class MultiTableException(Exception):
 
 
 @dataclass
+class TableEvaluation:
+    individual_sqs: int
+    ancestral_sqs: int
+
+
+@dataclass
 class ForeignKey:
     column_name: str
     parent_column_name: str

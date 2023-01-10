@@ -4,7 +4,6 @@ import os
 import random
 import time
 from concurrent.futures import Future, ThreadPoolExecutor, as_completed, wait
-from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple, Union
@@ -18,7 +17,7 @@ from sklearn import preprocessing
 
 from gretel_trainer import Trainer
 from gretel_trainer.models import GretelAmplify, GretelLSTM
-from gretel_trainer.relational.core import MultiTableException, RelationalData
+from gretel_trainer.relational.core import MultiTableException, RelationalData, TableEvaluation
 from gretel_trainer.relational.strategies.ancestral import AncestralStrategy
 from gretel_trainer.relational.strategies.single_table import SingleTableStrategy
 
@@ -41,12 +40,6 @@ class GenerateStatus(str, Enum):
     ModelUnavailable = "ModelUnavailable"
     SourcePreserved = "SourcePreserved"
     Failed = "Failed"
-
-
-@dataclass
-class TableEvaluation:
-    individual_sqs: int
-    ancestral_sqs: int
 
 
 class MultiTable:
