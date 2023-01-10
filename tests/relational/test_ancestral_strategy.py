@@ -13,12 +13,12 @@ def test_prepare_training_data_returns_multigenerational_data_without_keys_or_hi
     training_pets = strategy.prepare_training_data("pets", pets)
 
     assert set(training_pets.columns) == {
+        "self|id",
         "self|name",
         "self|age",
+        "self|human_id",
+        "self.human_id|id",
         "self.human_id|city",
-        # self|id rejected (primary key)
-        # self|human_id rejected (foreign key)
-        # self.human_id|id rejected (primary key)
         # self.human_id|name rejected (highly unique categorical)
     }
 

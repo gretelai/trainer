@@ -23,14 +23,12 @@ class AncestralStrategy:
         self, table_name: str, rel_data: RelationalData
     ) -> pd.DataFrame:
         """
-        Returns table data with all ancestors added, minus
-        all primary and foreign keys and any highly-unique
-        categorical fields from parents.
+        Returns table data with all ancestor fields added,
+        minus any highly-unique categorical fields from ancestors.
         """
         data = rel_data.get_table_data_with_ancestors(table_name)
         columns_to_drop = []
 
-        columns_to_drop.extend(rel_data.list_multigenerational_keys(table_name))
         for column in data.columns:
             if rel_data.is_ancestral_column(column) and _is_highly_unique_categorical(
                 column, data
