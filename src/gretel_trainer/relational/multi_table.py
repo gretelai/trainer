@@ -216,8 +216,13 @@ class MultiTable:
                 overwrite=False,
             )
             self.train_statuses[table_name] = TrainStatus.InProgress
+            seed_fields = self._strategy.get_seed_fields(
+                table_name, self.relational_data
+            )
             train_futures.append(
-                self.thread_pool.submit(_train, trainer, training_csv, table_name)
+                self.thread_pool.submit(
+                    _train, trainer, training_csv, table_name, seed_fields
+                )
             )
 
         for future in as_completed(train_futures):
@@ -581,8 +586,9 @@ def _train(
     trainer,
     training_csv: Path,
     table_name: str,
+    seed_fields: Optional[List[str]],
 ) -> Tuple[str, bool]:
-    trainer.train(training_csv)
+    trainer.train(training_csv, seed_fields=seed_fields)
     return (table_name, trainer.trained_successfully())
 
 

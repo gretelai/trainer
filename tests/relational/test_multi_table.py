@@ -35,7 +35,17 @@ def test_training_through_trainer(pets, configured_session):
             f"{work_dir}/_gretel_debug_summary.json"
         )
 
-        for table in ["humans", "pets"]:
-            training_csv = Path(f"{work_dir}/{table}.csv")
-            assert os.path.exists(training_csv)
-            train.assert_any_call(training_csv)
+        humans_training_csv = Path(f"{work_dir}/humans.csv")
+        assert os.path.exists(humans_training_csv)
+        train.assert_any_call(humans_training_csv, seed_fields=None)
+
+        pets_training_csv = Path(f"{work_dir}/pets.csv")
+        assert os.path.exists(pets_training_csv)
+        train.assert_any_call(
+            pets_training_csv,
+            seed_fields=[
+                "self.human_id|name",
+                "self.human_id|city",
+                "self.human_id|id",
+            ],
+        )
