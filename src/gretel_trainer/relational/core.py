@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import logging
 import os
 import re
 from dataclasses import dataclass
@@ -11,6 +12,8 @@ import networkx
 import pandas as pd
 from gretel_client.evaluation.quality_report import QualityReport
 from networkx.algorithms.dag import dag_longest_path_length
+
+logger = logging.getLogger(__name__)
 
 
 class MultiTableException(Exception):
@@ -49,8 +52,21 @@ class RelationalData:
 
     def add_foreign_key(self, foreign_key: str, referencing: str) -> None:
         """Format of both str arguments should be `table_name.column_name`"""
+        known_tables = self.list_all_tables()
         fk_table, fk_column = foreign_key.split(".")
         referenced_table, referenced_column = referencing.split(".")
+
+        abort = False
+        if fk_table not in known_tables:
+            logger.warning(f"Unrecognized table name: `{fk_table}`")
+            abort = True
+        if referenced_table not in known_tables:
+            logger.warning(f"Unrecognized table name: `{referenced_table}`")
+            abort = True
+
+        if abort:
+            return None
+
         self.graph.add_edge(fk_table, referenced_table)
         edge = self.graph.edges[fk_table, referenced_table]
         via = edge.get("via", [])

@@ -99,6 +99,25 @@ def test_mutagenesis_relational_data(mutagenesis):
     assert set(restored_bond.columns) == {"type", "atom1_id", "atom2_id"}
 
 
+def test_add_foreign_key_checks_if_tables_exist():
+    rel_data = RelationalData()
+    rel_data.add_table("users", "id", pd.DataFrame())
+    rel_data.add_table("events", "id", pd.DataFrame())
+
+    # attempt to add a foreign key to an unrecognized table
+    rel_data.add_foreign_key("events.user_id", "USR.id")
+    assert len(rel_data.get_foreign_keys("events")) == 0
+    assert set(rel_data.list_all_tables()) == {"users", "events"}
+
+    # again from the opposite side
+    rel_data.add_foreign_key("EVNT.user_id", "users.id")
+    assert set(rel_data.list_all_tables()) == {"users", "events"}
+
+    # add a foreign key correctly
+    rel_data.add_foreign_key("events.user_id", "users.id")
+    assert len(rel_data.get_foreign_keys("events")) == 1
+
+
 def test_ancestral_data_from_different_tablesets(source_nba, synthetic_nba):
     rel_data, _, _, _ = source_nba
     _, custom_states, custom_cities, custom_teams = synthetic_nba
