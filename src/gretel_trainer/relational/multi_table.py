@@ -488,7 +488,9 @@ class MultiTable:
         evaluations = {}
 
         for table_name, synthetic_data in synthetic_tables.items():
-            logger.info(f"Starting evaluation for `{table_name}`.")
+            logger.info(
+                f"Evaluating individual SQS and cross-table SQS for `{table_name}`."
+            )
 
             model_sqs_score = self._get_model_sqs_score(table_name)
             evaluation = self._strategy.evaluate(
