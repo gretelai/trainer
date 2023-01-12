@@ -56,7 +56,7 @@ class MultiTable:
         gretel_model (str, optional): The underlying Gretel model to use. Supports "Amplify" (default) and "LSTM".
         correlation_strategy (str, optional): The strategy to use. Supports "cross-table" (default) and "single-table".
         working_dir (str, optional): Directory in which temporary assets should be cached. Defaults to "working".
-        refresh_interval (int, optional): Frequency in seconds to poll Gretel Cloud for job statuses. Must be at least 60 seconds (default).
+        refresh_interval (int, optional): Frequency in seconds to poll Gretel Cloud for job statuses. Must be at least 60 (1m). Defaults to 180 (3m).
     """
 
     def __init__(
@@ -110,7 +110,7 @@ class MultiTable:
 
     def _set_refresh_interval(self, interval: Optional[int]) -> None:
         if interval is None:
-            self._refresh_interval = 60
+            self._refresh_interval = 180
         else:
             if interval < 60:
                 logger.warning(
