@@ -271,7 +271,27 @@ def test_evalute(ecom):
         get_sqs.return_value = 80
         table_evaluation = strategy.evaluate("users", ecom, 90, synthetic_tables)
 
+    # A model score was provided, so we only need to call Evaluate API once
+    assert get_sqs.call_count == 1
+
     # The model is trained on ancestral data, so its SQS score is the ancestral SQS
     assert table_evaluation.ancestral_sqs == 90
     # The individual score comes from the Evaluate API
     assert table_evaluation.individual_sqs == 80
+
+
+def test_evaluate_without_model_score_calls_evaluate_twice(ecom):
+    strategy = AncestralStrategy()
+    synthetic_tables = {"users": pd.DataFrame()}
+
+    with patch(
+        "gretel_trainer.relational.strategies.ancestral.get_sqs_via_evaluate"
+    ) as get_sqs:
+        get_sqs.return_value = 80
+        table_evaluation = strategy.evaluate("users", ecom, None, synthetic_tables)
+
+    # A model score was not provided, so we need to call Evaluate API twice
+    assert get_sqs.call_count == 2
+
+    assert table_evaluation.individual_sqs == 80
+    assert table_evaluation.ancestral_sqs == 80

@@ -100,17 +100,26 @@ class SingleTableStrategy:
         self,
         table: str,
         rel_data: RelationalData,
-        model_score: int,
+        model_score: Optional[int],
         synthetic_tables: Dict[str, pd.DataFrame],
     ) -> TableEvaluation:
         ancestral_synthetic_data = rel_data.get_table_data_with_ancestors(
             table, synthetic_tables
         )
         ancestral_reference_data = rel_data.get_table_data_with_ancestors(table)
-        ancestral_score = get_sqs_via_evaluate(
+        ancestral_sqs = get_sqs_via_evaluate(
             ancestral_synthetic_data, ancestral_reference_data
         )
 
+        if model_score is not None:
+            individual_sqs = model_score
+        else:
+            individual_synthetic_data = synthetic_tables[table]
+            individual_reference_data = rel_data.get_table_data(table)
+            individual_sqs = get_sqs_via_evaluate(
+                individual_synthetic_data, individual_reference_data
+            )
+
         return TableEvaluation(
-            individual_sqs=model_score, ancestral_sqs=ancestral_score
+            individual_sqs=individual_sqs, ancestral_sqs=ancestral_sqs
         )

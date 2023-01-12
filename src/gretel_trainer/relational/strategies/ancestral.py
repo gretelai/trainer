@@ -144,17 +144,28 @@ class AncestralStrategy:
         self,
         table: str,
         rel_data: RelationalData,
-        model_score: int,
+        model_score: Optional[int],
         synthetic_tables: Dict[str, pd.DataFrame],
     ) -> TableEvaluation:
+        if model_score is not None:
+            ancestral_sqs = model_score
+        else:
+            ancestral_synthetic_data = rel_data.get_table_data_with_ancestors(
+                table, synthetic_tables
+            )
+            ancestral_reference_data = rel_data.get_table_data_with_ancestors(table)
+            ancestral_sqs = get_sqs_via_evaluate(
+                ancestral_synthetic_data, ancestral_reference_data
+            )
+
         individual_synthetic_data = synthetic_tables[table]
         individual_reference_data = rel_data.get_table_data(table)
-        individual_score = get_sqs_via_evaluate(
+        individual_sqs = get_sqs_via_evaluate(
             individual_synthetic_data, individual_reference_data
         )
 
         return TableEvaluation(
-            individual_sqs=individual_score, ancestral_sqs=model_score
+            individual_sqs=individual_sqs, ancestral_sqs=ancestral_sqs
         )
 
 
