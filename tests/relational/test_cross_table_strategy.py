@@ -4,13 +4,13 @@ import pandas as pd
 import pandas.testing as pdtest
 import pytest
 
-from gretel_trainer.relational.strategies.ancestral import AncestralStrategy
+from gretel_trainer.relational.strategies.cross_table import CrossTableStrategy
 
 
 def test_prepare_training_data_returns_multigenerational_data_without_keys_or_highly_unique_categorial_fields(
     pets,
 ):
-    strategy = AncestralStrategy()
+    strategy = CrossTableStrategy()
 
     training_pets = strategy.prepare_training_data("pets", pets)
 
@@ -26,7 +26,7 @@ def test_prepare_training_data_returns_multigenerational_data_without_keys_or_hi
 
 
 def test_retraining_a_set_of_tables_forces_retraining_descendants_as_well(ecom):
-    strategy = AncestralStrategy()
+    strategy = CrossTableStrategy()
     assert set(strategy.tables_to_retrain(["users"], ecom)) == {
         "users",
         "events",
@@ -47,7 +47,7 @@ def test_retraining_a_set_of_tables_forces_retraining_descendants_as_well(ecom):
 
 
 def test_table_generation_readiness(ecom):
-    strategy = AncestralStrategy()
+    strategy = CrossTableStrategy()
 
     # To start, "eldest generation" tables (those with no parents / outbound foreign keys) are ready
     assert set(strategy.ready_to_generate(ecom, [], [])) == {
@@ -141,7 +141,7 @@ def test_table_generation_readiness(ecom):
 
 
 def test_generation_job(pets):
-    strategy = AncestralStrategy()
+    strategy = CrossTableStrategy()
 
     # Table with no ancestors
     parent_table_job = strategy.get_generation_job("humans", pets, 2.0, {})
@@ -196,11 +196,11 @@ def test_generation_job(pets):
 
 
 def test_evalute(ecom):
-    strategy = AncestralStrategy()
+    strategy = CrossTableStrategy()
     synthetic_tables = {"users": pd.DataFrame()}
 
     with patch(
-        "gretel_trainer.relational.strategies.ancestral.get_sqs_via_evaluate"
+        "gretel_trainer.relational.strategies.cross_table.get_sqs_via_evaluate"
     ) as get_sqs:
         get_sqs.return_value = 80
         table_evaluation = strategy.evaluate("users", ecom, 90, synthetic_tables)
@@ -208,18 +208,18 @@ def test_evalute(ecom):
     # A model score was provided, so we only need to call Evaluate API once
     assert get_sqs.call_count == 1
 
-    # The model is trained on ancestral data, so its SQS score is the ancestral SQS
-    assert table_evaluation.ancestral_sqs == 90
+    # The model is trained on cross-table data, so its SQS score is the cross-table SQS
+    assert table_evaluation.cross_table_sqs == 90
     # The individual score comes from the Evaluate API
     assert table_evaluation.individual_sqs == 80
 
 
 def test_evaluate_without_model_score_calls_evaluate_twice(ecom):
-    strategy = AncestralStrategy()
+    strategy = CrossTableStrategy()
     synthetic_tables = {"users": pd.DataFrame()}
 
     with patch(
-        "gretel_trainer.relational.strategies.ancestral.get_sqs_via_evaluate"
+        "gretel_trainer.relational.strategies.cross_table.get_sqs_via_evaluate"
     ) as get_sqs:
         get_sqs.return_value = 80
         table_evaluation = strategy.evaluate("users", ecom, None, synthetic_tables)
@@ -228,4 +228,4 @@ def test_evaluate_without_model_score_calls_evaluate_twice(ecom):
     assert get_sqs.call_count == 2
 
     assert table_evaluation.individual_sqs == 80
-    assert table_evaluation.ancestral_sqs == 80
+    assert table_evaluation.cross_table_sqs == 80

@@ -22,7 +22,7 @@ from gretel_trainer.relational.core import (
     RelationalData,
     TableEvaluation,
 )
-from gretel_trainer.relational.strategies.ancestral import AncestralStrategy
+from gretel_trainer.relational.strategies.cross_table import CrossTableStrategy
 from gretel_trainer.relational.strategies.single_table import SingleTableStrategy
 
 GretelModelConfig = Union[str, Path, Dict]
@@ -497,7 +497,7 @@ class MultiTable:
             evaluations[table_name] = evaluation
 
             logger.info(
-                f"SQS evaluation for `{table_name}` complete. Individual: {evaluation.individual_sqs}. Ancestral: {evaluation.ancestral_sqs}."
+                f"SQS evaluation for `{table_name}` complete. Individual: {evaluation.individual_sqs}. Cross-table: {evaluation.cross_table_sqs}."
             )
 
         return evaluations
@@ -690,9 +690,9 @@ def _select_model_config(model: str) -> str:
 
 def _select_strategy(
     strategy: str, model: str
-) -> Union[SingleTableStrategy, AncestralStrategy]:
+) -> Union[SingleTableStrategy, CrossTableStrategy]:
     if strategy == "cross-table":
-        return AncestralStrategy(model)
+        return CrossTableStrategy(model)
     elif strategy == "single-table":
         return SingleTableStrategy()
     else:

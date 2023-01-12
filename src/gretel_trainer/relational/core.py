@@ -23,7 +23,7 @@ class MultiTableException(Exception):
 @dataclass
 class TableEvaluation:
     individual_sqs: int
-    ancestral_sqs: int
+    cross_table_sqs: int
 
 
 @dataclass

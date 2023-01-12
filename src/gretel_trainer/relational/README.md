@@ -59,4 +59,4 @@ depends on one `Strategy`.
 
 There are currently two strategies:
 - `SingleTableStrategy`, in which models are trained on individual tables
-- `AncestralStrategy`, in which models are trained on multi-generational data via joined tables
+- `CrossTableStrategy`, in which models are trained on multi-generational data via joined tables

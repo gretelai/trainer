@@ -68,8 +68,8 @@ def test_evalute(ecom):
 
     # The model is trained on individual table data, so its SQS score is the individual SQS
     assert table_evaluation.individual_sqs == 90
-    # The ancestral score comes from the Evaluate API
-    assert table_evaluation.ancestral_sqs == 80
+    # The cross-table score comes from the Evaluate API
+    assert table_evaluation.cross_table_sqs == 80
 
 
 def test_evaluate_without_model_score_calls_evaluate_twice(ecom):
@@ -86,4 +86,4 @@ def test_evaluate_without_model_score_calls_evaluate_twice(ecom):
     assert get_sqs.call_count == 2
 
     assert table_evaluation.individual_sqs == 80
-    assert table_evaluation.ancestral_sqs == 80
+    assert table_evaluation.cross_table_sqs == 80

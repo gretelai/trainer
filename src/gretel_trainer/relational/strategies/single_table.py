@@ -80,12 +80,12 @@ class SingleTableStrategy:
         model_score: Optional[int],
         synthetic_tables: Dict[str, pd.DataFrame],
     ) -> TableEvaluation:
-        ancestral_synthetic_data = rel_data.get_table_data_with_ancestors(
+        cross_table_synthetic_data = rel_data.get_table_data_with_ancestors(
             table, synthetic_tables
         )
-        ancestral_reference_data = rel_data.get_table_data_with_ancestors(table)
-        ancestral_sqs = get_sqs_via_evaluate(
-            ancestral_synthetic_data, ancestral_reference_data
+        cross_table_reference_data = rel_data.get_table_data_with_ancestors(table)
+        cross_table_sqs = get_sqs_via_evaluate(
+            cross_table_synthetic_data, cross_table_reference_data
         )
 
         if model_score is not None:
@@ -98,5 +98,5 @@ class SingleTableStrategy:
             )
 
         return TableEvaluation(
-            individual_sqs=individual_sqs, ancestral_sqs=ancestral_sqs
+            individual_sqs=individual_sqs, cross_table_sqs=cross_table_sqs
         )
