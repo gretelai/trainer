@@ -110,36 +110,6 @@ class AncestralStrategy:
             seed_df = rel_data.build_seed_data_for_table(table, output_tables)
             return {"data_source": seed_df}
 
-    def get_generation_jobs(
-        self,
-        table: str,
-        rel_data: RelationalData,
-        record_size_ratio: float,
-        output_tables: Dict[str, pd.DataFrame],
-    ) -> List[Dict[str, Any]]:
-        """
-        If the table does not have any parents, returns a single job requesting an output
-        record count based on the initial table data size and the record size ratio.
-
-        If the table does have parents, builds a seed dataframe to use in generation.
-        """
-        if len(rel_data.get_parents(table)) == 0:
-            requested_synth_count = (
-                len(rel_data.get_table_data(table)) * record_size_ratio
-            )
-            return [{"num_records": requested_synth_count}]
-        else:
-            seed_df = rel_data.build_seed_data_for_table(table, output_tables)
-            return [{"seed_df": seed_df}]
-
-    def collect_generation_results(
-        self, results: List[pd.DataFrame], table_name: str, rel_data: RelationalData
-    ) -> pd.DataFrame:
-        """
-        Concatenates all results, which should just be a list of one element.
-        """
-        return pd.concat(results)
-
     def evaluate(
         self,
         table: str,
