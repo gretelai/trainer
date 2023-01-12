@@ -58,6 +58,21 @@ class SingleTableStrategy:
             if table not in in_progress and table not in finished
         ]
 
+    def get_generation_job(
+        self,
+        table: str,
+        rel_data: RelationalData,
+        record_size_ratio: float,
+        output_tables: Dict[str, pd.DataFrame],
+    ) -> Dict[str, Any]:
+        """
+        Returns kwargs for a record handler job requesting an output record
+        count based on the initial table data size and the record size ratio.
+        """
+        source_data_size = len(rel_data.get_table_data(table))
+        synth_size = int(source_data_size * record_size_ratio)
+        return {"params": {"num_records": synth_size}}
+
     def get_generation_jobs(
         self,
         table: str,

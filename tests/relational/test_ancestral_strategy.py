@@ -140,6 +140,61 @@ def test_table_generation_readiness(ecom):
     )
 
 
+def test_generation_job(pets):
+    strategy = AncestralStrategy()
+
+    # Table with no ancestors
+    parent_table_job = strategy.get_generation_job("humans", pets, 2.0, {})
+    assert parent_table_job == {"params": {"num_records": 10}}
+
+    # Table with ancestors
+    synthetic_humans = pd.DataFrame(
+        data={
+            "self|name": [
+                "Miles Davis",
+                "Wayne Shorter",
+                "Herbie Hancock",
+                "Ron Carter",
+                "Tony Williams",
+            ],
+            "self|city": [
+                "New York",
+                "New York",
+                "New York",
+                "New York",
+                "Los Angeles",
+            ],
+            "self|id": [1, 2, 3, 4, 5],
+        }
+    )
+    child_table_job = strategy.get_generation_job(
+        "pets", pets, 2.0, {"humans": synthetic_humans}
+    )
+
+    expected_seed_df = pd.DataFrame(
+        data={
+            "self.human_id|name": [
+                "Miles Davis",
+                "Wayne Shorter",
+                "Herbie Hancock",
+                "Ron Carter",
+                "Tony Williams",
+            ],
+            "self.human_id|city": [
+                "New York",
+                "New York",
+                "New York",
+                "New York",
+                "Los Angeles",
+            ],
+            "self.human_id|id": [1, 2, 3, 4, 5],
+        }
+    )
+
+    assert set(child_table_job.keys()) == {"data_source"}
+    pdtest.assert_frame_equal(child_table_job["data_source"], expected_seed_df)
+
+
 def test_generation_jobs(pets):
     strategy = AncestralStrategy()
 

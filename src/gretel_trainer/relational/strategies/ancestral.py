@@ -87,6 +87,29 @@ class AncestralStrategy:
 
         return ready
 
+    def get_generation_job(
+        self,
+        table: str,
+        rel_data: RelationalData,
+        record_size_ratio: float,
+        output_tables: Dict[str, pd.DataFrame],
+    ) -> Dict[str, Any]:
+        """
+        Returns kwargs for creating a record handler job via the Gretel SDK.
+
+        If the table does not have any parents, job requests an output
+        record count based on the initial table data size and the record size ratio.
+
+        If the table does have parents, builds a seed dataframe to use in generation.
+        """
+        if len(rel_data.get_parents(table)) == 0:
+            source_data_size = len(rel_data.get_table_data(table))
+            synth_size = int(source_data_size * record_size_ratio)
+            return {"params": {"num_records": synth_size}}
+        else:
+            seed_df = rel_data.build_seed_data_for_table(table, output_tables)
+            return {"data_source": seed_df}
+
     def get_generation_jobs(
         self,
         table: str,

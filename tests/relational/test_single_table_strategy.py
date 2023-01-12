@@ -46,6 +46,13 @@ def test_table_generation_readiness(ecom):
     }
 
 
+def test_generation_job_requests_num_records(pets):
+    strategy = SingleTableStrategy()
+    job = strategy.get_generation_job("pets", pets, 2.0, {})
+
+    assert job == {"params": {"num_records": 10}}
+
+
 def test_yields_one_generation_job_using_num_records_param(pets):
     strategy = SingleTableStrategy()
 
