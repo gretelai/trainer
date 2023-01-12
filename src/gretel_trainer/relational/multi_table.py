@@ -53,7 +53,7 @@ class MultiTable:
     Args:
         relational_data (RelationalData): Core data structure representing the source tables and their relationships.
         project_name (str, optional): Name for the Gretel project holding models and artifacts. Defaults to "multi-table".
-        gretel_model (str, optional): The underlying Gretel model to use. Supports "Amplify" (default) and "LSTM".
+        gretel_model (str, optional): The underlying Gretel model to use. Supports "Amplify" (default), "LSTM", and "ACTGAN".
         correlation_strategy (str, optional): The strategy to use. Supports "cross-table" (default) and "single-table".
         working_dir (str, optional): Directory in which temporary assets should be cached. Defaults to "working".
         refresh_interval (int, optional): Frequency in seconds to poll Gretel Cloud for job statuses. Must be at least 60 (1m). Defaults to 180 (3m).
@@ -68,23 +68,27 @@ class MultiTable:
         working_dir: str = "working",
         refresh_interval: Optional[int] = None,
     ):
+        gretel_model = gretel_model.lower()
+        strategy = correlation_strategy.lower()
+        _ensure_valid_combination(gretel_model, strategy)
+        self._model_config = _select_model_config(gretel_model)
+        self._strategy = _select_strategy(correlation_strategy, gretel_model)
+
         configure_session(api_key="prompt", cache="yes", validate=True)
         self._project_name = project_name
         self._project = create_or_get_unique_project(name=self._project_name)
-        gretel_model = gretel_model.lower()
-        strategy = correlation_strategy.lower()
-        self._model_config = _select_model_config(gretel_model)
-        self._strategy = _select_strategy(correlation_strategy, gretel_model)
+
         self.relational_data = relational_data
-        self._working_dir = Path(working_dir)
-        os.makedirs(self._working_dir, exist_ok=True)
-        self._create_debug_summary()
+        self._set_refresh_interval(refresh_interval)
         self._models = {}
         self.train_statuses = {}
         self._reset_train_statuses(self.relational_data.list_all_tables())
         self._reset_generation_statuses()
         self._reset_output_tables()
-        self._set_refresh_interval(refresh_interval)
+
+        self._working_dir = Path(working_dir)
+        os.makedirs(self._working_dir, exist_ok=True)
+        self._create_debug_summary()
 
     @property
     def state_by_action(self) -> Dict[str, Dict[str, Any]]:
@@ -679,15 +683,25 @@ def _get_data_from_record_handler(record_handler: RecordHandler) -> pd.DataFrame
     return pd.read_csv(record_handler.get_artifact_link("data"), compression="gzip")
 
 
+def _ensure_valid_combination(model: str, strategy: str) -> None:
+    if strategy == "cross-table":
+        if model != "amplify":
+            msg = f"Cross-table strategy does not support {model}; only amplify is supported."
+            logger.warning(msg)
+            raise MultiTableException(msg)
+
+
 def _select_model_config(model: str) -> str:
     if model == "amplify":
         return "synthetics/amplify"
     elif model == "lstm":
         return "synthetics/tabular-lstm"
+    elif model == "actgan":
+        return "synthetics/tabular-actgan"
     else:
-        raise MultiTableException(
-            f"Unrecognized gretel model requested: {model}. Supported models are `Amplify` and `LSTM`."
-        )
+        msg = f"Unrecognized gretel model requested: {model}. Supported models are `amplify`, `lsmt`, and `actgan`."
+        logger.warning(msg)
+        raise MultiTableException(msg)
 
 
 def _select_strategy(
@@ -698,9 +712,9 @@ def _select_strategy(
     elif strategy == "single-table":
         return SingleTableStrategy()
     else:
-        raise MultiTableException(
-            f"Unrecognized correlation strategy requested: {strategy}. Supported strategies are `cross-table` and `single-table`."
-        )
+        msg = f"Unrecognized correlation strategy requested: {strategy}. Supported strategies are `cross-table` and `single-table`."
+        logger.warning(msg)
+        raise MultiTableException(msg)
 
 
 def _cautiously_refresh_status(
