@@ -4,7 +4,7 @@ import pandas as pd
 import pandas.testing as pdtest
 import pytest
 
-from gretel_trainer.relational.core import TblEval
+from gretel_trainer.relational.core import TableEvaluation
 from gretel_trainer.relational.strategies.cross_table import CrossTableStrategy
 
 
@@ -198,7 +198,7 @@ def test_generation_job(pets):
 
 def test_uses_trained_model_to_update_cross_table_scores():
     strategy = CrossTableStrategy()
-    evaluation = TblEval()
+    evaluation = TableEvaluation()
     model = Mock()
 
     with patch(
@@ -233,7 +233,7 @@ def test_updates_single_table_scores_using_evaluate(source_nba, synthetic_nba):
     }
 
     strategy = CrossTableStrategy()
-    evaluation = TblEval()
+    evaluation = TableEvaluation()
 
     mock_report = Mock()
     mock_report.peek = lambda: {"score": 85}

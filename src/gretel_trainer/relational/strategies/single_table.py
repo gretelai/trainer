@@ -4,7 +4,7 @@ import pandas as pd
 from gretel_client.projects.models import Model
 
 import gretel_trainer.relational.strategies.common as common
-from gretel_trainer.relational.core import RelationalData, TblEval
+from gretel_trainer.relational.core import RelationalData, TableEvaluation
 
 
 class SingleTableStrategy:
@@ -71,14 +71,16 @@ class SingleTableStrategy:
         synth_size = int(source_data_size * record_size_ratio)
         return {"params": {"num_records": synth_size}}
 
-    def update_evaluation_from_model(self, evaluation: TblEval, model: Model) -> None:
+    def update_evaluation_from_model(
+        self, evaluation: TableEvaluation, model: Model
+    ) -> None:
         evaluation.individual_sqs = common.get_sqs_score(model)
         evaluation.individual_report_html = common.get_report_html(model)
         evaluation.individual_report_json = common.get_report_json(model)
 
     def update_evaluation_via_evaluate(
         self,
-        evaluation: TblEval,
+        evaluation: TableEvaluation,
         table: str,
         rel_data: RelationalData,
         synthetic_tables: Dict[str, pd.DataFrame],

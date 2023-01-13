@@ -17,7 +17,11 @@ from gretel_client.projects.models import Model, read_model_config
 from gretel_client.projects.records import RecordHandler
 from sklearn import preprocessing
 
-from gretel_trainer.relational.core import MultiTableException, RelationalData, TblEval
+from gretel_trainer.relational.core import (
+    MultiTableException,
+    RelationalData,
+    TableEvaluation,
+)
 from gretel_trainer.relational.strategies.cross_table import CrossTableStrategy
 from gretel_trainer.relational.strategies.single_table import SingleTableStrategy
 
@@ -81,7 +85,7 @@ class MultiTable:
         self._reset_train_statuses(self.relational_data.list_all_tables())
         self._reset_generation_statuses()
         self._reset_output_tables()
-        self.evaluations = defaultdict(lambda: TblEval())
+        self.evaluations = defaultdict(lambda: TableEvaluation())
 
         self._working_dir = Path(working_dir)
         os.makedirs(self._working_dir, exist_ok=True)

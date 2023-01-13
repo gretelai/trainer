@@ -20,7 +20,7 @@ class MultiTableException(Exception):
 
 
 @dataclass
-class TblEval:
+class TableEvaluation:
     cross_table_report_html: Optional[str] = None
     cross_table_report_json: Optional[Dict] = None
     cross_table_sqs: Optional[int] = None

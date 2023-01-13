@@ -5,7 +5,11 @@ from gretel_client.projects.models import Model
 from pandas.api.types import is_string_dtype
 
 import gretel_trainer.relational.strategies.common as common
-from gretel_trainer.relational.core import MultiTableException, RelationalData, TblEval
+from gretel_trainer.relational.core import (
+    MultiTableException,
+    RelationalData,
+    TableEvaluation,
+)
 
 
 class CrossTableStrategy:
@@ -106,14 +110,16 @@ class CrossTableStrategy:
             seed_df = rel_data.build_seed_data_for_table(table, output_tables)
             return {"data_source": seed_df}
 
-    def update_evaluation_from_model(self, evaluation: TblEval, model: Model) -> None:
+    def update_evaluation_from_model(
+        self, evaluation: TableEvaluation, model: Model
+    ) -> None:
         evaluation.cross_table_sqs = common.get_sqs_score(model)
         evaluation.cross_table_report_html = common.get_report_html(model)
         evaluation.cross_table_report_json = common.get_report_json(model)
 
     def update_evaluation_via_evaluate(
         self,
-        evaluation: TblEval,
+        evaluation: TableEvaluation,
         table: str,
         rel_data: RelationalData,
         synthetic_tables: Dict[str, pd.DataFrame],
