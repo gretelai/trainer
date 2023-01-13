@@ -20,7 +20,7 @@ def get_quality_report(
 
 def get_report_json(model: Model) -> Optional[Dict]:
     try:
-        return json.loads(smart_open.open(model.get_artifact_link("report")).read())
+        return json.loads(smart_open.open(model.get_artifact_link("report_json")).read())
     except:
         logger.warning("Failed to fetch model evaluation report JSON.")
         return None
