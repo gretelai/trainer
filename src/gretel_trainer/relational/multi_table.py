@@ -21,6 +21,7 @@ from gretel_trainer.relational.core import (
     MultiTableException,
     RelationalData,
     TableEvaluation,
+    TblEval,
 )
 from gretel_trainer.relational.strategies.cross_table import CrossTableStrategy
 from gretel_trainer.relational.strategies.single_table import SingleTableStrategy
@@ -85,6 +86,7 @@ class MultiTable:
         self._reset_train_statuses(self.relational_data.list_all_tables())
         self._reset_generation_statuses()
         self._reset_output_tables()
+        self.evaluations = defaultdict(lambda: TblEval())
 
         self._working_dir = Path(working_dir)
         os.makedirs(self._working_dir, exist_ok=True)
@@ -338,6 +340,9 @@ class MultiTable:
                 if status == Status.COMPLETED:
                     self._log_success(table_name, "model training")
                     self.train_statuses[table_name] = TrainStatus.Completed
+                    self._strategy.update_evaluation_from_model(
+                        self.evaluations[table_name], model
+                    )
                 elif status in END_STATES:
                     # already checked explicitly for completed; all other end states are effectively failures
                     self._log_failed(table_name, "model training")
