@@ -490,6 +490,21 @@ class MultiTable:
         for table_name, df in self.output_tables.items():
             df.to_csv(f"{self._working_dir}/{prefix}{table_name}.csv", index=False)
 
+    def expand_evaluations(self) -> None:
+        """
+        Adds evaluation metrics for the "opposite" correlation strategy using the Gretel Evaluate API.
+        """
+        for table_name in self.output_tables:
+            logger.info(
+                f"Expanding evaluation metrics for `{table_name}` via Gretel Evaluate API."
+            )
+            self._strategy.update_evaluation_via_evaluate(
+                evaluation=self.evaluations[table_name],
+                table=table_name,
+                rel_data=self.relational_data,
+                synthetic_tables=self.output_tables,
+            )
+
     def evaluate(
         self, synthetic_tables: Optional[Dict[str, pd.DataFrame]] = None
     ) -> Dict[str, TableEvaluation]:
