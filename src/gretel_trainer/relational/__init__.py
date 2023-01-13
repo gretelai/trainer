@@ -20,12 +20,13 @@ log_levels = {
     "gretel_trainer.relational.strategies.common": "INFO",
 }
 
-log_format = "%(levelname)s - %(name)s - %(message)s"
+log_format = "%(levelname)s - %(asctime)s - %(message)s"
+time_format = "%Y-%m-%d %H:%M:%S"
 
 for name, level in log_levels.items():
     logger = logging.getLogger(name)
 
-    formatter = logging.Formatter(log_format)
+    formatter = logging.Formatter(log_format, time_format)
     handler = logging.StreamHandler()
     handler.setFormatter(formatter)
 
