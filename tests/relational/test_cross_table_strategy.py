@@ -200,7 +200,7 @@ def test_evalute(ecom):
     synthetic_tables = {"users": pd.DataFrame()}
 
     with patch(
-        "gretel_trainer.relational.strategies.cross_table.get_sqs_via_evaluate"
+        "gretel_trainer.relational.strategies.cross_table.common.get_sqs_via_evaluate"
     ) as get_sqs:
         get_sqs.return_value = 80
         table_evaluation = strategy.evaluate("users", ecom, 90, synthetic_tables)
@@ -219,7 +219,7 @@ def test_evaluate_without_model_score_calls_evaluate_twice(ecom):
     synthetic_tables = {"users": pd.DataFrame()}
 
     with patch(
-        "gretel_trainer.relational.strategies.cross_table.get_sqs_via_evaluate"
+        "gretel_trainer.relational.strategies.cross_table.common.get_sqs_via_evaluate"
     ) as get_sqs:
         get_sqs.return_value = 80
         table_evaluation = strategy.evaluate("users", ecom, None, synthetic_tables)

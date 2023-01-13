@@ -2,10 +2,10 @@ from typing import Any, Dict, List, Optional
 
 import pandas as pd
 
+import gretel_trainer.relational.strategies.common as common
 from gretel_trainer.relational.core import (
     RelationalData,
     TableEvaluation,
-    get_sqs_via_evaluate,
 )
 
 
@@ -84,7 +84,7 @@ class SingleTableStrategy:
             table, synthetic_tables
         )
         cross_table_reference_data = rel_data.get_table_data_with_ancestors(table)
-        cross_table_sqs = get_sqs_via_evaluate(
+        cross_table_sqs = common.get_sqs_via_evaluate(
             cross_table_synthetic_data, cross_table_reference_data
         )
 
@@ -93,7 +93,7 @@ class SingleTableStrategy:
         else:
             individual_synthetic_data = synthetic_tables[table]
             individual_reference_data = rel_data.get_table_data(table)
-            individual_sqs = get_sqs_via_evaluate(
+            individual_sqs = common.get_sqs_via_evaluate(
                 individual_synthetic_data, individual_reference_data
             )
 
