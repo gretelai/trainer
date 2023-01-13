@@ -1,12 +1,10 @@
 from typing import Any, Dict, List, Optional
 
 import pandas as pd
+from gretel_client.projects.models import Model
 
 import gretel_trainer.relational.strategies.common as common
-from gretel_trainer.relational.core import (
-    RelationalData,
-    TableEvaluation,
-)
+from gretel_trainer.relational.core import RelationalData, TableEvaluation, TblEval
 
 
 class SingleTableStrategy:
@@ -100,3 +98,8 @@ class SingleTableStrategy:
         return TableEvaluation(
             individual_sqs=individual_sqs, cross_table_sqs=cross_table_sqs
         )
+
+    def update_evaluation_from_model(self, evaluation: TblEval, model: Model) -> None:
+        evaluation.individual_sqs = common.get_sqs_score(model)
+        evaluation.individual_report_html = common.get_report_html(model)
+        evaluation.individual_report_json = common.get_report_json(model)

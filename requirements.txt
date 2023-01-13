@@ -7,3 +7,4 @@ scikit-learn
 typing-extensions
 sqlalchemy
 networkx
+smart-open

@@ -26,6 +26,16 @@ class TableEvaluation:
 
 
 @dataclass
+class TblEval:
+    cross_table_report_html: Optional[str] = None
+    cross_table_report_json: Optional[Dict] = None
+    cross_table_sqs: Optional[int] = None
+    individual_report_html: Optional[str] = None
+    individual_report_json: Optional[Dict] = None
+    individual_sqs: Optional[int] = None
+
+
+@dataclass
 class ForeignKey:
     column_name: str
     parent_column_name: str

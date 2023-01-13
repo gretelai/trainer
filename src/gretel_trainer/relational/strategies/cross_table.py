@@ -2,6 +2,7 @@ from collections import defaultdict
 from typing import Any, Dict, List, Optional
 
 import pandas as pd
+from gretel_client.projects.models import Model
 from pandas.api.types import is_string_dtype
 
 import gretel_trainer.relational.strategies.common as common
@@ -9,6 +10,7 @@ from gretel_trainer.relational.core import (
     MultiTableException,
     RelationalData,
     TableEvaluation,
+    TblEval,
 )
 
 
@@ -137,6 +139,11 @@ class CrossTableStrategy:
         return TableEvaluation(
             individual_sqs=individual_sqs, cross_table_sqs=cross_table_sqs
         )
+
+    def update_evaluation_from_model(self, evaluation: TblEval, model: Model) -> None:
+        evaluation.cross_table_sqs = common.get_sqs_score(model)
+        evaluation.cross_table_report_html = common.get_report_html(model)
+        evaluation.cross_table_report_json = common.get_report_json(model)
 
 
 def _is_highly_unique_categorical(col: str, df: pd.DataFrame) -> bool:

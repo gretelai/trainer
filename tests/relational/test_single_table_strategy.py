@@ -1,8 +1,9 @@
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 import pandas as pd
 import pandas.testing as pdtest
 
+from gretel_trainer.relational.core import TblEval
 from gretel_trainer.relational.strategies.single_table import SingleTableStrategy
 
 
@@ -87,3 +88,30 @@ def test_evaluate_without_model_score_calls_evaluate_twice(ecom):
 
     assert table_evaluation.individual_sqs == 80
     assert table_evaluation.cross_table_sqs == 80
+
+
+def test_uses_trained_model_to_update_individual_scores():
+    strategy = SingleTableStrategy()
+    evaluation = TblEval()
+    model = Mock()
+
+    with patch(
+        "gretel_trainer.relational.strategies.single_table.common.get_sqs_score"
+    ) as get_sqs, patch(
+        "gretel_trainer.relational.strategies.single_table.common.get_report_html"
+    ) as get_html, patch(
+        "gretel_trainer.relational.strategies.single_table.common.get_report_json"
+    ) as get_json:
+        get_sqs.return_value = 80
+        get_html.return_value = "html"
+        get_json.return_value = {"report": "json"}
+
+        strategy.update_evaluation_from_model(evaluation, model)
+
+    assert evaluation.individual_sqs == 80
+    assert evaluation.individual_report_html == "html"
+    assert evaluation.individual_report_json == {"report": "json"}
+
+    assert evaluation.cross_table_sqs is None
+    assert evaluation.cross_table_report_html is None
+    assert evaluation.cross_table_report_json is None
