@@ -246,12 +246,21 @@ class RelationalData:
         tables = {}
         for table in all_tables:
             this_table_foreign_key_count = 0
+            foreign_keys = []
             for key in self.get_foreign_keys(table):
                 total_foreign_key_count = total_foreign_key_count + 1
                 this_table_foreign_key_count = this_table_foreign_key_count + 1
+                foreign_keys.append(
+                    {
+                        "column_name": key.column_name,
+                        "parent_column_name": key.parent_column_name,
+                        "parent_table_name": key.parent_table_name,
+                    }
+                )
             tables[table] = {
-                "foreign_key_count": this_table_foreign_key_count,
                 "primary_key": self.get_primary_key(table),
+                "foreign_key_count": this_table_foreign_key_count,
+                "foreign_keys": foreign_keys,
             }
         return {
             "foreign_key_count": total_foreign_key_count,

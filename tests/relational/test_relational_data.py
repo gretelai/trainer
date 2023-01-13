@@ -226,12 +226,70 @@ def test_debug_summary(ecom, mutagenesis):
         "max_depth": 3,
         "table_count": 6,
         "tables": {
-            "users": {"foreign_key_count": 0, "primary_key": "id"},
-            "events": {"foreign_key_count": 1, "primary_key": "id"},
-            "distribution_center": {"foreign_key_count": 0, "primary_key": "id"},
-            "products": {"foreign_key_count": 1, "primary_key": "id"},
-            "inventory_items": {"foreign_key_count": 2, "primary_key": "id"},
-            "order_items": {"foreign_key_count": 2, "primary_key": "id"},
+            "users": {
+                "primary_key": "id",
+                "foreign_key_count": 0,
+                "foreign_keys": [],
+            },
+            "events": {
+                "primary_key": "id",
+                "foreign_key_count": 1,
+                "foreign_keys": [
+                    {
+                        "column_name": "user_id",
+                        "parent_column_name": "id",
+                        "parent_table_name": "users",
+                    }
+                ],
+            },
+            "distribution_center": {
+                "primary_key": "id",
+                "foreign_key_count": 0,
+                "foreign_keys": [],
+            },
+            "products": {
+                "primary_key": "id",
+                "foreign_key_count": 1,
+                "foreign_keys": [
+                    {
+                        "column_name": "distribution_center_id",
+                        "parent_column_name": "id",
+                        "parent_table_name": "distribution_center",
+                    }
+                ],
+            },
+            "inventory_items": {
+                "primary_key": "id",
+                "foreign_key_count": 2,
+                "foreign_keys": [
+                    {
+                        "column_name": "product_id",
+                        "parent_column_name": "id",
+                        "parent_table_name": "products",
+                    },
+                    {
+                        "column_name": "product_distribution_center_id",
+                        "parent_column_name": "id",
+                        "parent_table_name": "distribution_center",
+                    },
+                ],
+            },
+            "order_items": {
+                "primary_key": "id",
+                "foreign_key_count": 2,
+                "foreign_keys": [
+                    {
+                        "column_name": "user_id",
+                        "parent_column_name": "id",
+                        "parent_table_name": "users",
+                    },
+                    {
+                        "column_name": "inventory_item_id",
+                        "parent_column_name": "id",
+                        "parent_table_name": "inventory_items",
+                    },
+                ],
+            },
         },
     }
 
@@ -240,9 +298,38 @@ def test_debug_summary(ecom, mutagenesis):
         "max_depth": 2,
         "table_count": 3,
         "tables": {
-            "bond": {"foreign_key_count": 2, "primary_key": None},
-            "atom": {"foreign_key_count": 1, "primary_key": "atom_id"},
-            "molecule": {"foreign_key_count": 0, "primary_key": "molecule_id"},
+            "bond": {
+                "primary_key": None,
+                "foreign_key_count": 2,
+                "foreign_keys": [
+                    {
+                        "column_name": "atom1_id",
+                        "parent_column_name": "atom_id",
+                        "parent_table_name": "atom",
+                    },
+                    {
+                        "column_name": "atom2_id",
+                        "parent_column_name": "atom_id",
+                        "parent_table_name": "atom",
+                    },
+                ],
+            },
+            "atom": {
+                "primary_key": "atom_id",
+                "foreign_key_count": 1,
+                "foreign_keys": [
+                    {
+                        "column_name": "molecule_id",
+                        "parent_column_name": "molecule_id",
+                        "parent_table_name": "molecule",
+                    }
+                ],
+            },
+            "molecule": {
+                "primary_key": "molecule_id",
+                "foreign_key_count": 0,
+                "foreign_keys": [],
+            },
         },
     }
 
