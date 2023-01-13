@@ -742,6 +742,7 @@ def _cautiously_refresh_status(
 ) -> Status:
     try:
         job.refresh()
+        refresh_attempts[key] = 0
     except:
         refresh_attempts[key] = refresh_attempts[key] + 1
 
