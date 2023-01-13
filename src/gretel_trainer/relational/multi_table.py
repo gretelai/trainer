@@ -190,7 +190,7 @@ class MultiTable:
             )
 
         while _more_to_do():
-            time.sleep(self._refresh_interval)
+            self._wait_refresh_interval()
 
             for table_name in named_configs:
                 # No need to re-check tables that are totally finished
@@ -296,7 +296,7 @@ class MultiTable:
         config_dict["name"] = table_name
         return config_dict
 
-    def _train_all(self, training_data: Dict[str, Path]) -> None:
+    def _train_models(self, training_data: Dict[str, Path]) -> None:
         for table_name, training_csv in training_data.items():
             self._log_start(table_name, "model training")
             self.train_statuses[table_name] = TrainStatus.InProgress
@@ -318,9 +318,9 @@ class MultiTable:
             )
 
         while _more_to_do():
-            time.sleep(self._refresh_interval)
+            self._wait_refresh_interval()
 
-            for table_name, model in self._models.items():
+            for table_name in training_data:
                 # No need to do anything with tables in terminal state
                 if self.train_statuses[table_name] in (
                     TrainStatus.Completed,
@@ -334,11 +334,16 @@ class MultiTable:
                     self.train_statuses[table_name] = TrainStatus.Failed
                     continue
 
+                model = self._models[table_name]
+
                 status = _cautiously_refresh_status(model, table_name, refresh_attempts)
 
                 if status == Status.COMPLETED:
                     self._log_success(table_name, "model training")
                     self.train_statuses[table_name] = TrainStatus.Completed
+                    logger.info(
+                        f"Fetching evaluation data for `{table_name}` from trained model."
+                    )
                     self._strategy.update_evaluation_from_model(
                         self.evaluations[table_name], model
                     )
@@ -356,7 +361,7 @@ class MultiTable:
         self._reset_train_statuses(tables)
 
         training_data = self._prepare_training_data(tables)
-        self._train_all(training_data)
+        self._train_models(training_data)
 
     def retrain_tables(self, tables: Dict[str, pd.DataFrame]) -> None:
         """
@@ -373,7 +378,7 @@ class MultiTable:
 
         self._reset_train_statuses(tables_to_retrain)
         training_data = self._prepare_training_data(tables_to_retrain)
-        self._train_all(training_data)
+        self._train_models(training_data)
 
     def _reset_train_statuses(self, tables: List[str]) -> None:
         for table in tables:
@@ -418,7 +423,7 @@ class MultiTable:
         while _more_to_do():
             # Don't wait needlessly the first time through.
             if len(record_handlers) > 0:
-                time.sleep(self._refresh_interval)
+                self._wait_refresh_interval()
 
             for table_name, record_handler in record_handlers.items():
                 # No need to do anything with tables in terminal state
@@ -606,15 +611,15 @@ class MultiTable:
             GenerateStatus.Failed,
         ]
 
+    def _wait_refresh_interval(self) -> None:
+        logger.info(f"Next status check in {self._refresh_interval} seconds.")
+        time.sleep(self._refresh_interval)
+
     def _log_start(self, table_name: str, action: str) -> None:
-        logger.info(
-            f"Starting {action} for `{table_name}`. Next status check in {self._refresh_interval} seconds."
-        )
+        logger.info(f"Starting {action} for `{table_name}`.")
 
     def _log_in_progress(self, table_name: str, action: str) -> None:
-        logger.info(
-            f"{action.capitalize()} job for `{table_name}` still in progress. Next status check in {self._refresh_interval} seconds."
-        )
+        logger.info(f"{action.capitalize()} job for `{table_name}` still in progress.")
 
     def _log_failed(self, table_name: str, action: str) -> None:
         logger.info(f"{action.capitalize()} failed for `{table_name}`.")
