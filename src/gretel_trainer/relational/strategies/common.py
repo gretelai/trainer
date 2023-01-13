@@ -16,6 +16,14 @@ def get_sqs_via_evaluate(data_source: pd.DataFrame, ref_data: pd.DataFrame) -> i
     return report.peek()["score"]
 
 
+def get_quality_report(
+    source_data: pd.DataFrame, synth_data: pd.DataFrame
+) -> QualityReport:
+    report = QualityReport(data_source=synth_data, ref_data=source_data)
+    report.run()
+    return report
+
+
 def get_report_json(model: Model) -> Optional[Dict]:
     try:
         return json.loads(smart_open.open(model.get_artifact_link("report")).read())

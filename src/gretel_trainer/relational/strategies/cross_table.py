@@ -145,6 +145,24 @@ class CrossTableStrategy:
         evaluation.cross_table_report_html = common.get_report_html(model)
         evaluation.cross_table_report_json = common.get_report_json(model)
 
+    def update_evaluation_via_evaluate(
+        self,
+        evaluation: TblEval,
+        table: str,
+        rel_data: RelationalData,
+        synthetic_tables: Dict[str, pd.DataFrame],
+    ) -> None:
+        source_data = rel_data.get_table_data(table)
+        synth_data = synthetic_tables[table]
+
+        report = common.get_quality_report(
+            source_data=source_data, synth_data=synth_data
+        )
+
+        evaluation.individual_sqs = report.peek().get("score")
+        evaluation.individual_report_html = report.as_html
+        evaluation.individual_report_json = report.as_dict
+
 
 def _is_highly_unique_categorical(col: str, df: pd.DataFrame) -> bool:
     return is_string_dtype(df[col]) and _percent_unique(col, df) >= 0.7

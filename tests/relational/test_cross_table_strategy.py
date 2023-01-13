@@ -257,3 +257,41 @@ def test_uses_trained_model_to_update_cross_table_scores():
     assert evaluation.individual_sqs is None
     assert evaluation.individual_report_html is None
     assert evaluation.individual_report_json is None
+
+
+def test_updates_single_table_scores_using_evaluate(source_nba, synthetic_nba):
+    rel_data, _, source_cities, _ = source_nba
+    _, synth_states, synth_cities, synth_teams = synthetic_nba
+    synthetic_tables = {
+        "teams": synth_teams,
+        "cities": synth_cities,
+        "states": synth_states,
+    }
+
+    strategy = CrossTableStrategy()
+    evaluation = TblEval()
+
+    mock_report = Mock()
+    mock_report.peek = lambda: {"score": 85}
+    mock_report.as_html = "HTML"
+    mock_report.as_dict = {"REPORT": "JSON"}
+
+    with patch(
+        "gretel_trainer.relational.strategies.cross_table.common.get_quality_report"
+    ) as get_report:
+        get_report.return_value = mock_report
+        strategy.update_evaluation_via_evaluate(
+            evaluation, "cities", rel_data, synthetic_tables
+        )
+
+    get_report.assert_called_once_with(
+        source_data=source_cities, synth_data=synth_cities
+    )
+
+    assert evaluation.individual_sqs == 85
+    assert evaluation.individual_report_html == "HTML"
+    assert evaluation.individual_report_json == {"REPORT": "JSON"}
+
+    assert evaluation.cross_table_sqs is None
+    assert evaluation.cross_table_report_html is None
+    assert evaluation.cross_table_report_json is None

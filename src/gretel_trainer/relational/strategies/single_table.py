@@ -103,3 +103,21 @@ class SingleTableStrategy:
         evaluation.individual_sqs = common.get_sqs_score(model)
         evaluation.individual_report_html = common.get_report_html(model)
         evaluation.individual_report_json = common.get_report_json(model)
+
+    def update_evaluation_via_evaluate(
+        self,
+        evaluation: TblEval,
+        table: str,
+        rel_data: RelationalData,
+        synthetic_tables: Dict[str, pd.DataFrame],
+    ) -> None:
+        source_data = rel_data.get_table_data_with_ancestors(table)
+        synth_data = rel_data.get_table_data_with_ancestors(table, synthetic_tables)
+
+        report = common.get_quality_report(
+            source_data=source_data, synth_data=synth_data
+        )
+
+        evaluation.cross_table_sqs = report.peek().get("score")
+        evaluation.cross_table_report_html = report.as_html
+        evaluation.cross_table_report_json = report.as_dict
