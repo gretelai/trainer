@@ -4,7 +4,7 @@ import pandas as pd
 from gretel_client.projects.models import Model
 
 import gretel_trainer.relational.strategies.common as common
-from gretel_trainer.relational.core import RelationalData, TableEvaluation, TblEval
+from gretel_trainer.relational.core import RelationalData, TblEval
 
 
 class SingleTableStrategy:
@@ -70,34 +70,6 @@ class SingleTableStrategy:
         source_data_size = len(rel_data.get_table_data(table))
         synth_size = int(source_data_size * record_size_ratio)
         return {"params": {"num_records": synth_size}}
-
-    def evaluate(
-        self,
-        table: str,
-        rel_data: RelationalData,
-        model_score: Optional[int],
-        synthetic_tables: Dict[str, pd.DataFrame],
-    ) -> TableEvaluation:
-        cross_table_synthetic_data = rel_data.get_table_data_with_ancestors(
-            table, synthetic_tables
-        )
-        cross_table_reference_data = rel_data.get_table_data_with_ancestors(table)
-        cross_table_sqs = common.get_sqs_via_evaluate(
-            cross_table_synthetic_data, cross_table_reference_data
-        )
-
-        if model_score is not None:
-            individual_sqs = model_score
-        else:
-            individual_synthetic_data = synthetic_tables[table]
-            individual_reference_data = rel_data.get_table_data(table)
-            individual_sqs = common.get_sqs_via_evaluate(
-                individual_synthetic_data, individual_reference_data
-            )
-
-        return TableEvaluation(
-            individual_sqs=individual_sqs, cross_table_sqs=cross_table_sqs
-        )
 
     def update_evaluation_from_model(self, evaluation: TblEval, model: Model) -> None:
         evaluation.individual_sqs = common.get_sqs_score(model)

@@ -196,42 +196,6 @@ def test_generation_job(pets):
     pdtest.assert_frame_equal(child_table_job["data_source"], expected_seed_df)
 
 
-def test_evalute(ecom):
-    strategy = CrossTableStrategy()
-    synthetic_tables = {"users": pd.DataFrame()}
-
-    with patch(
-        "gretel_trainer.relational.strategies.cross_table.common.get_sqs_via_evaluate"
-    ) as get_sqs:
-        get_sqs.return_value = 80
-        table_evaluation = strategy.evaluate("users", ecom, 90, synthetic_tables)
-
-    # A model score was provided, so we only need to call Evaluate API once
-    assert get_sqs.call_count == 1
-
-    # The model is trained on cross-table data, so its SQS score is the cross-table SQS
-    assert table_evaluation.cross_table_sqs == 90
-    # The individual score comes from the Evaluate API
-    assert table_evaluation.individual_sqs == 80
-
-
-def test_evaluate_without_model_score_calls_evaluate_twice(ecom):
-    strategy = CrossTableStrategy()
-    synthetic_tables = {"users": pd.DataFrame()}
-
-    with patch(
-        "gretel_trainer.relational.strategies.cross_table.common.get_sqs_via_evaluate"
-    ) as get_sqs:
-        get_sqs.return_value = 80
-        table_evaluation = strategy.evaluate("users", ecom, None, synthetic_tables)
-
-    # A model score was not provided, so we need to call Evaluate API twice
-    assert get_sqs.call_count == 2
-
-    assert table_evaluation.individual_sqs == 80
-    assert table_evaluation.cross_table_sqs == 80
-
-
 def test_uses_trained_model_to_update_cross_table_scores():
     strategy = CrossTableStrategy()
     evaluation = TblEval()

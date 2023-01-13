@@ -10,12 +10,6 @@ from gretel_client.projects.models import Model
 logger = logging.getLogger(__name__)
 
 
-def get_sqs_via_evaluate(data_source: pd.DataFrame, ref_data: pd.DataFrame) -> int:
-    report = QualityReport(data_source=data_source, ref_data=ref_data)
-    report.run()
-    return report.peek()["score"]
-
-
 def get_quality_report(
     source_data: pd.DataFrame, synth_data: pd.DataFrame
 ) -> QualityReport:

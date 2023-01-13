@@ -17,12 +17,7 @@ from gretel_client.projects.models import Model, read_model_config
 from gretel_client.projects.records import RecordHandler
 from sklearn import preprocessing
 
-from gretel_trainer.relational.core import (
-    MultiTableException,
-    RelationalData,
-    TableEvaluation,
-    TblEval,
-)
+from gretel_trainer.relational.core import MultiTableException, RelationalData, TblEval
 from gretel_trainer.relational.strategies.cross_table import CrossTableStrategy
 from gretel_trainer.relational.strategies.single_table import SingleTableStrategy
 
@@ -504,45 +499,6 @@ class MultiTable:
                 rel_data=self.relational_data,
                 synthetic_tables=self.output_tables,
             )
-
-    def evaluate(
-        self, synthetic_tables: Optional[Dict[str, pd.DataFrame]] = None
-    ) -> Dict[str, TableEvaluation]:
-        synthetic_tables = synthetic_tables or self.output_tables
-        evaluations = {}
-
-        for table_name, synthetic_data in synthetic_tables.items():
-            logger.info(
-                f"Evaluating individual SQS and cross-table SQS for `{table_name}`."
-            )
-
-            model_sqs_score = self._get_model_sqs_score(table_name)
-            evaluation = self._strategy.evaluate(
-                table_name, self.relational_data, model_sqs_score, synthetic_tables
-            )
-            evaluations[table_name] = evaluation
-
-            logger.info(
-                f"SQS evaluation for `{table_name}` complete. Individual: {evaluation.individual_sqs}. Cross-table: {evaluation.cross_table_sqs}."
-            )
-
-        return evaluations
-
-    def _get_model_sqs_score(self, table_name: str) -> Optional[int]:
-        model = self._models.get(table_name)
-        if model is None:
-            return None
-
-        summary = model.get_report_summary()
-        if summary is None or summary.get("summary") is None:
-            return None
-
-        sqs_score = None
-        for stat in summary["summary"]:
-            if stat["field"] == "synthetic_data_quality_score":
-                sqs_score = stat["value"]
-
-        return sqs_score
 
     def _reset_generation_statuses(self) -> None:
         """
