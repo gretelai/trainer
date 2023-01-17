@@ -16,21 +16,21 @@ def test_model_strategy_combinations(ecom):
         MultiTable(
             ecom,
             working_dir=tmpdir,
-            correlation_strategy="cross-table",
+            strategy="cross-table",
             gretel_model="amplify",
         )
         with pytest.raises(MultiTableException):
             MultiTable(
                 ecom,
                 working_dir=tmpdir,
-                correlation_strategy="cross-table",
+                strategy="cross-table",
                 gretel_model="actgan",
             )
         with pytest.raises(MultiTableException):
             MultiTable(
                 ecom,
                 working_dir=tmpdir,
-                correlation_strategy="cross-table",
+                strategy="cross-table",
                 gretel_model="lstm",
             )
 
@@ -38,19 +38,19 @@ def test_model_strategy_combinations(ecom):
         MultiTable(
             ecom,
             working_dir=tmpdir,
-            correlation_strategy="single-table",
+            strategy="single-table",
             gretel_model="amplify",
         )
         MultiTable(
             ecom,
             working_dir=tmpdir,
-            correlation_strategy="single-table",
+            strategy="single-table",
             gretel_model="actgan",
         )
         MultiTable(
             ecom,
             working_dir=tmpdir,
-            correlation_strategy="single-table",
+            strategy="single-table",
             gretel_model="lstm",
         )
 
