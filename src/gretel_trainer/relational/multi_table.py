@@ -15,7 +15,6 @@ from gretel_client.projects import create_or_get_unique_project
 from gretel_client.projects.jobs import END_STATES, Job, Status
 from gretel_client.projects.models import Model, read_model_config
 from gretel_client.projects.records import RecordHandler
-from sklearn import preprocessing
 
 from gretel_trainer.relational.core import (
     MultiTableException,
@@ -149,7 +148,9 @@ class MultiTable:
             dict[str, pd.DataFrame]: keys are table names and values are transformed tables
         """
         output_tables = self._execute_transform_jobs(configs)
-        output_tables = self._transform_keys(output_tables)
+        output_tables = self._strategy.label_encode_keys(
+            self.relational_data, output_tables
+        )
 
         if in_place:
             for table_name, transformed_table in output_tables:
@@ -247,32 +248,6 @@ class MultiTable:
                     self._log_in_progress(table_name, "transforms model training")
 
         return output_tables
-
-    def _transform_keys(
-        self, tables: Dict[str, pd.DataFrame]
-    ) -> Dict[str, pd.DataFrame]:
-        """
-        Crawls tables for all key columns (primary and foreign) and runs each through a LabelEncoder.
-        """
-        all_keys = set()
-        for table_name in tables:
-            primary_key = self.relational_data.get_primary_key(table_name)
-            if primary_key is not None:
-                all_keys.add((table_name, primary_key))
-            for foreign_key in self.relational_data.get_foreign_keys(table_name):
-                all_keys.add(
-                    (foreign_key.parent_table_name, foreign_key.parent_column_name)
-                )
-
-        for key in all_keys:
-            table, column = key
-            column_data = self.relational_data.get_table_data(table)[column]
-            values = list(set(column_data))
-            le = preprocessing.LabelEncoder()
-            le.fit(values)
-            tables[table][column] = le.transform(column_data)
-
-        return tables
 
     def _prepare_training_data(self, tables: List[str]) -> Dict[str, Path]:
         """

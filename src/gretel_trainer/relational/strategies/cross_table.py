@@ -20,6 +20,11 @@ class CrossTableStrategy:
             )
         self._model_type = model_type
 
+    def label_encode_keys(
+        self, rel_data: RelationalData, tables: Dict[str, pd.DataFrame]
+    ) -> Dict[str, pd.DataFrame]:
+        return common.label_encode_keys(rel_data, tables)
+
     def prepare_training_data(
         self, table_name: str, rel_data: RelationalData
     ) -> pd.DataFrame:
