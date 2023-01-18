@@ -105,7 +105,10 @@ class CrossTableStrategy:
             return {"data_source": seed_df}
 
     def post_process_synthetic_results(
-        self, output_tables: Dict[str, pd.DataFrame], preserved: List[str], rel_data: RelationalData
+        self,
+        output_tables: Dict[str, pd.DataFrame],
+        preserved: List[str],
+        rel_data: RelationalData,
     ) -> Dict[str, pd.DataFrame]:
         """
         WIP (PK/FK synthesis)

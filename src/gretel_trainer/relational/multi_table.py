@@ -456,7 +456,9 @@ class MultiTable:
                 record_handler.submit_cloud()
                 record_handlers[table_name] = record_handler
 
-        output_tables = self._strategy.post_process_synthetic_results(output_tables, preserve_tables, self.relational_data)
+        output_tables = self._strategy.post_process_synthetic_results(
+            output_tables, preserve_tables, self.relational_data
+        )
         self.synthetic_output_tables = output_tables
         return self.synthetic_output_tables
 
@@ -491,7 +493,9 @@ class MultiTable:
             for table_name in self.relational_data.list_all_tables()
         }
 
-    def _skip_some_tables(self, preserve_tables: List[str], output_tables: Dict[str, pd.DataFrame]) -> None:
+    def _skip_some_tables(
+        self, preserve_tables: List[str], output_tables: Dict[str, pd.DataFrame]
+    ) -> None:
         "Updates state for tables being preserved and tables lacking trained models."
         for table in self.relational_data.list_all_tables():
             if table in preserve_tables:

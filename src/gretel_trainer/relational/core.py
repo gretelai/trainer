@@ -124,9 +124,7 @@ class RelationalData:
             ref_col = fk.parent_column_name
 
             ancestral_foreign_key = f"self{end_prefix}{fk_col}"
-            ancestral_referenced_col = (
-                f"self{gen_delim}{fk_col}{end_prefix}{ref_col}"
-            )
+            ancestral_referenced_col = f"self{gen_delim}{fk_col}{end_prefix}{ref_col}"
 
             return (ancestral_foreign_key, ancestral_referenced_col)
 
@@ -196,7 +194,9 @@ class RelationalData:
         from the remaining columns, restoring them to their original source names.
         """
         end_prefix = self._end_lineage_prefix
-        root_columns = [col for col in df.columns if col.startswith(f"self{end_prefix}")]
+        root_columns = [
+            col for col in df.columns if col.startswith(f"self{end_prefix}")
+        ]
         mapper = {col: col.removeprefix(f"self{end_prefix}") for col in root_columns}
         return df[root_columns].rename(columns=mapper)
 

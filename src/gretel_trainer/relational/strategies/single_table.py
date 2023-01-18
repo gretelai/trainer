@@ -73,7 +73,10 @@ class SingleTableStrategy:
         return {"params": {"num_records": synth_size}}
 
     def post_process_synthetic_results(
-        self, synth_tables: Dict[str, pd.DataFrame], preserved: List[str], rel_data: RelationalData
+        self,
+        synth_tables: Dict[str, pd.DataFrame],
+        preserved: List[str],
+        rel_data: RelationalData,
     ) -> Dict[str, pd.DataFrame]:
         "Synthesizes primary and foreign keys"
         synth_tables = _synthesize_primary_keys(synth_tables, preserved, rel_data)
@@ -107,7 +110,9 @@ class SingleTableStrategy:
 
 
 def _synthesize_primary_keys(
-    synth_tables: Dict[str, pd.DataFrame], preserved: List[str], rel_data: RelationalData
+    synth_tables: Dict[str, pd.DataFrame],
+    preserved: List[str],
+    rel_data: RelationalData,
 ) -> Dict[str, pd.DataFrame]:
     """
     Alters primary key columns on all tables *except* preserved.
