@@ -39,7 +39,7 @@ class ForeignKey:
 class RelationalData:
     def __init__(self):
         self.graph = networkx.DiGraph()
-        self._lineage_column_delimiter = "|"
+        self._end_lineage_prefix = "|"
         self._generation_delimiter = "."
 
     def add_table(
@@ -119,13 +119,13 @@ class RelationalData:
     def get_ancestral_foreign_key_maps(self, table: str) -> List[Tuple[str, str]]:
         def _ancestral_fk_map(fk: ForeignKey) -> Tuple[str, str]:
             gen_delim = self._generation_delimiter
-            lineage_delim = self._lineage_column_delimiter
+            end_prefix = self._end_lineage_prefix
             fk_col = fk.column_name
             ref_col = fk.parent_column_name
 
-            ancestral_foreign_key = f"self{lineage_delim}{fk_col}"
+            ancestral_foreign_key = f"self{end_prefix}{fk_col}"
             ancestral_referenced_col = (
-                f"self{gen_delim}{fk_col}{lineage_delim}{ref_col}"
+                f"self{gen_delim}{fk_col}{end_prefix}{ref_col}"
             )
 
             return (ancestral_foreign_key, ancestral_referenced_col)
@@ -149,7 +149,7 @@ class RelationalData:
             df = tableset[table]
         else:
             df = self.get_table_data(table)
-        df = df.add_prefix(f"{lineage}{self._lineage_column_delimiter}")
+        df = df.add_prefix(f"{lineage}{self._end_lineage_prefix}")
         return _join_parents(df, table, lineage, self, tableset)
 
     def list_multigenerational_keys(self, table: str) -> List[str]:
@@ -161,12 +161,12 @@ class RelationalData:
         def _add_multigenerational_keys(keys: List[str], lineage: str, table_name: str):
             primary_key = self.get_primary_key(table_name)
             if primary_key is not None:
-                keys.append(f"{lineage}{self._lineage_column_delimiter}{primary_key}")
+                keys.append(f"{lineage}{self._end_lineage_prefix}{primary_key}")
 
             foreign_keys = self.get_foreign_keys(table_name)
             keys.extend(
                 [
-                    f"{lineage}{self._lineage_column_delimiter}{foreign_key.column_name}"
+                    f"{lineage}{self._end_lineage_prefix}{foreign_key.column_name}"
                     for foreign_key in foreign_keys
                 ]
             )
@@ -186,7 +186,7 @@ class RelationalData:
         """
         Returns True if the provided column name corresponds to an elder-generation ancestor.
         """
-        regex_string = rf"\{self._generation_delimiter}[^\{self._lineage_column_delimiter}]+\{self._lineage_column_delimiter}"
+        regex_string = rf"\{self._generation_delimiter}[^\{self._end_lineage_prefix}]+\{self._end_lineage_prefix}"
         regex = re.compile(regex_string)
         return bool(regex.search(column))
 
@@ -195,9 +195,9 @@ class RelationalData:
         Drops ancestral columns from the given dataframe and removes the lineage prefix
         from the remaining columns, restoring them to their original source names.
         """
-        delim = self._lineage_column_delimiter
-        root_columns = [col for col in df.columns if col.startswith(f"self{delim}")]
-        mapper = {col: col.removeprefix(f"self{delim}") for col in root_columns}
+        end_prefix = self._end_lineage_prefix
+        root_columns = [col for col in df.columns if col.startswith(f"self{end_prefix}")]
+        mapper = {col: col.removeprefix(f"self{end_prefix}") for col in root_columns}
         return df[root_columns].rename(columns=mapper)
 
     def build_seed_data_for_table(
@@ -316,7 +316,7 @@ def _join_parents(
     relational_data: RelationalData,
     tableset: Optional[Dict[str, pd.DataFrame]],
 ) -> pd.DataFrame:
-    delim = relational_data._lineage_column_delimiter
+    end_prefix = relational_data._end_lineage_prefix
     for foreign_key in relational_data.get_foreign_keys(table):
         next_lineage = (
             f"{lineage}{relational_data._generation_delimiter}{foreign_key.column_name}"
@@ -327,13 +327,13 @@ def _join_parents(
             parent_data = tableset[parent_table_name]
         else:
             parent_data = relational_data.get_table_data(parent_table_name)
-        parent_data = parent_data.add_prefix(f"{next_lineage}{delim}")
+        parent_data = parent_data.add_prefix(f"{next_lineage}{end_prefix}")
 
         df = df.merge(
             parent_data,
             how="left",
-            left_on=f"{lineage}{delim}{foreign_key.column_name}",
-            right_on=f"{next_lineage}{delim}{foreign_key.parent_column_name}",
+            left_on=f"{lineage}{end_prefix}{foreign_key.column_name}",
+            right_on=f"{next_lineage}{end_prefix}{foreign_key.parent_column_name}",
         )
 
         df = _join_parents(
