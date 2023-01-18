@@ -1,7 +1,6 @@
 import json
 import logging
 import os
-import random
 import time
 from collections import defaultdict
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -83,7 +82,6 @@ class MultiTable:
         self.train_statuses = {}
         self._reset_train_statuses(self.relational_data.list_all_tables())
         self._reset_generation_statuses()
-        self._reset_output_tables()
         self.evaluations = defaultdict(lambda: TableEvaluation())
 
         self._working_dir = Path(working_dir)
@@ -95,7 +93,6 @@ class MultiTable:
         return {
             "train": self.train_statuses,
             "generate": self.generate_statuses,
-            "output": self.output_tables,
         }
 
     @property
@@ -109,7 +106,6 @@ class MultiTable:
         return {
             "train": self.train_statuses[table_name],
             "generate": self.generate_statuses[table_name],
-            "output": self.output_tables.get(table_name),
         }
 
     def _set_refresh_interval(self, interval: Optional[int]) -> None:
@@ -156,7 +152,8 @@ class MultiTable:
             for table_name, transformed_table in output_tables:
                 self.relational_data.update_table_data(table_name, transformed_table)
 
-        return output_tables
+        self.transform_output_tables = output_tables
+        return self.transform_output_tables
 
     def _execute_transform_jobs(
         self, configs: Dict[str, GretelModelConfig]
@@ -378,10 +375,10 @@ class MultiTable:
             dict[str, pd.DataFrame]: Return a dictionary of table names and output data.
         """
         self._reset_generation_statuses()
-        self._reset_output_tables()
+        output_tables = {}
 
         preserve_tables = preserve_tables or []
-        self._skip_some_tables(preserve_tables)
+        self._skip_some_tables(preserve_tables, output_tables)
 
         all_tables = self.relational_data.list_all_tables()
         record_handlers: Dict[str, RecordHandler] = {}
@@ -418,7 +415,7 @@ class MultiTable:
                 if status == Status.COMPLETED:
                     self._log_success(table_name, "synthetic data generation")
                     self.generate_statuses[table_name] = GenerateStatus.Completed
-                    self.output_tables[table_name] = _get_data_from_record_handler(
+                    output_tables[table_name] = _get_data_from_record_handler(
                         record_handler
                     )
                 elif status in END_STATES:
@@ -450,7 +447,7 @@ class MultiTable:
                     table_name,
                     self.relational_data,
                     record_size_ratio,
-                    self.output_tables,
+                    output_tables,
                 )
                 self._log_start(table_name, "synthetic data generation")
                 self.generate_statuses[table_name] = GenerateStatus.InProgress
@@ -459,21 +456,22 @@ class MultiTable:
                 record_handler.submit_cloud()
                 record_handlers[table_name] = record_handler
 
-        self._synthesize_keys(preserve_tables)
-        return self.output_tables
+        output_tables = self._strategy.post_process_synthetic_results(output_tables, preserve_tables, self.relational_data)
+        self.synthetic_output_tables = output_tables
+        return self.synthetic_output_tables
 
-    def export_csvs(self, prefix: str = "out_") -> None:
+    def export_synthetic_tables(self, prefix: str = "synth_") -> None:
         """
         Exports output tables as CSVs to the working directory.
         """
-        for table_name, df in self.output_tables.items():
+        for table_name, df in self.synthetic_output_tables.items():
             df.to_csv(f"{self._working_dir}/{prefix}{table_name}.csv", index=False)
 
     def expand_evaluations(self) -> None:
         """
         Adds evaluation metrics for the "opposite" correlation strategy using the Gretel Evaluate API.
         """
-        for table_name in self.output_tables:
+        for table_name in self.synthetic_output_tables:
             logger.info(
                 f"Expanding evaluation metrics for `{table_name}` via Gretel Evaluate API."
             )
@@ -481,7 +479,7 @@ class MultiTable:
                 evaluation=self.evaluations[table_name],
                 table=table_name,
                 rel_data=self.relational_data,
-                synthetic_tables=self.output_tables,
+                synthetic_tables=self.synthetic_output_tables,
             )
 
     def _reset_generation_statuses(self) -> None:
@@ -493,16 +491,12 @@ class MultiTable:
             for table_name in self.relational_data.list_all_tables()
         }
 
-    def _reset_output_tables(self) -> None:
-        "Clears all output tables"
-        self.output_tables = {}
-
-    def _skip_some_tables(self, preserve_tables: List[str]) -> None:
+    def _skip_some_tables(self, preserve_tables: List[str], output_tables: Dict[str, pd.DataFrame]) -> None:
         "Updates state for tables being preserved and tables lacking trained models."
         for table in self.relational_data.list_all_tables():
             if table in preserve_tables:
                 self.generate_statuses[table] = GenerateStatus.SourcePreserved
-                self.output_tables[table] = self.relational_data.get_table_data(table)
+                output_tables[table] = self.relational_data.get_table_data(table)
             elif self.train_statuses[table] != TrainStatus.Completed:
                 logger.info(
                     f"Skipping synthetic data generation for `{table}` because it does not have a trained model"
@@ -513,67 +507,6 @@ class MultiTable:
                         f"Skipping synthetic data generation for `{descendant}` because it depends on `{table}`"
                     )
                     self.generate_statuses[descendant] = GenerateStatus.ModelUnavailable
-
-    def _synthesize_keys(self, preserve_tables: List[str]) -> Dict[str, pd.DataFrame]:
-        self.output_tables = self._synthesize_primary_keys(preserve_tables)
-        self.output_tables = self._synthesize_foreign_keys()
-        return self.output_tables
-
-    def _synthesize_primary_keys(
-        self, preserve_tables: List[str]
-    ) -> Dict[str, pd.DataFrame]:
-        """
-        Alters primary key columns on all tables *except* those flagged by the user as
-        not to be synthesized. Assumes the primary key column is of type integer.
-        """
-        for table_name, out_data in self.output_tables.items():
-            if table_name in preserve_tables:
-                continue
-
-            primary_key = self.relational_data.get_primary_key(table_name)
-            if primary_key is None:
-                continue
-
-            out_df = self.output_tables[table_name]
-            out_df[primary_key] = [i for i in range(len(out_data))]
-            self.output_tables[table_name] = out_df
-
-        return self.output_tables
-
-    def _synthesize_foreign_keys(self) -> Dict[str, pd.DataFrame]:
-        """
-        Alters foreign key columns on all tables (*including* those flagged as not to
-        be synthesized to ensure joining to a synthesized parent table continues to work)
-        by replacing foreign key column values with valid values from the parent table column
-        being referenced.
-        """
-        for table_name, out_data in self.output_tables.items():
-            for foreign_key in self.relational_data.get_foreign_keys(table_name):
-                out_df = self.output_tables[table_name]
-
-                valid_values = list(
-                    self.output_tables[foreign_key.parent_table_name][
-                        foreign_key.parent_column_name
-                    ]
-                )
-
-                original_table_data = self.relational_data.get_table_data(table_name)
-                original_fk_frequencies = (
-                    original_table_data.groupby(foreign_key.column_name)
-                    .size()
-                    .reset_index()
-                )
-                frequencies_descending = sorted(
-                    list(original_fk_frequencies[0]), reverse=True
-                )
-
-                new_fk_values = _collect_new_foreign_key_values(
-                    valid_values, frequencies_descending, len(out_df)
-                )
-
-                out_df[foreign_key.column_name] = new_fk_values
-
-        return self.output_tables
 
     def _table_generation_in_progress(self, table: str) -> bool:
         return self.generate_statuses[table] == GenerateStatus.InProgress
@@ -604,39 +537,6 @@ class MultiTable:
 
     def _log_lost_contact(self, table_name: str) -> None:
         logger.warning(f"Lost contact with job for `{table_name}`.")
-
-
-def _collect_new_foreign_key_values(
-    values: List[Any],
-    frequencies: List[int],
-    total: int,
-) -> List[Any]:
-    """
-    Uses `random.choices` to select `k=total` elements from `values`,
-    weighted according to `frequencies`.
-    """
-    v_len = len(values)
-    f_len = len(frequencies)
-    f_iter = iter(frequencies)
-
-    if v_len == f_len:
-        # Unlikely but convenient exact match
-        weights = frequencies
-
-    elif v_len < f_len:
-        # Add as many frequencies as necessary, in descending order
-        weights = []
-        while len(weights) < v_len:
-            weights.append(next(f_iter))
-
-    else:
-        # Add all frequencies to start, then fill in more as necessary in descending order
-        weights = frequencies
-        while len(weights) < v_len:
-            weights.append(next(f_iter))
-
-    random.shuffle(weights)
-    return random.choices(values, weights=weights, k=total)
 
 
 def _get_data_from_record_handler(record_handler: RecordHandler) -> pd.DataFrame:

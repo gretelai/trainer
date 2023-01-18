@@ -104,6 +104,15 @@ class CrossTableStrategy:
             seed_df = rel_data.build_seed_data_for_table(table, output_tables)
             return {"data_source": seed_df}
 
+    def post_process_synthetic_results(
+        self, output_tables: Dict[str, pd.DataFrame], preserved: List[str], rel_data: RelationalData
+    ) -> Dict[str, pd.DataFrame]:
+        """
+        WIP (PK/FK synthesis)
+        Restores tables from multigenerational to original shape
+        """
+        return output_tables
+
     def update_evaluation_from_model(
         self, evaluation: TableEvaluation, model: Model
     ) -> None:
