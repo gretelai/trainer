@@ -32,11 +32,6 @@ class SingleTableStrategy:
 
         return data.drop(columns=columns_to_drop)
 
-    def get_seed_fields(
-        self, table_name: str, rel_data: RelationalData
-    ) -> Optional[List[str]]:
-        return None
-
     def tables_to_retrain(
         self, tables: List[str], rel_data: RelationalData
     ) -> List[str]:

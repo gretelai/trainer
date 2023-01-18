@@ -43,17 +43,6 @@ class CrossTableStrategy:
 
         return data.drop(columns=columns_to_drop)
 
-    def get_seed_fields(
-        self, table_name: str, rel_data: RelationalData
-    ) -> Optional[List[str]]:
-        seed_data = rel_data.build_seed_data_for_table(table_name)
-        if seed_data is None:
-            return None
-        else:
-            return [
-                col for col in seed_data.columns if rel_data.is_ancestral_column(col)
-            ]
-
     def tables_to_retrain(
         self, tables: List[str], rel_data: RelationalData
     ) -> List[str]:
