@@ -200,6 +200,22 @@ class RelationalData:
         mapper = {col: col.removeprefix(f"self{end_prefix}") for col in root_columns}
         return df[root_columns].rename(columns=mapper)
 
+    def prepend_foreign_key_lineage(
+        self, df: pd.DataFrame, fk_col: str
+    ) -> pd.DataFrame:
+        """
+        Given a multigenerational dataframe, renames all columns such that the provided
+        foreign key acts as the lineage from some child table to the provided data.
+        The resulting column names are elder-generation ancestral column names from the
+        perspective of a child table that relates to that parent via the provided foreign key.
+        """
+
+        def _adjust(col: str) -> str:
+            return col.replace("self", f"self{self._generation_delimiter}{fk_col}", 1)
+
+        mapper = {col: _adjust(col) for col in df.columns}
+        return df.rename(columns=mapper)
+
     def build_seed_data_for_table(
         self, table: str, ancestor_data: Optional[Dict[str, pd.DataFrame]] = None
     ) -> Optional[pd.DataFrame]:

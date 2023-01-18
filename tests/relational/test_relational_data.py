@@ -348,6 +348,28 @@ def test_ancestral_foreign_key_maps(ecom):
     }
 
 
+def test_prepend_foreign_key_lineage(ecom):
+    multigen_inventory_items = ecom.get_table_data_with_ancestors("inventory_items")
+    order_items_parent_data = ecom.prepend_foreign_key_lineage(
+        multigen_inventory_items, "inventory_item_id"
+    )
+    assert set(order_items_parent_data.columns) == {
+        "self.inventory_item_id|id",
+        "self.inventory_item_id|sold_at",
+        "self.inventory_item_id|cost",
+        "self.inventory_item_id|product_id",
+        "self.inventory_item_id|product_distribution_center_id",
+        "self.inventory_item_id.product_id|id",
+        "self.inventory_item_id.product_id|name",
+        "self.inventory_item_id.product_id|brand",
+        "self.inventory_item_id.product_id|distribution_center_id",
+        "self.inventory_item_id.product_distribution_center_id|id",
+        "self.inventory_item_id.product_distribution_center_id|name",
+        "self.inventory_item_id.product_id.distribution_center_id|id",
+        "self.inventory_item_id.product_id.distribution_center_id|name",
+    }
+
+
 def test_building_seeds(source_nba, synthetic_nba):
     source_nba = source_nba[0]
     synthetic_nba = synthetic_nba[0]
