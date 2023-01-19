@@ -72,6 +72,18 @@ class SingleTableStrategy:
         synth_size = int(source_data_size * record_size_ratio)
         return {"params": {"num_records": synth_size}}
 
+    def post_process_individual_synthetic_result(
+        self,
+        table_name: str,
+        rel_data: RelationalData,
+        synthetic_table: pd.DataFrame,
+    ) -> pd.DataFrame:
+        """
+        No-op. This strategy does not apply any changes to individual table results upon record handler completion.
+        All post-processing is performed on the output tables collectively when they are all finished.
+        """
+        return synthetic_table
+
     def post_process_synthetic_results(
         self,
         synth_tables: Dict[str, pd.DataFrame],

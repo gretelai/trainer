@@ -415,8 +415,13 @@ class MultiTable:
                 if status == Status.COMPLETED:
                     self._log_success(table_name, "synthetic data generation")
                     self.generate_statuses[table_name] = GenerateStatus.Completed
-                    output_tables[table_name] = _get_data_from_record_handler(
+                    record_handler_result = _get_data_from_record_handler(
                         record_handler
+                    )
+                    output_tables[
+                        table_name
+                    ] = self._strategy.post_process_individual_synthetic_result(
+                        table_name, self.relational_data, record_handler_result
                     )
                 elif status in END_STATES:
                     # already checked explicitly for completed; all other end states are effectively failures

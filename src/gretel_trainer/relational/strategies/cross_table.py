@@ -158,6 +158,17 @@ class CrossTableStrategy:
 
         return seed_df
 
+    def post_process_individual_synthetic_result(
+        self,
+        table_name: str,
+        rel_data: RelationalData,
+        synthetic_table: pd.DataFrame,
+    ) -> pd.DataFrame:
+        """
+        Replaces primary key values with a new, contiguous set of values
+        """
+        return synthetic_table
+
     def post_process_synthetic_results(
         self,
         output_tables: Dict[str, pd.DataFrame],
