@@ -14,7 +14,9 @@ class SingleTableStrategy:
     ) -> Dict[str, pd.DataFrame]:
         return common.label_encode_keys(rel_data, tables)
 
-    def prep_training_data(self, rel_data: RelationalData) -> Dict[str, pd.DataFrame]:
+    def prepare_training_data(
+        self, rel_data: RelationalData
+    ) -> Dict[str, pd.DataFrame]:
         """
         Returns source tables with primary and foreign keys removed
         """

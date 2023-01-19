@@ -10,7 +10,7 @@ from gretel_trainer.relational.strategies.single_table import SingleTableStrateg
 def test_prepare_training_data_removes_primary_and_foreign_keys(pets):
     strategy = SingleTableStrategy()
 
-    training_data = strategy.prep_training_data(pets)
+    training_data = strategy.prepare_training_data(pets)
 
     assert set(training_data["pets"].columns) == {"name", "age"}
 

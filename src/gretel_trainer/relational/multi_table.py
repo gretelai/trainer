@@ -252,7 +252,7 @@ class MultiTable:
         to the working directory. Returns a dict with table names as keys and Paths
         to the CSVs as values.
         """
-        training_data = self._strategy.prep_training_data(self.relational_data)
+        training_data = self._strategy.prepare_training_data(self.relational_data)
         training_paths = {}
 
         for table_name in tables:

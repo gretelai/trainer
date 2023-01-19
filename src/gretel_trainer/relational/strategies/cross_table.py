@@ -26,7 +26,9 @@ class CrossTableStrategy:
     ) -> Dict[str, pd.DataFrame]:
         return common.label_encode_keys(rel_data, tables)
 
-    def prep_training_data(self, rel_data: RelationalData) -> Dict[str, pd.DataFrame]:
+    def prepare_training_data(
+        self, rel_data: RelationalData
+    ) -> Dict[str, pd.DataFrame]:
         """
         Returns tables with all ancestor fields added,
         minus any highly-unique categorical fields from ancestors.
@@ -206,7 +208,7 @@ class CrossTableStrategy:
             )
 
         # We may have omitted some ancestral columns from training, so they must be omitted here as well.
-        training_data = self.prep_training_data(rel_data)[table]
+        training_data = self.prepare_training_data(rel_data)[table]
         training_columns = list(training_data.columns)
         columns_to_drop = [
             col for col in seed_df.columns if col not in training_columns
