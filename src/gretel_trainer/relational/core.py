@@ -116,6 +116,13 @@ class RelationalData:
             foreign_keys.extend(fks)
         return foreign_keys
 
+    def get_multigenerational_primary_key(self, table: str) -> Optional[str]:
+        pk = self.get_primary_key(table)
+        if pk is None:
+            return None
+        else:
+            return f"self{self._end_lineage_prefix}{pk}"
+
     def get_ancestral_foreign_key_maps(self, table: str) -> List[Tuple[str, str]]:
         def _ancestral_fk_map(fk: ForeignKey) -> Tuple[str, str]:
             gen_delim = self._generation_delimiter

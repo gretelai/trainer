@@ -118,6 +118,11 @@ def test_add_foreign_key_checks_if_tables_exist():
     assert len(rel_data.get_foreign_keys("events")) == 1
 
 
+def test_primary_key_in_multigenerational_format(mutagenesis):
+    assert mutagenesis.get_multigenerational_primary_key("bond") is None
+    assert mutagenesis.get_multigenerational_primary_key("atom") == "self|atom_id"
+
+
 def test_ancestral_data_from_different_tablesets(source_nba, synthetic_nba):
     rel_data, _, _, _ = source_nba
     _, custom_states, custom_cities, custom_teams = synthetic_nba
