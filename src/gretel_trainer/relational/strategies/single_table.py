@@ -14,15 +14,13 @@ class SingleTableStrategy:
     ) -> Dict[str, pd.DataFrame]:
         return common.label_encode_keys(rel_data, tables)
 
-    def prep_training_data(
-        self, tables: List[str], rel_data: RelationalData
-    ) -> Dict[str, pd.DataFrame]:
+    def prep_training_data(self, rel_data: RelationalData) -> Dict[str, pd.DataFrame]:
         """
         Returns source tables with primary and foreign keys removed
         """
         training_data = {}
 
-        for table_name in tables:
+        for table_name in rel_data.list_all_tables():
             data = rel_data.get_table_data(table_name)
             columns_to_drop = []
 

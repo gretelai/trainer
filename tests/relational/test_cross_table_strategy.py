@@ -13,9 +13,9 @@ def test_prepare_training_data_returns_multigenerational_data_without_keys_or_hi
 ):
     strategy = CrossTableStrategy()
 
-    training_pets = strategy.prepare_training_data("pets", pets)
+    training_data = strategy.prep_training_data(pets)
 
-    assert set(training_pets.columns) == {
+    assert set(training_data["pets"].columns) == {
         "self|id",
         "self|name",
         "self|age",

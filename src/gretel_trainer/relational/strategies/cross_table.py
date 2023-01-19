@@ -26,9 +26,7 @@ class CrossTableStrategy:
     ) -> Dict[str, pd.DataFrame]:
         return common.label_encode_keys(rel_data, tables)
 
-    def prep_training_data(
-        self, tables: List[str], rel_data: RelationalData
-    ) -> Dict[str, pd.DataFrame]:
+    def prep_training_data(self, rel_data: RelationalData) -> Dict[str, pd.DataFrame]:
         """
         Returns tables with all ancestor fields added,
         minus any highly-unique categorical fields from ancestors.
@@ -36,11 +34,12 @@ class CrossTableStrategy:
         sufficiently wide range of synthetic values during seeding.
         Corresponding foreign keys are also modified accordingly.
         """
+        all_tables = rel_data.list_all_tables()
         tableset_with_altered_keys = {}
         training_data = {}
 
         # First, create a new table set identical to source data
-        for table_name in tables:
+        for table_name in all_tables:
             tableset_with_altered_keys[table_name] = rel_data.get_table_data(table_name)
 
         # On each table, alter the PKs in the first two rows for the
@@ -61,7 +60,7 @@ class CrossTableStrategy:
             data.loc[1, [pk]] = [new_pk_max]
 
             # Update FKs to match
-            for other_table_name in tables:
+            for other_table_name in all_tables:
                 if other_table_name == table_name:
                     continue
                 fks = rel_data.get_foreign_keys(other_table_name)
@@ -82,7 +81,7 @@ class CrossTableStrategy:
                         tableset_with_altered_keys[other_table_name] = modified
 
         # Next, collect all data in multigenerational format
-        for table_name in tables:
+        for table_name in all_tables:
             data = rel_data.get_table_data_with_ancestors(
                 table_name, tableset_with_altered_keys
             )
