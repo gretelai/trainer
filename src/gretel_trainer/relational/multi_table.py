@@ -252,16 +252,15 @@ class MultiTable:
         to the working directory. Returns a dict with table names as keys and Paths
         to the CSVs as values.
         """
-        training_data = {}
-        for table_name in tables:
-            training_path = self._working_dir / f"{table_name}_train.csv"
-            data = self._strategy.prepare_training_data(
-                table_name, self.relational_data
-            )
-            data.to_csv(training_path, index=False)
-            training_data[table_name] = training_path
+        training_data = self._strategy.prep_training_data(tables, self.relational_data)
+        training_paths = {}
 
-        return training_data
+        for table_name, df in training_data.items():
+            training_path = self._working_dir / f"{table_name}_train.csv"
+            df.to_csv(training_path, index=False)
+            training_paths[table_name] = training_path
+
+        return training_paths
 
     def _table_model_config(self, table_name: str) -> Dict:
         config_dict = read_model_config(self._model_config)

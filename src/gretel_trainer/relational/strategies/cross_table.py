@@ -26,6 +26,81 @@ class CrossTableStrategy:
     ) -> Dict[str, pd.DataFrame]:
         return common.label_encode_keys(rel_data, tables)
 
+    def prep_training_data(
+        self, tables: List[str], rel_data: RelationalData
+    ) -> Dict[str, pd.DataFrame]:
+        """
+        Returns tables with all ancestor fields added,
+        minus any highly-unique categorical fields from ancestors.
+        Primary keys are modified on two records to accommodate a
+        sufficiently wide range of synthetic values during seeding.
+        Corresponding foreign keys are also modified accordingly.
+        """
+        tableset_with_altered_keys = {}
+        training_data = {}
+
+        # First, create a new table set identical to source data
+        for table_name in tables:
+            tableset_with_altered_keys[table_name] = rel_data.get_table_data(table_name)
+
+        # On each table, alter the PKs in the first two rows for the
+        # min/max seed range, plus alter all FK references to those records
+        for table_name, data in tableset_with_altered_keys.items():
+            pk = rel_data.get_primary_key(table_name)
+            if pk is None:
+                continue
+
+            orig_pk_min = data.loc[0][pk]
+            orig_pk_max = data.loc[1][pk]
+
+            new_pk_min = 0
+            new_pk_max = len(data) * 50
+
+            # Mutate pk values on table
+            data.loc[0, [pk]] = [new_pk_min]
+            data.loc[1, [pk]] = [new_pk_max]
+
+            # Update FKs to match
+            for other_table_name in tables:
+                if other_table_name == table_name:
+                    continue
+                fks = rel_data.get_foreign_keys(other_table_name)
+                for fk in fks:
+                    if (
+                        fk.parent_table_name == table_name
+                        and fk.parent_column_name == pk
+                    ):
+                        other_table_data = tableset_with_altered_keys[other_table_name]
+                        modified = other_table_data.replace(
+                            {
+                                fk.column_name: {
+                                    orig_pk_min: new_pk_min,
+                                    orig_pk_max: new_pk_max,
+                                }
+                            }
+                        )
+                        tableset_with_altered_keys[other_table_name] = modified
+
+        # Next, collect all data in multigenerational format
+        for table_name in tables:
+            data = rel_data.get_table_data_with_ancestors(
+                table_name, tableset_with_altered_keys
+            )
+            training_data[table_name] = data
+
+        # Finally, drop highly-unique categorical ancestor fields
+        for table_name, data in training_data.items():
+            columns_to_drop = []
+
+            for column in data.columns:
+                if rel_data.is_ancestral_column(
+                    column
+                ) and _is_highly_unique_categorical(column, data):
+                    columns_to_drop.append(column)
+            training_data[table_name] = data.drop(columns=columns_to_drop)
+
+        return training_data
+
     def prepare_training_data(
         self, table_name: str, rel_data: RelationalData
     ) -> pd.DataFrame:
@@ -167,7 +242,12 @@ class CrossTableStrategy:
         """
         Replaces primary key values with a new, contiguous set of values
         """
-        return synthetic_table
+        primary_key = rel_data.get_multigenerational_primary_key(table_name)
+        if primary_key is None:
+            return synthetic_table
+        processed = synthetic_table
+        processed[primary_key] = [i for i in range(len(synthetic_table))]
+        return processed
 
     def post_process_synthetic_results(
         self,
