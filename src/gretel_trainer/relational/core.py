@@ -39,8 +39,9 @@ class ForeignKey:
 class RelationalData:
     def __init__(self):
         self.graph = networkx.DiGraph()
-        self._end_lineage_prefix = "|"
+        self._start_lineage = "self"
         self._generation_delimiter = "."
+        self._end_lineage_prefix = "|"
 
     def add_table(
         self, table: str, primary_key: Optional[str], data: pd.DataFrame
@@ -121,7 +122,7 @@ class RelationalData:
         if pk is None:
             return None
         else:
-            return f"self{self._end_lineage_prefix}{pk}"
+            return f"{self._start_lineage}{self._end_lineage_prefix}{pk}"
 
     def get_ancestral_foreign_key_maps(self, table: str) -> List[Tuple[str, str]]:
         def _ancestral_fk_map(fk: ForeignKey) -> Tuple[str, str]:
@@ -130,8 +131,10 @@ class RelationalData:
             fk_col = fk.column_name
             ref_col = fk.parent_column_name
 
-            ancestral_foreign_key = f"self{end_prefix}{fk_col}"
-            ancestral_referenced_col = f"self{gen_delim}{fk_col}{end_prefix}{ref_col}"
+            ancestral_foreign_key = f"{self._start_lineage}{end_prefix}{fk_col}"
+            ancestral_referenced_col = (
+                f"{self._start_lineage}{gen_delim}{fk_col}{end_prefix}{ref_col}"
+            )
 
             return (ancestral_foreign_key, ancestral_referenced_col)
 
@@ -149,7 +152,7 @@ class RelationalData:
 
         If `tableset` is provided, use it in place of the source data in `self.graph`.
         """
-        lineage = "self"
+        lineage = self._start_lineage
         if tableset is not None:
             df = tableset[table]
         else:
@@ -184,7 +187,7 @@ class RelationalData:
                 _add_multigenerational_keys(keys, next_lineage, parent_table_name)
 
         keys = []
-        _add_multigenerational_keys(keys, "self", table)
+        _add_multigenerational_keys(keys, self._start_lineage, table)
         return keys
 
     def is_ancestral_column(self, column: str) -> bool:
@@ -202,9 +205,14 @@ class RelationalData:
         """
         end_prefix = self._end_lineage_prefix
         root_columns = [
-            col for col in df.columns if col.startswith(f"self{end_prefix}")
+            col
+            for col in df.columns
+            if col.startswith(f"{self._start_lineage}{end_prefix}")
         ]
-        mapper = {col: col.removeprefix(f"self{end_prefix}") for col in root_columns}
+        mapper = {
+            col: col.removeprefix(f"{self._start_lineage}{end_prefix}")
+            for col in root_columns
+        }
         return df[root_columns].rename(columns=mapper)
 
     def prepend_foreign_key_lineage(
@@ -218,7 +226,11 @@ class RelationalData:
         """
 
         def _adjust(col: str) -> str:
-            return col.replace("self", f"self{self._generation_delimiter}{fk_col}", 1)
+            return col.replace(
+                self._start_lineage,
+                f"{self._start_lineage}{self._generation_delimiter}{fk_col}",
+                1,
+            )
 
         mapper = {col: _adjust(col) for col in df.columns}
         return df.rename(columns=mapper)
