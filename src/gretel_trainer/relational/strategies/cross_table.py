@@ -1,3 +1,4 @@
+import itertools
 from typing import Any, Dict, List, Optional
 
 import pandas as pd
@@ -96,13 +97,66 @@ class CrossTableStrategy:
 
         If the table does have parents, builds a seed dataframe to use in generation.
         """
+        source_data_size = len(rel_data.get_table_data(table))
+        synth_size = int(source_data_size * record_size_ratio)
         if len(rel_data.get_parents(table)) == 0:
-            source_data_size = len(rel_data.get_table_data(table))
-            synth_size = int(source_data_size * record_size_ratio)
             return {"params": {"num_records": synth_size}}
         else:
-            seed_df = rel_data.build_seed_data_for_table(table, output_tables)
+            seed_df = self._build_seed_data_for_table(
+                table, output_tables, rel_data, synth_size
+            )
             return {"data_source": seed_df}
+
+    def _build_seed_data_for_table(
+        self,
+        table: str,
+        output_tables: Dict[str, pd.DataFrame],
+        rel_data: RelationalData,
+        synth_size: int,
+    ) -> pd.DataFrame:
+        seed_df = pd.DataFrame()
+
+        for fk in rel_data.get_foreign_keys(table):
+            this_fk_seed_df = pd.DataFrame()
+
+            parent_table_data = output_tables[fk.parent_table_name]
+            parent_table_data = rel_data.prepend_foreign_key_lineage(
+                parent_table_data, fk.column_name
+            )
+            parent_index_cycle = itertools.cycle(range(len(parent_table_data)))
+
+            freqs = (
+                rel_data.get_table_data(table)
+                .groupby([fk.column_name])
+                .size()
+                .reset_index()
+            )
+            freqs = sorted(list(freqs[0]), reverse=True)
+            freqs_cycle = itertools.cycle(freqs)
+
+            while len(this_fk_seed_df) < synth_size:
+                parent_record = parent_table_data.loc[next(parent_index_cycle)]
+                for _ in range(next(freqs_cycle)):
+                    this_fk_seed_df = pd.concat(
+                        [this_fk_seed_df, pd.DataFrame([parent_record])]
+                    ).reset_index(drop=True)
+
+            seed_df = pd.concat(
+                [
+                    seed_df.reset_index(drop=True),
+                    this_fk_seed_df.reset_index(drop=True),
+                ],
+                axis=1,
+            )
+
+        # We may have omitted some ancestral columns from training, so they must be omitted here as well.
+        training_columns = list(self.prepare_training_data(table, rel_data).columns)
+        columns_to_drop = [
+            col for col in seed_df.columns if col not in training_columns
+        ]
+        seed_df = seed_df.drop(columns=columns_to_drop)
+
+        return seed_df
 
     def post_process_synthetic_results(
         self,

@@ -168,32 +168,34 @@ def test_generation_job(pets):
             "self|id": [1, 2, 3, 4, 5],
         }
     )
-    child_table_job = strategy.get_generation_job(
-        "pets", pets, 2.0, {"humans": synthetic_humans}
-    )
+    output_tables = {"humans": synthetic_humans}
+    child_table_job = strategy.get_generation_job("pets", pets, 2.0, output_tables)
 
+    # `self.human_id|name` should not be present in seed because it was
+    # excluded from training data (highly-unique categorical field)
     expected_seed_df = pd.DataFrame(
         data={
-            "self.human_id|name": [
-                "Miles Davis",
-                "Wayne Shorter",
-                "Herbie Hancock",
-                "Ron Carter",
-                "Tony Williams",
-            ],
             "self.human_id|city": [
                 "New York",
                 "New York",
                 "New York",
                 "New York",
                 "Los Angeles",
+                "New York",
+                "New York",
+                "New York",
+                "New York",
+                "Los Angeles",
             ],
-            "self.human_id|id": [1, 2, 3, 4, 5],
+            "self.human_id|id": [1, 2, 3, 4, 5, 1, 2, 3, 4, 5],
         }
     )
 
     assert set(child_table_job.keys()) == {"data_source"}
     pdtest.assert_frame_equal(child_table_job["data_source"], expected_seed_df)
+
+    # sanity check: assert we did not mutate the originally-supplied synthetic tables
+    assert set(output_tables["humans"].columns) == {"self|name", "self|city", "self|id"}
 
 
 def test_uses_trained_model_to_update_cross_table_scores():
