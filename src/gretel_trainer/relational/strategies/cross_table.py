@@ -100,24 +100,6 @@ class CrossTableStrategy:
 
         return training_data
 
-    def prepare_training_data(
-        self, table_name: str, rel_data: RelationalData
-    ) -> pd.DataFrame:
-        """
-        Returns table data with all ancestor fields added,
-        minus any highly-unique categorical fields from ancestors.
-        """
-        data = rel_data.get_table_data_with_ancestors(table_name)
-        columns_to_drop = []
-
-        for column in data.columns:
-            if rel_data.is_ancestral_column(column) and _is_highly_unique_categorical(
-                column, data
-            ):
-                columns_to_drop.append(column)
-
-        return data.drop(columns=columns_to_drop)
-
     def tables_to_retrain(
         self, tables: List[str], rel_data: RelationalData
     ) -> List[str]:
@@ -224,7 +206,8 @@ class CrossTableStrategy:
             )
 
         # We may have omitted some ancestral columns from training, so they must be omitted here as well.
-        training_columns = list(self.prepare_training_data(table, rel_data).columns)
+        training_data = self.prep_training_data(rel_data)[table]
+        training_columns = list(training_data.columns)
         columns_to_drop = [
             col for col in seed_df.columns if col not in training_columns
         ]
