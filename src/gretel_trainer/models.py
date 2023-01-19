@@ -114,7 +114,7 @@ class GretelLSTM(_BaseConfig):
     Source data should have <150 columns.
 
     Args:
-        config (str/dict, optional): Either a string representing the path to the config on the local filesystem, a string representing a path to the default Gretel configurations, or a dictionary containing the configurations. Default: "synthetics/default", a default Gretel configuration
+        config (str/dict, optional): Either a string representing the path to the config on the local filesystem, a string representing a path to the default Gretel configurations, or a dictionary containing the configurations. Default: "synthetics/tabular-lstm", a default Gretel configuration
         max_rows (int, optional): The number of rows of synthetic data to generate. Defaults to 50000
         max_header_clusters (int, optional): Default: 20
         enable_privacy_filters (bool, optional): This parameter is deprecated and will be removed in future versions.
@@ -126,7 +126,7 @@ class GretelLSTM(_BaseConfig):
 
     def __init__(
         self,
-        config="synthetics/default",
+        config="synthetics/tabular-lstm",
         max_rows=50_000,
         max_header_clusters=20,
         enable_privacy_filters=None,

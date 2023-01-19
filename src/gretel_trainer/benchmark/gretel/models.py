@@ -61,7 +61,7 @@ class GretelModel:
 
 
 class GretelLSTM(GretelModel):
-    config = "synthetics/default"
+    config = "synthetics/tabular-lstm"
 
 class GretelAmplify(GretelModel):
     config = "synthetics/amplify"
