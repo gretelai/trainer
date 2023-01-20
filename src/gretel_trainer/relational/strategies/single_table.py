@@ -71,6 +71,7 @@ class SingleTableStrategy:
         record_size_ratio: float,
         output_tables: Dict[str, pd.DataFrame],
         working_dir: Path,
+        training_columns: List[str],
     ) -> Dict[str, Any]:
         """
         Returns kwargs for a record handler job requesting an output record

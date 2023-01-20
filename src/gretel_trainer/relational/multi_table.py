@@ -79,6 +79,7 @@ class MultiTable:
         self._set_refresh_interval(refresh_interval)
         self._models = {}
         self.train_statuses = {}
+        self._training_columns = {}
         self._reset_train_statuses(self.relational_data.list_all_tables())
         self._reset_generation_statuses()
         self.evaluations = defaultdict(lambda: TableEvaluation())
@@ -253,6 +254,8 @@ class MultiTable:
         to the CSVs as values.
         """
         training_data = self._strategy.prepare_training_data(self.relational_data)
+        for table, df in training_data.items():
+            self._training_columns[table] = list(df.columns)
         training_paths = {}
 
         for table_name in tables:
@@ -450,6 +453,7 @@ class MultiTable:
                     record_size_ratio,
                     output_tables,
                     self._working_dir,
+                    self._training_columns[table_name],
                 )
                 self._log_start(table_name, "synthetic data generation")
                 self.generate_statuses[table_name] = GenerateStatus.InProgress

@@ -141,6 +141,7 @@ class CrossTableStrategy:
         record_size_ratio: float,
         output_tables: Dict[str, pd.DataFrame],
         working_dir: Path,
+        training_columns: List[str],
     ) -> Dict[str, Any]:
         """
         Returns kwargs for creating a record handler job via the Gretel SDK.
@@ -156,7 +157,7 @@ class CrossTableStrategy:
             return {"params": {"num_records": synth_size}}
         else:
             seed_df = self._build_seed_data_for_table(
-                table, output_tables, rel_data, synth_size
+                table, output_tables, rel_data, synth_size, training_columns
             )
             seed_path = working_dir / f"seed_{table}.csv"
             seed_df.to_csv(seed_path, index=False)
@@ -168,6 +169,7 @@ class CrossTableStrategy:
         output_tables: Dict[str, pd.DataFrame],
         rel_data: RelationalData,
         synth_size: int,
+        training_columns: List[str],
     ) -> pd.DataFrame:
         seed_df = pd.DataFrame()
 
@@ -204,9 +206,7 @@ class CrossTableStrategy:
                 axis=1,
             )
 
-        # We may have omitted some ancestral columns from training, so they must be omitted here as well.
-        training_data = self.prepare_training_data(rel_data)[table]
-        training_columns = list(training_data.columns)
+        # Drop any columns that weren't used in training
         columns_to_drop = [
             col for col in seed_df.columns if col not in training_columns
         ]
