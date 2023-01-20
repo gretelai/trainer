@@ -256,7 +256,7 @@ class MultiTable:
         training_paths = {}
 
         for table_name in tables:
-            training_path = self._working_dir / f"{table_name}_train.csv"
+            training_path = self._working_dir / f"train_{table_name}.csv"
             training_data[table_name].to_csv(training_path, index=False)
             training_paths[table_name] = training_path
 
