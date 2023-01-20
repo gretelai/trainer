@@ -312,11 +312,8 @@ class MultiTable:
                 if status == Status.COMPLETED:
                     self._log_success(table_name, "model training")
                     self.train_statuses[table_name] = TrainStatus.Completed
-                    logger.info(
-                        f"Fetching evaluation data for `{table_name}` from trained model."
-                    )
                     self._strategy.update_evaluation_from_model(
-                        self.evaluations[table_name], model
+                        table_name, self.evaluations, model, self._working_dir
                     )
                 elif status in END_STATES:
                     # already checked explicitly for completed; all other end states are effectively failures

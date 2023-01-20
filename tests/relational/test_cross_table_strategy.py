@@ -1,3 +1,4 @@
+import gzip
 import os
 import tempfile
 from pathlib import Path
@@ -290,28 +291,68 @@ def test_post_process_synthetic_results(ecom):
 
 def test_uses_trained_model_to_update_cross_table_scores():
     strategy = CrossTableStrategy()
-    evaluation = TableEvaluation()
+    evaluations = {
+        "table_1": TableEvaluation(),
+        "table_2": TableEvaluation(),
+    }
     model = Mock()
 
-    with patch(
+    with tempfile.TemporaryDirectory() as working_dir, patch(
+        "gretel_trainer.relational.strategies.cross_table.common.download_artifacts"
+    ) as download_artifacts, patch(
         "gretel_trainer.relational.strategies.cross_table.common.get_sqs_score"
-    ) as get_sqs, patch(
-        "gretel_trainer.relational.strategies.cross_table.common.get_report_html"
-    ) as get_html, patch(
-        "gretel_trainer.relational.strategies.cross_table.common.get_report_json"
-    ) as get_json:
+    ) as get_sqs:
         get_sqs.return_value = 80
-        get_html.return_value = "html"
-        get_json.return_value = {"report": "json"}
+        working_dir = Path(working_dir)
+        artifacts_subdir = working_dir / "artifacts_table_1"
+        os.makedirs(artifacts_subdir, exist_ok=True)
+        with gzip.open(str(artifacts_subdir / "report_json.json.gz"), "wb") as f:
+            f.write(b'{"report": "json"}')
+        download_artifacts.return_value = artifacts_subdir
 
-        strategy.update_evaluation_from_model(evaluation, model)
+        strategy.update_evaluation_from_model(
+            "table_1", evaluations, model, working_dir
+        )
+
+    evaluation = evaluations["table_1"]
 
     assert evaluation.cross_table_sqs == 80
-    assert evaluation.cross_table_report_html == "html"
     assert evaluation.cross_table_report_json == {"report": "json"}
 
     assert evaluation.individual_sqs is None
-    assert evaluation.individual_report_html is None
+    assert evaluation.individual_report_json is None
+
+
+def test_falls_back_to_fetching_report_json_when_download_artifacts_fails():
+    strategy = CrossTableStrategy()
+    evaluations = {
+        "table_1": TableEvaluation(),
+        "table_2": TableEvaluation(),
+    }
+    model = Mock()
+
+    with tempfile.TemporaryDirectory() as working_dir, patch(
+        "gretel_trainer.relational.strategies.cross_table.common.download_artifacts"
+    ) as download_artifacts, patch(
+        "gretel_trainer.relational.strategies.cross_table.common.get_sqs_score"
+    ) as get_sqs, patch(
+        "gretel_trainer.relational.strategies.cross_table.common._get_report_json"
+    ) as get_json:
+        get_sqs.return_value = 80
+        working_dir = Path(working_dir)
+        download_artifacts.return_value = None
+        get_json.return_value = {"report": "json"}
+
+        strategy.update_evaluation_from_model(
+            "table_1", evaluations, model, working_dir
+        )
+
+    evaluation = evaluations["table_1"]
+
+    assert evaluation.cross_table_sqs == 80
+    assert evaluation.cross_table_report_json == {"report": "json"}
+
+    assert evaluation.individual_sqs is None
     assert evaluation.individual_report_json is None
 
 
@@ -345,9 +386,7 @@ def test_updates_single_table_scores_using_evaluate(source_nba, synthetic_nba):
     )
 
     assert evaluation.individual_sqs == 85
-    assert evaluation.individual_report_html == "HTML"
     assert evaluation.individual_report_json == {"REPORT": "JSON"}
 
     assert evaluation.cross_table_sqs is None
-    assert evaluation.cross_table_report_html is None
     assert evaluation.cross_table_report_json is None

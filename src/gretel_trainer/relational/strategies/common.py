@@ -1,5 +1,6 @@
 import json
 import logging
+from pathlib import Path
 from typing import Dict, Optional, Set, Tuple
 
 import pandas as pd
@@ -21,21 +22,40 @@ def get_quality_report(
     return report
 
 
-def get_report_json(model: Model) -> Optional[Dict]:
+def download_artifacts(
+    model: Model, table_name: str, working_dir: Path
+) -> Optional[Path]:
+    """
+    Downloads all model artifacts to a subdirectory in the working directory.
+    Returns the artifact directory path when successful.
+    """
+    target_dir = working_dir / f"artifacts_{table_name}"
+    logger.info(f"Downloading model artifacts for {table_name}")
+    try:
+        model.download_artifacts(target_dir)
+        return target_dir
+    except:
+        logger.warning(f"Failed to download model artifacts for {table_name}")
+        return None
+
+
+def read_report_json_data(
+    model: Model, artifacts_dir: Optional[Path]
+) -> Optional[Dict]:
+    if artifacts_dir is not None:
+        report_json_path = artifacts_dir / "report_json.json.gz"
+        return json.loads(smart_open.open(report_json_path).read())
+    else:
+        return _get_report_json(model)
+
+
+def _get_report_json(model: Model) -> Optional[Dict]:
     try:
         return json.loads(
             smart_open.open(model.get_artifact_link("report_json")).read()
         )
     except:
         logger.warning("Failed to fetch model evaluation report JSON.")
-        return None
-
-
-def get_report_html(model: Model) -> Optional[str]:
-    try:
-        return smart_open.open(model.get_artifact_link("report")).read()
-    except:
-        logger.warning("Failed to fetch model evaluation report HTML.")
         return None
 
 

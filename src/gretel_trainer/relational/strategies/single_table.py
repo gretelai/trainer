@@ -104,11 +104,19 @@ class SingleTableStrategy:
         return synth_tables
 
     def update_evaluation_from_model(
-        self, evaluation: TableEvaluation, model: Model
+        self,
+        table_name: str,
+        evaluations: Dict[str, TableEvaluation],
+        model: Model,
+        working_dir: Path,
     ) -> None:
+        artifacts_dir = common.download_artifacts(model, table_name, working_dir)
+
+        evaluation = evaluations[table_name]
         evaluation.individual_sqs = common.get_sqs_score(model)
-        evaluation.individual_report_html = common.get_report_html(model)
-        evaluation.individual_report_json = common.get_report_json(model)
+        evaluation.individual_report_json = common.read_report_json_data(
+            model, artifacts_dir
+        )
 
     def update_evaluation_via_evaluate(
         self,
@@ -125,7 +133,6 @@ class SingleTableStrategy:
         )
 
         evaluation.cross_table_sqs = report.peek().get("score")
-        evaluation.cross_table_report_html = report.as_html
         evaluation.cross_table_report_json = report.as_dict
 
 
