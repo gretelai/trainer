@@ -14,13 +14,6 @@ from gretel_trainer.relational.core import (
 
 
 class CrossTableStrategy:
-    def __init__(self, model_type: str = "amplify"):
-        if model_type not in ("amplify", "lstm"):
-            raise MultiTableException(
-                f"Unsupported model type: {model_type}. Supported model types are `Amplify` and `LSTM`."
-            )
-        self._model_type = model_type
-
     def label_encode_keys(
         self, rel_data: RelationalData, tables: Dict[str, pd.DataFrame]
     ) -> Dict[str, pd.DataFrame]:

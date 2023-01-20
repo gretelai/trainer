@@ -582,7 +582,7 @@ def _select_strategy(
     strategy: str, model: str
 ) -> Union[SingleTableStrategy, CrossTableStrategy]:
     if strategy == "cross-table":
-        return CrossTableStrategy(model)
+        return CrossTableStrategy()
     elif strategy == "single-table":
         return SingleTableStrategy()
     else:
