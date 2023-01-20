@@ -274,6 +274,7 @@ class CrossTableStrategy:
         table: str,
         rel_data: RelationalData,
         synthetic_tables: Dict[str, pd.DataFrame],
+        working_dir: Path,
     ) -> None:
         source_data = rel_data.get_table_data(table)
         synth_data = synthetic_tables[table]
@@ -281,6 +282,7 @@ class CrossTableStrategy:
         report = common.get_quality_report(
             source_data=source_data, synth_data=synth_data
         )
+        common.write_report(report, table, working_dir)
 
         evaluation.individual_sqs = report.peek().get("score")
         evaluation.individual_report_json = report.as_dict

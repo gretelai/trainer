@@ -1,4 +1,5 @@
 import gzip
+import json
 import os
 import tempfile
 from pathlib import Path
@@ -6,6 +7,7 @@ from unittest.mock import Mock, patch
 
 import pandas as pd
 import pandas.testing as pdtest
+import smart_open
 
 import gretel_trainer.relational.ancestry as ancestry
 from gretel_trainer.relational.core import TableEvaluation
@@ -143,13 +145,22 @@ def test_updates_cross_table_scores_using_evaluate(source_nba, synthetic_nba):
     mock_report.as_html = "HTML"
     mock_report.as_dict = {"REPORT": "JSON"}
 
-    with patch(
+    with tempfile.TemporaryDirectory() as working_dir, patch(
         "gretel_trainer.relational.strategies.single_table.common.get_quality_report"
     ) as get_report:
+        working_dir = Path(working_dir)
         get_report.return_value = mock_report
         strategy.update_evaluation_via_evaluate(
-            evaluation, "cities", rel_data, synthetic_tables
+            evaluation, "cities", rel_data, synthetic_tables, working_dir
         )
+        assert len(os.listdir(working_dir)) == 2
+        assert (
+            smart_open.open(working_dir / "expanded_evaluation_cities.html").read()
+            == "HTML"
+        )
+        assert json.loads(
+            smart_open.open(working_dir / "expanded_evaluation_cities.json").read()
+        ) == {"REPORT": "JSON"}
 
     get_report.assert_called_once()
 

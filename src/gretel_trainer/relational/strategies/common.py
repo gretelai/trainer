@@ -22,6 +22,16 @@ def get_quality_report(
     return report
 
 
+def write_report(report: QualityReport, table_name: str, working_dir: Path) -> None:
+    html_path = working_dir / f"expanded_evaluation_{table_name}.html"
+    json_path = working_dir / f"expanded_evaluation_{table_name}.json"
+
+    with open(html_path, "w") as f:
+        f.write(report.as_html)
+    with open(json_path, "w") as f:
+        f.write(json.dumps(report.as_dict))
+
+
 def download_artifacts(
     model: Model, table_name: str, working_dir: Path
 ) -> Optional[Path]:

@@ -486,6 +486,7 @@ class MultiTable:
                 table=table_name,
                 rel_data=self.relational_data,
                 synthetic_tables=self.synthetic_output_tables,
+                working_dir=self._working_dir,
             )
 
     def _reset_generation_statuses(self) -> None:

@@ -126,6 +126,7 @@ class SingleTableStrategy:
         table: str,
         rel_data: RelationalData,
         synthetic_tables: Dict[str, pd.DataFrame],
+        working_dir: Path,
     ) -> None:
         source_data = ancestry.get_table_data_with_ancestors(rel_data, table)
         synth_data = ancestry.get_table_data_with_ancestors(
@@ -135,6 +136,7 @@ class SingleTableStrategy:
         report = common.get_quality_report(
             source_data=source_data, synth_data=synth_data
         )
+        common.write_report(report, table, working_dir)
 
         evaluation.cross_table_sqs = report.peek().get("score")
         evaluation.cross_table_report_json = report.as_dict
