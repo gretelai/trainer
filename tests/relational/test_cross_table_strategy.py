@@ -198,6 +198,31 @@ def test_generation_job(pets):
     assert set(output_tables["humans"].columns) == {"self|name", "self|city", "self|id"}
 
 
+def test_post_processing_individual_synthetic_result(ecom):
+    strategy = CrossTableStrategy()
+    synth_events = pd.DataFrame(
+        data={
+            "self|id": [100, 101, 102, 103, 104],
+            "self|user_id": [200, 201, 202, 203, 204],
+            "self.user_id|id": [10, 11, 12, 13, 14],
+        }
+    )
+
+    processed_events = strategy.post_process_individual_synthetic_result(
+        "events", ecom, synth_events
+    )
+
+    expected_post_processing = pd.DataFrame(
+        data={
+            "self|id": [0, 1, 2, 3, 4],
+            "self|user_id": [10, 11, 12, 13, 14],
+            "self.user_id|id": [10, 11, 12, 13, 14],
+        }
+    )
+
+    pdtest.assert_frame_equal(expected_post_processing, processed_events)
+
+
 def test_uses_trained_model_to_update_cross_table_scores():
     strategy = CrossTableStrategy()
     evaluation = TableEvaluation()
