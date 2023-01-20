@@ -1,3 +1,4 @@
+from pathlib import Path
 from unittest.mock import Mock, patch
 
 import pandas as pd
@@ -49,7 +50,7 @@ def test_table_generation_readiness(ecom):
 
 def test_generation_job_requests_num_records(pets):
     strategy = SingleTableStrategy()
-    job = strategy.get_generation_job("pets", pets, 2.0, {})
+    job = strategy.get_generation_job("pets", pets, 2.0, {}, Path("/working"))
 
     assert job == {"params": {"num_records": 10}}
 

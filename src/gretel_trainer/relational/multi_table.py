@@ -452,6 +452,7 @@ class MultiTable:
                     self.relational_data,
                     record_size_ratio,
                     output_tables,
+                    self._working_dir,
                 )
                 self._log_start(table_name, "synthetic data generation")
                 self.generate_statuses[table_name] = GenerateStatus.InProgress

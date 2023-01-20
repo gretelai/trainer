@@ -1,4 +1,5 @@
 import random
+from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 import pandas as pd
@@ -69,6 +70,7 @@ class SingleTableStrategy:
         rel_data: RelationalData,
         record_size_ratio: float,
         output_tables: Dict[str, pd.DataFrame],
+        working_dir: Path,
     ) -> Dict[str, Any]:
         """
         Returns kwargs for a record handler job requesting an output record

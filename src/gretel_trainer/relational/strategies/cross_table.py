@@ -1,4 +1,5 @@
 import itertools
+from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 import pandas as pd
@@ -139,6 +140,7 @@ class CrossTableStrategy:
         rel_data: RelationalData,
         record_size_ratio: float,
         output_tables: Dict[str, pd.DataFrame],
+        working_dir: Path,
     ) -> Dict[str, Any]:
         """
         Returns kwargs for creating a record handler job via the Gretel SDK.
@@ -156,7 +158,9 @@ class CrossTableStrategy:
             seed_df = self._build_seed_data_for_table(
                 table, output_tables, rel_data, synth_size
             )
-            return {"data_source": seed_df}
+            seed_path = working_dir / f"seed_{table}.csv"
+            seed_df.to_csv(seed_path, index=False)
+            return {"data_source": seed_path}
 
     def _build_seed_data_for_table(
         self,
