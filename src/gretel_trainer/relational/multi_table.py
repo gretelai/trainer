@@ -129,7 +129,7 @@ class MultiTable:
     def transform(
         self,
         configs: Dict[str, GretelModelConfig],
-        in_place: bool,
+        in_place: bool = False,
     ) -> Dict[str, pd.DataFrame]:
         """
         Applies supplied transform model configurations to tables. Returned dictionary includes all transformed
@@ -137,7 +137,7 @@ class MultiTable:
 
         Args:
             configs (dict[str, GretelModelConfig]): keys are table names and values are Transform model configs.
-            in_place (bool): If True, overwrites internal source dataframes with transformed dataframes,
+            in_place (bool, optional): If True, overwrites internal source dataframes with transformed dataframes,
             which means subsequent synthetic model training would be performed on the transform results.
 
         Returns:
