@@ -9,16 +9,6 @@ from gretel_trainer.relational.core import RelationalData
 
 
 @pytest.fixture()
-def configured_session():
-    # Need to patch configure_session in two spots because MultiTable calls it first
-    # (before any work is done) and then Trainer instances call it internally
-    with patch("gretel_trainer.relational.multi_table.configure_session"), patch(
-        "gretel_trainer.trainer.configure_session"
-    ):
-        yield
-
-
-@pytest.fixture()
 def pets():
     humans = pd.DataFrame(
         data={
