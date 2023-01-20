@@ -161,36 +161,6 @@ class RelationalData:
         df = df.add_prefix(f"{lineage}{self._end_lineage_prefix}")
         return _join_parents(df, table, lineage, self, tableset)
 
-    def list_multigenerational_keys(self, table: str) -> List[str]:
-        """
-        Returns a list of multigenerational column names (i.e. including lineage)
-        that are primary or foreign keys on the source tables.
-        """
-
-        def _add_multigenerational_keys(keys: List[str], lineage: str, table_name: str):
-            primary_key = self.get_primary_key(table_name)
-            if primary_key is not None:
-                keys.append(f"{lineage}{self._end_lineage_prefix}{primary_key}")
-
-            foreign_keys = self.get_foreign_keys(table_name)
-            keys.extend(
-                [
-                    f"{lineage}{self._end_lineage_prefix}{foreign_key.column_name}"
-                    for foreign_key in foreign_keys
-                ]
-            )
-
-            for foreign_key in foreign_keys:
-                next_lineage = (
-                    f"{lineage}{self._generation_delimiter}{foreign_key.column_name}"
-                )
-                parent_table_name = foreign_key.parent_table_name
-                _add_multigenerational_keys(keys, next_lineage, parent_table_name)
-
-        keys = []
-        _add_multigenerational_keys(keys, self._start_lineage, table)
-        return keys
-
     def is_ancestral_column(self, column: str) -> bool:
         """
         Returns True if the provided column name corresponds to an elder-generation ancestor.

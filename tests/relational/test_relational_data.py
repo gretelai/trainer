@@ -144,19 +144,6 @@ def test_ancestral_data_from_different_tablesets(source_nba, synthetic_nba):
     assert set(custom_teams_with_ancestors["self|name"]) == {"Sixers", "Heat"}
 
 
-def test_list_ancestral_keys(mutagenesis):
-    assert set(mutagenesis.list_multigenerational_keys("bond")) == {
-        "self|atom1_id",
-        "self|atom2_id",
-        "self.atom1_id|atom_id",
-        "self.atom1_id|molecule_id",
-        "self.atom2_id|atom_id",
-        "self.atom2_id|molecule_id",
-        "self.atom1_id.molecule_id|molecule_id",
-        "self.atom2_id.molecule_id|molecule_id",
-    }
-
-
 def test_whether_column_is_ancestral(mutagenesis):
     assert mutagenesis.is_ancestral_column("self|atom1_id") is False
     assert mutagenesis.is_ancestral_column("self.atom1_id|atom1_id")
