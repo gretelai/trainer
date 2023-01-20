@@ -1,17 +1,9 @@
 # Relational
 
-## Quickstart
+## User guide
 
-```python
-from gretel_trainer.relational.connectors import sqlite_conn
-from gretel_trainer.relational.multi_table import MultiTable
+See `notebooks/multitable.ipynb` for a walkthrough of functionality.
 
-connection = sqlite_conn(path="my_data.db")
-relational_data = connection.extract()
-multitable = MultiTable(relational_data)
-multitable.train()
-synthetic_tables = multitable.generate()
-```
 
 ## Overview of Python objects
 
@@ -55,7 +47,7 @@ depends on one `Strategy`.
 `Strategy` instances capture low-level business logic, including but not limited to:
 - how source data is modified prior to training
 - sequencing of table generation jobs
-- how many generation jobs are run and their parameters
+- post-processing of synthetic results from generation jobs
 
 There are currently two strategies:
 - `SingleTableStrategy`, in which models are trained on individual tables
