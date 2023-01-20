@@ -2,11 +2,8 @@ from __future__ import annotations
 
 import json
 import logging
-import os
-import re
 from dataclasses import dataclass, field
-from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional
 
 import networkx
 import pandas as pd
@@ -37,9 +34,6 @@ class ForeignKey:
 class RelationalData:
     def __init__(self):
         self.graph = networkx.DiGraph()
-        self._start_lineage = "self"
-        self._generation_delimiter = "."
-        self._end_lineage_prefix = "|"
 
     def add_table(
         self, table: str, primary_key: Optional[str], data: pd.DataFrame
@@ -115,95 +109,6 @@ class RelationalData:
             foreign_keys.extend(fks)
         return foreign_keys
 
-    def get_multigenerational_primary_key(self, table: str) -> Optional[str]:
-        pk = self.get_primary_key(table)
-        if pk is None:
-            return None
-        else:
-            return f"{self._start_lineage}{self._end_lineage_prefix}{pk}"
-
-    def get_ancestral_foreign_key_maps(self, table: str) -> List[Tuple[str, str]]:
-        def _ancestral_fk_map(fk: ForeignKey) -> Tuple[str, str]:
-            start_lineage = self._start_lineage
-            gen_delim = self._generation_delimiter
-            end_prefix = self._end_lineage_prefix
-            fk_col = fk.column_name
-            ref_col = fk.parent_column_name
-
-            ancestral_foreign_key = f"{start_lineage}{end_prefix}{fk_col}"
-            ancestral_referenced_col = (
-                f"{start_lineage}{gen_delim}{fk_col}{end_prefix}{ref_col}"
-            )
-
-            return (ancestral_foreign_key, ancestral_referenced_col)
-
-        return [_ancestral_fk_map(fk) for fk in self.get_foreign_keys(table)]
-
-    def get_table_data_with_ancestors(
-        self, table: str, tableset: Optional[Dict[str, pd.DataFrame]] = None
-    ) -> pd.DataFrame:
-        """
-        Returns a data frame with all ancestral data joined to each record.
-        Column names are modified to the format `LINAGE|COLUMN_NAME`.
-        Lineage begins with `self` for the supplied `table`, and as older
-        generations are joined, the foreign keys to those generations are appended,
-        separated by periods.
-
-        If `tableset` is provided, use it in place of the source data in `self.graph`.
-        """
-        lineage = self._start_lineage
-        if tableset is not None:
-            df = tableset[table]
-        else:
-            df = self.get_table_data(table)
-        df = df.add_prefix(f"{lineage}{self._end_lineage_prefix}")
-        return _join_parents(df, table, lineage, self, tableset)
-
-    def is_ancestral_column(self, column: str) -> bool:
-        """
-        Returns True if the provided column name corresponds to an elder-generation ancestor.
-        """
-        regex_string = rf"\{self._generation_delimiter}[^\{self._end_lineage_prefix}]+\{self._end_lineage_prefix}"
-        regex = re.compile(regex_string)
-        return bool(regex.search(column))
-
-    def drop_ancestral_data(self, df: pd.DataFrame) -> pd.DataFrame:
-        """
-        Drops ancestral columns from the given dataframe and removes the lineage prefix
-        from the remaining columns, restoring them to their original source names.
-        """
-        end_prefix = self._end_lineage_prefix
-        root_columns = [
-            col
-            for col in df.columns
-            if col.startswith(f"{self._start_lineage}{end_prefix}")
-        ]
-        mapper = {
-            col: col.removeprefix(f"{self._start_lineage}{end_prefix}")
-            for col in root_columns
-        }
-        return df[root_columns].rename(columns=mapper)
-
-    def prepend_foreign_key_lineage(
-        self, df: pd.DataFrame, fk_col: str
-    ) -> pd.DataFrame:
-        """
-        Given a multigenerational dataframe, renames all columns such that the provided
-        foreign key acts as the lineage from some child table to the provided data.
-        The resulting column names are elder-generation ancestral column names from the
-        perspective of a child table that relates to that parent via the provided foreign key.
-        """
-
-        def _adjust(col: str) -> str:
-            return col.replace(
-                self._start_lineage,
-                f"{self._start_lineage}{self._generation_delimiter}{fk_col}",
-                1,
-            )
-
-        mapper = {col: _adjust(col) for col in df.columns}
-        return df.rename(columns=mapper)
-
     def debug_summary(self) -> Dict[str, Any]:
         max_depth = dag_longest_path_length(self.graph)
         all_tables = self.list_all_tables()
@@ -276,36 +181,3 @@ class RelationalData:
             relational_data.add_foreign_key(foreign_key, referencing)
 
         return relational_data
-
-
-def _join_parents(
-    df: pd.DataFrame,
-    table: str,
-    lineage: str,
-    relational_data: RelationalData,
-    tableset: Optional[Dict[str, pd.DataFrame]],
-) -> pd.DataFrame:
-    end_prefix = relational_data._end_lineage_prefix
-    for foreign_key in relational_data.get_foreign_keys(table):
-        next_lineage = (
-            f"{lineage}{relational_data._generation_delimiter}{foreign_key.column_name}"
-        )
-
-        parent_table_name = foreign_key.parent_table_name
-        if tableset is not None:
-            parent_data = tableset[parent_table_name]
-        else:
-            parent_data = relational_data.get_table_data(parent_table_name)
-        parent_data = parent_data.add_prefix(f"{next_lineage}{end_prefix}")
-
-        df = df.merge(
-            parent_data,
-            how="left",
-            left_on=f"{lineage}{end_prefix}{foreign_key.column_name}",
-            right_on=f"{next_lineage}{end_prefix}{foreign_key.parent_column_name}",
-        )
-
-        df = _join_parents(
-            df, parent_table_name, next_lineage, relational_data, tableset
-        )
-    return df

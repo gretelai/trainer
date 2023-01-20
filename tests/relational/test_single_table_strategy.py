@@ -7,6 +7,7 @@ from unittest.mock import Mock, patch
 import pandas as pd
 import pandas.testing as pdtest
 
+import gretel_trainer.relational.ancestry as ancestry
 from gretel_trainer.relational.core import TableEvaluation
 from gretel_trainer.relational.strategies.single_table import SingleTableStrategy
 
@@ -152,8 +153,10 @@ def test_updates_cross_table_scores_using_evaluate(source_nba, synthetic_nba):
 
     get_report.assert_called_once()
 
-    ancestral_source_data = rel_data.get_table_data_with_ancestors("cities")
-    ancestral_synth_data = synth_rel_data.get_table_data_with_ancestors("cities")
+    ancestral_source_data = ancestry.get_table_data_with_ancestors(rel_data, "cities")
+    ancestral_synth_data = ancestry.get_table_data_with_ancestors(
+        synth_rel_data, "cities"
+    )
 
     call_args = get_report.call_args
 

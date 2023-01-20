@@ -6,6 +6,7 @@ import pandas as pd
 from gretel_client.projects.models import Model
 from pandas.api.types import is_string_dtype
 
+import gretel_trainer.relational.ancestry as ancestry
 import gretel_trainer.relational.strategies.common as common
 from gretel_trainer.relational.core import (
     MultiTableException,
@@ -78,8 +79,8 @@ class CrossTableStrategy:
 
         # Next, collect all data in multigenerational format
         for table_name in all_tables:
-            data = rel_data.get_table_data_with_ancestors(
-                table_name, tableset_with_altered_keys
+            data = ancestry.get_table_data_with_ancestors(
+                rel_data, table_name, tableset_with_altered_keys
             )
             training_data[table_name] = data
 
@@ -88,7 +89,7 @@ class CrossTableStrategy:
             columns_to_drop = []
 
             for column in data.columns:
-                if rel_data.is_ancestral_column(
+                if ancestry.is_ancestral_column(
                     column
                 ) and _is_highly_unique_categorical(column, data):
                     columns_to_drop.append(column)
@@ -177,7 +178,7 @@ class CrossTableStrategy:
             this_fk_seed_df = pd.DataFrame()
 
             parent_table_data = output_tables[fk.parent_table_name]
-            parent_table_data = rel_data.prepend_foreign_key_lineage(
+            parent_table_data = ancestry.prepend_foreign_key_lineage(
                 parent_table_data, fk.column_name
             )
             parent_index_cycle = itertools.cycle(range(len(parent_table_data)))
@@ -224,14 +225,14 @@ class CrossTableStrategy:
         Replaces primary key values with a new, contiguous set of values.
         Replaces synthesized foreign keys with seed primary keys.
         """
-        primary_key = rel_data.get_multigenerational_primary_key(table_name)
+        primary_key = ancestry.get_multigenerational_primary_key(rel_data, table_name)
         if primary_key is None:
             return synthetic_table
 
         processed = synthetic_table
         processed[primary_key] = [i for i in range(len(synthetic_table))]
 
-        foreign_key_maps = rel_data.get_ancestral_foreign_key_maps(table_name)
+        foreign_key_maps = ancestry.get_ancestral_foreign_key_maps(rel_data, table_name)
         for fk, parent_pk in foreign_key_maps:
             processed[fk] = processed[parent_pk]
 
@@ -248,7 +249,7 @@ class CrossTableStrategy:
         """
         # TODO: do we need to do any additional PK/FK manipulation?
         return {
-            table_name: rel_data.drop_ancestral_data(df)
+            table_name: ancestry.drop_ancestral_data(df)
             for table_name, df in output_tables.items()
         }
 

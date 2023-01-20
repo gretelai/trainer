@@ -5,6 +5,7 @@ from typing import Any, Dict, List, Optional
 import pandas as pd
 from gretel_client.projects.models import Model
 
+import gretel_trainer.relational.ancestry as ancestry
 import gretel_trainer.relational.strategies.common as common
 from gretel_trainer.relational.core import RelationalData, TableEvaluation
 
@@ -126,8 +127,10 @@ class SingleTableStrategy:
         rel_data: RelationalData,
         synthetic_tables: Dict[str, pd.DataFrame],
     ) -> None:
-        source_data = rel_data.get_table_data_with_ancestors(table)
-        synth_data = rel_data.get_table_data_with_ancestors(table, synthetic_tables)
+        source_data = ancestry.get_table_data_with_ancestors(rel_data, table)
+        synth_data = ancestry.get_table_data_with_ancestors(
+            rel_data, table, synthetic_tables
+        )
 
         report = common.get_quality_report(
             source_data=source_data, synth_data=synth_data

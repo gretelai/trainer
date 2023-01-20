@@ -8,6 +8,7 @@ import pandas as pd
 import pandas.testing as pdtest
 import pytest
 
+import gretel_trainer.relational.ancestry as ancestry
 from gretel_trainer.relational.core import TableEvaluation
 from gretel_trainer.relational.strategies.cross_table import CrossTableStrategy
 
@@ -235,8 +236,8 @@ def test_generation_job_seeds_go_back_multiple_generations(source_nba, synthetic
     source_nba = source_nba[0]
     synthetic_nba = synthetic_nba[0]
     output_tables = {
-        "cities": synthetic_nba.get_table_data_with_ancestors("cities"),
-        "states": synthetic_nba.get_table_data_with_ancestors("states"),
+        "cities": ancestry.get_table_data_with_ancestors(synthetic_nba, "cities"),
+        "states": ancestry.get_table_data_with_ancestors(synthetic_nba, "states"),
     }
     training_columns = {
         "teams": [
