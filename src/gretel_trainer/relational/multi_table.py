@@ -465,14 +465,12 @@ class MultiTable:
             output_tables, preserve_tables, self.relational_data
         )
         self.synthetic_output_tables = output_tables
-        return self.synthetic_output_tables
 
-    def export_synthetic_tables(self, prefix: str = "synth_") -> None:
-        """
-        Exports output tables as CSVs to the working directory.
-        """
         for table_name, df in self.synthetic_output_tables.items():
-            df.to_csv(f"{self._working_dir}/{prefix}{table_name}.csv", index=False)
+            out_path = self._working_dir / f"synth_{table_name}.csv"
+            df.to_csv(out_path, index=False)
+
+        return self.synthetic_output_tables
 
     def expand_evaluations(self) -> None:
         """
