@@ -4,7 +4,7 @@ import json
 import logging
 import os
 import re
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -21,9 +21,9 @@ class MultiTableException(Exception):
 
 @dataclass
 class TableEvaluation:
-    cross_table_report_json: Optional[Dict] = None
+    cross_table_report_json: Optional[Dict] = field(default=None, repr=False)
     cross_table_sqs: Optional[int] = None
-    individual_report_json: Optional[Dict] = None
+    individual_report_json: Optional[Dict] = field(default=None, repr=False)
     individual_sqs: Optional[int] = None
 
 
