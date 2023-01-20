@@ -53,7 +53,7 @@ class MultiTable:
         project_name (str, optional): Name for the Gretel project holding models and artifacts. Defaults to "multi-table".
         gretel_model (str, optional): The underlying Gretel model to use. Supports "Amplify" (default), "LSTM", and "ACTGAN".
         strategy (str, optional): The strategy to use. Supports "cross-table" (default) and "single-table".
-        working_dir (str, optional): Directory in which temporary assets should be cached. Defaults to "working".
+        working_dir (str, optional): Directory in which temporary assets should be cached. Defaults to match the project_name.
         refresh_interval (int, optional): Frequency in seconds to poll Gretel Cloud for job statuses. Must be at least 60 (1m). Defaults to 180 (3m).
     """
 
@@ -63,7 +63,7 @@ class MultiTable:
         project_name: str = "multi-table",
         gretel_model: str = "amplify",
         strategy: str = "cross-table",
-        working_dir: str = "working",
+        working_dir: Optional[str] = None,
         refresh_interval: Optional[int] = None,
     ):
         gretel_model = gretel_model.lower()
@@ -73,8 +73,7 @@ class MultiTable:
         self._strategy = _select_strategy(strategy, gretel_model)
 
         configure_session(api_key="prompt", cache="yes", validate=True)
-        self._project_name = project_name
-        self._project = create_or_get_unique_project(name=self._project_name)
+        self._project = create_or_get_unique_project(name=project_name)
 
         self.relational_data = relational_data
         self._set_refresh_interval(refresh_interval)
@@ -84,6 +83,7 @@ class MultiTable:
         self._reset_generation_statuses()
         self.evaluations = defaultdict(lambda: TableEvaluation())
 
+        working_dir = working_dir or project_name
         self._working_dir = Path(working_dir)
         os.makedirs(self._working_dir, exist_ok=True)
         self._create_debug_summary()
