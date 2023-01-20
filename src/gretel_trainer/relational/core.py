@@ -204,41 +204,6 @@ class RelationalData:
         mapper = {col: _adjust(col) for col in df.columns}
         return df.rename(columns=mapper)
 
-    def build_seed_data_for_table(
-        self, table: str, ancestor_data: Optional[Dict[str, pd.DataFrame]] = None
-    ) -> Optional[pd.DataFrame]:
-        """
-        Returns a multigenerational dataframe composed exclusively of ancestral columns;
-        columns from the provided table are excluded. If ancestor_data is provided, will
-        use that tableset; otherwise uses source data. The ancestor_data dict MAY include
-        a key/value pair for for the provided table, but it is not necessary because those
-        columns are not included in the output dataframe.
-
-        Returns None if table has no parents.
-        """
-        if len(self.get_parents(table)) == 0:
-            return None
-        else:
-            if ancestor_data is not None:
-                # TODO: check and raise if ancestor_data is missing any parents?
-
-                # Ensure provided data is not multigenerational; columns should match source
-                # TODO: do we need to be defensive here and explicitly check for lineage prefixes?
-                for name, data in ancestor_data.items():
-                    ancestor_data[name] = self.drop_ancestral_data(data)
-
-                # Data from supplied `table` must be present for the call to `get_table_data_with_ancestors`,
-                # but those columns are not included in the output so it's OK to add source data to an
-                # otherwise synthetic tableset
-                if ancestor_data.get(table) is None:
-                    ancestor_data.update({table: self.get_table_data(table)})
-
-            df = self.get_table_data_with_ancestors(table, ancestor_data)
-            ancestral_columns = [
-                col for col in df.columns if self.is_ancestral_column(col)
-            ]
-            return df.filter(ancestral_columns)
-
     def debug_summary(self) -> Dict[str, Any]:
         max_depth = dag_longest_path_length(self.graph)
         all_tables = self.list_all_tables()

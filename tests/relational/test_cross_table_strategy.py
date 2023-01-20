@@ -214,6 +214,34 @@ def test_generation_job(pets):
     assert set(output_tables["humans"].columns) == {"self|name", "self|city", "self|id"}
 
 
+def test_generation_job_seeds_go_back_multiple_generations(source_nba, synthetic_nba):
+    source_nba = source_nba[0]
+    synthetic_nba = synthetic_nba[0]
+    output_tables = {
+        "cities": synthetic_nba.get_table_data_with_ancestors("cities"),
+        "states": synthetic_nba.get_table_data_with_ancestors("states"),
+    }
+
+    strategy = CrossTableStrategy()
+
+    with tempfile.TemporaryDirectory() as tmp:
+        working_dir = Path(tmp)
+        job = strategy.get_generation_job(
+            "teams", source_nba, 1.0, output_tables, working_dir
+        )
+        seed_df = pd.read_csv(job["data_source"])
+
+    expected_seed_df_columns = {
+        "self.city_id|id",
+        # "self.city_id|name", # highly unique categorical
+        "self.city_id|state_id",
+        "self.city_id.state_id|id",
+        # "self.city_id.state_id|name", # highly unique categorical
+    }
+
+    assert set(seed_df.columns) == expected_seed_df_columns
+
+
 def test_post_processing_individual_synthetic_result(ecom):
     strategy = CrossTableStrategy()
     synth_events = pd.DataFrame(
