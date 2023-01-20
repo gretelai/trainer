@@ -470,6 +470,7 @@ class MultiTable:
         for table_name, df in self.synthetic_output_tables.items():
             out_path = self._working_dir / f"synth_{table_name}.csv"
             df.to_csv(out_path, index=False)
+            self._project.upload_artifact(out_path)
 
         return self.synthetic_output_tables
 
