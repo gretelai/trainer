@@ -240,10 +240,13 @@ class CrossTableStrategy:
         rel_data: RelationalData,
     ) -> Dict[str, pd.DataFrame]:
         """
-        WIP (PK/FK synthesis)
         Restores tables from multigenerational to original shape
         """
-        return output_tables
+        # TODO: do we need to do any additional PK/FK manipulation?
+        return {
+            table_name: rel_data.drop_ancestral_data(df)
+            for table_name, df in output_tables.items()
+        }
 
     def update_evaluation_from_model(
         self, evaluation: TableEvaluation, model: Model

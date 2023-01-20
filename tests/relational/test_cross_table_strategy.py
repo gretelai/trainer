@@ -223,6 +223,56 @@ def test_post_processing_individual_synthetic_result(ecom):
     pdtest.assert_frame_equal(expected_post_processing, processed_events)
 
 
+def test_post_process_synthetic_results(ecom):
+    strategy = CrossTableStrategy()
+    out_events = pd.DataFrame(
+        data={
+            "self|id": [0, 1, 2],
+            "self|browser": ["chrome", "safari", "brave"],
+            "self|traffic_source": ["mobile", "mobile", "mobile"],
+            "self|user_id": [0, 1, 2],
+            "self.user_id|id": [0, 1, 2],
+            "self.user_id|first_name": ["a", "b", "c"],
+            "self.user_id|last_name": ["A", "B", "C"],
+            "self.user_id|ssn": ["111", "222", "333"],
+        }
+    )
+    out_users = pd.DataFrame(
+        data={
+            "self|id": [0, 1, 2],
+            "self|first_name": ["a", "b", "c"],
+            "self|last_name": ["A", "B", "C"],
+            "self|ssn": ["111", "222", "333"],
+        }
+    )
+    output_tables = {
+        "events": out_events,
+        "users": out_users,
+    }
+
+    processed_tables = strategy.post_process_synthetic_results(output_tables, [], ecom)
+
+    expected_events = pd.DataFrame(
+        data={
+            "id": [0, 1, 2],
+            "browser": ["chrome", "safari", "brave"],
+            "traffic_source": ["mobile", "mobile", "mobile"],
+            "user_id": [0, 1, 2],
+        }
+    )
+    expected_users = pd.DataFrame(
+        data={
+            "id": [0, 1, 2],
+            "first_name": ["a", "b", "c"],
+            "last_name": ["A", "B", "C"],
+            "ssn": ["111", "222", "333"],
+        }
+    )
+
+    pdtest.assert_frame_equal(expected_events, processed_tables["events"])
+    pdtest.assert_frame_equal(expected_users, processed_tables["users"])
+
+
 def test_uses_trained_model_to_update_cross_table_scores():
     strategy = CrossTableStrategy()
     evaluation = TableEvaluation()
