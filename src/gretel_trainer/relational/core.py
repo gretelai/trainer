@@ -126,14 +126,15 @@ class RelationalData:
 
     def get_ancestral_foreign_key_maps(self, table: str) -> List[Tuple[str, str]]:
         def _ancestral_fk_map(fk: ForeignKey) -> Tuple[str, str]:
+            start_lineage = self._start_lineage
             gen_delim = self._generation_delimiter
             end_prefix = self._end_lineage_prefix
             fk_col = fk.column_name
             ref_col = fk.parent_column_name
 
-            ancestral_foreign_key = f"{self._start_lineage}{end_prefix}{fk_col}"
+            ancestral_foreign_key = f"{start_lineage}{end_prefix}{fk_col}"
             ancestral_referenced_col = (
-                f"{self._start_lineage}{gen_delim}{fk_col}{end_prefix}{ref_col}"
+                f"{start_lineage}{gen_delim}{fk_col}{end_prefix}{ref_col}"
             )
 
             return (ancestral_foreign_key, ancestral_referenced_col)
