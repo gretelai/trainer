@@ -160,7 +160,7 @@ class CrossTableStrategy:
             )
             seed_path = working_dir / f"seed_{table}.csv"
             seed_df.to_csv(seed_path, index=False)
-            return {"data_source": seed_path}
+            return {"data_source": str(seed_path)}
 
     def _build_seed_data_for_table(
         self,
