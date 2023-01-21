@@ -9,6 +9,29 @@ from gretel_trainer.relational.core import RelationalData
 
 
 @pytest.fixture()
+def trips():
+    vehicle_types = pd.DataFrame(
+        data={
+            "name": ["car", "train", "bike", "plane"],
+            "id": [1, 2, 3, 4],
+        }
+    )
+    vehicle_type_ids = [1] * 60 + [2] * 30 + [3] * 5 + [4] * 5
+    trips = pd.DataFrame(
+        data={
+            "id": list(range(100)),
+            "vehicle_type_id": vehicle_type_ids,
+            "purpose": ["work"] * 100,
+        }
+    )
+    rel_data = RelationalData()
+    rel_data.add_table("vehicle_types", "id", vehicle_types)
+    rel_data.add_table("trips", "id", trips)
+    rel_data.add_foreign_key("trips.vehicle_type_id", "vehicle_types.id")
+    return rel_data
+
+
+@pytest.fixture()
 def pets():
     humans = pd.DataFrame(
         data={

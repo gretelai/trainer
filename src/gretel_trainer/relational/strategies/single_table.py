@@ -1,3 +1,4 @@
+import itertools
 import random
 from pathlib import Path
 from typing import Any, Dict, List, Optional
@@ -191,12 +192,10 @@ def _synthesize_foreign_keys(
                 .size()
                 .reset_index()
             )
-            frequencies_descending = sorted(
-                list(original_fk_frequencies[0]), reverse=True
-            )
+            frequencies = list(original_fk_frequencies[0])
 
             new_fk_values = _collect_new_foreign_key_values(
-                synth_pk_values, frequencies_descending, len(out_df)
+                synth_pk_values, frequencies, len(out_df)
             )
 
             out_df[foreign_key.column_name] = new_fk_values
@@ -211,29 +210,23 @@ def _collect_new_foreign_key_values(
     frequencies: List[int],
     total: int,
 ) -> List[Any]:
-    """
-    Uses `random.choices` to select `k=total` elements from `values`,
-    weighted according to `frequencies`.
-    """
-    v_len = len(values)
-    f_len = len(frequencies)
-    f_iter = iter(frequencies)
+    values_cycle = itertools.cycle(values)
+    freqs_cycle = itertools.cycle(sorted(frequencies))
 
-    if v_len == f_len:
-        # Unlikely but convenient exact match
-        weights = frequencies
+    # Loop through frequencies in ascending order,
+    # adding "that many" of the next valid FK value
+    # to the output collection
+    new_fk_values = []
+    while len(new_fk_values) < total:
+        fk_value = next(values_cycle)
 
-    elif v_len < f_len:
-        # Add as many frequencies as necessary, in descending order
-        weights = []
-        while len(weights) < v_len:
-            weights.append(next(f_iter))
+        for _ in range(next(freqs_cycle)):
+            new_fk_values.append(fk_value)
 
-    else:
-        # Add all frequencies to start, then fill in more as necessary in descending order
-        weights = frequencies
-        while len(weights) < v_len:
-            weights.append(next(f_iter))
+    # trim potential excess
+    new_fk_values = new_fk_values[0:total]
 
-    random.shuffle(weights)
-    return random.choices(values, weights=weights, k=total)
+    # shuffle for realism
+    random.shuffle(new_fk_values)
+
+    return new_fk_values

@@ -2,6 +2,7 @@ import gzip
 import json
 import os
 import tempfile
+from collections import defaultdict
 from pathlib import Path
 from unittest.mock import Mock, patch
 
@@ -59,6 +60,111 @@ def test_generation_job_requests_num_records(pets):
     job = strategy.get_generation_job("pets", pets, 2.0, {}, Path("/working"), [])
 
     assert job == {"params": {"num_records": 10}}
+
+
+def test_post_processing_one_to_one(pets):
+    strategy = SingleTableStrategy()
+
+    # Models train on data with PKs and FKs removed,
+    # so those fields won't be present in raw results
+    raw_synth_tables = {
+        "humans": pd.DataFrame(
+            data={
+                "name": ["Michael", "Dominique", "Dirk"],
+                "city": ["Chicago", "Atlanta", "Dallas"],
+            }
+        ),
+        "pets": pd.DataFrame(
+            data={
+                "name": ["Bull", "Hawk", "Maverick"],
+                "age": [6, 0, 1],
+            }
+        ),
+    }
+
+    processed = strategy.post_process_synthetic_results(raw_synth_tables, [], pets)
+
+    pdtest.assert_frame_equal(
+        processed["humans"],
+        pd.DataFrame(
+            data={
+                "name": ["Michael", "Dominique", "Dirk"],
+                "city": ["Chicago", "Atlanta", "Dallas"],
+                "id": [0, 1, 2],  # contiguous set of integers
+            }
+        ),
+    )
+
+    # FK order varies, so here we only assert on the deterministic fields
+    pdtest.assert_frame_equal(
+        processed["pets"][["name", "age", "id"]],
+        pd.DataFrame(
+            data={
+                "name": ["Bull", "Hawk", "Maverick"],
+                "age": [6, 0, 1],
+                "id": [0, 1, 2],  # contiguous set of integers
+            }
+        ),
+    )
+
+    # Given 1:1 FK:PK relationship and record_size_ratio of 1,
+    # we expect to see all PKs present in the FK column
+    # (though we can't guarantee their order)
+    assert set(processed["pets"]["human_id"]) == {0, 1, 2}
+
+
+def test_post_processing_one_to_one_foreign_keys(pets):
+    strategy = SingleTableStrategy()
+
+    raw_synth_tables = {
+        "humans": pd.DataFrame(
+            data={
+                "name": ["Michael", "Dominique", "Dirk"],
+                "city": ["Chicago", "Atlanta", "Dallas"],
+            }
+        ),
+        "pets": pd.DataFrame(
+            data={
+                "name": ["Bull", "Hawk", "Maverick"],
+                "age": [6, 0, 1],
+            }
+        ),
+    }
+
+    processed = strategy.post_process_synthetic_results(raw_synth_tables, [], pets)
+
+    fk_values = set(processed["pets"]["human_id"])
+
+    assert fk_values == {0, 1, 2}
+
+
+def test_post_processing_foreign_keys_with_skewed_frequencies_and_different_size_tables(
+    trips,
+):
+    strategy = SingleTableStrategy()
+
+    # Simulate a record_size_ratio of 1.5
+    raw_synth_tables = {
+        "vehicle_types": pd.DataFrame(
+            data={"name": ["car", "train", "plane", "bus", "walk", "bike"]}
+        ),
+        "trips": pd.DataFrame(data={"purpose": ["w"] * 150}),
+    }
+
+    processed = strategy.post_process_synthetic_results(raw_synth_tables, [], trips)
+    processed_trips = processed["trips"]
+
+    fk_values = set(processed["trips"]["vehicle_type_id"])
+    assert fk_values == {0, 1, 2, 3, 4, 5}
+
+    fk_value_counts = defaultdict(int)
+    for _, row in processed_trips.iterrows():
+        fk_value = row["vehicle_type_id"]
+        fk_value_counts[fk_value] = fk_value_counts[fk_value] + 1
+
+    fk_value_counts = sorted(list(fk_value_counts.values()))
+
+    assert fk_value_counts == [5, 5, 15, 30, 35, 60]
 
 
 def test_uses_trained_model_to_update_individual_scores():
