@@ -110,6 +110,19 @@ class CrossTableStrategy:
             retrain.update(rel_data.get_descendants(table))
         return list(retrain)
 
+    def validate_preserved_tables(
+        self, tables: List[str], rel_data: RelationalData
+    ) -> None:
+        """
+        Ensures that for every table marked as preserved, all its ancestors are also preserved.
+        """
+        for table in tables:
+            for parent in rel_data.get_parents(table):
+                if parent not in tables:
+                    raise MultiTableException(
+                        f"Cannot preserve table {table} without also preserving parent {parent}."
+                    )
+
     def ready_to_generate(
         self,
         rel_data: RelationalData,

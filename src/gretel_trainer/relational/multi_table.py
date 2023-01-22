@@ -377,6 +377,7 @@ class MultiTable:
         output_tables = {}
 
         preserve_tables = preserve_tables or []
+        self._strategy.validate_preserved_tables(preserve_tables, self.relational_data)
         self._skip_some_tables(preserve_tables, output_tables)
 
         all_tables = self.relational_data.list_all_tables()

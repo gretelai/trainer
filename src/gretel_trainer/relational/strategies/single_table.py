@@ -50,6 +50,14 @@ class SingleTableStrategy:
         """
         return tables
 
+    def validate_preserved_tables(
+        self, tables: List[str], rel_data: RelationalData
+    ) -> None:
+        """
+        No-op. Under this strategy, any collection of tables can be preserved.
+        """
+        pass
+
     def ready_to_generate(
         self,
         rel_data: RelationalData,

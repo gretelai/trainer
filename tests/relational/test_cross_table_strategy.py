@@ -11,7 +11,7 @@ import pytest
 import smart_open
 
 import gretel_trainer.relational.ancestry as ancestry
-from gretel_trainer.relational.core import TableEvaluation
+from gretel_trainer.relational.core import MultiTableException, TableEvaluation
 from gretel_trainer.relational.strategies.cross_table import CrossTableStrategy
 
 
@@ -52,6 +52,28 @@ def test_retraining_a_set_of_tables_forces_retraining_descendants_as_well(ecom):
         "inventory_items",
         "order_items",
     }
+
+
+def test_preserve_tables(ecom):
+    strategy = CrossTableStrategy()
+
+    with pytest.raises(MultiTableException):
+        # Need to also preserve parent users
+        strategy.validate_preserved_tables(["events"], ecom)
+
+    with pytest.raises(MultiTableException):
+        # Need to also preserve parent products
+        strategy.validate_preserved_tables(
+            ["distribution_center", "inventory_items"], ecom
+        )
+
+    assert strategy.validate_preserved_tables(["users", "events"], ecom) is None
+    assert (
+        strategy.validate_preserved_tables(
+            ["distribution_center", "products", "inventory_items"], ecom
+        )
+        is None
+    )
 
 
 def test_table_generation_readiness(ecom):
