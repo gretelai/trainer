@@ -16,8 +16,7 @@
 
         <div class="header">
           <h1>Gretel<br />Multi-Table Synthetic Report</h1>
-          {# "%m/%d/%Y, %H:%M" #}
-          <span>Generated {{ now.strftime("%m/%d/%Y, %H:%M") }}</span>
+          <span>Generated {{ presenter.generated_at }}</span>
         </div>
 
     </div>
@@ -25,7 +24,8 @@
     <section>
       <h2>Table Relationships</h2>
 
-      <p>The fields of each table in the synthesized database and their relationships are displayed below. Primary keys
+      <p>
+        The fields of each table in the synthesized database and their relationships are displayed below. Primary keys
         are <strong>bolded</strong>. Foreign keys are highlighted in the same color as their corresponding primary key.
       </p>
 
@@ -33,16 +33,16 @@
       <table>
           <thead>
             <tr>
-              {% for table in report.fields_dict['columns'] %}
-              <th scope="col">{{table}}</th>
+              {% for table in presenter.relationships.columns %}
+                <th scope="col">{{table}}</th>
               {% endfor %}
             </tr>
           </thead>
           <tbody>
-            {% for list in report.fields_dict['data'] %}
+            {% for cell_list in presenter.relationships.data %}
             <tr>
-              {% for cell in list %}
-              <td style="background-color: {{cell.color}}; font-weight: {{cell.bold}}">{{cell.value}}</td>
+              {% for cell in cell_list %}
+                <td style="{{cell.style}}">{{cell.value}}</td>
               {% endfor %}
             </tr>
             {% endfor %}
@@ -74,12 +74,12 @@
               <th scope="col">Cross-Table SQS</th>
             </tr>
           </thead>
-          {% for table in report.eval_dict %}
+          {% for table, evaluation in presenter.evaluations.items() %}
           <tbody>
             <tr>
               <th scope="row">{{table}}</th>
-              <td style="text-align: center">{{report.eval_dict[table].individual_sqs}}</td>
-              <td style="text-align: center">{{report.eval_dict[table].individual_sqs}}</td>
+              <td style="text-align: center">{{evaluation.individual_sqs}}</td>
+              <td style="text-align: center">{{evaluation.cross_table_sqs}}</td>
             </tr>
           </tbody>
           {% endfor %}
@@ -92,7 +92,7 @@
 
     <footer>
       <p>
-        Copyright © {{ now.strftime("%Y") }} Gretel Labs, Inc. All rights reserved.
+        Copyright © {{ presenter.copyright_year }} Gretel Labs, Inc. All rights reserved.
       </p>
     </footer>
 
