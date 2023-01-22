@@ -11,6 +11,7 @@ from gretel_trainer.relational.connectors import (
 )
 from gretel_trainer.relational.core import RelationalData
 from gretel_trainer.relational.multi_table import MultiTable
+from gretel_trainer.relational.report.report import create_report
 
 # Optimize logging for multitable output
 log_levels = {
