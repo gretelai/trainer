@@ -58,6 +58,13 @@ class SingleTableStrategy:
         """
         pass
 
+    def get_preserved_data(self, table: str, rel_data: RelationalData) -> pd.DataFrame:
+        """
+        Returns preserved source data for synthetic children
+        to reference during generation post-processing.
+        """
+        return rel_data.get_table_data(table)
+
     def ready_to_generate(
         self,
         rel_data: RelationalData,

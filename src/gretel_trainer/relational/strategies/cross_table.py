@@ -123,6 +123,13 @@ class CrossTableStrategy:
                         f"Cannot preserve table {table} without also preserving parent {parent}."
                     )
 
+    def get_preserved_data(self, table: str, rel_data: RelationalData) -> pd.DataFrame:
+        """
+        Returns preserved source data in multigenerational format for synthetic children
+        to reference during generation post-processing.
+        """
+        return ancestry.get_table_data_with_ancestors(rel_data, table)
+
     def ready_to_generate(
         self,
         rel_data: RelationalData,

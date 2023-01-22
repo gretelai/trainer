@@ -507,13 +507,9 @@ class MultiTable:
         for table in self.relational_data.list_all_tables():
             if table in preserve_tables:
                 self.generate_statuses[table] = GenerateStatus.SourcePreserved
-                # TODO: need to think carefully about this.
-                # Seems like we should add `get_table_data_with_ancestors` here if cross-table strategy, so that
-                # all the dfs in `output_tables` are consistently shaped in multigenerational format.
-                # However, what if this table has a parent that isn't being preserved? A couple concerns:
-                # 1. We don't have synthetic data to use for the ancestral columns
-                # 2. Even if we did, if we don't modify the FK on this table, we risk dangling FKs
-                output_tables[table] = self.relational_data.get_table_data(table)
+                output_tables[table] = self._strategy.get_preserved_data(
+                    table, self.relational_data
+                )
             elif self.train_statuses[table] != TrainStatus.Completed:
                 logger.info(
                     f"Skipping synthetic data generation for `{table}` because it does not have a trained model"
