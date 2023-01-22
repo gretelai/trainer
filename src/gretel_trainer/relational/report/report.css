@@ -22,6 +22,10 @@ a:hover {
 	/* border-left: 1px solid #E5E5E6;
 	border-right: 1px solid #E5E5E6; */
 }
+.scroll {
+	overflow-x:scroll;
+	/*width: 70rem;*/
+}
 section {
 	background-color: #fff;
 	padding: 2rem;
