@@ -1,0 +1,101 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <title>Gretel multi-table synthetics report</title>
+  <style>
+    {% include "report.css" %}
+    {% include "report_synthetic_quality.css" %}
+  </style>
+</head>
+
+<body>
+  <div class="wrapper">
+    <div class="section header">
+
+        <div class="header">
+          <h1>Gretel<br />Multi-Table Synthetic Report</h1>
+          <span>Generated {{ presenter.generated_at }}</span>
+        </div>
+
+    </div>
+
+    <section class="scroll">
+      <h2>Table Relationships</h2>
+
+      <p>
+        The fields of each table in the synthesized database and their relationships are displayed below. Primary keys
+        are <strong>bolded</strong>. Foreign keys are highlighted in the same color as their corresponding primary key.
+      </p>
+
+
+      <table>
+          <thead>
+            <tr>
+              {% for table in presenter.relationships.columns %}
+                <th scope="col">{{table}}</th>
+              {% endfor %}
+            </tr>
+          </thead>
+          <tbody>
+            {% for cell_list in presenter.relationships.data %}
+            <tr>
+              {% for cell in cell_list %}
+                <td style="{{cell.style}}">{{cell.value}}</td>
+              {% endfor %}
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+    </section>
+
+    <section class="break">
+      <h2>Synthetic Data Quality Results</h2>
+
+      <p>For each table, individual and cross-table Gretel Synthetic Reports are generated, which include the Synthetic Data
+      Quality Score (SQS). The individual Synthetic Report evaluates the statistical accuracy of the individual synthetic table compared to the real world data that it is
+      based on. This provides insight into the accuracy of the synthetic output of the stand-alone
+      table. The individual SQS does not take into account statistical correlations of data across related tables. The
+      cross-table Synthetic Report evaluates the statistical accuracy of the synthetic data of a table with consideration to the
+      correlations between data across related tables. The cross-table SQS provides insight into the accuracy of the
+      table in the context of the database as a whole. More information about the Gretel Synthetic Report and Synthetic Data Quality Score is
+      available <a href="https://docs.gretel.ai/reference/synthetics/gretel-synthetic-report">here</a>.</p>
+
+      <h2>Synthetic Data Quality Scores</h2>
+
+        <p>For each table, individual and cross-table synthetic data quality scores (SQS) are computed and displayed below.</p>
+
+        <table>
+          <thead>
+            <tr>
+              <th scope="row">Table</th>
+              <th scope="col">Individual SQS</th>
+              <th scope="col">Cross-Table SQS</th>
+            </tr>
+          </thead>
+          {% for table, evaluation in presenter.evaluations.items() %}
+          <tbody>
+            <tr>
+              <th scope="row">{{table}}</th>
+              <td style="text-align: center">{{evaluation.individual_sqs}}</td>
+              <td style="text-align: center">{{evaluation.cross_table_sqs}}</td>
+            </tr>
+          </tbody>
+          {% endfor %}
+        </table>
+
+        <p> The Synthetic Data Quality Score is an estimate of how well the generated synthetic data maintains the same statistical properties as the original dataset. In this sense, the Synthetic Data Quality Score can be viewed as a utility score or a confidence score as to whether scientific conclusions drawn from the synthetic dataset would be the same if one were to have used the original dataset instead. If you do not require statistical symmetry, as might be the case in a testing or demo environment, a lower score may be just as acceptable.</p>
+        <p> If your Synthetic Data Quality Score isn't as high as you'd like it to be, read <a href="https://docs.gretel.ai/reference/synthetics/tips-improve-synthetic-data-accuracy">here</a> for a multitude of ideas for improving your model.</p>
+
+    </section>
+
+    <footer>
+      <p>
+        Copyright © {{ presenter.copyright_year }} Gretel Labs, Inc. All rights reserved.
+      </p>
+    </footer>
+
+    </div>
+</body>
+</html>

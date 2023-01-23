@@ -1,0 +1,144 @@
+html,
+body {
+	font-size: 16px;
+	margin: 0;
+	padding: 0;
+	background-color: #fafafa;
+	line-height: 1.5;
+	font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+	Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji",
+	"Segoe UI Symbol";
+}
+a {
+	color: #0c052e;
+}
+a:hover {
+	color: #3c1ae5;
+}
+.wrapper {
+	margin: auto;
+	max-width: 75ch;
+	max-width: 960px;
+	/* border-left: 1px solid #E5E5E6;
+	border-right: 1px solid #E5E5E6; */
+}
+.scroll {
+	overflow-x:scroll;
+	/*width: 70rem;*/
+}
+section {
+	background-color: #fff;
+	padding: 2rem;
+	margin: 2rem 0;
+	box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+}
+section.break {
+	page-break-after: always;
+}
+figure {
+	text-align: center;
+	/* border: 2px solid #180a5c; */
+	width: 100%;
+	margin: 0 0 2rem 0;
+}
+figcaption {
+	text-align: center;
+	color: #646369;
+	font-size: 0.875rem;
+	margin: 0.5rem 0;
+}
+header {
+	padding: 2rem 0 4rem 0;
+	margin-bottom: -4rem;
+	color: #fff;
+	background-color: #0c0c0d;
+}
+h1 {
+	font-size: 3rem;
+	font-weight: 500;
+	line-height: 1.2;
+	margin-bottom: 0.5em;
+}
+h2 {
+	margin: 0;
+	page-break-after: avoid;
+}
+.note {
+	background-color: #faecd1;
+}
+/* TABLE */
+table {
+	width: 100%;
+	padding: 1;
+	text-align: center;
+	border: 1px solid  #000000;
+	/*border-collapse: collapse;*/
+}
+th {
+	background-color: #fafafa;
+	text-align: center;
+	border: 1px solid  #000000;
+}
+th,
+td {
+	padding: 0.25rem 0.5rem;
+	border-bottom: 1px solid #000000;
+	border-top: 1px solid #000000;
+	border-right: 1px solid #000000;
+	text-align: center;
+}
+th:last-of-type,
+td:last-of-type {
+	border-right: 1px solid #000000;
+	text-align: center;
+}
+th.tnum,
+td.tnum {
+	font-feature-settings: "tnum";
+	text-align: center;
+}
+dl {
+	display: grid;
+	grid-template-columns: 3fr 1fr;
+	grid-template-rows: auto;
+	font-size: 1.25rem;
+	margin: 0;
+}
+dt,
+dd {
+	margin: 0 0 0.75rem 0;
+	padding: 0 0 0.25rem 0;
+	border-bottom: 2px solid #e5e5e6;
+}
+dd {
+	font-family: monospace;
+}
+.highlight {
+	background-color: #fafafa;
+	font-family: monospace;
+	font-weight: normal;
+}
+footer {
+	color: #646369;
+}
+@media print {
+	html,
+	body {
+		font-size: 12px;
+		background-color: transparent;
+	}
+	header {
+		color: #000;
+		background-color: transparent;
+	}
+	section {
+		box-shadow: none;
+		border: 1px solid #e5e5e6;
+	}
+	a {
+		text-decoration: none;
+	}
+	a:not([href*="#"])::after {
+		content: " (" attr(href) ")";
+	}
+}

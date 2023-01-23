@@ -170,3 +170,4 @@ _build
 
 trainer-runner.json
 seeds.csv
+*.csv
