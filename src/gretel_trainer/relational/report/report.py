@@ -99,9 +99,15 @@ def _table_relationships(rel_data: RelationalData) -> Relationships:
         seen = set()
         fields = []
 
-        # Add primary key if present
+        # Add primary key
         pk = rel_data.get_primary_key(table)
-        if pk is not None:
+        if pk is None:
+            fields.append(
+                Cell(
+                    value="(no primary key)",
+                )
+            )
+        else:
             seen.add(pk)
             fields.append(
                 Cell(
