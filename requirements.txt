@@ -8,3 +8,4 @@ typing-extensions
 sqlalchemy
 networkx
 smart-open
+jinja2
