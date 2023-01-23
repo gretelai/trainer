@@ -641,24 +641,6 @@ class StrategyRunner:
         return done == len(self._strategy.partitions)
 
     @_needs_load
-    def partition_results(self, *, handler: bool = False) -> Optional[List[Status]]:
-        """
-        If job is done, returns a list of all (terminal) partition statuses.
-        If job is not done, returns None.
-        """
-        if not self.is_done(handler=handler):
-            return None
-
-        statuses = []
-        for p in self._strategy.partitions:
-            if handler:
-                ctx_base = p.ctx.get(HANDLER, {})
-            else:
-                ctx_base = p.ctx
-            statuses.append(ctx_base.get(STATUS))
-        return statuses
-
-    @_needs_load
     def train_all_partitions(self):
         logger.info(f"Processing {len(self._strategy.partitions)} partitions")
         while True:
@@ -748,7 +730,6 @@ class StrategyRunner:
         df = self._get_synthetic_data("run", "data")
         return self._maybe_restore_df_headers(df)
 
-    @_needs_load
     def get_sqs_information(self) -> List[dict]:
         return [
             partition.ctx[SQS]
