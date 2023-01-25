@@ -12,13 +12,13 @@ import smart_open
 
 import gretel_trainer.relational.ancestry as ancestry
 from gretel_trainer.relational.core import MultiTableException, TableEvaluation
-from gretel_trainer.relational.strategies.cross_table import CrossTableStrategy
+from gretel_trainer.relational.strategies.ancestral import AncestralStrategy
 
 
 def test_prepare_training_data_returns_multigenerational_data_without_keys_or_highly_unique_categorial_fields(
     pets,
 ):
-    strategy = CrossTableStrategy()
+    strategy = AncestralStrategy()
 
     training_data = strategy.prepare_training_data(pets)
 
@@ -34,7 +34,7 @@ def test_prepare_training_data_returns_multigenerational_data_without_keys_or_hi
 
 
 def test_retraining_a_set_of_tables_forces_retraining_descendants_as_well(ecom):
-    strategy = CrossTableStrategy()
+    strategy = AncestralStrategy()
     assert set(strategy.tables_to_retrain(["users"], ecom)) == {
         "users",
         "events",
@@ -55,7 +55,7 @@ def test_retraining_a_set_of_tables_forces_retraining_descendants_as_well(ecom):
 
 
 def test_preserve_tables(ecom):
-    strategy = CrossTableStrategy()
+    strategy = AncestralStrategy()
 
     with pytest.raises(MultiTableException):
         # Need to also preserve parent users
@@ -77,7 +77,7 @@ def test_preserve_tables(ecom):
 
 
 def test_table_generation_readiness(ecom):
-    strategy = CrossTableStrategy()
+    strategy = AncestralStrategy()
 
     # To start, "eldest generation" tables (those with no parents / outbound foreign keys) are ready
     assert set(strategy.ready_to_generate(ecom, [], [])) == {
@@ -171,7 +171,7 @@ def test_table_generation_readiness(ecom):
 
 
 def test_generation_job(pets):
-    strategy = CrossTableStrategy()
+    strategy = AncestralStrategy()
 
     training_columns = {
         "humans": [
@@ -287,7 +287,7 @@ def test_generation_job_seeds_go_back_multiple_generations(source_nba, synthetic
         ],
     }
 
-    strategy = CrossTableStrategy()
+    strategy = AncestralStrategy()
 
     with tempfile.TemporaryDirectory() as tmp:
         working_dir = Path(tmp)
@@ -313,7 +313,7 @@ def test_generation_job_seeds_go_back_multiple_generations(source_nba, synthetic
 
 
 def test_post_processing_individual_synthetic_result(ecom):
-    strategy = CrossTableStrategy()
+    strategy = AncestralStrategy()
     synth_events = pd.DataFrame(
         data={
             "self|id": [100, 101, 102, 103, 104],
@@ -338,7 +338,7 @@ def test_post_processing_individual_synthetic_result(ecom):
 
 
 def test_post_process_synthetic_results(ecom):
-    strategy = CrossTableStrategy()
+    strategy = AncestralStrategy()
     out_events = pd.DataFrame(
         data={
             "self|id": [0, 1, 2],
@@ -388,7 +388,7 @@ def test_post_process_synthetic_results(ecom):
 
 
 def test_uses_trained_model_to_update_cross_table_scores():
-    strategy = CrossTableStrategy()
+    strategy = AncestralStrategy()
     evaluations = {
         "table_1": TableEvaluation(),
         "table_2": TableEvaluation(),
@@ -396,9 +396,9 @@ def test_uses_trained_model_to_update_cross_table_scores():
     model = Mock()
 
     with tempfile.TemporaryDirectory() as working_dir, patch(
-        "gretel_trainer.relational.strategies.cross_table.common.download_artifacts"
+        "gretel_trainer.relational.strategies.ancestral.common.download_artifacts"
     ) as download_artifacts, patch(
-        "gretel_trainer.relational.strategies.cross_table.common.get_sqs_score"
+        "gretel_trainer.relational.strategies.ancestral.common.get_sqs_score"
     ) as get_sqs:
         get_sqs.return_value = 80
         working_dir = Path(working_dir)
@@ -422,7 +422,7 @@ def test_uses_trained_model_to_update_cross_table_scores():
 
 
 def test_falls_back_to_fetching_report_json_when_download_artifacts_fails():
-    strategy = CrossTableStrategy()
+    strategy = AncestralStrategy()
     evaluations = {
         "table_1": TableEvaluation(),
         "table_2": TableEvaluation(),
@@ -430,11 +430,11 @@ def test_falls_back_to_fetching_report_json_when_download_artifacts_fails():
     model = Mock()
 
     with tempfile.TemporaryDirectory() as working_dir, patch(
-        "gretel_trainer.relational.strategies.cross_table.common.download_artifacts"
+        "gretel_trainer.relational.strategies.ancestral.common.download_artifacts"
     ) as download_artifacts, patch(
-        "gretel_trainer.relational.strategies.cross_table.common.get_sqs_score"
+        "gretel_trainer.relational.strategies.ancestral.common.get_sqs_score"
     ) as get_sqs, patch(
-        "gretel_trainer.relational.strategies.cross_table.common._get_report_json"
+        "gretel_trainer.relational.strategies.ancestral.common._get_report_json"
     ) as get_json:
         get_sqs.return_value = 80
         working_dir = Path(working_dir)
@@ -463,7 +463,7 @@ def test_updates_single_table_scores_using_evaluate(source_nba, synthetic_nba):
         "states": synth_states,
     }
 
-    strategy = CrossTableStrategy()
+    strategy = AncestralStrategy()
     evaluation = TableEvaluation()
 
     mock_report = Mock()
@@ -472,7 +472,7 @@ def test_updates_single_table_scores_using_evaluate(source_nba, synthetic_nba):
     mock_report.as_dict = {"REPORT": "JSON"}
 
     with tempfile.TemporaryDirectory() as working_dir, patch(
-        "gretel_trainer.relational.strategies.cross_table.common.get_quality_report"
+        "gretel_trainer.relational.strategies.ancestral.common.get_quality_report"
     ) as get_report:
         working_dir = Path(working_dir)
         get_report.return_value = mock_report
