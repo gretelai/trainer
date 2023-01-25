@@ -19,8 +19,8 @@ def test_model_strategy_combinations(ecom):
         assert mt._model_config == "synthetics/amplify"
         assert isinstance(mt._strategy, SingleTableStrategy)
 
-        # Default to Amplify when cross-table strategy is chosen
-        mt = MultiTable(ecom, working_dir=tmpdir, strategy="cross-table")
+        # Default to Amplify when ancestral strategy is chosen
+        mt = MultiTable(ecom, working_dir=tmpdir, strategy="ancestral")
         assert mt._model_config == "synthetics/amplify"
         assert isinstance(mt._strategy, CrossTableStrategy)
 
@@ -29,34 +29,34 @@ def test_model_strategy_combinations(ecom):
             MultiTable(
                 ecom,
                 working_dir=tmpdir,
-                strategy="cross-table",
+                strategy="ancestral",
                 gretel_model="actgan",
             )
         with pytest.raises(MultiTableException):
             MultiTable(
                 ecom,
                 working_dir=tmpdir,
-                strategy="cross-table",
+                strategy="ancestral",
                 gretel_model="lstm",
             )
 
-        # Single-table works with Amplify, ACTGAN, and LSTM
+        # Independent strategy works with Amplify, ACTGAN, and LSTM
         MultiTable(
             ecom,
             working_dir=tmpdir,
-            strategy="single-table",
+            strategy="independent",
             gretel_model="amplify",
         )
         MultiTable(
             ecom,
             working_dir=tmpdir,
-            strategy="single-table",
+            strategy="independent",
             gretel_model="actgan",
         )
         MultiTable(
             ecom,
             working_dir=tmpdir,
-            strategy="single-table",
+            strategy="independent",
             gretel_model="lstm",
         )
 

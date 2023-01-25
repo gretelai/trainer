@@ -51,7 +51,7 @@ class MultiTable:
     Args:
         relational_data (RelationalData): Core data structure representing the source tables and their relationships.
         project_name (str, optional): Name for the Gretel project holding models and artifacts. Defaults to "multi-table".
-        strategy (str, optional): The strategy to use. Supports "single-table" (default) and "cross-table".
+        strategy (str, optional): The strategy to use. Supports "independent" (default) and "ancestral".
         gretel_model (str, optional): The underlying Gretel model to use. Default and acceptable models vary based on strategy.
         working_dir (str, optional): Directory in which temporary assets should be cached. Defaults to match the project_name.
         refresh_interval (int, optional): Frequency in seconds to poll Gretel Cloud for job statuses. Must be at least 60 (1m). Defaults to 180 (3m).
@@ -61,7 +61,7 @@ class MultiTable:
         self,
         relational_data: RelationalData,
         project_name: str = "multi-table",
-        strategy: str = "single-table",
+        strategy: str = "independent",
         gretel_model: Optional[str] = None,
         working_dir: Optional[str] = None,
         refresh_interval: Optional[int] = None,
@@ -576,11 +576,21 @@ def _validate_strategy(strategy: str) -> Union[SingleTableStrategy, CrossTableSt
     strategy = strategy.lower()
 
     if strategy == "single-table":
+        logger.warning(
+            "The 'single-table' value for the 'strategy' parameter is deprecated and will be removed in a future release. Please use 'independent' instead."
+        )
+        return SingleTableStrategy()
+    elif strategy == "independent":
         return SingleTableStrategy()
     elif strategy == "cross-table":
+        logger.warning(
+            "The 'cross-table' value for the 'strategy' parameter is deprecated and will be removed in a future release. Please use 'ancestral' instead."
+        )
+        return CrossTableStrategy()
+    elif strategy == "ancestral":
         return CrossTableStrategy()
     else:
-        msg = f"Unrecognized strategy requested: {strategy}. Supported strategies are `cross-table` and `single-table`."
+        msg = f"Unrecognized strategy requested: {strategy}. Supported strategies are `independent` and `ancestral`."
         logger.warning(msg)
         raise MultiTableException(msg)
 
