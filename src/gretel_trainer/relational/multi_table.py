@@ -52,7 +52,7 @@ class MultiTable:
         relational_data (RelationalData): Core data structure representing the source tables and their relationships.
         project_name (str, optional): Name for the Gretel project holding models and artifacts. Defaults to "multi-table".
         gretel_model (str, optional): The underlying Gretel model to use. Supports "Amplify" (default), "LSTM", and "ACTGAN".
-        strategy (str, optional): The strategy to use. Supports "cross-table" (default) and "single-table".
+        strategy (str, optional): The strategy to use. Supports "single-table" (default) and "cross-table".
         working_dir (str, optional): Directory in which temporary assets should be cached. Defaults to match the project_name.
         refresh_interval (int, optional): Frequency in seconds to poll Gretel Cloud for job statuses. Must be at least 60 (1m). Defaults to 180 (3m).
     """
@@ -62,7 +62,7 @@ class MultiTable:
         relational_data: RelationalData,
         project_name: str = "multi-table",
         gretel_model: str = "amplify",
-        strategy: str = "cross-table",
+        strategy: str = "single-table",
         working_dir: Optional[str] = None,
         refresh_interval: Optional[int] = None,
     ):
