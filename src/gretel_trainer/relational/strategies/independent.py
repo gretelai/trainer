@@ -11,7 +11,7 @@ import gretel_trainer.relational.strategies.common as common
 from gretel_trainer.relational.core import RelationalData, TableEvaluation
 
 
-class SingleTableStrategy:
+class IndependentStrategy:
     @property
     def default_model(self) -> str:
         return "amplify"

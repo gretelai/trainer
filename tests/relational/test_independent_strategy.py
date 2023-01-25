@@ -12,11 +12,11 @@ import smart_open
 
 import gretel_trainer.relational.ancestry as ancestry
 from gretel_trainer.relational.core import TableEvaluation
-from gretel_trainer.relational.strategies.single_table import SingleTableStrategy
+from gretel_trainer.relational.strategies.independent import IndependentStrategy
 
 
 def test_prepare_training_data_removes_primary_and_foreign_keys(pets):
-    strategy = SingleTableStrategy()
+    strategy = IndependentStrategy()
 
     training_data = strategy.prepare_training_data(pets)
 
@@ -24,7 +24,7 @@ def test_prepare_training_data_removes_primary_and_foreign_keys(pets):
 
 
 def test_retraining_a_set_of_tables_only_retrains_those_tables(ecom):
-    strategy = SingleTableStrategy()
+    strategy = IndependentStrategy()
     assert set(strategy.tables_to_retrain(["users"], ecom)) == {"users"}
     assert set(strategy.tables_to_retrain(["users", "events"], ecom)) == {
         "users",
@@ -34,7 +34,7 @@ def test_retraining_a_set_of_tables_only_retrains_those_tables(ecom):
 
 
 def test_table_generation_readiness(ecom):
-    strategy = SingleTableStrategy()
+    strategy = IndependentStrategy()
 
     # All tables are immediately ready for generation
     assert set(strategy.ready_to_generate(ecom, [], [])) == {
@@ -56,14 +56,14 @@ def test_table_generation_readiness(ecom):
 
 
 def test_generation_job_requests_num_records(pets):
-    strategy = SingleTableStrategy()
+    strategy = IndependentStrategy()
     job = strategy.get_generation_job("pets", pets, 2.0, {}, Path("/working"), [])
 
     assert job == {"params": {"num_records": 10}}
 
 
 def test_post_processing_one_to_one(pets):
-    strategy = SingleTableStrategy()
+    strategy = IndependentStrategy()
 
     # Models train on data with PKs and FKs removed,
     # so those fields won't be present in raw results
@@ -114,7 +114,7 @@ def test_post_processing_one_to_one(pets):
 
 
 def test_post_processing_one_to_one_foreign_keys(pets):
-    strategy = SingleTableStrategy()
+    strategy = IndependentStrategy()
 
     raw_synth_tables = {
         "humans": pd.DataFrame(
@@ -141,7 +141,7 @@ def test_post_processing_one_to_one_foreign_keys(pets):
 def test_post_processing_foreign_keys_with_skewed_frequencies_and_different_size_tables(
     trips,
 ):
-    strategy = SingleTableStrategy()
+    strategy = IndependentStrategy()
 
     # Simulate a record_size_ratio of 1.5
     raw_synth_tables = {
@@ -168,7 +168,7 @@ def test_post_processing_foreign_keys_with_skewed_frequencies_and_different_size
 
 
 def test_uses_trained_model_to_update_individual_scores():
-    strategy = SingleTableStrategy()
+    strategy = IndependentStrategy()
     evaluations = {
         "table_1": TableEvaluation(),
         "table_2": TableEvaluation(),
@@ -176,9 +176,9 @@ def test_uses_trained_model_to_update_individual_scores():
     model = Mock()
 
     with tempfile.TemporaryDirectory() as working_dir, patch(
-        "gretel_trainer.relational.strategies.cross_table.common.download_artifacts"
+        "gretel_trainer.relational.strategies.independent.common.download_artifacts"
     ) as download_artifacts, patch(
-        "gretel_trainer.relational.strategies.cross_table.common.get_sqs_score"
+        "gretel_trainer.relational.strategies.independent.common.get_sqs_score"
     ) as get_sqs:
         get_sqs.return_value = 80
         working_dir = Path(working_dir)
@@ -202,7 +202,7 @@ def test_uses_trained_model_to_update_individual_scores():
 
 
 def test_falls_back_to_fetching_report_json_when_download_artifacts_fails():
-    strategy = SingleTableStrategy()
+    strategy = IndependentStrategy()
     evaluations = {
         "table_1": TableEvaluation(),
         "table_2": TableEvaluation(),
@@ -210,11 +210,11 @@ def test_falls_back_to_fetching_report_json_when_download_artifacts_fails():
     model = Mock()
 
     with tempfile.TemporaryDirectory() as working_dir, patch(
-        "gretel_trainer.relational.strategies.cross_table.common.download_artifacts"
+        "gretel_trainer.relational.strategies.independent.common.download_artifacts"
     ) as download_artifacts, patch(
-        "gretel_trainer.relational.strategies.cross_table.common.get_sqs_score"
+        "gretel_trainer.relational.strategies.independent.common.get_sqs_score"
     ) as get_sqs, patch(
-        "gretel_trainer.relational.strategies.cross_table.common._get_report_json"
+        "gretel_trainer.relational.strategies.independent.common._get_report_json"
     ) as get_json:
         get_sqs.return_value = 80
         working_dir = Path(working_dir)
@@ -243,7 +243,7 @@ def test_updates_cross_table_scores_using_evaluate(source_nba, synthetic_nba):
         "states": synth_states,
     }
 
-    strategy = SingleTableStrategy()
+    strategy = IndependentStrategy()
     evaluation = TableEvaluation()
 
     mock_report = Mock()
@@ -252,7 +252,7 @@ def test_updates_cross_table_scores_using_evaluate(source_nba, synthetic_nba):
     mock_report.as_dict = {"REPORT": "JSON"}
 
     with tempfile.TemporaryDirectory() as working_dir, patch(
-        "gretel_trainer.relational.strategies.single_table.common.get_quality_report"
+        "gretel_trainer.relational.strategies.independent.common.get_quality_report"
     ) as get_report:
         working_dir = Path(working_dir)
         get_report.return_value = mock_report

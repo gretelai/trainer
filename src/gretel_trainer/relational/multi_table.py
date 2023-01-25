@@ -20,8 +20,8 @@ from gretel_trainer.relational.core import (
     RelationalData,
     TableEvaluation,
 )
-from gretel_trainer.relational.strategies.cross_table import CrossTableStrategy
-from gretel_trainer.relational.strategies.single_table import SingleTableStrategy
+from gretel_trainer.relational.strategies.ancestral import AncestralStrategy
+from gretel_trainer.relational.strategies.independent import IndependentStrategy
 
 GretelModelConfig = Union[str, Path, Dict]
 
@@ -572,23 +572,23 @@ def _get_data_from_record_handler(record_handler: RecordHandler) -> pd.DataFrame
     return pd.read_csv(record_handler.get_artifact_link("data"), compression="gzip")
 
 
-def _validate_strategy(strategy: str) -> Union[SingleTableStrategy, CrossTableStrategy]:
+def _validate_strategy(strategy: str) -> Union[IndependentStrategy, AncestralStrategy]:
     strategy = strategy.lower()
 
     if strategy == "single-table":
         logger.warning(
             "The 'single-table' value for the 'strategy' parameter is deprecated and will be removed in a future release. Please use 'independent' instead."
         )
-        return SingleTableStrategy()
+        return IndependentStrategy()
     elif strategy == "independent":
-        return SingleTableStrategy()
+        return IndependentStrategy()
     elif strategy == "cross-table":
         logger.warning(
             "The 'cross-table' value for the 'strategy' parameter is deprecated and will be removed in a future release. Please use 'ancestral' instead."
         )
-        return CrossTableStrategy()
+        return AncestralStrategy()
     elif strategy == "ancestral":
-        return CrossTableStrategy()
+        return AncestralStrategy()
     else:
         msg = f"Unrecognized strategy requested: {strategy}. Supported strategies are `independent` and `ancestral`."
         logger.warning(msg)

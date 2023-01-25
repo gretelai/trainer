@@ -5,8 +5,8 @@ import pytest
 
 from gretel_trainer.relational.core import MultiTableException
 from gretel_trainer.relational.multi_table import MultiTable
-from gretel_trainer.relational.strategies.cross_table import CrossTableStrategy
-from gretel_trainer.relational.strategies.single_table import SingleTableStrategy
+from gretel_trainer.relational.strategies.ancestral import AncestralStrategy
+from gretel_trainer.relational.strategies.independent import IndependentStrategy
 
 
 def test_model_strategy_combinations(ecom):
@@ -17,12 +17,12 @@ def test_model_strategy_combinations(ecom):
         # Default to Amplify/single-table
         mt = MultiTable(ecom, working_dir=tmpdir)
         assert mt._model_config == "synthetics/amplify"
-        assert isinstance(mt._strategy, SingleTableStrategy)
+        assert isinstance(mt._strategy, IndependentStrategy)
 
         # Default to Amplify when ancestral strategy is chosen
         mt = MultiTable(ecom, working_dir=tmpdir, strategy="ancestral")
         assert mt._model_config == "synthetics/amplify"
-        assert isinstance(mt._strategy, CrossTableStrategy)
+        assert isinstance(mt._strategy, AncestralStrategy)
 
         # Cross-table only works with Amplify
         with pytest.raises(MultiTableException):

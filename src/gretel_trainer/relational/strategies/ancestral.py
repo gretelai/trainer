@@ -15,7 +15,7 @@ from gretel_trainer.relational.core import (
 )
 
 
-class CrossTableStrategy:
+class AncestralStrategy:
     @property
     def default_model(self) -> str:
         return "amplify"
