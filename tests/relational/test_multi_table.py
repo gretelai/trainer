@@ -14,9 +14,9 @@ def test_model_strategy_combinations(ecom):
         "gretel_trainer.relational.multi_table.configure_session"
     ), patch("gretel_trainer.relational.multi_table.create_or_get_unique_project"):
 
-        # Default to LSTM/single-table
+        # Default to Amplify/single-table
         mt = MultiTable(ecom, working_dir=tmpdir)
-        assert mt._model_config == "synthetics/tabular-lstm"
+        assert mt._model_config == "synthetics/amplify"
         assert isinstance(mt._strategy, SingleTableStrategy)
 
         # Default to Amplify when cross-table strategy is chosen

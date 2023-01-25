@@ -14,7 +14,7 @@ from gretel_trainer.relational.core import RelationalData, TableEvaluation
 class SingleTableStrategy:
     @property
     def default_model(self) -> str:
-        return "lstm"
+        return "amplify"
 
     @property
     def supported_models(self) -> List[str]:
