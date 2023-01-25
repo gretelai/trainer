@@ -37,16 +37,6 @@ class RelationalData:
 
     def log_test(self) -> None:
         logger.info("This is a test")
-        log_to_debug = logging.getLogger("myapp.ui.edit")
-        while log_to_debug is not None:
-            print("level: %s, name: %s (%x), handlers: %s" % (
-                log_to_debug.level,
-                log_to_debug.name,
-                id(log_to_debug),
-                log_to_debug.handlers))
-
-            log_to_debug = log_to_debug.parent
-        logger.info("We're still testing")
 
     def add_table(
         self, table: str, primary_key: Optional[str], data: pd.DataFrame

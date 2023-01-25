@@ -24,6 +24,11 @@ log_levels = {
 log_format = "%(levelname)s - %(asctime)s - %(message)s"
 time_format = "%Y-%m-%d %H:%M:%S"
 
+# Clear out any existing root handlers (Colab)
+for root_handler in logging.root.handlers:
+    logging.root.removeHandler(root_handler)
+
+# Configure our loggers
 for name, level in log_levels.items():
     logger = logging.getLogger(name)
 
