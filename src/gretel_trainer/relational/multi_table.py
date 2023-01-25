@@ -66,9 +66,8 @@ class MultiTable:
         working_dir: Optional[str] = None,
         refresh_interval: Optional[int] = None,
     ):
-        strategy_name, strategy_instance = _validate_strategy(strategy)
-        self._strategy = strategy_instance
-        self._model_config = _validate_gretel_model(gretel_model, strategy_name)
+        self._strategy = _validate_strategy(strategy)
+        self._model_config = self._validate_gretel_model(gretel_model)
 
         configure_session(api_key="prompt", cache="yes", validate=True)
         self._project = create_or_get_unique_project(name=project_name)
@@ -549,19 +548,40 @@ class MultiTable:
     def _log_lost_contact(self, table_name: str) -> None:
         logger.warning(f"Lost contact with job for `{table_name}`.")
 
+    def _validate_gretel_model(self, gretel_model: Optional[str]) -> str:
+        if gretel_model is None:
+            gretel_model = self._default_model_for_strategy()
+        gretel_model = gretel_model.lower()
+
+        if isinstance(self._strategy, CrossTableStrategy) and gretel_model != "amplify":
+            msg = f"Cross-table strategy does not support {gretel_model}; only amplify is supported."
+            logger.warning(msg)
+            raise MultiTableException(msg)
+        elif gretel_model not in _BLUEPRINTS.keys():
+            msg = f"Unrecognized gretel model requested: {gretel_model}. Supported models are `amplify`, `lsmt`, and `actgan`."
+            logger.warning(msg)
+            raise MultiTableException(msg)
+
+        return _BLUEPRINTS[gretel_model]
+
+    def _default_model_for_strategy(self) -> str:
+        if isinstance(self._strategy, CrossTableStrategy):
+            return "amplify"
+        else:
+            return "lstm"
+
 
 def _get_data_from_record_handler(record_handler: RecordHandler) -> pd.DataFrame:
     return pd.read_csv(record_handler.get_artifact_link("data"), compression="gzip")
 
 
-def _validate_strategy(
-    strategy: str,
-) -> Tuple[str, Union[SingleTableStrategy, CrossTableStrategy]]:
+def _validate_strategy(strategy: str) -> Union[SingleTableStrategy, CrossTableStrategy]:
     strategy = strategy.lower()
+
     if strategy == "single-table":
-        return (strategy, SingleTableStrategy())
+        return SingleTableStrategy()
     elif strategy == "cross-table":
-        return (strategy, CrossTableStrategy())
+        return CrossTableStrategy()
     else:
         msg = f"Unrecognized strategy requested: {strategy}. Supported strategies are `cross-table` and `single-table`."
         logger.warning(msg)
@@ -573,30 +593,6 @@ _BLUEPRINTS = {
     "actgan": "synthetics/tabular-actgan",
     "lstm": "synthetics/tabular-lstm",
 }
-
-
-def _validate_gretel_model(gretel_model: Optional[str], strategy: str) -> str:
-    if gretel_model is None:
-        gretel_model = _default_model_for_strategy(strategy)
-    gretel_model = gretel_model.lower()
-
-    if strategy == "cross-table" and gretel_model != "amplify":
-        msg = f"Cross-table strategy does not support {gretel_model}; only amplify is supported."
-        logger.warning(msg)
-        raise MultiTableException(msg)
-    elif gretel_model not in _BLUEPRINTS.keys():
-        msg = f"Unrecognized gretel model requested: {gretel_model}. Supported models are `amplify`, `lsmt`, and `actgan`."
-        logger.warning(msg)
-        raise MultiTableException(msg)
-
-    return _BLUEPRINTS[gretel_model]
-
-
-def _default_model_for_strategy(strategy: str) -> str:
-    if strategy == "cross-table":
-        return "amplify"
-    else:
-        return "lstm"
 
 
 def _cautiously_refresh_status(
