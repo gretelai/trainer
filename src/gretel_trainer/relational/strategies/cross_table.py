@@ -16,6 +16,14 @@ from gretel_trainer.relational.core import (
 
 
 class CrossTableStrategy:
+    @property
+    def default_model(self) -> str:
+        return "amplify"
+
+    @property
+    def supported_models(self) -> List[str]:
+        return ["amplify"]
+
     def label_encode_keys(
         self, rel_data: RelationalData, tables: Dict[str, pd.DataFrame]
     ) -> Dict[str, pd.DataFrame]:

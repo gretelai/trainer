@@ -12,6 +12,14 @@ from gretel_trainer.relational.core import RelationalData, TableEvaluation
 
 
 class SingleTableStrategy:
+    @property
+    def default_model(self) -> str:
+        return "lstm"
+
+    @property
+    def supported_models(self) -> List[str]:
+        return ["amplify", "actgan", "lstm"]
+
     def label_encode_keys(
         self, rel_data: RelationalData, tables: Dict[str, pd.DataFrame]
     ) -> Dict[str, pd.DataFrame]:

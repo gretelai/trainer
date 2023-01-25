@@ -550,25 +550,22 @@ class MultiTable:
 
     def _validate_gretel_model(self, gretel_model: Optional[str]) -> str:
         if gretel_model is None:
-            gretel_model = self._default_model_for_strategy()
+            gretel_model = self._strategy.default_model
         gretel_model = gretel_model.lower()
 
-        if isinstance(self._strategy, CrossTableStrategy) and gretel_model != "amplify":
-            msg = f"Cross-table strategy does not support {gretel_model}; only amplify is supported."
+        supported_models = self._strategy.supported_models
+        if gretel_model not in supported_models:
+            msg = f"Invalid gretel model requested: {gretel_model}. The selected strategy supports: {supported_models}."
             logger.warning(msg)
             raise MultiTableException(msg)
-        elif gretel_model not in _BLUEPRINTS.keys():
-            msg = f"Unrecognized gretel model requested: {gretel_model}. Supported models are `amplify`, `lsmt`, and `actgan`."
-            logger.warning(msg)
-            raise MultiTableException(msg)
+
+        _BLUEPRINTS = {
+            "amplify": "synthetics/amplify",
+            "actgan": "synthetics/tabular-actgan",
+            "lstm": "synthetics/tabular-lstm",
+        }
 
         return _BLUEPRINTS[gretel_model]
-
-    def _default_model_for_strategy(self) -> str:
-        if isinstance(self._strategy, CrossTableStrategy):
-            return "amplify"
-        else:
-            return "lstm"
 
 
 def _get_data_from_record_handler(record_handler: RecordHandler) -> pd.DataFrame:
@@ -586,13 +583,6 @@ def _validate_strategy(strategy: str) -> Union[SingleTableStrategy, CrossTableSt
         msg = f"Unrecognized strategy requested: {strategy}. Supported strategies are `cross-table` and `single-table`."
         logger.warning(msg)
         raise MultiTableException(msg)
-
-
-_BLUEPRINTS = {
-    "amplify": "synthetics/amplify",
-    "actgan": "synthetics/tabular-actgan",
-    "lstm": "synthetics/tabular-lstm",
-}
 
 
 def _cautiously_refresh_status(
