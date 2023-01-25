@@ -24,7 +24,8 @@ log_levels = {
 log_format = "%(levelname)s - %(asctime)s - %(message)s"
 time_format = "%Y-%m-%d %H:%M:%S"
 
-# Clear out any existing root handlers (Colab)
+# Clear out any existing root handlers
+# (This prevents duplicate log output in Colab)
 for root_handler in logging.root.handlers:
     logging.root.removeHandler(root_handler)
 
