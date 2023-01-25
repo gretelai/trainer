@@ -51,8 +51,8 @@ class MultiTable:
     Args:
         relational_data (RelationalData): Core data structure representing the source tables and their relationships.
         project_name (str, optional): Name for the Gretel project holding models and artifacts. Defaults to "multi-table".
-        gretel_model (str, optional): The underlying Gretel model to use. Supports "Amplify" (default), "LSTM", and "ACTGAN".
         strategy (str, optional): The strategy to use. Supports "single-table" (default) and "cross-table".
+        gretel_model (str, optional): The underlying Gretel model to use. Default and acceptable models vary based on strategy.
         working_dir (str, optional): Directory in which temporary assets should be cached. Defaults to match the project_name.
         refresh_interval (int, optional): Frequency in seconds to poll Gretel Cloud for job statuses. Must be at least 60 (1m). Defaults to 180 (3m).
     """
@@ -61,16 +61,14 @@ class MultiTable:
         self,
         relational_data: RelationalData,
         project_name: str = "multi-table",
-        gretel_model: str = "amplify",
         strategy: str = "single-table",
+        gretel_model: Optional[str] = None,
         working_dir: Optional[str] = None,
         refresh_interval: Optional[int] = None,
     ):
-        gretel_model = gretel_model.lower()
-        strategy = strategy.lower()
-        _ensure_valid_combination(gretel_model, strategy)
-        self._model_config = _select_model_config(gretel_model)
-        self._strategy = _select_strategy(strategy, gretel_model)
+        strategy_name, strategy_instance = _validate_strategy(strategy)
+        self._strategy = strategy_instance
+        self._model_config = _validate_gretel_model(gretel_model, strategy_name)
 
         configure_session(api_key="prompt", cache="yes", validate=True)
         self._project = create_or_get_unique_project(name=project_name)
@@ -556,38 +554,49 @@ def _get_data_from_record_handler(record_handler: RecordHandler) -> pd.DataFrame
     return pd.read_csv(record_handler.get_artifact_link("data"), compression="gzip")
 
 
-def _ensure_valid_combination(model: str, strategy: str) -> None:
-    if strategy == "cross-table":
-        if model != "amplify":
-            msg = f"Cross-table strategy does not support {model}; only amplify is supported."
-            logger.warning(msg)
-            raise MultiTableException(msg)
-
-
-def _select_model_config(model: str) -> str:
-    if model == "amplify":
-        return "synthetics/amplify"
-    elif model == "lstm":
-        return "synthetics/tabular-lstm"
-    elif model == "actgan":
-        return "synthetics/tabular-actgan"
+def _validate_strategy(
+    strategy: str,
+) -> Tuple[str, Union[SingleTableStrategy, CrossTableStrategy]]:
+    strategy = strategy.lower()
+    if strategy == "single-table":
+        return (strategy, SingleTableStrategy())
+    elif strategy == "cross-table":
+        return (strategy, CrossTableStrategy())
     else:
-        msg = f"Unrecognized gretel model requested: {model}. Supported models are `amplify`, `lsmt`, and `actgan`."
+        msg = f"Unrecognized strategy requested: {strategy}. Supported strategies are `cross-table` and `single-table`."
         logger.warning(msg)
         raise MultiTableException(msg)
 
 
-def _select_strategy(
-    strategy: str, model: str
-) -> Union[SingleTableStrategy, CrossTableStrategy]:
-    if strategy == "cross-table":
-        return CrossTableStrategy()
-    elif strategy == "single-table":
-        return SingleTableStrategy()
-    else:
-        msg = f"Unrecognized correlation strategy requested: {strategy}. Supported strategies are `cross-table` and `single-table`."
+_BLUEPRINTS = {
+    "amplify": "synthetics/amplify",
+    "actgan": "synthetics/tabular-actgan",
+    "lstm": "synthetics/tabular-lstm",
+}
+
+
+def _validate_gretel_model(gretel_model: Optional[str], strategy: str) -> str:
+    if gretel_model is None:
+        gretel_model = _default_model_for_strategy(strategy)
+    gretel_model = gretel_model.lower()
+
+    if strategy == "cross-table" and gretel_model != "amplify":
+        msg = f"Cross-table strategy does not support {gretel_model}; only amplify is supported."
         logger.warning(msg)
         raise MultiTableException(msg)
+    elif gretel_model not in _BLUEPRINTS.keys():
+        msg = f"Unrecognized gretel model requested: {gretel_model}. Supported models are `amplify`, `lsmt`, and `actgan`."
+        logger.warning(msg)
+        raise MultiTableException(msg)
+
+    return _BLUEPRINTS[gretel_model]
+
+
+def _default_model_for_strategy(strategy: str) -> str:
+    if strategy == "cross-table":
+        return "amplify"
+    else:
+        return "lstm"
 
 
 def _cautiously_refresh_status(
