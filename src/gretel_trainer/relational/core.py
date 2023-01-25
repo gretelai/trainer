@@ -35,6 +35,9 @@ class RelationalData:
     def __init__(self):
         self.graph = networkx.DiGraph()
 
+    def log_test(self) -> None:
+        logger.info("This is a test")
+
     def add_table(
         self, table: str, primary_key: Optional[str], data: pd.DataFrame
     ) -> None:
