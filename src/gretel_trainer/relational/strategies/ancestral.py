@@ -203,14 +203,12 @@ class AncestralStrategy:
         seed_df = pd.DataFrame()
 
         for fk in rel_data.get_foreign_keys(table):
-            this_fk_seed_df = pd.DataFrame()
-
             parent_table_data = output_tables[fk.parent_table_name]
             parent_table_data = ancestry.prepend_foreign_key_lineage(
                 parent_table_data, fk.column_name
             )
-            parent_index_cycle = itertools.cycle(range(len(parent_table_data)))
 
+            # Get FK frequencies
             freqs = (
                 rel_data.get_table_data(table)
                 .groupby([fk.column_name])
@@ -220,12 +218,32 @@ class AncestralStrategy:
             freqs = sorted(list(freqs[0]), reverse=True)
             freqs_cycle = itertools.cycle(freqs)
 
-            while len(this_fk_seed_df) < synth_size:
-                parent_record = parent_table_data.loc[next(parent_index_cycle)]
+            # Make a list of parent_table indicies matching FK frequencies
+            parent_index_cycle = itertools.cycle(range(len(parent_table_data)))
+            parent_indices_to_use = []
+            while len(parent_indices_to_use) < synth_size:
+                parent_index = next(parent_index_cycle)
                 for _ in range(next(freqs_cycle)):
-                    this_fk_seed_df = pd.concat(
-                        [this_fk_seed_df, pd.DataFrame([parent_record])]
-                    ).reset_index(drop=True)
+                    parent_indices_to_use.append(parent_index)
+
+            # Turn list into a DF and merge the parent table data
+            tmp_column_name = "tmp_parent_merge"
+            this_fk_seed_df = pd.DataFrame(
+                data={tmp_column_name: parent_indices_to_use}
+            )
+            this_fk_seed_df = this_fk_seed_df.merge(
+                parent_table_data,
+                how="left",
+                left_on=tmp_column_name,
+                right_index=True,
+            )
+
+            # Drop any columns that weren't used in training, as well as the temporary merge column
+            columns_to_drop = [
+                col for col in this_fk_seed_df.columns if col not in training_columns
+            ]
+            columns_to_drop.append(tmp_column_name)
+            this_fk_seed_df = this_fk_seed_df.drop(columns=columns_to_drop)
 
             seed_df = pd.concat(
                 [
@@ -234,12 +252,6 @@ class AncestralStrategy:
                 ],
                 axis=1,
             )
-
-        # Drop any columns that weren't used in training
-        columns_to_drop = [
-            col for col in seed_df.columns if col not in training_columns
-        ]
-        seed_df = seed_df.drop(columns=columns_to_drop)
 
         return seed_df
 
