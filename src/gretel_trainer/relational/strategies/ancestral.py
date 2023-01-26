@@ -1,6 +1,5 @@
-import itertools
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Union
 
 import pandas as pd
 from gretel_client.projects.models import Model
@@ -216,20 +215,23 @@ class AncestralStrategy:
                 .reset_index()
             )
             freqs = sorted(list(freqs[0]), reverse=True)
-            freqs_cycle = itertools.cycle(freqs)
+            f = 0
 
             # Make a list of parent_table indicies matching FK frequencies
-            parent_index_cycle = itertools.cycle(range(len(parent_table_data)))
-            parent_indices_to_use = []
-            while len(parent_indices_to_use) < synth_size:
-                parent_index = next(parent_index_cycle)
-                for _ in range(next(freqs_cycle)):
-                    parent_indices_to_use.append(parent_index)
+            parent_indices = range(len(parent_table_data))
+            p = 0
+            parent_indices_to_use_as_fks = []
+            while len(parent_indices_to_use_as_fks) < synth_size:
+                parent_index_to_use = parent_indices[p]
+                for _ in range(freqs[f]):
+                    parent_indices_to_use_as_fks.append(parent_index_to_use)
+                p = _safe_inc(p, parent_indices)
+                f = _safe_inc(f, freqs)
 
             # Turn list into a DF and merge the parent table data
             tmp_column_name = "tmp_parent_merge"
             this_fk_seed_df = pd.DataFrame(
-                data={tmp_column_name: parent_indices_to_use}
+                data={tmp_column_name: parent_indices_to_use_as_fks}
             )
             this_fk_seed_df = this_fk_seed_df.merge(
                 parent_table_data,
@@ -341,3 +343,10 @@ def _percent_unique(col: str, df: pd.DataFrame) -> float:
         return 0.0
     else:
         return distinct / total
+
+
+def _safe_inc(i: int, col: Union[List[Any], range]) -> int:
+    i = i + 1
+    if i == len(col):
+        i = 0
+    return i

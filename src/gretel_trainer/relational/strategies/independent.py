@@ -1,4 +1,3 @@
-import itertools
 import random
 from pathlib import Path
 from typing import Any, Dict, List, Optional
@@ -233,18 +232,22 @@ def _collect_new_foreign_key_values(
     frequencies: List[int],
     total: int,
 ) -> List[Any]:
-    values_cycle = itertools.cycle(values)
-    freqs_cycle = itertools.cycle(sorted(frequencies))
+    freqs = sorted(frequencies)
 
     # Loop through frequencies in ascending order,
     # adding "that many" of the next valid FK value
     # to the output collection
+    v = 0
+    f = 0
     new_fk_values = []
     while len(new_fk_values) < total:
-        fk_value = next(values_cycle)
+        fk_value = values[v]
 
-        for _ in range(next(freqs_cycle)):
+        for _ in range(freqs[f]):
             new_fk_values.append(fk_value)
+
+        v = _safe_inc(v, values)
+        f = _safe_inc(f, freqs)
 
     # trim potential excess
     new_fk_values = new_fk_values[0:total]
@@ -253,3 +256,10 @@ def _collect_new_foreign_key_values(
     random.shuffle(new_fk_values)
 
     return new_fk_values
+
+
+def _safe_inc(i: int, col: List[Any]) -> int:
+    i = i + 1
+    if i == len(col):
+        i = 0
+    return i
