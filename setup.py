@@ -4,11 +4,16 @@ from setuptools import setup, find_packages
 local_path = pathlib.Path(__file__).parent
 install_requires = (local_path / "requirements.txt").read_text().splitlines()
 
-relational_extras = [
+mysql_extras = [
     "mysqlclient",
+]
+postgres_extras = [
     "psycopg2-binary",
+]
+snowflake_extras = [
     "snowflake-sqlalchemy",
 ]
+connectors_extras = mysql_extras + postgres_extras + snowflake_extras
 
 setup(name="gretel-trainer",
       use_scm_version=True,
@@ -16,7 +21,10 @@ setup(name="gretel-trainer",
       package_dir={'': 'src'},
       install_requires=install_requires,
       extras_require={
-          "relational": relational_extras,
+          "connectors": connectors_extras,
+          "mysql": mysql_extras,
+          "postgres": postgres_extras,
+          "snowflake": snowflake_extras,
       },
       python_requires=">=3.7",
       packages=find_packages("src"),
