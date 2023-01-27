@@ -276,9 +276,10 @@ def test_updates_cross_table_scores_using_evaluate(source_nba, synthetic_nba):
     )
 
     call_args = get_report.call_args
+    call_args_kwargs = call_args[1]  # call_args.kwargs introduced in 3.8
 
-    pdtest.assert_frame_equal(ancestral_source_data, call_args.kwargs["source_data"])
-    pdtest.assert_frame_equal(ancestral_synth_data, call_args.kwargs["synth_data"])
+    pdtest.assert_frame_equal(ancestral_source_data, call_args_kwargs["source_data"])
+    pdtest.assert_frame_equal(ancestral_synth_data, call_args_kwargs["synth_data"])
 
     assert evaluation.cross_table_sqs == 85
     assert evaluation.cross_table_report_json == {"REPORT": "JSON"}
