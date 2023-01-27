@@ -106,7 +106,8 @@ def drop_ancestral_data(df: pd.DataFrame) -> pd.DataFrame:
         col for col in df.columns if col.startswith(f"{_START_LINEAGE}{_END_LINEAGE}")
     ]
     mapper = {
-        col: col.removeprefix(f"{_START_LINEAGE}{_END_LINEAGE}") for col in root_columns
+        col: _removeprefix(col, f"{_START_LINEAGE}{_END_LINEAGE}")
+        for col in root_columns
     }
     return df[root_columns].rename(columns=mapper)
 
@@ -128,3 +129,10 @@ def prepend_foreign_key_lineage(df: pd.DataFrame, fk_col: str) -> pd.DataFrame:
 
     mapper = {col: _adjust(col) for col in df.columns}
     return df.rename(columns=mapper)
+
+
+def _removeprefix(s: str, prefix: str) -> str:
+    if s.startswith(prefix):
+        return s[len(prefix) :]
+    else:
+        return s
