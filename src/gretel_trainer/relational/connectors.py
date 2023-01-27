@@ -107,60 +107,35 @@ def sqlite_conn(path: str) -> Connector:
 
 
 def postgres_conn(
-    user: str, password: str, host: str, port: int, database: Optional[str] = None
+    *, user: str, password: str, host: str, port: int, database: str
 ) -> Connector:
-    conn_string = f"postgresql://{user}:{password}@{host}:{port}"
-    if database is not None:
-        conn_string = f"{conn_string}/{database}"
-
+    conn_string = f"postgresql://{user}:{password}@{host}:{port}/{database}"
     engine = create_engine(conn_string)
     return Connector(engine)
 
 
-def mysql_conn(
-    user: str, password: str, host: str, port: int, database: Optional[str] = None
-):
-    conn_string = f"mysql://{user}:{password}@{host}:{port}"
-    if database is not None:
-        conn_string = f"{conn_string}/{database}"
-
+def mysql_conn(*, user: str, password: str, host: str, port: int, database: str):
+    conn_string = f"mysql://{user}:{password}@{host}:{port}/{database}"
     engine = create_engine(conn_string)
     return Connector(engine)
 
 
-def mariadb_conn(
-    user: str, password: str, host: str, port: int, database: Optional[str] = None
-):
-    conn_string = f"mariadb://{user}:{password}@{host}:{port}"
-    if database is not None:
-        conn_string = f"{conn_string}/{database}"
-
+def mariadb_conn(*, user: str, password: str, host: str, port: int, database: str):
+    conn_string = f"mariadb://{user}:{password}@{host}:{port}/{database}"
     engine = create_engine(conn_string)
     return Connector(engine)
 
 
 def snowflake_conn(
+    *,
     user: str,
     password: str,
     account_identifier: str,
-    database: Optional[str] = None,
-    schema: Optional[str] = None,
-    warehouse: Optional[str] = None,
-    role: Optional[str] = None,
+    database: str,
+    schema: str,
+    warehouse: str,
+    role: str,
 ) -> Connector:
-    conn_string = f"snowflake://{user}:{password}@{account_identifier}"
-
-    if database is not None:
-        conn_string = f"{conn_string}/{database}"
-        if schema is not None:
-            conn_string = f"{conn_string}/{schema}"
-
-    next_sep = "?"
-    if warehouse is not None:
-        conn_string = f"{conn_string}{next_sep}warehouse={warehouse}"
-        next_sep = "&"
-    if role is not None:
-        conn_string = f"{conn_string}{next_sep}role={role}"
-
+    conn_string = f"snowflake://{user}:{password}@{account_identifier}/{database}/{schema}?warehouse={warehouse}&role={role}"
     engine = create_engine(conn_string)
     return Connector(engine)
