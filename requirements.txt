@@ -5,7 +5,7 @@ pandas
 pydantic==1.9.0
 scikit-learn
 typing-extensions
-sqlalchemy
+sqlalchemy~=1.4.46
 networkx
 smart-open
 jinja2
