@@ -50,5 +50,5 @@ depends on one `Strategy`.
 - post-processing of synthetic results from generation jobs
 
 There are currently two strategies:
-- `SingleTableStrategy`, in which models are trained on individual tables
-- `CrossTableStrategy`, in which models are trained on multi-generational data via joined tables
+- `independent`, in which models are trained on individual tables
+- `ancestral`, in which models are trained on multi-generational data via joined tables
