@@ -1,5 +1,5 @@
 import tempfile
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 import pytest
 
@@ -12,15 +12,19 @@ from gretel_trainer.relational.strategies.independent import IndependentStrategy
 def test_model_strategy_combinations(ecom):
     with tempfile.TemporaryDirectory() as tmpdir, patch(
         "gretel_trainer.relational.multi_table.configure_session"
-    ), patch("gretel_trainer.relational.multi_table.create_or_get_unique_project"):
+    ), patch("gretel_trainer.relational.multi_table.create_project") as create_project:
+        project = Mock()
+        project.name = tmpdir
+        project.artifacts = []
+        create_project.return_value = project
 
         # Default to Amplify/single-table
-        mt = MultiTable(ecom, working_dir=tmpdir)
+        mt = MultiTable(ecom, project_display_name=tmpdir)
         assert mt._model_config == "synthetics/amplify"
         assert isinstance(mt._strategy, IndependentStrategy)
 
         # Default to Amplify when ancestral strategy is chosen
-        mt = MultiTable(ecom, working_dir=tmpdir, strategy="ancestral")
+        mt = MultiTable(ecom, project_display_name=tmpdir, strategy="ancestral")
         assert mt._model_config == "synthetics/amplify"
         assert isinstance(mt._strategy, AncestralStrategy)
 
@@ -28,14 +32,14 @@ def test_model_strategy_combinations(ecom):
         with pytest.raises(MultiTableException):
             MultiTable(
                 ecom,
-                working_dir=tmpdir,
+                project_display_name=tmpdir,
                 strategy="ancestral",
                 gretel_model="actgan",
             )
         with pytest.raises(MultiTableException):
             MultiTable(
                 ecom,
-                working_dir=tmpdir,
+                project_display_name=tmpdir,
                 strategy="ancestral",
                 gretel_model="lstm",
             )
@@ -43,19 +47,19 @@ def test_model_strategy_combinations(ecom):
         # Independent strategy works with Amplify, ACTGAN, and LSTM
         MultiTable(
             ecom,
-            working_dir=tmpdir,
+            project_display_name=tmpdir,
             strategy="independent",
             gretel_model="amplify",
         )
         MultiTable(
             ecom,
-            working_dir=tmpdir,
+            project_display_name=tmpdir,
             strategy="independent",
             gretel_model="actgan",
         )
         MultiTable(
             ecom,
-            working_dir=tmpdir,
+            project_display_name=tmpdir,
             strategy="independent",
             gretel_model="lstm",
         )
@@ -64,15 +68,20 @@ def test_model_strategy_combinations(ecom):
 def test_refresh_interval_config(ecom):
     with tempfile.TemporaryDirectory() as tmpdir, patch(
         "gretel_trainer.relational.multi_table.configure_session"
-    ), patch("gretel_trainer.relational.multi_table.create_or_get_unique_project"):
+    ), patch("gretel_trainer.relational.multi_table.create_project") as create_project:
+        project = Mock()
+        project.name = tmpdir
+        project.artifacts = []
+        create_project.return_value = project
+
         # default to 180
-        mt = MultiTable(ecom, working_dir=tmpdir)
+        mt = MultiTable(ecom, project_display_name=tmpdir)
         assert mt._refresh_interval == 180
 
         # must be at least 60
-        mt = MultiTable(ecom, working_dir=tmpdir, refresh_interval=30)
+        mt = MultiTable(ecom, project_display_name=tmpdir, refresh_interval=30)
         assert mt._refresh_interval == 60
 
         # may be greater than 60
-        mt = MultiTable(ecom, working_dir=tmpdir, refresh_interval=120)
+        mt = MultiTable(ecom, project_display_name=tmpdir, refresh_interval=120)
         assert mt._refresh_interval == 120
