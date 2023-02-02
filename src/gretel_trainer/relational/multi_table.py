@@ -120,9 +120,14 @@ class MultiTable:
 
     def _create_debug_summary(self) -> None:
         debug_summary_path = self._working_dir / "_gretel_debug_summary.json"
+        content = {
+            "relational_data": self.relational_data.debug_summary(),
+            "strategy": self._strategy.name,
+            "model": self._gretel_model,
+        }
         with open(debug_summary_path, "w") as dbg:
-            json.dump(self.relational_data.debug_summary(), dbg)
-        self._project.upload_artifact(str(debug_summary_path))
+            json.dump(content, dbg)
+        upload_gretel_singleton_object(self._project, debug_summary_path)
 
     def transform(
         self,
