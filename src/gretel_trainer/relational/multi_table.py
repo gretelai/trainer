@@ -722,8 +722,9 @@ class MultiTable:
         first_pass = True
         while _more_to_do():
             # Don't wait needlessly the first time through.
-            if not first_pass:
+            if first_pass:
                 first_pass = False
+            else:
                 self._wait_refresh_interval()
 
             for table_name, record_handler in self._record_handlers.items():
