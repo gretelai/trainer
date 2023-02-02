@@ -190,6 +190,13 @@ class MultiTable:
             model = project.get_model(table_train_backup.model_id)
             mt._models[table_name] = model
             train_status = _train_status_for_model(model)
+            if train_status == TrainStatus.InProgress:
+                logger.warning(
+                    f"Training still in progress for table `{table_name}`. From here, your next step is to log in to the Console, wait for training to finish, and re-attempt restoring from backup once all models reach a terminal state."
+                )
+                raise MultiTableException(
+                    "Cannot restore while model training is actively in progress."
+                )
             mt.train_statuses[table_name] = train_status
             mt._training_columns[table_name] = table_train_backup.training_columns
             _download_artifact(
@@ -201,24 +208,12 @@ class MultiTable:
                 )
             logger.info(f"Restored model for {table_name} with status {train_status}.")
 
-        in_progress_tables = [
-            table_name
-            for table_name, train_status in mt.train_statuses.items()
-            if train_status == TrainStatus.InProgress
-        ]
         failed_tables = [
             table_name
             for table_name, train_status in mt.train_statuses.items()
             if train_status == TrainStatus.Failed
         ]
-        if len(in_progress_tables) > 0:
-            logger.warning(
-                f"Training still in progress for tables: {in_progress_tables}. From here, your next step is to log in to the Console, wait for training to finish, and re-attempt restoring from backup once all models reach a terminal state."
-            )
-            raise MultiTableException(
-                "Cannot restore while model training is actively in progress."
-            )
-        elif len(failed_tables) > 0:
+        if len(failed_tables) > 0:
             logger.warning(
                 f"Training failed for tables: {failed_tables}. From here, your next step is to try retraining them with modified data by calling `retrain_tables`."
             )
