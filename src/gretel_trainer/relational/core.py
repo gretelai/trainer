@@ -26,6 +26,7 @@ class TableEvaluation:
 
 @dataclass
 class ForeignKey:
+    table_name: str
     column_name: str
     parent_column_name: str
     parent_table_name: str
@@ -62,6 +63,7 @@ class RelationalData:
         via = edge.get("via", [])
         via.append(
             ForeignKey(
+                table_name=fk_table,
                 column_name=fk_column,
                 parent_column_name=referenced_column,
                 parent_table_name=referenced_table,
