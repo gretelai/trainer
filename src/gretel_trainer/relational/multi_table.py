@@ -195,6 +195,10 @@ class MultiTable:
             _download_artifact(
                 project, model.data_source, working_dir / f"train_{table_name}.csv"
             )
+            if train_status == TrainStatus.Completed:
+                mt._strategy.update_evaluation_from_model(
+                    table_name, mt.evaluations, model, mt._working_dir
+                )
             logger.info(f"Restored model for {table_name} with status {train_status}.")
 
         in_progress_tables = [
