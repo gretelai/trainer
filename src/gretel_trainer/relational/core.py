@@ -131,6 +131,7 @@ class RelationalData:
                     }
                 )
             tables[table] = {
+                "column_count": len(self.get_table_data(table).columns),
                 "primary_key": self.get_primary_key(table),
                 "foreign_key_count": this_table_foreign_key_count,
                 "foreign_keys": foreign_keys,
