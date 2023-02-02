@@ -228,7 +228,7 @@ class MultiTable:
             )
             return mt
 
-        backup_copy_dest = f"restoring_{backup_file}"
+        backup_copy_dest = f"{backup_file}.restoring"
         logger.info(
             f"Found backup generate data. Copying this backup file to {backup_copy_dest} since restoring generate data can alter the backup file."
         )
