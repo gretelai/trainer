@@ -34,7 +34,10 @@ from gretel_trainer.relational.core import (
     RelationalData,
     TableEvaluation,
 )
-from gretel_trainer.relational.sdk_extras import upload_gretel_singleton_object
+from gretel_trainer.relational.sdk_extras import (
+    cautiously_refresh_status,
+    upload_gretel_singleton_object,
+)
 from gretel_trainer.relational.strategies.ancestral import AncestralStrategy
 from gretel_trainer.relational.strategies.independent import IndependentStrategy
 
@@ -476,7 +479,7 @@ class MultiTable:
                 # If RH is not finished but model training is, update RH status and handle
                 if model_statuses.get(table_name) in END_STATES:
                     record_handler = record_handlers[table_name]
-                    rh_status = _cautiously_refresh_status(
+                    rh_status = cautiously_refresh_status(
                         record_handler, table_name, refresh_attempts
                     )
                     record_handler_statuses[table_name] = rh_status
@@ -496,7 +499,7 @@ class MultiTable:
 
                 # Here = model training was last seen in progress. Update model status and handle.
                 model = models[table_name]
-                model_status = _cautiously_refresh_status(
+                model_status = cautiously_refresh_status(
                     model, table_name, refresh_attempts
                 )
                 model_statuses[table_name] = model_status
@@ -583,7 +586,7 @@ class MultiTable:
 
                 model = self._models[table_name]
 
-                status = _cautiously_refresh_status(model, table_name, refresh_attempts)
+                status = cautiously_refresh_status(model, table_name, refresh_attempts)
 
                 if status == Status.COMPLETED:
                     self._log_success(table_name, "model training")
@@ -735,7 +738,7 @@ class MultiTable:
                     self.generate_statuses[table_name] = GenerateStatus.Failed
                     continue
 
-                status = _cautiously_refresh_status(
+                status = cautiously_refresh_status(
                     record_handler, table_name, refresh_attempts
                 )
 
@@ -935,18 +938,6 @@ def _validate_strategy(strategy: str) -> Union[IndependentStrategy, AncestralStr
         msg = f"Unrecognized strategy requested: {strategy}. Supported strategies are `independent` and `ancestral`."
         logger.warning(msg)
         raise MultiTableException(msg)
-
-
-def _cautiously_refresh_status(
-    job: Job, key: str, refresh_attempts: Dict[str, int]
-) -> Status:
-    try:
-        job.refresh()
-        refresh_attempts[key] = 0
-    except:
-        refresh_attempts[key] = refresh_attempts[key] + 1
-
-    return job.status
 
 
 def _train_status_for_model(model: Model) -> TrainStatus:
