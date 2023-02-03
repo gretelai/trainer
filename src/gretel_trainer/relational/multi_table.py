@@ -36,7 +36,7 @@ from gretel_trainer.relational.core import (
 )
 from gretel_trainer.relational.sdk_extras import (
     cautiously_refresh_status,
-    upload_gretel_singleton_object,
+    upload_singleton_project_artifact,
 )
 from gretel_trainer.relational.strategies.ancestral import AncestralStrategy
 from gretel_trainer.relational.strategies.independent import IndependentStrategy
@@ -136,6 +136,7 @@ class MultiTable:
         self._working_dir = Path(self._project.name)
         os.makedirs(self._working_dir, exist_ok=True)
         self._create_debug_summary()
+        self._upload_sources_to_project(self.relational_data.list_all_tables())
 
     @classmethod
     def restore(cls, backup_file: str) -> MultiTable:
@@ -295,7 +296,7 @@ class MultiTable:
         with open(backup_path, "w") as bak:
             json.dump(backup.as_dict, bak)
 
-        upload_gretel_singleton_object(self._project, backup_path)
+        upload_singleton_project_artifact(self._project, backup_path)
         self._latest_backup = backup
 
     def _build_backup(self) -> Backup:
@@ -404,7 +405,7 @@ class MultiTable:
         }
         with open(debug_summary_path, "w") as dbg:
             json.dump(content, dbg)
-        upload_gretel_singleton_object(self._project, debug_summary_path)
+        upload_singleton_project_artifact(self._project, debug_summary_path)
 
     def transform(
         self,
@@ -614,10 +615,6 @@ class MultiTable:
         tables = self.relational_data.list_all_tables()
         self._reset_train_statuses(tables)
 
-        for table in tables:
-            df = self.relational_data.get_table_data(table)
-            self._upload_source_data_to_project(table, df)
-
         training_data = self._prepare_training_data(tables)
         self._train_models(training_data)
 
@@ -629,7 +626,8 @@ class MultiTable:
         """
         for table_name, table_data in tables.items():
             self.relational_data.update_table_data(table_name, table_data)
-            self._upload_source_data_to_project(table_name, table_data)
+
+        self._upload_sources_to_project(list(tables.keys()))
 
         tables_to_retrain = self._strategy.tables_to_retrain(
             list(tables.keys()), self.relational_data
@@ -639,21 +637,14 @@ class MultiTable:
         training_data = self._prepare_training_data(tables_to_retrain)
         self._train_models(training_data)
 
-    def _upload_source_data_to_project(self, table: str, df: pd.DataFrame) -> None:
-        """
-        Uploads source data as a project artifact as `source_{table}.csv`. If an existing
-        artifact exists for the table, removes it so as not to have project artifacts with
-        duplicate names.
-        """
-        existing_source_artifact_id = self._source_artifact_ids.get(table)
-
-        # upload new artifact and track the artifact ID
-        artifact_id = self._upload_df_to_project(df, f"source_{table}")
-        self._source_artifact_ids[table] = artifact_id
-
-        # remove previous artifact if one existed
-        if existing_source_artifact_id is not None:
-            self._project.delete_artifact(existing_source_artifact_id)
+    def _upload_sources_to_project(self, tables: List[str]) -> None:
+        for table in tables:
+            out_path = self._working_dir / f"source_{table}.csv"
+            df = self.relational_data.get_table_data(table)
+            df.to_csv(out_path, index=False)
+            key = upload_singleton_project_artifact(self._project, out_path)
+            self._source_artifact_ids[table] = key
+        self._backup()
 
     def _reset_train_statuses(self, tables: List[str]) -> None:
         for table in tables:
