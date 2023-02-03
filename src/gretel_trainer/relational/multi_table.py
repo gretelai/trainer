@@ -104,14 +104,15 @@ class MultiTable:
         self._model_config = model_config
         self._set_refresh_interval(refresh_interval)
 
-        configure_session(api_key="prompt", cache="yes", validate=True)
         if project_unique_name is not None:
-            # Raises GretelProjectError if not found
+            # We only go down this path via `restore`, which already configures a session
+            # Raises GretelProjectError if not found, but `restore` should have already found the project
             self._project = get_project(name=project_unique_name)
             logger.info(
                 f"Connected to existing project `{self._project.display_name}` with unique name `{self._project.name}`."
             )
         else:
+            configure_session(api_key="prompt", cache="yes", validate=True)
             project_display_name = project_display_name or "multi-table"
             self._project = create_project(display_name=project_display_name)
             logger.info(
