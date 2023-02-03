@@ -36,7 +36,7 @@ from gretel_trainer.relational.core import (
 )
 from gretel_trainer.relational.sdk_extras import (
     cautiously_refresh_status,
-    upload_gretel_singleton_object,
+    upload_singleton_project_artifact,
 )
 from gretel_trainer.relational.strategies.ancestral import AncestralStrategy
 from gretel_trainer.relational.strategies.independent import IndependentStrategy
@@ -293,7 +293,7 @@ class MultiTable:
         with open(backup_path, "w") as bak:
             json.dump(backup.as_dict, bak)
 
-        upload_gretel_singleton_object(self._project, backup_path)
+        upload_singleton_project_artifact(self._project, backup_path)
         self._latest_backup = backup
 
     def _build_backup(self) -> Backup:
@@ -402,7 +402,7 @@ class MultiTable:
         }
         with open(debug_summary_path, "w") as dbg:
             json.dump(content, dbg)
-        upload_gretel_singleton_object(self._project, debug_summary_path)
+        upload_singleton_project_artifact(self._project, debug_summary_path)
 
     def transform(
         self,
@@ -639,7 +639,7 @@ class MultiTable:
             out_path = self._working_dir / f"source_{table}.csv"
             df = self.relational_data.get_table_data(table)
             df.to_csv(out_path, index=False)
-            key = upload_gretel_singleton_object(self._project, out_path)
+            key = upload_singleton_project_artifact(self._project, out_path)
             self._source_artifact_ids[table] = key
         self._backup()
 

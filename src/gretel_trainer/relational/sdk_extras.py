@@ -5,7 +5,7 @@ from gretel_client.projects import Project
 from gretel_client.projects.jobs import Job, Status
 
 
-def upload_gretel_singleton_object(project: Project, path: Path) -> str:
+def upload_singleton_project_artifact(project: Project, path: Path) -> str:
     latest_key = project.upload_artifact(str(path))
     for artifact in project.artifacts:
         key = artifact["key"]

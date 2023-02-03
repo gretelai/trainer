@@ -15,7 +15,7 @@ def test_model_strategy_combinations(ecom):
     ), patch(
         "gretel_trainer.relational.multi_table.create_project"
     ) as create_project, patch(
-        "gretel_trainer.relational.multi_table.upload_gretel_singleton_object"
+        "gretel_trainer.relational.multi_table.upload_singleton_project_artifact"
     ) as upload_singleton:
         project = Mock()
         project.name = tmpdir
@@ -75,7 +75,7 @@ def test_refresh_interval_config(ecom):
     ), patch(
         "gretel_trainer.relational.multi_table.create_project"
     ) as create_project, patch(
-        "gretel_trainer.relational.multi_table.upload_gretel_singleton_object"
+        "gretel_trainer.relational.multi_table.upload_singleton_project_artifact"
     ) as upload_singleton:
         project = Mock()
         project.name = tmpdir
