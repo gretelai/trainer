@@ -192,7 +192,7 @@ class MultiTable:
             train_status = _train_status_for_model(model)
             if train_status == TrainStatus.InProgress:
                 logger.warning(
-                    f"Training still in progress for table `{table_name}`. From here, your next step is to log in to the Console, wait for training to finish, and re-attempt restoring from backup once all models reach a terminal state."
+                    f"Training still in progress for table `{table_name}`. From here, your next step is to wait for training to finish, and re-attempt restoring from backup once all models have completed training. You can view training progress in the Console under the `{table_name}` model page in the `{project.display_name} ({project.name})` project."
                 )
                 raise MultiTableException(
                     "Cannot restore while model training is actively in progress."
