@@ -74,11 +74,13 @@ class Connector:
                             f"{referenced_table}.{referenced_column}",
                         )
                     )
-            relational_data.add_table(table_name, primary_key, df)
+            relational_data.add_table(name=table_name, primary_key=primary_key, data=df)
 
         for foreign_key_tuple in foreign_keys:
             foreign_key, referencing = foreign_key_tuple
-            relational_data.add_foreign_key(foreign_key, referencing)
+            relational_data.add_foreign_key(
+                foreign_key=foreign_key, referencing=referencing
+            )
 
         return relational_data
 

@@ -25,9 +25,11 @@ def trips():
         }
     )
     rel_data = RelationalData()
-    rel_data.add_table("vehicle_types", "id", vehicle_types)
-    rel_data.add_table("trips", "id", trips)
-    rel_data.add_foreign_key("trips.vehicle_type_id", "vehicle_types.id")
+    rel_data.add_table(name="vehicle_types", primary_key="id", data=vehicle_types)
+    rel_data.add_table(name="trips", primary_key="id", data=trips)
+    rel_data.add_foreign_key(
+        foreign_key="trips.vehicle_type_id", referencing="vehicle_types.id"
+    )
     return rel_data
 
 
@@ -49,9 +51,9 @@ def pets():
         }
     )
     rel_data = RelationalData()
-    rel_data.add_table("humans", "id", humans)
-    rel_data.add_table("pets", "id", pets)
-    rel_data.add_foreign_key("pets.human_id", "humans.id")
+    rel_data.add_table(name="humans", primary_key="id", data=humans)
+    rel_data.add_table(name="pets", primary_key="id", data=pets)
+    rel_data.add_foreign_key(foreign_key="pets.human_id", referencing="humans.id")
     return rel_data
 
 
@@ -59,17 +61,19 @@ def pets():
 def ecom():
     ecommerce = RelationalData()
     ecommerce.add_table(
-        "events",
-        "id",
-        pd.DataFrame(columns=["id", "browser", "traffic_source", "user_id"]),
+        name="events",
+        primary_key="id",
+        data=pd.DataFrame(columns=["id", "browser", "traffic_source", "user_id"]),
     )
     ecommerce.add_table(
-        "users", "id", pd.DataFrame(columns=["id", "first_name", "last_name"])
+        name="users",
+        primary_key="id",
+        data=pd.DataFrame(columns=["id", "first_name", "last_name"]),
     )
     ecommerce.add_table(
-        "inventory_items",
-        "id",
-        pd.DataFrame(
+        name="inventory_items",
+        primary_key="id",
+        data=pd.DataFrame(
             columns=[
                 "id",
                 "sold_at",
@@ -80,29 +84,37 @@ def ecom():
         ),
     )
     ecommerce.add_table(
-        "products",
-        "id",
-        pd.DataFrame(columns=["id", "name", "brand", "distribution_center_id"]),
+        name="products",
+        primary_key="id",
+        data=pd.DataFrame(columns=["id", "name", "brand", "distribution_center_id"]),
     )
     ecommerce.add_table(
-        "distribution_center", "id", pd.DataFrame(columns=["id", "name"])
+        name="distribution_center",
+        primary_key="id",
+        data=pd.DataFrame(columns=["id", "name"]),
     )
     ecommerce.add_table(
-        "order_items",
-        "id",
-        pd.DataFrame(
+        name="order_items",
+        primary_key="id",
+        data=pd.DataFrame(
             columns=["id", "sale_price", "status", "user_id", "inventory_item_id"]
         ),
     )
-    ecommerce.add_foreign_key("events.user_id", "users.id")
-    ecommerce.add_foreign_key("order_items.user_id", "users.id")
-    ecommerce.add_foreign_key("order_items.inventory_item_id", "inventory_items.id")
-    ecommerce.add_foreign_key("inventory_items.product_id", "products.id")
+    ecommerce.add_foreign_key(foreign_key="events.user_id", referencing="users.id")
+    ecommerce.add_foreign_key(foreign_key="order_items.user_id", referencing="users.id")
     ecommerce.add_foreign_key(
-        "inventory_items.product_distribution_center_id", "distribution_center.id"
+        foreign_key="order_items.inventory_item_id", referencing="inventory_items.id"
     )
     ecommerce.add_foreign_key(
-        "products.distribution_center_id", "distribution_center.id"
+        foreign_key="inventory_items.product_id", referencing="products.id"
+    )
+    ecommerce.add_foreign_key(
+        foreign_key="inventory_items.product_distribution_center_id",
+        referencing="distribution_center.id",
+    )
+    ecommerce.add_foreign_key(
+        foreign_key="products.distribution_center_id",
+        referencing="distribution_center.id",
     )
     return ecommerce
 
@@ -111,19 +123,25 @@ def ecom():
 def mutagenesis():
     mutagenesis = RelationalData()
     mutagenesis.add_table(
-        "bond", None, pd.DataFrame(columns=["type", "atom1_id", "atom2_id"])
+        name="bond",
+        primary_key=None,
+        data=pd.DataFrame(columns=["type", "atom1_id", "atom2_id"]),
     )
     mutagenesis.add_table(
-        "atom",
-        "atom_id",
-        pd.DataFrame(columns=["atom_id", "element", "charge", "molecule_id"]),
+        name="atom",
+        primary_key="atom_id",
+        data=pd.DataFrame(columns=["atom_id", "element", "charge", "molecule_id"]),
     )
     mutagenesis.add_table(
-        "molecule", "molecule_id", pd.DataFrame(columns=["molecule_id", "mutagenic"])
+        name="molecule",
+        primary_key="molecule_id",
+        data=pd.DataFrame(columns=["molecule_id", "mutagenic"]),
     )
-    mutagenesis.add_foreign_key("bond.atom1_id", "atom.atom_id")
-    mutagenesis.add_foreign_key("bond.atom2_id", "atom.atom_id")
-    mutagenesis.add_foreign_key("atom.molecule_id", "molecule.molecule_id")
+    mutagenesis.add_foreign_key(foreign_key="bond.atom1_id", referencing="atom.atom_id")
+    mutagenesis.add_foreign_key(foreign_key="bond.atom2_id", referencing="atom.atom_id")
+    mutagenesis.add_foreign_key(
+        foreign_key="atom.molecule_id", referencing="molecule.molecule_id"
+    )
     return mutagenesis
 
 
@@ -152,11 +170,11 @@ def _setup_nba(synthetic: bool):
     teams = pd.DataFrame(data={"name": teams, "id": [1, 2], "city_id": [1, 2]})
 
     rel_data = RelationalData()
-    rel_data.add_table("states", "id", states)
-    rel_data.add_table("cities", "id", cities)
-    rel_data.add_table("teams", "id", teams)
-    rel_data.add_foreign_key("teams.city_id", "cities.id")
-    rel_data.add_foreign_key("cities.state_id", "states.id")
+    rel_data.add_table(name="states", primary_key="id", data=states)
+    rel_data.add_table(name="cities", primary_key="id", data=cities)
+    rel_data.add_table(name="teams", primary_key="id", data=teams)
+    rel_data.add_foreign_key(foreign_key="teams.city_id", referencing="cities.id")
+    rel_data.add_foreign_key(foreign_key="cities.state_id", referencing="states.id")
 
     return rel_data, states, cities, teams
 

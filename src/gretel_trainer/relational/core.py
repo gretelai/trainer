@@ -178,9 +178,13 @@ class RelationalData:
         for table_name, details in d["tables"].items():
             primary_key = details["primary_key"]
             data = pd.read_csv(details["csv_path"])
-            relational_data.add_table(table_name, primary_key, data)
+            relational_data.add_table(
+                name=table_name, primary_key=primary_key, data=data
+            )
         for foreign_key_tuple in d["foreign_keys"]:
             foreign_key, referencing = foreign_key_tuple
-            relational_data.add_foreign_key(foreign_key, referencing)
+            relational_data.add_foreign_key(
+                foreign_key=foreign_key, referencing=referencing
+            )
 
         return relational_data

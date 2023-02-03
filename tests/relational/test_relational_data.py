@@ -26,20 +26,20 @@ def test_mutagenesis_relational_data(mutagenesis):
 
 def test_add_foreign_key_checks_if_tables_exist():
     rel_data = RelationalData()
-    rel_data.add_table("users", "id", pd.DataFrame())
-    rel_data.add_table("events", "id", pd.DataFrame())
+    rel_data.add_table(name="users", primary_key="id", data=pd.DataFrame())
+    rel_data.add_table(name="events", primary_key="id", data=pd.DataFrame())
 
     # attempt to add a foreign key to an unrecognized table
-    rel_data.add_foreign_key("events.user_id", "USR.id")
+    rel_data.add_foreign_key(foreign_key="events.user_id", referencing="USR.id")
     assert len(rel_data.get_foreign_keys("events")) == 0
     assert set(rel_data.list_all_tables()) == {"users", "events"}
 
     # again from the opposite side
-    rel_data.add_foreign_key("EVNT.user_id", "users.id")
+    rel_data.add_foreign_key(foreign_key="EVNT.user_id", referencing="users.id")
     assert set(rel_data.list_all_tables()) == {"users", "events"}
 
     # add a foreign key correctly
-    rel_data.add_foreign_key("events.user_id", "users.id")
+    rel_data.add_foreign_key(foreign_key="events.user_id", referencing="users.id")
     assert len(rel_data.get_foreign_keys("events")) == 1
 
 
