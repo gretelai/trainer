@@ -206,7 +206,9 @@ class MultiTable:
                 mt._strategy.update_evaluation_from_model(
                     table_name, mt.evaluations, model, mt._working_dir
                 )
-            logger.info(f"Restored model for {table_name} with status {train_status}.")
+            logger.info(
+                f"Restored model for `{table_name}` with status {train_status}."
+            )
 
         failed_tables = [
             table_name
@@ -230,7 +232,7 @@ class MultiTable:
 
         backup_copy_dest = f"{backup_file}.restoring"
         logger.info(
-            f"Found backup generate data. Copying this backup file to {backup_copy_dest} since restoring generate data can alter the backup file."
+            f"Found backup generate data. Copying this backup file to `{backup_copy_dest}` since restoring generate data can alter the backup file."
         )
         shutil.copy(backup_file, backup_copy_dest)
 

@@ -40,7 +40,7 @@ def download_artifacts(
     Returns the artifact directory path when successful.
     """
     target_dir = working_dir / f"artifacts_{table_name}"
-    logger.info(f"Downloading model artifacts for {table_name}")
+    logger.info(f"Downloading model artifacts for `{table_name}`")
     try:
         model.download_artifacts(target_dir)
         return target_dir
