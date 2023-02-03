@@ -78,6 +78,7 @@ class MultiTable:
     def __init__(
         self,
         relational_data: RelationalData,
+        *,
         strategy: str = "independent",
         gretel_model: Optional[str] = None,
         project_display_name: Optional[str] = None,
@@ -158,7 +159,9 @@ class MultiTable:
                 project, table_backup.source_artifact_id, local_source_out
             )
             source_data = pd.read_csv(str(local_source_out))
-            rel_data.add_table(table_name, table_backup.primary_key, source_data)
+            rel_data.add_table(
+                name=table_name, primary_key=table_backup.primary_key, data=source_data
+            )
         for fk_backup in backup.relational_data.foreign_keys:
             rel_data.add_foreign_key(
                 foreign_key=fk_backup.foreign_key, referencing=fk_backup.referencing
