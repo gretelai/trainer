@@ -37,11 +37,11 @@ class RelationalData:
         self.graph = networkx.DiGraph()
 
     def add_table(
-        self, table: str, primary_key: Optional[str], data: pd.DataFrame
+        self, *, name: str, primary_key: Optional[str], data: pd.DataFrame
     ) -> None:
-        self.graph.add_node(table, primary_key=primary_key, data=data)
+        self.graph.add_node(name, primary_key=primary_key, data=data)
 
-    def add_foreign_key(self, foreign_key: str, referencing: str) -> None:
+    def add_foreign_key(self, *, foreign_key: str, referencing: str) -> None:
         """Format of both str arguments should be `table_name.column_name`"""
         known_tables = self.list_all_tables()
         fk_table, fk_column = foreign_key.split(".")

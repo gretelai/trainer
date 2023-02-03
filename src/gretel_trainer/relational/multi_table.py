@@ -78,6 +78,7 @@ class MultiTable:
     def __init__(
         self,
         relational_data: RelationalData,
+        *,
         strategy: str = "independent",
         gretel_model: Optional[str] = None,
         project_display_name: Optional[str] = None,
