@@ -12,6 +12,10 @@ from gretel_trainer.relational.core import RelationalData, TableEvaluation
 
 class IndependentStrategy:
     @property
+    def name(self) -> str:
+        return "independent"
+
+    @property
     def default_model(self) -> str:
         return "amplify"
 

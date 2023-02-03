@@ -16,6 +16,10 @@ from gretel_trainer.relational.core import (
 
 class AncestralStrategy:
     @property
+    def name(self) -> str:
+        return "ancestral"
+
+    @property
     def default_model(self) -> str:
         return "amplify"
 

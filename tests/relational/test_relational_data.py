@@ -112,11 +112,13 @@ def test_debug_summary(ecom, mutagenesis):
         "table_count": 6,
         "tables": {
             "users": {
+                "column_count": 3,
                 "primary_key": "id",
                 "foreign_key_count": 0,
                 "foreign_keys": [],
             },
             "events": {
+                "column_count": 4,
                 "primary_key": "id",
                 "foreign_key_count": 1,
                 "foreign_keys": [
@@ -128,11 +130,13 @@ def test_debug_summary(ecom, mutagenesis):
                 ],
             },
             "distribution_center": {
+                "column_count": 2,
                 "primary_key": "id",
                 "foreign_key_count": 0,
                 "foreign_keys": [],
             },
             "products": {
+                "column_count": 4,
                 "primary_key": "id",
                 "foreign_key_count": 1,
                 "foreign_keys": [
@@ -144,6 +148,7 @@ def test_debug_summary(ecom, mutagenesis):
                 ],
             },
             "inventory_items": {
+                "column_count": 5,
                 "primary_key": "id",
                 "foreign_key_count": 2,
                 "foreign_keys": [
@@ -160,6 +165,7 @@ def test_debug_summary(ecom, mutagenesis):
                 ],
             },
             "order_items": {
+                "column_count": 5,
                 "primary_key": "id",
                 "foreign_key_count": 2,
                 "foreign_keys": [
@@ -184,6 +190,7 @@ def test_debug_summary(ecom, mutagenesis):
         "table_count": 3,
         "tables": {
             "bond": {
+                "column_count": 3,
                 "primary_key": None,
                 "foreign_key_count": 2,
                 "foreign_keys": [
@@ -200,6 +207,7 @@ def test_debug_summary(ecom, mutagenesis):
                 ],
             },
             "atom": {
+                "column_count": 4,
                 "primary_key": "atom_id",
                 "foreign_key_count": 1,
                 "foreign_keys": [
@@ -211,6 +219,7 @@ def test_debug_summary(ecom, mutagenesis):
                 ],
             },
             "molecule": {
+                "column_count": 2,
                 "primary_key": "molecule_id",
                 "foreign_key_count": 0,
                 "foreign_keys": [],
