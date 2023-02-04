@@ -21,7 +21,7 @@ def create_report(multitable: MultiTable) -> None:
         evaluations=multitable.evaluations,
         now=datetime.datetime.utcnow(),
     )
-    output_path = multitable._working_dir / "multitable_report.html"
+    output_path = multitable._working_dir / "relational_report.html"
     with open(output_path, "w") as report:
         html_content = ReportRenderer().render(presenter)
         report.write(html_content)
@@ -150,7 +150,7 @@ def _table_relationships(rel_data: RelationalData) -> Relationships:
 
 def _assign_primary_key_colors(rel_data: RelationalData) -> Dict[str, str]:
     colors = itertools.cycle(
-        ["#ABEBC6", "#ABC6EB", "#EBABC6", "#EBC6AB", "#C6ABEB", "#C6EBAB"]
+        ["#F48FB1", "#C5E1A5", "#FFCC80", "#CE93D8", "#FFF59D", "#90CAF9", "#FFE082", "#B39DDB", "#A5D6A7", "#80DEEA" ]
     )
     color_dict = {}
     for table in rel_data.list_all_tables():
