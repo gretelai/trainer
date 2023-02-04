@@ -1,129 +1,60 @@
 from __future__ import annotations
 
-import csv
 import json
-import os
-
-from contextlib import contextmanager
-from dataclasses import dataclass
-from typing import Dict, List, Optional, Protocol, Tuple, Union
+from functools import cached_property
+from typing import Optional, Union
 
 import boto3
-
 from botocore import UNSIGNED
-from botocore.client import BaseClient, Config
-from gretel_trainer.benchmark.core import BenchmarkException, Datatype
+from botocore.client import Config
 
-GRETEL_DELIMITER = ","
-
-
-@dataclass
-class GretelCSVSource:
-    name: str
-    path: str
-    datatype: Datatype
-    row_count: int
-    column_count: int
-
-    @property
-    def delimiter(self) -> str:
-        return GRETEL_DELIMITER
-
-    @contextmanager
-    def unwrap(self):
-        yield self.path
+from gretel_trainer.benchmark.core import BenchmarkException, Datatype, get_data_shape
 
 
 class GretelDataset:
-    def __init__(
-        self,
-        name: str,
-        datatype: Datatype,
-        tags: List[str],
-        s3: BaseClient,
-        bucket: str,
-        load_dir: str,
-    ):
+    def __init__(self, name: str, datatype: Datatype, tags: list[str]):
         self.name = name
         self.datatype = datatype
         self.tags = tags
-        self.s3 = s3
-        self.bucket = bucket
-        self.load_dir = load_dir
 
-    def sources(self) -> List[GretelCSVSource]:
-        _sources = self._load()
-        if len(_sources) == 0:
-            raise BenchmarkException(f"Could not load sources for dataset {self.name}")
-        return _sources
+    @cached_property
+    def data_source(self) -> str:
+        return f"https://gretel-datasets.s3.amazonaws.com/{self.name}.csv"
 
-    def _load(self) -> List[GretelCSVSource]:
-        prefix = f"{self.name}/"
-        list_s3_objects = self.s3.list_objects_v2(
-            Bucket=self.bucket,
-            Prefix=prefix,
-        )
-        keys = [
-            obj["Key"] for obj in list_s3_objects["Contents"] if obj["Key"] != prefix
-        ]
-        os.makedirs(f"{self.load_dir}/{self.name}", exist_ok=True)
-        sources = []
-        for key in keys:
-            source_name = key
-            local_path = f"{self.load_dir}/{key}"
-            self.s3.download_file(Bucket=self.bucket, Key=key, Filename=local_path)
-            shape = _get_data_shape(local_path)
-            sources.append(
-                GretelCSVSource(
-                    name=source_name,
-                    path=local_path,
-                    datatype=self.datatype,
-                    row_count=shape[0],
-                    column_count=shape[1],
-                )
-            )
-        return sources
+    @cached_property
+    def row_count(self) -> int:
+        return self._shape[0]
+
+    @cached_property
+    def column_count(self) -> int:
+        return self._shape[1]
+
+    @cached_property
+    def _shape(self) -> tuple[int, int]:
+        return get_data_shape(self.data_source)
+
+    def __repr__(self) -> str:
+        return f"GretelDataset(name={self.name}, datatype={self.datatype})"
+
+    @property
+    def public(self) -> bool:
+        return True
 
 
-def _get_data_shape(path: str) -> Tuple[int, int]:
-    with open(os.path.expanduser(path)) as f:
-        reader = csv.reader(f, delimiter=GRETEL_DELIMITER)
-        cols = len(next(reader))
-        # We just read the header to get cols,
-        # so the remaining rows are all data
-        rows = sum(1 for _ in f)
-
-    return (rows, cols)
-
-
-class GretelDatasetRepo(Protocol):
-    def list_datasets(
-        self, datatype: Optional[Union[Datatype, str]], tags: Optional[List[str]]
-    ) -> List[GretelDataset]:
-        ...
-
-    def get_dataset(self, name: str) -> GretelDataset:
-        ...
-
-    def list_tags(self) -> List[str]:
-        ...
-
-
-class GretelPublicDatasetRepo:
-    def __init__(self, bucket: str, region: str, load_dir: str):
-        self.bucket = bucket
+class GretelDatasetRepo:
+    def __init__(self):
+        self.bucket = "gretel-datasets"
         self.s3 = boto3.client(
-            "s3", config=Config(signature_version=UNSIGNED), region_name=region
+            "s3", config=Config(signature_version=UNSIGNED), region_name="us-west-2"
         )
-        self.load_dir = load_dir
-        self.datasets = self._read_manifest()
+        self.manifest = self._read_manifest()
 
     def list_datasets(
         self,
         datatype: Optional[Union[Datatype, str]] = None,
-        tags: Optional[List[str]] = None,
-    ) -> List[GretelDataset]:
-        matches = list(self.datasets.values())
+        tags: Optional[list[str]] = None,
+    ) -> list[GretelDataset]:
+        matches = list(self.manifest.values())
         if datatype is not None:
             matches = [dataset for dataset in matches if dataset.datatype == datatype]
         if tags is not None:
@@ -136,29 +67,33 @@ class GretelPublicDatasetRepo:
 
     def get_dataset(self, name: str) -> GretelDataset:
         try:
-            return self.datasets[name]
+            return self.manifest[name]
         except KeyError:
             raise BenchmarkException(f"No dataset exists with name {name}")
 
-    def list_tags(self) -> List[str]:
+    def list_tags(self) -> list[str]:
         unique_tags = set()
-        for dataset in self.datasets.values():
+        for dataset in self.manifest.values():
             for tag in dataset.tags:
                 unique_tags.add(tag)
         return list(unique_tags)
 
-    def _read_manifest(self) -> Dict[str, GretelDataset]:
+    def _read_manifest(self) -> dict[str, GretelDataset]:
         response = self.s3.get_object(Bucket=self.bucket, Key="manifest.json")
         data = response["Body"].read()
         manifest = json.loads(data)["datasets"]
         return {
             name: GretelDataset(
                 name=name,
-                datatype=Datatype(data["datatype"]),
+                datatype=_coerce_datatype(data["datatype"]),
                 tags=data["tags"],
-                s3=self.s3,
-                bucket=self.bucket,
-                load_dir=self.load_dir,
             )
             for name, data in manifest.items()
         }
+
+
+def _coerce_datatype(datatype: str) -> Datatype:
+    if datatype in ("tabular_numeric", "tabular_mixed"):
+        return Datatype.TABULAR
+    else:
+        return Datatype(datatype)
