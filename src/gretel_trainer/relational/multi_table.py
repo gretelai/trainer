@@ -36,10 +36,7 @@ from gretel_trainer.relational.core import (
     RelationalData,
     TableEvaluation,
 )
-from gretel_trainer.relational.sdk_extras import (
-    cautiously_refresh_status,
-    upload_singleton_project_artifact,
-)
+from gretel_trainer.relational.sdk_extras import cautiously_refresh_status
 from gretel_trainer.relational.strategies.ancestral import AncestralStrategy
 from gretel_trainer.relational.strategies.independent import IndependentStrategy
 
