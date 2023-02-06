@@ -120,7 +120,7 @@ class MultiTable:
             )
 
         self.relational_data = relational_data
-        self._artifact_collection = ArtifactCollection(project=self._project)
+        self._artifact_collection = ArtifactCollection()
         self._latest_backup: Optional[Backup] = None
         self._models: Dict[str, Model] = {}
         self._record_handlers: Dict[str, RecordHandler] = {}
@@ -287,7 +287,7 @@ class MultiTable:
         with open(backup_path, "w") as bak:
             json.dump(backup.as_dict, bak)
 
-        self._artifact_collection.upload_gretel_backup(str(backup_path))
+        self._artifact_collection.upload_gretel_backup(self._project, str(backup_path))
 
         self._latest_backup = backup
 
@@ -391,7 +391,9 @@ class MultiTable:
         }
         with open(debug_summary_path, "w") as dbg:
             json.dump(content, dbg)
-        self._artifact_collection.upload_gretel_debug_summary(str(debug_summary_path))
+        self._artifact_collection.upload_gretel_debug_summary(
+            self._project, str(debug_summary_path)
+        )
 
     def transform(
         self,
@@ -630,7 +632,9 @@ class MultiTable:
             for table in self.relational_data.list_all_tables()
         }
         self._archive(source_dataframes, archive_path, "source_")
-        self._artifact_collection.upload_synthetics_source_archive(str(archive_path))
+        self._artifact_collection.upload_synthetics_source_archive(
+            self._project, str(archive_path)
+        )
         self._backup()
 
     def _reset_train_statuses(self, tables: List[str]) -> None:
@@ -785,7 +789,9 @@ class MultiTable:
 
         archive_path = self._working_dir / "synthetics_output_tables.tar.gz"
         self._archive(output_tables, archive_path, "synth_")
-        self._artifact_collection.upload_synthetics_output_archive(str(archive_path))
+        self._artifact_collection.upload_synthetics_output_archive(
+            self._project, str(archive_path)
+        )
         self._backup()
         self.synthetic_output_tables = output_tables
         return self.synthetic_output_tables
