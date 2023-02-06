@@ -6,16 +6,19 @@ from gretel_client.projects import Project
 
 @dataclass
 class ArtifactCollection:
-    gretel_backup: Optional[str] = None
     gretel_debug_summary: Optional[str] = None
     transforms_output_archive: Optional[str] = None
     synthetics_source_archive: Optional[str] = None
     synthetics_output_archive: Optional[str] = None
     synthetics_reports_archive: Optional[str] = None
 
+    # Backup behaves differently to avoid constantly busting the cache
     def upload_gretel_backup(self, project: Project, path: str) -> None:
-        existing = self.gretel_backup
-        self.gretel_backup = self._upload_file(project, path, existing)
+        latest = project.upload_artifact(path)
+        for artifact in project.artifacts:
+            key = artifact["key"]
+            if key != latest and key.endswith("__gretel_backup.json"):
+                project.delete_artifact(key)
 
     def upload_gretel_debug_summary(self, project: Project, path: str) -> None:
         existing = self.gretel_debug_summary

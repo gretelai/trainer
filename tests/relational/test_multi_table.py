@@ -12,7 +12,11 @@ from gretel_trainer.relational.strategies.independent import IndependentStrategy
 def test_model_strategy_combinations(ecom):
     with tempfile.TemporaryDirectory() as tmpdir, patch(
         "gretel_trainer.relational.multi_table.configure_session"
-    ), patch("gretel_trainer.relational.multi_table.create_project") as create_project:
+    ), patch(
+        "gretel_trainer.relational.multi_table.create_project"
+    ) as create_project, patch(
+        "gretel_trainer.relational.artifacts.ArtifactCollection.upload_gretel_backup"
+    ):
         project = Mock()
         project.name = tmpdir
         project.upload_artifact.return_value = "gretel_abcdefg_somefile.someextension"
@@ -68,7 +72,11 @@ def test_model_strategy_combinations(ecom):
 def test_refresh_interval_config(ecom):
     with tempfile.TemporaryDirectory() as tmpdir, patch(
         "gretel_trainer.relational.multi_table.configure_session"
-    ), patch("gretel_trainer.relational.multi_table.create_project") as create_project:
+    ), patch(
+        "gretel_trainer.relational.multi_table.create_project"
+    ) as create_project, patch(
+        "gretel_trainer.relational.artifacts.ArtifactCollection.upload_gretel_backup"
+    ):
         project = Mock()
         project.name = tmpdir
         project.upload_artifact.return_value = "gretel_abcdefg_somefile.someextension"
