@@ -394,7 +394,7 @@ class MultiTable:
         }
         with open(debug_summary_path, "w") as dbg:
             json.dump(content, dbg)
-        upload_singleton_project_artifact(self._project, debug_summary_path)
+        self._artifact_collection.upload_gretel_debug_summary(str(debug_summary_path))
 
     def transform(
         self,
