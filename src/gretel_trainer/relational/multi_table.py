@@ -158,10 +158,10 @@ class MultiTable:
             raise MultiTableException(
                 "Cannot restore from backup—source table archive is missing."
             )
-        source_archive_path = working_dir / "synthetic_source_tables.tar.gz"
+        source_archive_path = working_dir / "synthetics_source_tables.tar.gz"
         _download_artifact(project, source_archive_id, source_archive_path)
         with tarfile.open(source_archive_path, "r:gz") as tar:
-            tar.extractall(working_dir)
+            tar.extractall()
 
         # Restore RelationalData instance
         rel_data = RelationalData()
@@ -280,7 +280,7 @@ class MultiTable:
                 project, synthetics_output_archive_id, synthetics_output_archive_path
             )
             with tarfile.open(synthetics_output_archive_path, "r:gz") as tar:
-                tar.extractall(working_dir)
+                tar.extractall()
             for table_name in backup.relational_data.tables:
                 local_synth_path = working_dir / f"synth_{table_name}.csv"
                 mt.synthetic_output_tables[table_name] = pd.read_csv(
