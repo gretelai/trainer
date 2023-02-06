@@ -627,13 +627,11 @@ class MultiTable:
 
     def _upload_sources_to_project(self) -> None:
         archive_path = self._working_dir / "synthetics_source_tables.tar.gz"
-        with tarfile.open(archive_path, "w:gz") as tar:
-            for table in self.relational_data.list_all_tables():
-                out_path = self._working_dir / f"source_{table}.csv"
-                df = self.relational_data.get_table_data(table)
-                df.to_csv(out_path, index=False)
-                tar.add(out_path)
-
+        source_dataframes = {
+            table: self.relational_data.get_table_data(table)
+            for table in self.relational_data.list_all_tables()
+        }
+        self._archive(source_dataframes, archive_path, "source_")
         self._artifact_collection.upload_synthetics_source_archive(str(archive_path))
         self._backup()
 
@@ -786,19 +784,22 @@ class MultiTable:
         output_tables = self._strategy.post_process_synthetic_results(
             output_tables, preserve_tables, self.relational_data
         )
-        self.synthetic_output_tables = output_tables
 
         archive_path = self._working_dir / "synthetics_output_tables.tar.gz"
+        self._archive(output_tables, archive_path, "synth_")
+        self._artifact_collection.upload_synthetics_output_archive(str(archive_path))
+        self._backup()
+        self.synthetic_output_tables = output_tables
+        return self.synthetic_output_tables
+
+    def _archive(
+        self, table_dataframes: Dict[str, pd.DataFrame], archive_path: Path, prefix: str
+    ) -> None:
         with tarfile.open(archive_path, "w:gz") as tar:
-            for table, df in self.synthetic_output_tables.items():
-                out_path = self._working_dir / f"synth_{table}.csv"
+            for table, df in table_dataframes.items():
+                out_path = self._working_dir / f"{prefix}{table}.csv"
                 df.to_csv(out_path, index=False)
                 tar.add(out_path)
-        self._artifact_collection.upload_synthetics_output_archive(str(archive_path))
-
-        self._backup()
-
-        return self.synthetic_output_tables
 
     def expand_evaluations(self) -> None:
         """
