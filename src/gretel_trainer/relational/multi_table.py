@@ -127,12 +127,12 @@ class MultiTable:
         self._latest_backup: Optional[Backup] = None
         self._models: Dict[str, Model] = {}
         self._record_handlers: Dict[str, RecordHandler] = {}
-        self._synthetic_artifact_ids: Dict[str, str] = {}
         self._record_size_ratio = 1.0
         self.train_statuses: Dict[str, TrainStatus] = {}
         self._training_columns: Dict[str, List[str]] = {}
         self._reset_train_statuses(self.relational_data.list_all_tables())
         self._reset_generation_statuses()
+        self.synthetic_output_tables: Dict[str, pd.DataFrame] = {}
         self.evaluations = defaultdict(lambda: TableEvaluation())
 
         self._working_dir = Path(self._project.name)
@@ -245,7 +245,6 @@ class MultiTable:
         for table_name in backup_generate.preserved:
             mt.generate_statuses[table_name] = GenerateStatus.SourcePreserved
 
-        completely_finished_count = 0
         for table_name, table_generate_backup in backup_generate.tables.items():
             model = mt._models[table_name]
             record_handler = model.get_record_handler(
@@ -261,25 +260,21 @@ class MultiTable:
                 out_path = working_dir / f"seed_{model.name}.csv"
                 _download_artifact(project, data_source, out_path)
 
-            synth_artifact_id = table_generate_backup.synthetic_artifact_id
-            if synth_artifact_id is not None:
-                out_path = working_dir / f"synth_{model.name}.csv"
-                _download_artifact(project, synth_artifact_id, out_path)
-                completely_finished_count = completely_finished_count + 1
-
-        total_generate_jobs_count = len(backup_generate.tables)
-        if total_generate_jobs_count == completely_finished_count:
-            logger.info(
-                "Generation jobs for all tables from previous run finished prior to backup. Running post-processing."
-            )
-            mt.generate(resume=True)
-            logger.info(
-                "Post-processing complete. From here, you can review your synthetic data via `synthetic_output_tables` or call `expand_evaluations` for additional SQS metrics."
-            )
-        else:
-            logger.info(
-                f"At time of backup, {completely_finished_count} of {total_generate_jobs_count} generation jobs had finished. From here, you can attempt to resume that job via `generate(resume=True)`, or restart generation from scratch via a regular call to `generate`."
-            )
+        # TODO: if ArtifactCollection has a synthetics_output_tables_archive,
+        # then we know generation finished completely. Download it and log the "you're done" msg.
+        # Otherwise we were still in progress and need to try --resume.
+        # if total_generate_jobs_count == completely_finished_count:
+        #     logger.info(
+        #         "Generation jobs for all tables from previous run finished prior to backup. Running post-processing."
+        #     )
+        #     mt.generate(resume=True)
+        #     logger.info(
+        #         "Post-processing complete. From here, you can review your synthetic data via `synthetic_output_tables` or call `expand_evaluations` for additional SQS metrics."
+        #     )
+        # else:
+        #     logger.info(
+        #         f"At time of backup, {completely_finished_count} of {total_generate_jobs_count} generation jobs had finished. From here, you can attempt to resume that job via `generate(resume=True)`, or restart generation from scratch via a regular call to `generate`."
+        #     )
 
         mt._backup()
         return mt
@@ -341,7 +336,6 @@ class MultiTable:
             backup_generate_tables = {
                 table: BackupGenerateTable(
                     record_handler_id=rh.record_id,
-                    synthetic_artifact_id=self._synthetic_artifact_ids.get(table),
                 )
                 for table, rh in self._record_handlers.items()
             }
@@ -793,11 +787,14 @@ class MultiTable:
             output_tables, preserve_tables, self.relational_data
         )
         self.synthetic_output_tables = output_tables
-        self._synthetic_artifact_ids = {}
 
-        for table_name, df in self.synthetic_output_tables.items():
-            artifact_id = self._upload_df_to_project(df, f"synth_{table_name}")
-            self._synthetic_artifact_ids[table_name] = artifact_id
+        archive_path = self._working_dir / "synthetics_output_tables.tar.gz"
+        with tarfile.open(archive_path, "w:gz") as tar:
+            for table, df in self.synthetic_output_tables.items():
+                out_path = self._working_dir / f"synth_{table}.csv"
+                df.to_csv(out_path, index=False)
+                tar.add(out_path)
+        self._artifact_collection.upload_synthetics_output_archive(str(archive_path))
 
         self._backup()
 
@@ -859,14 +856,6 @@ class MultiTable:
             GenerateStatus.ModelUnavailable,
             GenerateStatus.Failed,
         ]
-
-    def _upload_df_to_project(self, df: pd.DataFrame, name: str) -> str:
-        """
-        Writes the given DataFrame to a CSV file in the local directory
-        """
-        out_path = self._working_dir / f"{name}.csv"
-        df.to_csv(out_path, index=False)
-        return self._project.upload_artifact(str(out_path))
 
     def _wait_refresh_interval(self) -> None:
         logger.info(f"Next status check in {self._refresh_interval} seconds.")

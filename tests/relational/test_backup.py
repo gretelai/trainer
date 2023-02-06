@@ -46,11 +46,9 @@ def test_backup():
         tables={
             "customer": BackupGenerateTable(
                 record_handler_id="555444666",
-                synthetic_artifact_id="gretel_boaief_synth_customer.csv",
             ),
             "address": BackupGenerateTable(
                 record_handler_id="333111222",
-                synthetic_artifact_id=None,
             ),
         },
     )

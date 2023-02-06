@@ -45,7 +45,6 @@ class BackupTrain:
 @dataclass
 class BackupGenerateTable:
     record_handler_id: str
-    synthetic_artifact_id: Optional[str] = None
 
 
 @dataclass
