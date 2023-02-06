@@ -8,6 +8,7 @@ import tarfile
 import time
 from collections import defaultdict
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from dataclasses import replace
 from enum import Enum
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple, Union
@@ -332,7 +333,7 @@ class MultiTable:
             gretel_model=self._gretel_model,
             working_dir=str(self._working_dir),
             refresh_interval=self._refresh_interval,
-            artifact_collection=self._artifact_collection,
+            artifact_collection=replace(self._artifact_collection),
             relational_data=backup_relational_data,
         )
 
