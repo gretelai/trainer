@@ -1,5 +1,6 @@
 import json
 
+from gretel_trainer.relational.artifacts import ArtifactCollection
 from gretel_trainer.relational.backup import (
     Backup,
     BackupForeignKey,
@@ -52,12 +53,18 @@ def test_backup():
             ),
         },
     )
+    artifact_collection = ArtifactCollection(
+        gretel_backup="gretel_abc__gretel_backup.json",
+        gretel_debug_summary="gretel_abc__gretel_debug_summary.json",
+        synthetics_output_archive="gretel_abc_synthetics_output_tables.tar.gz",
+    )
     backup = Backup(
         project_name="my-project",
         strategy="independent",
         gretel_model="amplify",
         working_dir="workdir",
         refresh_interval=120,
+        artifact_collection=artifact_collection,
         relational_data=backup_relational,
         train=backup_train,
         generate=backup_generate,

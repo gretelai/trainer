@@ -315,6 +315,7 @@ class MultiTable:
             gretel_model=self._gretel_model,
             working_dir=str(self._working_dir),
             refresh_interval=self._refresh_interval,
+            artifact_collection=self._artifact_collection,
             relational_data=backup_relational_data,
         )
 

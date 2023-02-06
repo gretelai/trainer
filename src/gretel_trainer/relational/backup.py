@@ -4,6 +4,7 @@ import json
 from dataclasses import asdict, dataclass
 from typing import Any, Dict, List, Optional, Tuple
 
+from gretel_trainer.relational.artifacts import ArtifactCollection
 from gretel_trainer.relational.core import ForeignKey
 
 
@@ -61,6 +62,7 @@ class Backup:
     gretel_model: str
     working_dir: str
     refresh_interval: int
+    artifact_collection: ArtifactCollection
     relational_data: BackupRelationalData
     train: Optional[BackupTrain] = None
     generate: Optional[BackupGenerate] = None
@@ -92,6 +94,7 @@ class Backup:
             gretel_model=b["gretel_model"],
             working_dir=b["working_dir"],
             refresh_interval=b["refresh_interval"],
+            artifact_collection=ArtifactCollection(**b["artifact_collection"]),
             relational_data=brd,
         )
 
