@@ -891,10 +891,7 @@ class MultiTable:
         logger.warning(f"Lost contact with job for `{table_name}`.")
 
     def _validate_gretel_model(self, gretel_model: Optional[str]) -> Tuple[str, str]:
-        if gretel_model is None:
-            gretel_model = self._strategy.default_model
-        gretel_model = gretel_model.lower()
-
+        gretel_model = (gretel_model or self._strategy.default_model).lower()
         supported_models = self._strategy.supported_models
         if gretel_model not in supported_models:
             msg = f"Invalid gretel model requested: {gretel_model}. The selected strategy supports: {supported_models}."
