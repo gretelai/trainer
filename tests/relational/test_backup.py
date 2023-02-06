@@ -16,11 +16,9 @@ def test_backup():
     backup_relational = BackupRelationalData(
         tables={
             "customer": BackupRelationalDataTable(
-                source_artifact_id="gretel_abcdefg_customer.csv",
                 primary_key="id",
             ),
             "address": BackupRelationalDataTable(
-                source_artifact_id="gretel_abcdefg_address.csv",
                 primary_key=None,
             ),
         },

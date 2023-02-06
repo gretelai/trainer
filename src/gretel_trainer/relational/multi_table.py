@@ -4,6 +4,7 @@ import json
 import logging
 import os
 import shutil
+import tarfile
 import time
 from collections import defaultdict
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -19,6 +20,7 @@ from gretel_client.projects.jobs import ACTIVE_STATES, END_STATES, Job, Status
 from gretel_client.projects.models import Model, read_model_config
 from gretel_client.projects.records import RecordHandler
 
+from gretel_trainer.relational.artifacts import ArtifactCollection
 from gretel_trainer.relational.backup import (
     Backup,
     BackupForeignKey,
@@ -121,10 +123,10 @@ class MultiTable:
             )
 
         self.relational_data = relational_data
+        self._artifact_collection = ArtifactCollection(project=self._project)
         self._latest_backup: Optional[Backup] = None
         self._models: Dict[str, Model] = {}
         self._record_handlers: Dict[str, RecordHandler] = {}
-        self._source_artifact_ids: Dict[str, str] = {}
         self._synthetic_artifact_ids: Dict[str, str] = {}
         self._record_size_ratio = 1.0
         self.train_statuses: Dict[str, TrainStatus] = {}
@@ -136,7 +138,7 @@ class MultiTable:
         self._working_dir = Path(self._project.name)
         os.makedirs(self._working_dir, exist_ok=True)
         self._create_debug_summary()
-        self._upload_sources_to_project(self.relational_data.list_all_tables())
+        self._upload_sources_to_project()
 
     @classmethod
     def restore(cls, backup_file: str) -> MultiTable:
@@ -152,13 +154,13 @@ class MultiTable:
         working_dir = Path(project_name)
         os.makedirs(working_dir, exist_ok=True)
 
+        # TODO: create a restored ArtifactCollection instance here
+        # we'll use it downstream to download artifacts to the working directory
+
         # Restore RelationalData instance
         rel_data = RelationalData()
         for table_name, table_backup in backup.relational_data.tables.items():
             local_source_out = working_dir / f"source_{table_name}.csv"
-            _download_artifact(
-                project, table_backup.source_artifact_id, local_source_out
-            )
             source_data = pd.read_csv(str(local_source_out))
             rel_data.add_table(
                 name=table_name, primary_key=table_backup.primary_key, data=source_data
@@ -175,10 +177,7 @@ class MultiTable:
             project_unique_name=project_name,
             refresh_interval=backup.refresh_interval,
         )
-        mt._source_artifact_ids = {
-            table_name: table_backup.source_artifact_id
-            for table_name, table_backup in backup.relational_data.tables.items()
-        }
+        # TODO: set artifact collection attribute
 
         logger.info(
             "MultiTable instance created with RelationalData restored from `source_{table}` project artifacts."
@@ -301,15 +300,10 @@ class MultiTable:
 
     def _build_backup(self) -> Backup:
         # Relational Data
-        if len(self._source_artifact_ids) == 0:
-            raise MultiTableException(
-                "Cannot backup MultiTable prior to source artifacts being uploaded via train"
-            )
         tables = {}
         foreign_keys = []
-        for table, artifact_id in self._source_artifact_ids.items():
+        for table in self.relational_data.list_all_tables():
             tables[table] = BackupRelationalDataTable(
-                source_artifact_id=artifact_id,
                 primary_key=self.relational_data.get_primary_key(table),
             )
             foreign_keys.extend(
@@ -627,7 +621,7 @@ class MultiTable:
         for table_name, table_data in tables.items():
             self.relational_data.update_table_data(table_name, table_data)
 
-        self._upload_sources_to_project(list(tables.keys()))
+        self._upload_sources_to_project()
 
         tables_to_retrain = self._strategy.tables_to_retrain(
             list(tables.keys()), self.relational_data
@@ -637,13 +631,16 @@ class MultiTable:
         training_data = self._prepare_training_data(tables_to_retrain)
         self._train_models(training_data)
 
-    def _upload_sources_to_project(self, tables: List[str]) -> None:
-        for table in tables:
-            out_path = self._working_dir / f"source_{table}.csv"
-            df = self.relational_data.get_table_data(table)
-            df.to_csv(out_path, index=False)
-            key = upload_singleton_project_artifact(self._project, out_path)
-            self._source_artifact_ids[table] = key
+    def _upload_sources_to_project(self) -> None:
+        archive_path = self._working_dir / "synthetics_source_tables.tar.gz"
+        with tarfile.open(archive_path, "w:gz") as tar:
+            for table in self.relational_data.list_all_tables():
+                out_path = self._working_dir / f"source_{table}.csv"
+                df = self.relational_data.get_table_data(table)
+                df.to_csv(out_path, index=False)
+                tar.add(out_path)
+
+        self._artifact_collection.upload_synthetics_source_archive(str(archive_path))
         self._backup()
 
     def _reset_train_statuses(self, tables: List[str]) -> None:

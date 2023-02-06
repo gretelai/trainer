@@ -9,7 +9,6 @@ from gretel_trainer.relational.core import ForeignKey
 
 @dataclass
 class BackupRelationalDataTable:
-    source_artifact_id: str
     primary_key: Optional[str]
 
 
