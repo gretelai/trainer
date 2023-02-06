@@ -290,7 +290,8 @@ class MultiTable:
         with open(backup_path, "w") as bak:
             json.dump(backup.as_dict, bak)
 
-        upload_singleton_project_artifact(self._project, backup_path)
+        self._artifact_collection.upload_gretel_backup(str(backup_path))
+
         self._latest_backup = backup
 
     def _build_backup(self) -> Backup:
