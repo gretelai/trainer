@@ -151,14 +151,22 @@ class MultiTable:
         working_dir = Path(project_name)
         os.makedirs(working_dir, exist_ok=True)
 
-        # TODO: create a restored ArtifactCollection instance here
-        # we'll use it downstream to download artifacts to the working directory
+        artifact_collection = backup.artifact_collection
+        source_archive_id = artifact_collection.synthetics_source_archive
+        if source_archive_id is None:
+            raise MultiTableException(
+                "Cannot restore from backup—source table archive is missing."
+            )
+        source_archive_path = working_dir / "synthetic_source_tables.tar.gz"
+        _download_artifact(project, source_archive_id, source_archive_path)
+        with tarfile.open(source_archive_path, "r:gz") as tar:
+            tar.extractall(working_dir)
 
         # Restore RelationalData instance
         rel_data = RelationalData()
         for table_name, table_backup in backup.relational_data.tables.items():
-            local_source_out = working_dir / f"source_{table_name}.csv"
-            source_data = pd.read_csv(str(local_source_out))
+            local_source_path = working_dir / f"source_{table_name}.csv"
+            source_data = pd.read_csv(str(local_source_path))
             rel_data.add_table(
                 name=table_name, primary_key=table_backup.primary_key, data=source_data
             )
@@ -174,7 +182,7 @@ class MultiTable:
             project_unique_name=project_name,
             refresh_interval=backup.refresh_interval,
         )
-        # TODO: set artifact collection attribute
+        mt._artifact_collection = artifact_collection
 
         logger.info(
             "MultiTable instance created with RelationalData restored from `source_{table}` project artifacts."
@@ -257,21 +265,30 @@ class MultiTable:
                 out_path = working_dir / f"seed_{model.name}.csv"
                 _download_artifact(project, data_source, out_path)
 
-        # TODO: if ArtifactCollection has a synthetics_output_tables_archive,
-        # then we know generation finished completely. Download it and log the "you're done" msg.
-        # Otherwise we were still in progress and need to try --resume.
-        # if total_generate_jobs_count == completely_finished_count:
-        #     logger.info(
-        #         "Generation jobs for all tables from previous run finished prior to backup. Running post-processing."
-        #     )
-        #     mt.generate(resume=True)
-        #     logger.info(
-        #         "Post-processing complete. From here, you can review your synthetic data via `synthetic_output_tables` or call `expand_evaluations` for additional SQS metrics."
-        #     )
-        # else:
-        #     logger.info(
-        #         f"At time of backup, {completely_finished_count} of {total_generate_jobs_count} generation jobs had finished. From here, you can attempt to resume that job via `generate(resume=True)`, or restart generation from scratch via a regular call to `generate`."
-        #     )
+        synthetics_output_archive_id = artifact_collection.synthetics_output_archive
+        if synthetics_output_archive_id is None:
+            logger.info(
+                f"At time of last backup, generation had not yet finished. "
+                "From here, you can attempt to resume that job via `generate(resume=True)`, or restart generation from scratch via a regular call to `generate`."
+            )
+        else:
+            synthetics_output_archive_path = (
+                working_dir / "synthetic_output_tables.tar.gz"
+            )
+            _download_artifact(
+                project, synthetics_output_archive_id, synthetics_output_archive_path
+            )
+            with tarfile.open(synthetics_output_archive_path, "r:gz") as tar:
+                tar.extractall(working_dir)
+            for table_name in backup.relational_data.tables:
+                local_synth_path = working_dir / f"synth_{table_name}.csv"
+                mt.synthetic_output_tables[table_name] = pd.read_csv(
+                    str(local_synth_path)
+                )
+            logger.info(
+                "Generation jobs for all tables from previous run finished prior to backup. "
+                "From here, you can review your synthetic data via `synthetic_output_tables` or call `expand_evaluations` for additional SQS metrics."
+            )
 
         mt._backup()
         return mt
