@@ -1,5 +1,5 @@
-from dataclasses import dataclass, field
-from typing import Dict, Optional
+from dataclasses import dataclass
+from typing import Optional
 
 from gretel_client.projects import Project
 
@@ -9,11 +9,8 @@ class ArtifactCollection:
     project: Project
     gretel_backup: Optional[str] = None
     gretel_debug_summary: Optional[str] = None
-    transforms_source_tables: Dict[str, str] = field(default_factory=dict)
     transforms_output_archive: Optional[str] = None
     synthetics_source_archive: Optional[str] = None
-    synthetics_train_tables: Dict[str, str] = field(default_factory=dict)
-    synthetics_seeds: Dict[str, str] = field(default_factory=dict)
     synthetics_output_archive: Optional[str] = None
     synthetics_reports_archive: Optional[str] = None
 
@@ -25,10 +22,6 @@ class ArtifactCollection:
         existing = self.gretel_debug_summary
         self.gretel_debug_summary = self._upload_file(path, existing)
 
-    def upload_transforms_source_table(self, path: str, table_name: str) -> None:
-        existing = self.transforms_source_tables.get(table_name)
-        self.transforms_source_tables[table_name] = self._upload_file(path, existing)
-
     def upload_transforms_output_archive(self, path: str) -> None:
         existing = self.transforms_output_archive
         self.transforms_output_archive = self._upload_file(path, existing)
@@ -36,14 +29,6 @@ class ArtifactCollection:
     def upload_synthetics_source_archive(self, path: str) -> None:
         existing = self.synthetics_source_archive
         self.synthetics_source_archive = self._upload_file(path, existing)
-
-    def upload_synthetics_train_table(self, path: str, table_name: str) -> None:
-        existing = self.synthetics_train_tables.get(table_name)
-        self.synthetics_train_tables[table_name] = self._upload_file(path, existing)
-
-    def upload_synthetics_seed(self, path: str, table_name: str) -> None:
-        existing = self.synthetics_seeds.get(table_name)
-        self.synthetics_seeds[table_name] = self._upload_file(path, existing)
 
     def upload_synthetics_output_archive(self, path: str) -> None:
         existing = self.synthetics_output_archive
