@@ -3,6 +3,7 @@ from pathlib import Path
 from typing import Dict, Union
 
 import requests
+import smart_open
 from gretel_client.projects.jobs import Job, Status
 from gretel_client.projects.models import Model
 from gretel_client.projects.projects import Project
@@ -22,16 +23,25 @@ def cautiously_refresh_status(
     return job.status
 
 
-def download_one_artifact(
+def download_file_artifact(
     gretel_object: Union[Project, Model],
     artifact_name: str,
     out_path: Union[str, Path],
 ) -> None:
     download_link = gretel_object.get_artifact_link(artifact_name)
     try:
-        artifact = requests.get(download_link)
-        if artifact.status_code == 200:
-            with open(out_path, "wb+") as out:
-                out.write(artifact.content)
-    except requests.exceptions.HTTPError as ex:
+        with open(out_path, "wb+") as out:
+            out.write(smart_open.open(download_link, "rb").read())
+    except:
+        logger.warning(f"Failed to download `{artifact_name}`")
+
+
+def download_tar_artifact(project: Project, artifact_name: str, out_path: Path) -> None:
+    download_link = project.get_artifact_link(artifact_name)
+    try:
+        response = requests.get(download_link)
+        if response.status_code == 200:
+            with open(out_path, "wb") as out:
+                out.write(response.content)
+    except:
         logger.warning(f"Failed to download `{artifact_name}`")

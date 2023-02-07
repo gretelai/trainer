@@ -11,7 +11,7 @@ from gretel_client.projects.models import Model
 from sklearn import preprocessing
 
 from gretel_trainer.relational.core import RelationalData
-from gretel_trainer.relational.sdk_extras import download_one_artifact
+from gretel_trainer.relational.sdk_extras import download_file_artifact
 
 logger = logging.getLogger(__name__)
 
@@ -47,7 +47,7 @@ def download_artifacts(
 
     for filetype, artifact_name in legend.items():
         out_path = f"{out_filepath}.{filetype}"
-        download_one_artifact(model, artifact_name, out_path)
+        download_file_artifact(model, artifact_name, out_path)
 
 
 def read_report_json_data(

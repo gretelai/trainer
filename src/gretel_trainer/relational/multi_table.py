@@ -39,7 +39,8 @@ from gretel_trainer.relational.core import (
 )
 from gretel_trainer.relational.sdk_extras import (
     cautiously_refresh_status,
-    download_one_artifact,
+    download_file_artifact,
+    download_tar_artifact,
 )
 from gretel_trainer.relational.strategies.ancestral import AncestralStrategy
 from gretel_trainer.relational.strategies.independent import IndependentStrategy
@@ -219,7 +220,7 @@ class MultiTable:
                 "Cannot restore from backup—source table archive is missing."
             )
         source_archive_path = working_dir / "synthetics_source_tables.tar.gz"
-        download_one_artifact(project, source_archive_id, source_archive_path)
+        download_tar_artifact(project, source_archive_id, source_archive_path)
         with tarfile.open(source_archive_path, "r:gz") as tar:
             tar.extractall()
 
@@ -260,7 +261,7 @@ class MultiTable:
                     "Cannot restore while model training is actively in progress."
                 )
             else:
-                download_one_artifact(
+                download_file_artifact(
                     project,
                     model.data_source,
                     working_dir / f"synthetics_train_{table_name}.csv",
@@ -299,7 +300,7 @@ class MultiTable:
             data_source = record_handler.data_source
             if data_source is not None:
                 out_path = working_dir / f"synthetics_seed_{table_name}.csv"
-                download_one_artifact(project, data_source, out_path)
+                download_file_artifact(project, data_source, out_path)
 
         restore_config.record_handlers = record_handlers
 
@@ -310,7 +311,7 @@ class MultiTable:
             synthetics_output_archive_path = (
                 working_dir / "synthetics_output_tables.tar.gz"
             )
-            download_one_artifact(
+            download_tar_artifact(
                 project, synthetics_output_archive_id, synthetics_output_archive_path
             )
             with tarfile.open(synthetics_output_archive_path, "r:gz") as tar:
