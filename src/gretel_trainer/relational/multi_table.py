@@ -8,7 +8,7 @@ import tarfile
 import time
 from collections import defaultdict
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from dataclasses import replace
+from dataclasses import dataclass, replace
 from enum import Enum
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple, Union
@@ -62,6 +62,32 @@ class GenerateStatus(str, Enum):
     Failed = "Failed"
 
 
+@dataclass
+class RestoreConfig:
+    project: Project
+    artifact_collection: ArtifactCollection
+    working_dir: Path
+    log_message: str
+    train_models: Optional[Dict[str, Model]] = None
+    training_columns: Optional[Dict[str, List[str]]] = None
+    record_size_ratio: Optional[float] = None
+    preserved: Optional[List[str]] = None
+    record_handlers: Optional[Dict[str, RecordHandler]] = None
+    synthetic_output_tables: Optional[Dict[str, pd.DataFrame]] = None
+
+
+def _create_multitable(
+    rel_data: RelationalData, backup: Backup, restore_config: RestoreConfig
+) -> MultiTable:
+    return MultiTable(
+        relational_data=rel_data,
+        strategy=backup.strategy,
+        gretel_model=backup.gretel_model,
+        refresh_interval=backup.refresh_interval,
+        restore_config=restore_config,
+    )
+
+
 class MultiTable:
     """
     Relational data support for the Trainer SDK
@@ -71,8 +97,8 @@ class MultiTable:
         strategy (str, optional): The strategy to use. Supports "independent" (default) and "ancestral".
         gretel_model (str, optional): The underlying Gretel model to use. Default and acceptable models vary based on strategy.
         project_display_name (str, optional): Display name in the console for a new Gretel project holding models and artifacts. Defaults to "multi-table".
-        project_unique_name (str, optional): Unique name of an existing Gretel project. Used for restoring state only; if starting anew use `project_display_name`.
         refresh_interval (int, optional): Frequency in seconds to poll Gretel Cloud for job statuses. Must be at least 60 (1m). Defaults to 180 (3m).
+        restore_config (RestoreConfig, optional): Data used to restore from backup. Should not be supplied manually; instead use the `restore` classmethod.
     """
 
     def __init__(
@@ -82,8 +108,8 @@ class MultiTable:
         strategy: str = "independent",
         gretel_model: Optional[str] = None,
         project_display_name: Optional[str] = None,
-        project_unique_name: Optional[str] = None,
         refresh_interval: Optional[int] = None,
+        restore_config: Optional[RestoreConfig] = None,
         # deprecated
         project_name: Optional[str] = None,
         working_dir: Optional[str] = None,
@@ -105,21 +131,6 @@ class MultiTable:
         self._model_config = model_config
         self._set_refresh_interval(refresh_interval)
 
-        if project_unique_name is not None:
-            # We only go down this path via `restore`, which already configures a session
-            # Raises GretelProjectError if not found, but `restore` should have already found the project
-            self._project = get_project(name=project_unique_name)
-            logger.info(
-                f"Connected to existing project `{self._project.display_name}` with unique name `{self._project.name}`."
-            )
-        else:
-            configure_session(api_key="prompt", cache="yes", validate=True)
-            project_display_name = project_display_name or "multi-table"
-            self._project = create_project(display_name=project_display_name)
-            logger.info(
-                f"Created project `{self._project.display_name}` with unique name `{self._project.name}`."
-            )
-
         self.relational_data = relational_data
         self._artifact_collection = ArtifactCollection()
         self._latest_backup: Optional[Backup] = None
@@ -133,10 +144,52 @@ class MultiTable:
         self.synthetic_output_tables: Dict[str, pd.DataFrame] = {}
         self.evaluations = defaultdict(lambda: TableEvaluation())
 
-        self._working_dir = Path(self._project.name)
-        os.makedirs(self._working_dir, exist_ok=True)
-        self._create_debug_summary()
-        self._upload_sources_to_project()
+        if restore_config is None:
+            configure_session(api_key="prompt", cache="yes", validate=True)
+            project_display_name = project_display_name or "multi-table"
+            self._project = create_project(display_name=project_display_name)
+            logger.info(
+                f"Created project `{self._project.display_name}` with unique name `{self._project.name}`."
+            )
+            self._working_dir = _mkdir(self._project.name)
+            self._create_debug_summary()
+            self._upload_sources_to_project()
+        else:
+            self._project = restore_config.project
+            logger.info(
+                f"Connected to existing project `{self._project.display_name}` with unique name `{self._project.name}`."
+            )
+            self._working_dir = restore_config.working_dir
+            self._artifact_collection = restore_config.artifact_collection
+            self._models = restore_config.train_models or self._models
+            for table, model in self._models.items():
+                train_status = _train_status_for_model(model)
+                self.train_statuses[table] = train_status
+                if train_status == TrainStatus.Completed:
+                    self._strategy.update_evaluation_from_model(
+                        table, self.evaluations, model, self._working_dir
+                    )
+            self._record_handlers = (
+                restore_config.record_handlers or self._record_handlers
+            )
+            self._record_size_ratio = (
+                restore_config.record_size_ratio or self._record_size_ratio
+            )
+            self._training_columns = (
+                restore_config.training_columns or self._training_columns
+            )
+            if restore_config.preserved is not None:
+                for table in restore_config.preserved:
+                    self.generate_statuses[table] = GenerateStatus.SourcePreserved
+            if restore_config.record_handlers is not None:
+                for table, record_handler in restore_config.record_handlers.items():
+                    self.generate_statuses[table] = _generate_status_for_record_handler(
+                        record_handler
+                    )
+            if restore_config.synthetic_output_tables is not None:
+                self.synthetic_output_tables = restore_config.synthetic_output_tables
+
+            logger.info(restore_config.log_message)
 
     @classmethod
     def restore(cls, backup_file: str) -> MultiTable:
@@ -148,9 +201,13 @@ class MultiTable:
         project_name = backup.project_name
         # Raises GretelProjectEror if not found
         project = get_project(name=project_name)
-
-        working_dir = Path(project_name)
-        os.makedirs(working_dir, exist_ok=True)
+        working_dir = _mkdir(project_name)
+        restore_config = RestoreConfig(
+            project=project,
+            artifact_collection=backup.artifact_collection,
+            working_dir=working_dir,
+            log_message="",
+        )
 
         artifact_collection = backup.artifact_collection
         source_archive_id = artifact_collection.synthetics_source_archive
@@ -176,69 +233,48 @@ class MultiTable:
                 foreign_key=fk_backup.foreign_key, referencing=fk_backup.referencing
             )
 
-        mt = MultiTable(
-            relational_data=rel_data,
-            strategy=backup.strategy,
-            gretel_model=backup.gretel_model,
-            project_unique_name=project_name,
-            refresh_interval=backup.refresh_interval,
-        )
-        mt._artifact_collection = artifact_collection
-
-        logger.info(
-            "MultiTable instance created with RelationalData restored from `source_{table}` project artifacts."
-        )
-
         backup_train = backup.train
         if backup_train is None:
-            logger.info(
-                "No model train data present in backup. From here, your next step is to call `train`."
-            )
-            return mt
+            restore_config.log_message = "No model train data present in backup. From here, your next step is to call `train`."
+            return _create_multitable(rel_data, backup, restore_config)
 
+        train_models: Dict[str, Model] = {}
+        training_columns: Dict[str, List[str]] = {}
+        failed_to_train = []
         for table_name, table_train_backup in backup_train.tables.items():
             model = project.get_model(table_train_backup.model_id)
-            mt._models[table_name] = model
+            train_models[table_name] = model
+            training_columns[table_name] = table_train_backup.training_columns
+
             train_status = _train_status_for_model(model)
-            if train_status == TrainStatus.InProgress:
+            if train_status == TrainStatus.Failed:
+                failed_to_train.append(table_name)
+            elif train_status == TrainStatus.InProgress:
                 logger.warning(
                     f"Training still in progress for table `{table_name}`. From here, your next step is to wait for training to finish, and re-attempt restoring from backup once all models have completed training. You can view training progress in the Console under the `{table_name}` model page in the `{project.display_name} ({project.name})` project."
                 )
                 raise MultiTableException(
                     "Cannot restore while model training is actively in progress."
                 )
-            mt.train_statuses[table_name] = train_status
-            mt._training_columns[table_name] = table_train_backup.training_columns
-            _download_artifact(
-                project, model.data_source, working_dir / f"train_{table_name}.csv"
-            )
-            if train_status == TrainStatus.Completed:
-                mt._strategy.update_evaluation_from_model(
-                    table_name, mt.evaluations, model, mt._working_dir
+            else:
+                _download_artifact(
+                    project, model.data_source, working_dir / f"train_{table_name}.csv"
                 )
-            logger.info(
-                f"Restored model for `{table_name}` with status {train_status}."
-            )
-
-        failed_tables = [
-            table_name
-            for table_name, train_status in mt.train_statuses.items()
-            if train_status == TrainStatus.Failed
-        ]
-        if len(failed_tables) > 0:
-            logger.warning(
-                f"Training failed for tables: {failed_tables}. From here, your next step is to try retraining them with modified data by calling `retrain_tables`."
-            )
-            return mt
+                logger.info(
+                    f"Restored model for `{table_name}` with status {train_status}."
+                )
+        restore_config.train_models = train_models
+        restore_config.training_columns = training_columns
+        if len(failed_to_train) > 0:
+            restore_config.log_message = f"Training failed for tables: {failed_to_train}. From here, your next step is to try retraining them with modified data by calling `retrain_tables`."
+            return _create_multitable(rel_data, backup, restore_config)
         else:
             logger.info("Training restoration complete.")
 
         backup_generate = backup.generate
         if backup_generate is None:
-            logger.info(
-                "No generation data present in backup. From here, your next step is to call `generate`."
-            )
-            return mt
+            restore_config.log_message = "No generation data present in backup. From here, your next step is to call `generate`."
+            return _create_multitable(rel_data, backup, restore_config)
 
         backup_copy_dest = f"{backup_file}.restoring"
         logger.info(
@@ -246,53 +282,42 @@ class MultiTable:
         )
         shutil.copy(backup_file, backup_copy_dest)
 
-        mt._record_size_ratio = backup_generate.record_size_ratio
+        restore_config.record_size_ratio = backup_generate.record_size_ratio
+        restore_config.preserved = backup_generate.preserved
 
-        for table_name in backup_generate.preserved:
-            mt.generate_statuses[table_name] = GenerateStatus.SourcePreserved
-
+        record_handlers: Dict[str, RecordHandler] = {}
         for table_name, table_generate_backup in backup_generate.tables.items():
-            model = mt._models[table_name]
-            record_handler = model.get_record_handler(
+            record_handler = train_models[table_name].get_record_handler(
                 table_generate_backup.record_handler_id
             )
-            mt._record_handlers[table_name] = record_handler
-            mt.generate_statuses[table_name] = _generate_status_for_record_handler(
-                record_handler
-            )
-
+            record_handlers[table_name] = record_handler
             data_source = record_handler.data_source
             if data_source is not None:
-                out_path = working_dir / f"seed_{model.name}.csv"
+                out_path = working_dir / f"seed_{table_name}.csv"
                 _download_artifact(project, data_source, out_path)
+
+        restore_config.record_handlers = record_handlers
 
         synthetics_output_archive_id = artifact_collection.synthetics_output_archive
         if synthetics_output_archive_id is None:
-            logger.info(
-                f"At time of last backup, generation had not yet finished. "
-                "From here, you can attempt to resume that job via `generate(resume=True)`, or restart generation from scratch via a regular call to `generate`."
-            )
+            restore_config.log_message = f"At time of last backup, generation had not yet finished. From here, you can attempt to resume that job via `generate(resume=True)`, or restart generation from scratch via a regular call to `generate`."
         else:
             synthetics_output_archive_path = (
-                working_dir / "synthetic_output_tables.tar.gz"
+                working_dir / "synthetics_output_tables.tar.gz"
             )
             _download_artifact(
                 project, synthetics_output_archive_id, synthetics_output_archive_path
             )
             with tarfile.open(synthetics_output_archive_path, "r:gz") as tar:
                 tar.extractall()
+            synthetic_output_tables: Dict[str, pd.DataFrame] = {}
             for table_name in backup.relational_data.tables:
                 local_synth_path = working_dir / f"synth_{table_name}.csv"
-                mt.synthetic_output_tables[table_name] = pd.read_csv(
-                    str(local_synth_path)
-                )
-            logger.info(
-                "Generation jobs for all tables from previous run finished prior to backup. "
-                "From here, you can review your synthetic data via `synthetic_output_tables` or call `expand_evaluations` for additional SQS metrics."
-            )
+                synthetic_output_tables[table_name] = pd.read_csv(str(local_synth_path))
+            restore_config.synthetic_output_tables = synthetic_output_tables
+            restore_config.log_message = "Generation jobs for all tables from previous run finished prior to backup. From here, you can review your synthetic data via `synthetic_output_tables` or call `expand_evaluations` for additional SQS metrics."
 
-        mt._backup()
-        return mt
+        return _create_multitable(rel_data, backup, restore_config)
 
     def _backup(self) -> None:
         backup = self._build_backup()
@@ -973,3 +998,9 @@ def _download_artifact(project: Project, artifact_id: str, out_path: Path) -> No
                 out.write(artifact.content)
     except requests.exceptions.HTTPError as ex:
         logger.error(f"Failed to download artifact {artifact_id}")
+
+
+def _mkdir(name: str) -> Path:
+    d = Path(name)
+    os.makedirs(d, exist_ok=True)
+    return d
