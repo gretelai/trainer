@@ -150,7 +150,18 @@ def _table_relationships(rel_data: RelationalData) -> Relationships:
 
 def _assign_primary_key_colors(rel_data: RelationalData) -> Dict[str, str]:
     colors = itertools.cycle(
-        ["#F48FB1", "#C5E1A5", "#FFCC80", "#CE93D8", "#FFF59D", "#90CAF9", "#FFE082", "#B39DDB", "#A5D6A7", "#80DEEA" ]
+        [
+            "#F48FB1",
+            "#C5E1A5",
+            "#FFCC80",
+            "#CE93D8",
+            "#FFF59D",
+            "#90CAF9",
+            "#FFE082",
+            "#B39DDB",
+            "#A5D6A7",
+            "#80DEEA",
+        ]
     )
     color_dict = {}
     for table in rel_data.list_all_tables():
