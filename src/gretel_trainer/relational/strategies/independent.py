@@ -139,7 +139,8 @@ class IndependentStrategy:
         model: Model,
         working_dir: Path,
     ) -> None:
-        artifacts_dir = common.download_artifacts(model, table_name, working_dir)
+        out_filepath = working_dir / f"synthetics_individual_evaluation_{table_name}"
+        artifacts_dir = common.download_artifacts(model, out_filepath, table_name)
 
         evaluation = evaluations[table_name]
         evaluation.individual_sqs = common.get_sqs_score(model)
@@ -163,7 +164,8 @@ class IndependentStrategy:
         report = common.get_quality_report(
             source_data=source_data, synth_data=synth_data
         )
-        common.write_report(report, table, working_dir)
+        out_filepath = working_dir / f"synthetics_cross_table_evaluation_{table}"
+        common.write_report(report, out_filepath)
 
         evaluation.cross_table_sqs = report.peek().get("score")
         evaluation.cross_table_report_json = report.as_dict

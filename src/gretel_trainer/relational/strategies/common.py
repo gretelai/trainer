@@ -4,12 +4,14 @@ from pathlib import Path
 from typing import Dict, Optional, Set, Tuple
 
 import pandas as pd
+import requests
 import smart_open
 from gretel_client.evaluation.quality_report import QualityReport
 from gretel_client.projects.models import Model
 from sklearn import preprocessing
 
 from gretel_trainer.relational.core import RelationalData
+from gretel_trainer.relational.sdk_extras import download_one_artifact
 
 logger = logging.getLogger(__name__)
 
@@ -22,9 +24,9 @@ def get_quality_report(
     return report
 
 
-def write_report(report: QualityReport, table_name: str, working_dir: Path) -> None:
-    html_path = working_dir / f"expanded_evaluation_{table_name}.html"
-    json_path = working_dir / f"expanded_evaluation_{table_name}.json"
+def write_report(report: QualityReport, out_filepath: Path) -> None:
+    html_path = f"{out_filepath}.html"
+    json_path = f"{out_filepath}.json"
 
     with open(html_path, "w") as f:
         f.write(report.as_html)
@@ -33,20 +35,19 @@ def write_report(report: QualityReport, table_name: str, working_dir: Path) -> N
 
 
 def download_artifacts(
-    model: Model, table_name: str, working_dir: Path
+    model: Model, out_filepath: Path, table_name: str
 ) -> Optional[Path]:
     """
     Downloads all model artifacts to a subdirectory in the working directory.
     Returns the artifact directory path when successful.
     """
-    target_dir = working_dir / f"artifacts_{table_name}"
-    logger.info(f"Downloading model artifacts for `{table_name}`")
-    try:
-        model.download_artifacts(target_dir)
-        return target_dir
-    except:
-        logger.warning(f"Failed to download model artifacts for {table_name}")
-        return None
+    logger.info(f"Downloading model evaluation artifacts for `{table_name}`")
+
+    legend = {"html": "report", "json": "report_json"}
+
+    for filetype, artifact_name in legend.items():
+        out_path = f"{out_filepath}.{filetype}"
+        download_one_artifact(model, artifact_name, out_path)
 
 
 def read_report_json_data(

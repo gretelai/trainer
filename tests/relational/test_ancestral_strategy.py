@@ -481,11 +481,15 @@ def test_updates_single_table_scores_using_evaluate(source_nba, synthetic_nba):
         )
         assert len(os.listdir(working_dir)) == 2
         assert (
-            smart_open.open(working_dir / "expanded_evaluation_cities.html").read()
+            smart_open.open(
+                working_dir / "synthetics_individual_evaluation_cities.html"
+            ).read()
             == "HTML"
         )
         assert json.loads(
-            smart_open.open(working_dir / "expanded_evaluation_cities.json").read()
+            smart_open.open(
+                working_dir / "synthetics_individual_evaluation_cities.json"
+            ).read()
         ) == {"REPORT": "JSON"}
 
     get_report.assert_called_once_with(
