@@ -499,9 +499,7 @@ class MultiTable:
 
                     if rh_status == Status.COMPLETED:
                         self._log_success(table_name, "transforms data generation")
-                        out_table = pd.read_csv(
-                            record_handler.get_artifact_link("data"), compression="gzip"
-                        )
+                        out_table = _get_data_from_record_handler(record_handler)
                         output_tables[table_name] = out_table
                     elif rh_status in END_STATES:
                         self._log_failed(table_name, "transforms data generation")
