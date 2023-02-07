@@ -258,7 +258,9 @@ class MultiTable:
                 )
             else:
                 _download_artifact(
-                    project, model.data_source, working_dir / f"train_{table_name}.csv"
+                    project,
+                    model.data_source,
+                    working_dir / f"synthetics_train_{table_name}.csv",
                 )
                 logger.info(
                     f"Restored model for `{table_name}` with status {train_status}."
@@ -293,7 +295,7 @@ class MultiTable:
             record_handlers[table_name] = record_handler
             data_source = record_handler.data_source
             if data_source is not None:
-                out_path = working_dir / f"seed_{table_name}.csv"
+                out_path = working_dir / f"synthetics_seed_{table_name}.csv"
                 _download_artifact(project, data_source, out_path)
 
         restore_config.record_handlers = record_handlers
@@ -569,7 +571,7 @@ class MultiTable:
         training_paths = {}
 
         for table_name in tables:
-            training_path = self._working_dir / f"train_{table_name}.csv"
+            training_path = self._working_dir / f"synthetics_train_{table_name}.csv"
             training_data[table_name].to_csv(training_path, index=False)
             training_paths[table_name] = training_path
 

@@ -191,7 +191,7 @@ class AncestralStrategy:
             seed_df = self._build_seed_data_for_table(
                 table, output_tables, rel_data, synth_size, training_columns
             )
-            seed_path = working_dir / f"seed_{table}.csv"
+            seed_path = working_dir / f"synthetics_seed_{table}.csv"
             seed_df.to_csv(seed_path, index=False)
             return {"data_source": str(seed_path)}
 
