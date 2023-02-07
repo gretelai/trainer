@@ -227,7 +227,7 @@ class MultiTable:
         # Restore RelationalData instance
         rel_data = RelationalData()
         for table_name, table_backup in backup.relational_data.tables.items():
-            local_source_path = working_dir / f"source_{table_name}.csv"
+            local_source_path = working_dir / f"synthetics_source_{table_name}.csv"
             source_data = pd.read_csv(str(local_source_path))
             rel_data.add_table(
                 name=table_name, primary_key=table_backup.primary_key, data=source_data
@@ -304,7 +304,7 @@ class MultiTable:
 
         restore_config.record_handlers = record_handlers
 
-        synthetics_output_archive_id = artifact_collection.synthetics_output_archive
+        synthetics_output_archive_id = artifact_collection.synthetics_outputs_archive
         if synthetics_output_archive_id is None:
             restore_config.log_message = f"At time of last backup, generation had not yet finished. From here, you can attempt to resume that job via `generate(resume=True)`, or restart generation from scratch via a regular call to `generate`."
         else:
@@ -321,6 +321,7 @@ class MultiTable:
                 local_synth_path = working_dir / f"synth_{table_name}.csv"
                 synthetic_output_tables[table_name] = pd.read_csv(str(local_synth_path))
             restore_config.synthetic_output_tables = synthetic_output_tables
+            # TODO: somewhere around here, restore evaluations
             restore_config.log_message = "Generation jobs for all tables from previous run finished prior to backup. From here, you can review your synthetic data via `synthetic_output_tables` or call `expand_evaluations` for additional SQS metrics."
 
         return _create_multitable(rel_data, backup, restore_config)
@@ -675,11 +676,12 @@ class MultiTable:
 
     def _upload_sources_to_project(self) -> None:
         archive_path = self._working_dir / "synthetics_source_tables.tar.gz"
-        source_dataframes = {
-            table: self.relational_data.get_table_data(table)
-            for table in self.relational_data.list_all_tables()
-        }
-        self._archive(source_dataframes, archive_path, "source_")
+        with tarfile.open(archive_path, "w:gz") as tar:
+            for table in self.relational_data.list_all_tables():
+                out_path = self._working_dir / f"synthetics_source_{table}.csv"
+                df = self.relational_data.get_table_data(table)
+                df.to_csv(out_path, index=False)
+                tar.add(out_path)
         self._artifact_collection.upload_synthetics_source_archive(
             self._project, str(archive_path)
         )
@@ -694,7 +696,7 @@ class MultiTable:
         record_size_ratio: Optional[float] = None,
         preserve_tables: Optional[List[str]] = None,
         resume: bool = False,
-    ) -> Dict[str, pd.DataFrame]:
+    ) -> None:
         """
         Sample synthetic data from trained models.
         Tables that did not train successfully will be omitted from the output dictionary.
@@ -835,29 +837,42 @@ class MultiTable:
             output_tables, preserve_tables, self.relational_data
         )
 
-        archive_path = self._working_dir / "synthetics_output_tables.tar.gz"
-        self._archive(output_tables, archive_path, "synth_")
-        self._artifact_collection.upload_synthetics_output_archive(
+        self._expand_evaluations(output_tables)
+
+        # TODO: Create relational report
+
+        logger.info("Collecting all synthetic outputs")
+        archive_path = self._working_dir / "synthetics_outputs.tar.gz"
+        with tarfile.open(archive_path, "w:gz") as tar:
+            # TODO: Add relational report
+            for table in self.relational_data.list_all_tables():
+                # Add synthetic output table
+                synthetic_df = output_tables[table]
+                out_path = self._working_dir / f"synth_{table}.csv"
+                synthetic_df.to_csv(out_path, index=False)
+                tar.add(out_path)
+                # Add individual and cross_table reports
+                for eval_type in ["individual", "cross_table"]:
+                    for ext in ["html", "json"]:
+                        filename = f"synthetics_{eval_type}_evaluation_{table}.{ext}"
+                        try:
+                            tar.add(self._working_dir / filename)
+                        except FileNotFoundError:
+                            logger.warning(
+                                f"Could not find `{filename}` in working directory"
+                            )
+
+        self._artifact_collection.upload_synthetics_outputs_archive(
             self._project, str(archive_path)
         )
         self._backup()
         self.synthetic_output_tables = output_tables
-        return self.synthetic_output_tables
 
-    def _archive(
-        self, table_dataframes: Dict[str, pd.DataFrame], archive_path: Path, prefix: str
-    ) -> None:
-        with tarfile.open(archive_path, "w:gz") as tar:
-            for table, df in table_dataframes.items():
-                out_path = self._working_dir / f"{prefix}{table}.csv"
-                df.to_csv(out_path, index=False)
-                tar.add(out_path)
-
-    def expand_evaluations(self) -> None:
+    def _expand_evaluations(self, output_tables: Dict[str, pd.DataFrame]) -> None:
         """
         Adds evaluation metrics for the "opposite" correlation strategy using the Gretel Evaluate API.
         """
-        for table_name in self.synthetic_output_tables:
+        for table_name in output_tables:
             logger.info(
                 f"Expanding evaluation metrics for `{table_name}` via Gretel Evaluate API."
             )
@@ -865,7 +880,7 @@ class MultiTable:
                 evaluation=self.evaluations[table_name],
                 table=table_name,
                 rel_data=self.relational_data,
-                synthetic_tables=self.synthetic_output_tables,
+                synthetic_tables=output_tables,
                 working_dir=self._working_dir,
             )
 

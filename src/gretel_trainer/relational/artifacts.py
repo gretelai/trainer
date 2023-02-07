@@ -9,8 +9,7 @@ class ArtifactCollection:
     gretel_debug_summary: Optional[str] = None
     transforms_output_archive: Optional[str] = None
     synthetics_source_archive: Optional[str] = None
-    synthetics_output_archive: Optional[str] = None
-    synthetics_reports_archive: Optional[str] = None
+    synthetics_outputs_archive: Optional[str] = None
 
     # Backup behaves differently to avoid constantly busting the cache
     def upload_gretel_backup(self, project: Project, path: str) -> None:
@@ -32,13 +31,9 @@ class ArtifactCollection:
         existing = self.synthetics_source_archive
         self.synthetics_source_archive = self._upload_file(project, path, existing)
 
-    def upload_synthetics_output_archive(self, project: Project, path: str) -> None:
-        existing = self.synthetics_output_archive
-        self.synthetics_output_archive = self._upload_file(project, path, existing)
-
-    def upload_synthetics_reports_archive(self, project: Project, path: str) -> None:
-        existing = self.synthetics_reports_archive
-        self.synthetics_reports_archive = self._upload_file(project, path, existing)
+    def upload_synthetics_outputs_archive(self, project: Project, path: str) -> None:
+        existing = self.synthetics_outputs_archive
+        self.synthetics_outputs_archive = self._upload_file(project, path, existing)
 
     def _upload_file(self, project: Project, path: str, existing: Optional[str]) -> str:
         latest = project.upload_artifact(path)
