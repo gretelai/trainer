@@ -18,6 +18,7 @@ log_levels = {
     "gretel_trainer.relational.connectors": "INFO",
     "gretel_trainer.relational.core": "INFO",
     "gretel_trainer.relational.multi_table": "INFO",
+    "gretel_trainer.relational.sdk_extras": "INFO",
     "gretel_trainer.relational.strategies.common": "INFO",
 }
 

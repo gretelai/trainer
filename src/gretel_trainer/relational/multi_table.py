@@ -37,7 +37,10 @@ from gretel_trainer.relational.core import (
     RelationalData,
     TableEvaluation,
 )
-from gretel_trainer.relational.sdk_extras import cautiously_refresh_status
+from gretel_trainer.relational.sdk_extras import (
+    cautiously_refresh_status,
+    download_one_artifact,
+)
 from gretel_trainer.relational.strategies.ancestral import AncestralStrategy
 from gretel_trainer.relational.strategies.independent import IndependentStrategy
 
@@ -216,7 +219,7 @@ class MultiTable:
                 "Cannot restore from backup—source table archive is missing."
             )
         source_archive_path = working_dir / "synthetics_source_tables.tar.gz"
-        _download_artifact(project, source_archive_id, source_archive_path)
+        download_one_artifact(project, source_archive_id, source_archive_path)
         with tarfile.open(source_archive_path, "r:gz") as tar:
             tar.extractall()
 
@@ -257,7 +260,7 @@ class MultiTable:
                     "Cannot restore while model training is actively in progress."
                 )
             else:
-                _download_artifact(
+                download_one_artifact(
                     project,
                     model.data_source,
                     working_dir / f"synthetics_train_{table_name}.csv",
@@ -296,7 +299,7 @@ class MultiTable:
             data_source = record_handler.data_source
             if data_source is not None:
                 out_path = working_dir / f"synthetics_seed_{table_name}.csv"
-                _download_artifact(project, data_source, out_path)
+                download_one_artifact(project, data_source, out_path)
 
         restore_config.record_handlers = record_handlers
 
@@ -307,7 +310,7 @@ class MultiTable:
             synthetics_output_archive_path = (
                 working_dir / "synthetics_output_tables.tar.gz"
             )
-            _download_artifact(
+            download_one_artifact(
                 project, synthetics_output_archive_id, synthetics_output_archive_path
             )
             with tarfile.open(synthetics_output_archive_path, "r:gz") as tar:
@@ -989,17 +992,6 @@ def _generate_status_for_record_handler(rh: RecordHandler) -> GenerateStatus:
         return GenerateStatus.InProgress
     else:
         return GenerateStatus.NotStarted
-
-
-def _download_artifact(project: Project, artifact_id: str, out_path: Path) -> None:
-    download_link = project.get_artifact_link(artifact_id)
-    try:
-        artifact = requests.get(download_link)
-        if artifact.status_code == 200:
-            with open(out_path, "wb+") as out:
-                out.write(artifact.content)
-    except requests.exceptions.HTTPError as ex:
-        logger.error(f"Failed to download artifact {artifact_id}")
 
 
 def _mkdir(name: str) -> Path:
