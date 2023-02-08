@@ -51,6 +51,8 @@ from gretel_trainer.relational.strategies.independent import IndependentStrategy
 
 GretelModelConfig = Union[str, Path, Dict]
 
+MAX_REFRESH_ATTEMPTS = 3
+
 logger = logging.getLogger(__name__)
 
 
@@ -105,7 +107,7 @@ class MultiTable:
         strategy (str, optional): The strategy to use. Supports "independent" (default) and "ancestral".
         gretel_model (str, optional): The underlying Gretel model to use. Default and acceptable models vary based on strategy.
         project_display_name (str, optional): Display name in the console for a new Gretel project holding models and artifacts. Defaults to "multi-table".
-        refresh_interval (int, optional): Frequency in seconds to poll Gretel Cloud for job statuses. Must be at least 60 (1m). Defaults to 180 (3m).
+        refresh_interval (int, optional): Frequency in seconds to poll Gretel Cloud for job statuses. Must be at least 30. Defaults to 60 (1m).
         restore_config (RestoreConfig, optional): Data used to restore from backup. Should not be supplied manually; instead use the `restore` classmethod.
     """
 
@@ -413,35 +415,15 @@ class MultiTable:
 
         return backup
 
-    @property
-    def state_by_action(self) -> Dict[str, Dict[str, Any]]:
-        return {
-            "train": self.train_statuses,
-            "generate": self.generate_statuses,
-        }
-
-    @property
-    def state_by_table(self) -> Dict[str, Dict[str, Any]]:
-        return {
-            table_name: self._table_state(table_name)
-            for table_name in self.relational_data.list_all_tables()
-        }
-
-    def _table_state(self, table_name: str) -> Dict[str, Any]:
-        return {
-            "train": self.train_statuses[table_name],
-            "generate": self.generate_statuses[table_name],
-        }
-
     def _set_refresh_interval(self, interval: Optional[int]) -> None:
         if interval is None:
-            self._refresh_interval = 180
+            self._refresh_interval = 60
         else:
-            if interval < 60:
+            if interval < 30:
                 logger.warning(
-                    "Refresh interval must be at least 60 seconds. Setting to 60."
+                    "Refresh interval must be at least 30 seconds. Setting to 30."
                 )
-                self._refresh_interval = 60
+                self._refresh_interval = 30
             else:
                 self._refresh_interval = interval
 
@@ -528,7 +510,7 @@ class MultiTable:
                     continue
 
                 # If we consistently failed to refresh the job status, fail the table
-                if refresh_attempts[table_name] >= 5:
+                if refresh_attempts[table_name] >= MAX_REFRESH_ATTEMPTS:
                     self._log_lost_contact(table_name)
                     record_handler_statuses[table_name] = Status.LOST
                     continue
@@ -548,7 +530,9 @@ class MultiTable:
                     elif rh_status in END_STATES:
                         self._log_failed(table_name, "transforms data generation")
                     else:
-                        self._log_in_progress(table_name, "transforms data generation")
+                        self._log_in_progress(
+                            table_name, rh_status, "transforms data generation"
+                        )
 
                     continue
 
@@ -572,7 +556,9 @@ class MultiTable:
                     # In this case, CANCELLED is standing in for "Won't Attempt"
                     record_handler_statuses[table_name] = Status.CANCELLED
                 else:
-                    self._log_in_progress(table_name, "transforms model training")
+                    self._log_in_progress(
+                        table_name, model_status, "transforms model training"
+                    )
 
         return output_tables
 
@@ -634,7 +620,7 @@ class MultiTable:
                     continue
 
                 # If we consistently failed to refresh the job status, fail the table
-                if refresh_attempts[table_name] >= 5:
+                if refresh_attempts[table_name] >= MAX_REFRESH_ATTEMPTS:
                     self._log_lost_contact(table_name)
                     self.train_statuses[table_name] = TrainStatus.Failed
                     continue
@@ -654,7 +640,7 @@ class MultiTable:
                     self._log_failed(table_name, "model training")
                     self.train_statuses[table_name] = TrainStatus.Failed
                 else:
-                    self._log_in_progress(table_name, "model training")
+                    self._log_in_progress(table_name, status, "model training")
                     continue
 
             self._backup()
@@ -783,7 +769,7 @@ class MultiTable:
                     continue
 
                 # If we consistently failed to refresh the job via API, fail the table
-                if refresh_attempts[table_name] >= 5:
+                if refresh_attempts[table_name] >= MAX_REFRESH_ATTEMPTS:
                     self._log_lost_contact(table_name)
                     self.generate_statuses[table_name] = GenerateStatus.Failed
                     continue
@@ -808,7 +794,9 @@ class MultiTable:
                     self._log_failed(table_name, "synthetic data generation")
                     self.generate_statuses[table_name] = GenerateStatus.Failed
                 else:
-                    self._log_in_progress(table_name, "synthetic data generation")
+                    self._log_in_progress(
+                        table_name, status, "synthetic data generation"
+                    )
                     continue
 
             # Determine if we can start any more jobs
@@ -977,8 +965,10 @@ class MultiTable:
     def _log_start(self, table_name: str, action: str) -> None:
         logger.info(f"Starting {action} for `{table_name}`.")
 
-    def _log_in_progress(self, table_name: str, action: str) -> None:
-        logger.info(f"{action.capitalize()} job for `{table_name}` still in progress.")
+    def _log_in_progress(self, table_name: str, status: Status, action: str) -> None:
+        logger.info(
+            f"{action.capitalize()} job for `{table_name}` still in progress (status: {status})."
+        )
 
     def _log_failed(self, table_name: str, action: str) -> None:
         logger.info(f"{action.capitalize()} failed for `{table_name}`.")

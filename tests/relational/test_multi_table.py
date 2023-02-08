@@ -82,14 +82,14 @@ def test_refresh_interval_config(ecom):
         project.upload_artifact.return_value = "gretel_abcdefg_somefile.someextension"
         create_project.return_value = project
 
-        # default to 180
+        # default to 60
         mt = MultiTable(ecom, project_display_name=tmpdir)
-        assert mt._refresh_interval == 180
-
-        # must be at least 60
-        mt = MultiTable(ecom, project_display_name=tmpdir, refresh_interval=30)
         assert mt._refresh_interval == 60
 
-        # may be greater than 60
-        mt = MultiTable(ecom, project_display_name=tmpdir, refresh_interval=120)
-        assert mt._refresh_interval == 120
+        # must be at least 30
+        mt = MultiTable(ecom, project_display_name=tmpdir, refresh_interval=20)
+        assert mt._refresh_interval == 30
+
+        # may be greater than 30
+        mt = MultiTable(ecom, project_display_name=tmpdir, refresh_interval=45)
+        assert mt._refresh_interval == 45
