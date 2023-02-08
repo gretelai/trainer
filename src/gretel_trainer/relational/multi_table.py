@@ -51,6 +51,8 @@ from gretel_trainer.relational.strategies.independent import IndependentStrategy
 
 GretelModelConfig = Union[str, Path, Dict]
 
+MAX_REFRESH_ATTEMPTS = 3
+
 logger = logging.getLogger(__name__)
 
 
@@ -528,7 +530,7 @@ class MultiTable:
                     continue
 
                 # If we consistently failed to refresh the job status, fail the table
-                if refresh_attempts[table_name] >= 5:
+                if refresh_attempts[table_name] >= MAX_REFRESH_ATTEMPTS:
                     self._log_lost_contact(table_name)
                     record_handler_statuses[table_name] = Status.LOST
                     continue
@@ -634,7 +636,7 @@ class MultiTable:
                     continue
 
                 # If we consistently failed to refresh the job status, fail the table
-                if refresh_attempts[table_name] >= 5:
+                if refresh_attempts[table_name] >= MAX_REFRESH_ATTEMPTS:
                     self._log_lost_contact(table_name)
                     self.train_statuses[table_name] = TrainStatus.Failed
                     continue
@@ -783,7 +785,7 @@ class MultiTable:
                     continue
 
                 # If we consistently failed to refresh the job via API, fail the table
-                if refresh_attempts[table_name] >= 5:
+                if refresh_attempts[table_name] >= MAX_REFRESH_ATTEMPTS:
                     self._log_lost_contact(table_name)
                     self.generate_statuses[table_name] = GenerateStatus.Failed
                     continue
