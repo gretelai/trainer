@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import datetime
 import json
 import logging
 import os
@@ -37,6 +38,7 @@ from gretel_trainer.relational.core import (
     RelationalData,
     TableEvaluation,
 )
+from gretel_trainer.relational.report.report import ReportPresenter, ReportRenderer
 from gretel_trainer.relational.sdk_extras import (
     cautiously_refresh_status,
     download_file_artifact,
@@ -839,12 +841,12 @@ class MultiTable:
 
         self._expand_evaluations(output_tables)
 
-        # TODO: Create relational report
+        self.create_relational_report()
 
         logger.info("Collecting all synthetic outputs")
         archive_path = self._working_dir / "synthetics_outputs.tar.gz"
         with tarfile.open(archive_path, "w:gz") as tar:
-            # TODO: Add relational report
+            tar.add(self._working_dir / "relational_report.html")
             for table in self.relational_data.list_all_tables():
                 # Add synthetic output table
                 synthetic_df = output_tables[table]
@@ -883,6 +885,17 @@ class MultiTable:
                 synthetic_tables=output_tables,
                 working_dir=self._working_dir,
             )
+
+    def create_relational_report(self) -> None:
+        presenter = ReportPresenter(
+            rel_data=self.relational_data,
+            evaluations=self.evaluations,
+            now=datetime.datetime.utcnow(),
+        )
+        output_path = self._working_dir / "relational_report.html"
+        with open(output_path, "w") as report:
+            html_content = ReportRenderer().render(presenter)
+            report.write(html_content)
 
     def _reset_generation_statuses(self) -> None:
         """

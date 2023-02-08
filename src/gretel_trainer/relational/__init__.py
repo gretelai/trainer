@@ -1,5 +1,7 @@
 import logging
 
+# Some of these are imported simply to ensure the logger is instantiated before getting configured below
+import gretel_trainer.relational.sdk_extras
 import gretel_trainer.relational.strategies.common
 from gretel_trainer.relational.connectors import (
     Connector,
@@ -11,7 +13,6 @@ from gretel_trainer.relational.connectors import (
 )
 from gretel_trainer.relational.core import RelationalData
 from gretel_trainer.relational.multi_table import MultiTable
-from gretel_trainer.relational.report.report import create_report
 
 # Optimize logging for multitable output
 log_levels = {
@@ -41,3 +42,11 @@ for name, level in log_levels.items():
     logger.handlers.clear()
     logger.addHandler(handler)
     logger.setLevel(level)
+
+
+def create_report(multitable: MultiTable) -> None:
+    logger = logging.getLogger("gretel_trainer.relational.multi_table")
+    logger.info(
+        "The `create_report` function is deprecated and will be removed in a future release. Instead call the `MultiTable#create_relational_report` instance method."
+    )
+    multitable.create_relational_report()
