@@ -7,9 +7,9 @@ from gretel_client.projects import Project
 @dataclass
 class ArtifactCollection:
     gretel_debug_summary: Optional[str] = None
-    transforms_output_archive: Optional[str] = None
     source_archive: Optional[str] = None
     synthetics_outputs_archive: Optional[str] = None
+    transforms_output_archive: Optional[str] = None
 
     # Backup behaves differently to avoid constantly busting the cache
     def upload_gretel_backup(self, project: Project, path: str) -> None:
