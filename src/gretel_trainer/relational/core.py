@@ -23,6 +23,14 @@ class TableEvaluation:
     individual_report_json: Optional[Dict] = field(default=None, repr=False)
     individual_sqs: Optional[int] = None
 
+    def is_complete(self) -> bool:
+        return (
+            self.cross_table_report_json is not None
+            and self.cross_table_sqs is not None
+            and self.individual_report_json is not None
+            and self.individual_sqs is not None
+        )
+
 
 @dataclass
 class ForeignKey:
