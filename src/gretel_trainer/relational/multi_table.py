@@ -216,6 +216,12 @@ class MultiTable:
         )
 
         artifact_collection = backup.artifact_collection
+
+        debug_summary_id = artifact_collection.gretel_debug_summary
+        if debug_summary_id is not None:
+            debug_summary_path = working_dir / "_gretel_debug_summary.json"
+            download_file_artifact(project, debug_summary_id, debug_summary_path)
+
         source_archive_id = artifact_collection.source_archive
         if source_archive_id is None:
             raise MultiTableException(
