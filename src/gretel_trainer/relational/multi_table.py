@@ -856,9 +856,9 @@ class MultiTable:
         }
         self._expand_evaluations(tables_with_incomplete_evaluations)
 
+        logger.info("Creating relational report")
         self.create_relational_report()
 
-        logger.info("Collecting all synthetic outputs")
         archive_path = self._working_dir / "synthetics_outputs.tar.gz"
         with tarfile.open(archive_path, "w:gz") as tar:
             tar.add(self._working_dir / "relational_report.html")
