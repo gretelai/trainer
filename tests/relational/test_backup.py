@@ -1,5 +1,6 @@
 import json
 
+from gretel_trainer.relational.artifacts import ArtifactCollection
 from gretel_trainer.relational.backup import (
     Backup,
     BackupForeignKey,
@@ -16,11 +17,9 @@ def test_backup():
     backup_relational = BackupRelationalData(
         tables={
             "customer": BackupRelationalDataTable(
-                source_artifact_id="gretel_abcdefg_customer.csv",
                 primary_key="id",
             ),
             "address": BackupRelationalDataTable(
-                source_artifact_id="gretel_abcdefg_address.csv",
                 primary_key=None,
             ),
         },
@@ -48,13 +47,15 @@ def test_backup():
         tables={
             "customer": BackupGenerateTable(
                 record_handler_id="555444666",
-                synthetic_artifact_id="gretel_boaief_synth_customer.csv",
             ),
             "address": BackupGenerateTable(
                 record_handler_id="333111222",
-                synthetic_artifact_id=None,
             ),
         },
+    )
+    artifact_collection = ArtifactCollection(
+        gretel_debug_summary="gretel_abc__gretel_debug_summary.json",
+        source_archive="gretel_abc_source_tables.tar.gz",
     )
     backup = Backup(
         project_name="my-project",
@@ -62,6 +63,7 @@ def test_backup():
         gretel_model="amplify",
         working_dir="workdir",
         refresh_interval=120,
+        artifact_collection=artifact_collection,
         relational_data=backup_relational,
         train=backup_train,
         generate=backup_generate,

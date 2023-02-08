@@ -1,3 +1,4 @@
+import logging
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Union
 
@@ -12,6 +13,8 @@ from gretel_trainer.relational.core import (
     RelationalData,
     TableEvaluation,
 )
+
+logger = logging.getLogger(__name__)
 
 
 class AncestralStrategy:
@@ -191,7 +194,7 @@ class AncestralStrategy:
             seed_df = self._build_seed_data_for_table(
                 table, output_tables, rel_data, synth_size, training_columns
             )
-            seed_path = working_dir / f"seed_{table}.csv"
+            seed_path = working_dir / f"synthetics_seed_{table}.csv"
             seed_df.to_csv(seed_path, index=False)
             return {"data_source": str(seed_path)}
 
@@ -306,12 +309,14 @@ class AncestralStrategy:
         model: Model,
         working_dir: Path,
     ) -> None:
-        artifacts_dir = common.download_artifacts(model, table_name, working_dir)
+        logger.info(f"Downloading cross_table evaluation reports for `{table_name}`.")
+        out_filepath = working_dir / f"synthetics_cross_table_evaluation_{table_name}"
+        common.download_artifacts(model, out_filepath, table_name)
 
         evaluation = evaluations[table_name]
         evaluation.cross_table_sqs = common.get_sqs_score(model)
         evaluation.cross_table_report_json = common.read_report_json_data(
-            model, artifacts_dir
+            model, out_filepath
         )
 
     def update_evaluation_via_evaluate(
@@ -325,10 +330,12 @@ class AncestralStrategy:
         source_data = rel_data.get_table_data(table)
         synth_data = synthetic_tables[table]
 
+        logger.info(f"Running individual evaluations for `{table}`.")
         report = common.get_quality_report(
             source_data=source_data, synth_data=synth_data
         )
-        common.write_report(report, table, working_dir)
+        out_filepath = working_dir / f"synthetics_individual_evaluation_{table}"
+        common.write_report(report, out_filepath)
 
         evaluation.individual_sqs = report.peek().get("score")
         evaluation.individual_report_json = report.as_dict

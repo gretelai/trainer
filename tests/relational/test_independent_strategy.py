@@ -1,4 +1,3 @@
-import gzip
 import json
 import os
 import tempfile
@@ -182,11 +181,10 @@ def test_uses_trained_model_to_update_individual_scores():
     ) as get_sqs:
         get_sqs.return_value = 80
         working_dir = Path(working_dir)
-        artifacts_subdir = working_dir / "artifacts_table_1"
-        os.makedirs(artifacts_subdir, exist_ok=True)
-        with gzip.open(str(artifacts_subdir / "report_json.json.gz"), "wb") as f:
-            f.write(b'{"report": "json"}')
-        download_artifacts.return_value = artifacts_subdir
+        with open(
+            working_dir / "synthetics_individual_evaluation_table_1.json", "w"
+        ) as f:
+            f.write(json.dumps({"report": "json"}))
 
         strategy.update_evaluation_from_model(
             "table_1", evaluations, model, working_dir
@@ -261,11 +259,15 @@ def test_updates_cross_table_scores_using_evaluate(source_nba, synthetic_nba):
         )
         assert len(os.listdir(working_dir)) == 2
         assert (
-            smart_open.open(working_dir / "expanded_evaluation_cities.html").read()
+            smart_open.open(
+                working_dir / "synthetics_cross_table_evaluation_cities.html"
+            ).read()
             == "HTML"
         )
         assert json.loads(
-            smart_open.open(working_dir / "expanded_evaluation_cities.json").read()
+            smart_open.open(
+                working_dir / "synthetics_cross_table_evaluation_cities.json"
+            ).read()
         ) == {"REPORT": "JSON"}
 
     get_report.assert_called_once()

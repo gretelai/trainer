@@ -10,21 +10,8 @@ import pandas as pd
 from jinja2 import Environment, FileSystemLoader
 
 from gretel_trainer.relational.core import RelationalData, TableEvaluation
-from gretel_trainer.relational.multi_table import MultiTable
 
 _TEMPLATE_DIR = str(Path(__file__).parent)
-
-
-def create_report(multitable: MultiTable) -> None:
-    presenter = ReportPresenter(
-        rel_data=multitable.relational_data,
-        evaluations=multitable.evaluations,
-        now=datetime.datetime.utcnow(),
-    )
-    output_path = multitable._working_dir / "relational_report.html"
-    with open(output_path, "w") as report:
-        html_content = ReportRenderer().render(presenter)
-        report.write(html_content)
 
 
 class ReportRenderer:
@@ -150,7 +137,18 @@ def _table_relationships(rel_data: RelationalData) -> Relationships:
 
 def _assign_primary_key_colors(rel_data: RelationalData) -> Dict[str, str]:
     colors = itertools.cycle(
-        ["#F48FB1", "#C5E1A5", "#FFCC80", "#CE93D8", "#FFF59D", "#90CAF9", "#FFE082", "#B39DDB", "#A5D6A7", "#80DEEA" ]
+        [
+            "#F48FB1",
+            "#C5E1A5",
+            "#FFCC80",
+            "#CE93D8",
+            "#FFF59D",
+            "#90CAF9",
+            "#FFE082",
+            "#B39DDB",
+            "#A5D6A7",
+            "#80DEEA",
+        ]
     )
     color_dict = {}
     for table in rel_data.list_all_tables():

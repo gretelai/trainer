@@ -15,12 +15,12 @@ def test_model_strategy_combinations(ecom):
     ), patch(
         "gretel_trainer.relational.multi_table.create_project"
     ) as create_project, patch(
-        "gretel_trainer.relational.multi_table.upload_singleton_project_artifact"
-    ) as upload_singleton:
+        "gretel_trainer.relational.multi_table._upload_gretel_backup"
+    ):
         project = Mock()
         project.name = tmpdir
+        project.upload_artifact.return_value = "gretel_abcdefg_somefile.someextension"
         create_project.return_value = project
-        upload_singleton.return_value = "gretel_abcdefg_source_table.csv"
 
         # Default to Amplify/single-table
         mt = MultiTable(ecom, project_display_name=tmpdir)
@@ -75,12 +75,12 @@ def test_refresh_interval_config(ecom):
     ), patch(
         "gretel_trainer.relational.multi_table.create_project"
     ) as create_project, patch(
-        "gretel_trainer.relational.multi_table.upload_singleton_project_artifact"
-    ) as upload_singleton:
+        "gretel_trainer.relational.multi_table._upload_gretel_backup"
+    ):
         project = Mock()
         project.name = tmpdir
+        project.upload_artifact.return_value = "gretel_abcdefg_somefile.someextension"
         create_project.return_value = project
-        upload_singleton.return_value = "gretel_abcdefg_source_table.csv"
 
         # default to 180
         mt = MultiTable(ecom, project_display_name=tmpdir)
