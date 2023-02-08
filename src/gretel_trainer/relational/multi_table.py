@@ -550,7 +550,9 @@ class MultiTable:
                     elif rh_status in END_STATES:
                         self._log_failed(table_name, "transforms data generation")
                     else:
-                        self._log_in_progress(table_name, "transforms data generation")
+                        self._log_in_progress(
+                            table_name, rh_status, "transforms data generation"
+                        )
 
                     continue
 
@@ -574,7 +576,9 @@ class MultiTable:
                     # In this case, CANCELLED is standing in for "Won't Attempt"
                     record_handler_statuses[table_name] = Status.CANCELLED
                 else:
-                    self._log_in_progress(table_name, "transforms model training")
+                    self._log_in_progress(
+                        table_name, model_status, "transforms model training"
+                    )
 
         return output_tables
 
@@ -656,7 +660,7 @@ class MultiTable:
                     self._log_failed(table_name, "model training")
                     self.train_statuses[table_name] = TrainStatus.Failed
                 else:
-                    self._log_in_progress(table_name, "model training")
+                    self._log_in_progress(table_name, status, "model training")
                     continue
 
             self._backup()
@@ -810,7 +814,9 @@ class MultiTable:
                     self._log_failed(table_name, "synthetic data generation")
                     self.generate_statuses[table_name] = GenerateStatus.Failed
                 else:
-                    self._log_in_progress(table_name, "synthetic data generation")
+                    self._log_in_progress(
+                        table_name, status, "synthetic data generation"
+                    )
                     continue
 
             # Determine if we can start any more jobs
@@ -979,8 +985,10 @@ class MultiTable:
     def _log_start(self, table_name: str, action: str) -> None:
         logger.info(f"Starting {action} for `{table_name}`.")
 
-    def _log_in_progress(self, table_name: str, action: str) -> None:
-        logger.info(f"{action.capitalize()} job for `{table_name}` still in progress.")
+    def _log_in_progress(self, table_name: str, status: Status, action: str) -> None:
+        logger.info(
+            f"{action.capitalize()} job for `{table_name}` still in progress (status: {status})."
+        )
 
     def _log_failed(self, table_name: str, action: str) -> None:
         logger.info(f"{action.capitalize()} failed for `{table_name}`.")
