@@ -311,12 +311,12 @@ class AncestralStrategy:
     ) -> None:
         logger.info(f"Downloading cross_table evaluation reports for `{table_name}`.")
         out_filepath = working_dir / f"synthetics_cross_table_evaluation_{table_name}"
-        artifacts_dir = common.download_artifacts(model, out_filepath, table_name)
+        common.download_artifacts(model, out_filepath, table_name)
 
         evaluation = evaluations[table_name]
         evaluation.cross_table_sqs = common.get_sqs_score(model)
         evaluation.cross_table_report_json = common.read_report_json_data(
-            model, artifacts_dir
+            model, out_filepath
         )
 
     def update_evaluation_via_evaluate(

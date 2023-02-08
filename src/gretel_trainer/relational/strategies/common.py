@@ -34,9 +34,7 @@ def write_report(report: QualityReport, out_filepath: Path) -> None:
         f.write(json.dumps(report.as_dict))
 
 
-def download_artifacts(
-    model: Model, out_filepath: Path, table_name: str
-) -> Optional[Path]:
+def download_artifacts(model: Model, out_filepath: Path, table_name: str) -> None:
     """
     Downloads all model artifacts to a subdirectory in the working directory.
     Returns the artifact directory path when successful.
@@ -48,13 +46,11 @@ def download_artifacts(
         download_file_artifact(model, artifact_name, out_path)
 
 
-def read_report_json_data(
-    model: Model, artifacts_dir: Optional[Path]
-) -> Optional[Dict]:
-    if artifacts_dir is not None:
-        report_json_path = artifacts_dir / "report_json.json.gz"
-        return json.loads(smart_open.open(report_json_path).read())
-    else:
+def read_report_json_data(model: Model, report_path: Path) -> Optional[Dict]:
+    full_path = f"{report_path}.json"
+    try:
+        return json.loads(smart_open.open(full_path).read())
+    except:
         return _get_report_json(model)
 
 
