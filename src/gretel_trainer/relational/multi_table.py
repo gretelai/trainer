@@ -349,7 +349,7 @@ class MultiTable:
         with open(backup_path, "w") as bak:
             json.dump(backup.as_dict, bak)
 
-        self._artifact_collection.upload_gretel_backup(self._project, str(backup_path))
+        _upload_gretel_backup(self._project, str(backup_path))
 
         self._latest_backup = backup
 
@@ -1059,3 +1059,11 @@ def _mkdir(name: str) -> Path:
     d = Path(name)
     os.makedirs(d, exist_ok=True)
     return d
+
+
+def _upload_gretel_backup(project: Project, path: str) -> None:
+    latest = project.upload_artifact(path)
+    for artifact in project.artifacts:
+        key = artifact["key"]
+        if key != latest and key.endswith("__gretel_backup.json"):
+            project.delete_artifact(key)

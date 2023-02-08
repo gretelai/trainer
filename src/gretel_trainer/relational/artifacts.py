@@ -11,14 +11,6 @@ class ArtifactCollection:
     synthetics_outputs_archive: Optional[str] = None
     transforms_output_archive: Optional[str] = None
 
-    # Backup behaves differently to avoid constantly busting the cache
-    def upload_gretel_backup(self, project: Project, path: str) -> None:
-        latest = project.upload_artifact(path)
-        for artifact in project.artifacts:
-            key = artifact["key"]
-            if key != latest and key.endswith("__gretel_backup.json"):
-                project.delete_artifact(key)
-
     def upload_gretel_debug_summary(self, project: Project, path: str) -> None:
         existing = self.gretel_debug_summary
         self.gretel_debug_summary = self._upload_file(project, path, existing)
