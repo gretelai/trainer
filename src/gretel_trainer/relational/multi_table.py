@@ -415,26 +415,6 @@ class MultiTable:
 
         return backup
 
-    @property
-    def state_by_action(self) -> Dict[str, Dict[str, Any]]:
-        return {
-            "train": self.train_statuses,
-            "generate": self.generate_statuses,
-        }
-
-    @property
-    def state_by_table(self) -> Dict[str, Dict[str, Any]]:
-        return {
-            table_name: self._table_state(table_name)
-            for table_name in self.relational_data.list_all_tables()
-        }
-
-    def _table_state(self, table_name: str) -> Dict[str, Any]:
-        return {
-            "train": self.train_statuses[table_name],
-            "generate": self.generate_statuses[table_name],
-        }
-
     def _set_refresh_interval(self, interval: Optional[int]) -> None:
         if interval is None:
             self._refresh_interval = 60
