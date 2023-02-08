@@ -16,6 +16,7 @@ from typing import Any, Dict, List, Optional, Tuple, Union
 
 import pandas as pd
 import requests
+import smart_open
 from gretel_client import configure_session
 from gretel_client.projects import Project, create_project, get_project
 from gretel_client.projects.jobs import ACTIVE_STATES, END_STATES, Job, Status
@@ -43,6 +44,7 @@ from gretel_trainer.relational.sdk_extras import (
     cautiously_refresh_status,
     download_file_artifact,
     download_tar_artifact,
+    sqs_score_from_full_report,
 )
 from gretel_trainer.relational.strategies.ancestral import AncestralStrategy
 from gretel_trainer.relational.strategies.independent import IndependentStrategy
@@ -192,8 +194,11 @@ class MultiTable:
                     self.generate_statuses[table] = _generate_status_for_record_handler(
                         record_handler
                     )
-            if restore_config.synthetic_output_tables is not None:
-                self.synthetic_output_tables = restore_config.synthetic_output_tables
+            synth_out_tables = restore_config.synthetic_output_tables
+            if synth_out_tables is not None:
+                self.synthetic_output_tables = synth_out_tables
+                for table in synth_out_tables:
+                    self._attach_existing_reports(table)
 
             logger.info(restore_config.log_message)
 
@@ -329,7 +334,6 @@ class MultiTable:
                 local_synth_path = working_dir / f"synth_{table_name}.csv"
                 synthetic_output_tables[table_name] = pd.read_csv(str(local_synth_path))
             restore_config.synthetic_output_tables = synthetic_output_tables
-            # TODO: somewhere around here, restore evaluations
             restore_config.log_message = "Generation jobs for all tables from previous run finished prior to backup. From here, you can access your synthetic data as Pandas DataFrames via `synthetic_output_tables`, or review them in CSV format along with the relational report in the local working directory."
 
         return _create_multitable(rel_data, backup, restore_config)
@@ -845,7 +849,12 @@ class MultiTable:
             output_tables, preserve_tables, self.relational_data
         )
 
-        self._expand_evaluations(output_tables)
+        tables_with_incomplete_evaluations = {
+            table: df
+            for table, df in output_tables.items()
+            if not self.evaluations[table].is_complete()
+        }
+        self._expand_evaluations(tables_with_incomplete_evaluations)
 
         self.create_relational_report()
 
@@ -940,6 +949,26 @@ class MultiTable:
             GenerateStatus.ModelUnavailable,
             GenerateStatus.Failed,
         ]
+
+    def _attach_existing_reports(self, table: str) -> None:
+        individual_path = (
+            self._working_dir / f"synthetics_individual_evaluation_{table}.json"
+        )
+        cross_table_path = (
+            self._working_dir / f"synthetics_cross_table_evaluation_{table}.json"
+        )
+
+        individual_report_json = json.loads(smart_open.open(individual_path).read())
+        cross_table_report_json = json.loads(smart_open.open(individual_path).read())
+
+        self.evaluations[table].individual_report_json = individual_report_json
+        self.evaluations[table].individual_sqs = sqs_score_from_full_report(
+            individual_report_json
+        )
+        self.evaluations[table].cross_table_report_json = cross_table_report_json
+        self.evaluations[table].cross_table_sqs = sqs_score_from_full_report(
+            cross_table_report_json
+        )
 
     def _wait_refresh_interval(self) -> None:
         logger.info(f"Next status check in {self._refresh_interval} seconds.")
