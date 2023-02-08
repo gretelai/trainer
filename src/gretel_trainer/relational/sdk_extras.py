@@ -1,6 +1,7 @@
 import logging
+from contextlib import suppress
 from pathlib import Path
-from typing import Dict, Union
+from typing import Any, Dict, Optional, Union
 
 import requests
 import smart_open
@@ -45,3 +46,10 @@ def download_tar_artifact(project: Project, artifact_name: str, out_path: Path) 
                 out.write(response.content)
     except:
         logger.warning(f"Failed to download `{artifact_name}`")
+
+
+def sqs_score_from_full_report(report: Dict[str, Any]) -> Optional[int]:
+    with suppress(KeyError):
+        for field_dict in report["summary"]:
+            if field_dict["field"] == "synthetic_data_quality_score":
+                return field_dict["value"]
