@@ -41,8 +41,6 @@ def download_artifacts(
     Downloads all model artifacts to a subdirectory in the working directory.
     Returns the artifact directory path when successful.
     """
-    logger.info(f"Downloading model evaluation artifacts for `{table_name}`")
-
     legend = {"html": "report", "json": "report_json"}
 
     for filetype, artifact_name in legend.items():

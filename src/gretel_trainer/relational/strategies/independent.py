@@ -1,3 +1,4 @@
+import logging
 import random
 from pathlib import Path
 from typing import Any, Dict, List, Optional
@@ -8,6 +9,8 @@ from gretel_client.projects.models import Model
 import gretel_trainer.relational.ancestry as ancestry
 import gretel_trainer.relational.strategies.common as common
 from gretel_trainer.relational.core import RelationalData, TableEvaluation
+
+logger = logging.getLogger(__name__)
 
 
 class IndependentStrategy:
@@ -139,6 +142,7 @@ class IndependentStrategy:
         model: Model,
         working_dir: Path,
     ) -> None:
+        logger.info(f"Downloading individual evaluation reports for `{table_name}`.")
         out_filepath = working_dir / f"synthetics_individual_evaluation_{table_name}"
         artifacts_dir = common.download_artifacts(model, out_filepath, table_name)
 
@@ -161,6 +165,7 @@ class IndependentStrategy:
             rel_data, table, synthetic_tables
         )
 
+        logger.info(f"Running cross_table evaluations for `{table}`.")
         report = common.get_quality_report(
             source_data=source_data, synth_data=synth_data
         )

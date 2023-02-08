@@ -1,3 +1,4 @@
+import logging
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Union
 
@@ -12,6 +13,8 @@ from gretel_trainer.relational.core import (
     RelationalData,
     TableEvaluation,
 )
+
+logger = logging.getLogger(__name__)
 
 
 class AncestralStrategy:
@@ -306,6 +309,7 @@ class AncestralStrategy:
         model: Model,
         working_dir: Path,
     ) -> None:
+        logger.info(f"Downloading cross_table evaluation reports for `{table_name}`.")
         out_filepath = working_dir / f"synthetics_cross_table_evaluation_{table_name}"
         artifacts_dir = common.download_artifacts(model, out_filepath, table_name)
 
@@ -326,6 +330,7 @@ class AncestralStrategy:
         source_data = rel_data.get_table_data(table)
         synth_data = synthetic_tables[table]
 
+        logger.info(f"Running individual evaluations for `{table}`.")
         report = common.get_quality_report(
             source_data=source_data, synth_data=synth_data
         )

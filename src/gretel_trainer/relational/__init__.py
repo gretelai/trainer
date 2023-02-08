@@ -2,7 +2,9 @@ import logging
 
 # Some of these are imported simply to ensure the logger is instantiated before getting configured below
 import gretel_trainer.relational.sdk_extras
+import gretel_trainer.relational.strategies.ancestral
 import gretel_trainer.relational.strategies.common
+import gretel_trainer.relational.strategies.independent
 from gretel_trainer.relational.connectors import (
     Connector,
     mariadb_conn,
@@ -20,7 +22,9 @@ log_levels = {
     "gretel_trainer.relational.core": "INFO",
     "gretel_trainer.relational.multi_table": "INFO",
     "gretel_trainer.relational.sdk_extras": "INFO",
+    "gretel_trainer.relational.strategies.ancestral": "INFO",
     "gretel_trainer.relational.strategies.common": "INFO",
+    "gretel_trainer.relational.strategies.independent": "INFO",
 }
 
 log_format = "%(levelname)s - %(asctime)s - %(message)s"

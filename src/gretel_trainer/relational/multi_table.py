@@ -324,7 +324,7 @@ class MultiTable:
                 synthetic_output_tables[table_name] = pd.read_csv(str(local_synth_path))
             restore_config.synthetic_output_tables = synthetic_output_tables
             # TODO: somewhere around here, restore evaluations
-            restore_config.log_message = "Generation jobs for all tables from previous run finished prior to backup. From here, you can review your synthetic data via `synthetic_output_tables` or call `expand_evaluations` for additional SQS metrics."
+            restore_config.log_message = "Generation jobs for all tables from previous run finished prior to backup. From here, you can access your synthetic data as Pandas DataFrames via `synthetic_output_tables`, or review them in CSV format along with the relational report in the local working directory."
 
         return _create_multitable(rel_data, backup, restore_config)
 
@@ -875,9 +875,6 @@ class MultiTable:
         Adds evaluation metrics for the "opposite" correlation strategy using the Gretel Evaluate API.
         """
         for table_name in output_tables:
-            logger.info(
-                f"Expanding evaluation metrics for `{table_name}` via Gretel Evaluate API."
-            )
             self._strategy.update_evaluation_via_evaluate(
                 evaluation=self.evaluations[table_name],
                 table=table_name,
