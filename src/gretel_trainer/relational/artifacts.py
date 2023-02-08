@@ -23,10 +23,6 @@ class ArtifactCollection:
         existing = self.gretel_debug_summary
         self.gretel_debug_summary = self._upload_file(project, path, existing)
 
-    def upload_transforms_output_archive(self, project: Project, path: str) -> None:
-        existing = self.transforms_output_archive
-        self.transforms_output_archive = self._upload_file(project, path, existing)
-
     def upload_source_archive(self, project: Project, path: str) -> None:
         existing = self.source_archive
         self.source_archive = self._upload_file(project, path, existing)
@@ -34,6 +30,10 @@ class ArtifactCollection:
     def upload_synthetics_outputs_archive(self, project: Project, path: str) -> None:
         existing = self.synthetics_outputs_archive
         self.synthetics_outputs_archive = self._upload_file(project, path, existing)
+
+    def upload_transforms_output_archive(self, project: Project, path: str) -> None:
+        existing = self.transforms_output_archive
+        self.transforms_output_archive = self._upload_file(project, path, existing)
 
     def _upload_file(self, project: Project, path: str, existing: Optional[str]) -> str:
         latest = project.upload_artifact(path)
