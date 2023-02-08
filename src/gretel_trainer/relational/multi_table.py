@@ -216,12 +216,12 @@ class MultiTable:
         )
 
         artifact_collection = backup.artifact_collection
-        source_archive_id = artifact_collection.synthetics_source_archive
+        source_archive_id = artifact_collection.source_archive
         if source_archive_id is None:
             raise MultiTableException(
-                "Cannot restore from backup—source table archive is missing."
+                "Cannot restore from backup: source archive is missing."
             )
-        source_archive_path = working_dir / "synthetics_source_tables.tar.gz"
+        source_archive_path = working_dir / "source_tables.tar.gz"
         download_tar_artifact(project, source_archive_id, source_archive_path)
         with tarfile.open(source_archive_path, "r:gz") as tar:
             tar.extractall()
@@ -229,7 +229,7 @@ class MultiTable:
         # Restore RelationalData instance
         rel_data = RelationalData()
         for table_name, table_backup in backup.relational_data.tables.items():
-            local_source_path = working_dir / f"synthetics_source_{table_name}.csv"
+            local_source_path = working_dir / f"source_{table_name}.csv"
             source_data = pd.read_csv(str(local_source_path))
             rel_data.add_table(
                 name=table_name, primary_key=table_backup.primary_key, data=source_data
@@ -677,14 +677,14 @@ class MultiTable:
         self._train_models(training_data)
 
     def _upload_sources_to_project(self) -> None:
-        archive_path = self._working_dir / "synthetics_source_tables.tar.gz"
+        archive_path = self._working_dir / "source_tables.tar.gz"
         with tarfile.open(archive_path, "w:gz") as tar:
             for table in self.relational_data.list_all_tables():
-                out_path = self._working_dir / f"synthetics_source_{table}.csv"
+                out_path = self._working_dir / f"source_{table}.csv"
                 df = self.relational_data.get_table_data(table)
                 df.to_csv(out_path, index=False)
                 tar.add(out_path)
-        self._artifact_collection.upload_synthetics_source_archive(
+        self._artifact_collection.upload_source_archive(
             self._project, str(archive_path)
         )
         self._backup()
