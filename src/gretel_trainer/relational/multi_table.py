@@ -481,7 +481,7 @@ class MultiTable:
         )
 
         if in_place:
-            for table_name, transformed_table in output_tables:
+            for table_name, transformed_table in output_tables.items():
                 self.relational_data.update_table_data(table_name, transformed_table)
 
         self.transform_output_tables = output_tables
