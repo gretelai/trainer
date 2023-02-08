@@ -105,7 +105,7 @@ class MultiTable:
         strategy (str, optional): The strategy to use. Supports "independent" (default) and "ancestral".
         gretel_model (str, optional): The underlying Gretel model to use. Default and acceptable models vary based on strategy.
         project_display_name (str, optional): Display name in the console for a new Gretel project holding models and artifacts. Defaults to "multi-table".
-        refresh_interval (int, optional): Frequency in seconds to poll Gretel Cloud for job statuses. Must be at least 60 (1m). Defaults to 180 (3m).
+        refresh_interval (int, optional): Frequency in seconds to poll Gretel Cloud for job statuses. Must be at least 30. Defaults to 60 (1m).
         restore_config (RestoreConfig, optional): Data used to restore from backup. Should not be supplied manually; instead use the `restore` classmethod.
     """
 
@@ -435,13 +435,13 @@ class MultiTable:
 
     def _set_refresh_interval(self, interval: Optional[int]) -> None:
         if interval is None:
-            self._refresh_interval = 180
+            self._refresh_interval = 60
         else:
-            if interval < 60:
+            if interval < 30:
                 logger.warning(
-                    "Refresh interval must be at least 60 seconds. Setting to 60."
+                    "Refresh interval must be at least 30 seconds. Setting to 30."
                 )
-                self._refresh_interval = 60
+                self._refresh_interval = 30
             else:
                 self._refresh_interval = interval
 
