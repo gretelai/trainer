@@ -144,6 +144,9 @@ class MultiTable:
         self.relational_data = relational_data
         self._artifact_collection = ArtifactCollection()
         self._latest_backup: Optional[Backup] = None
+        self._transforms_models: Dict[str, Model] = {}
+        self.transforms_train_statuses: Dict[str, TrainStatus] = {}
+        self.transforms_output_tables: Dict[str, pd.DataFrame] = {}
         self._synthetics_models: Dict[str, Model] = {}
         self._record_handlers: Dict[str, RecordHandler] = {}
         self._record_size_ratio = 1.0
@@ -441,6 +444,187 @@ class MultiTable:
         self._artifact_collection.upload_gretel_debug_summary(
             self._project, str(debug_summary_path)
         )
+
+    def train_transform_models(self, configs: Dict[str, GretelModelConfig]) -> None:
+        for table, config in configs.items():
+            # Set initial status
+            self.transforms_train_statuses[table] = TrainStatus.NotStarted
+
+            # Ensure consistent, friendly model name in Console
+            named_config = read_model_config(config)
+            named_config["name"] = f"{table}-transforms"
+
+            # Ensure consistent, friendly data source names in Console
+            table_data = self.relational_data.get_table_data(table)
+            transforms_train_path = self._working_dir / f"transforms_train_{table}.csv"
+            table_data.to_csv(transforms_train_path, index=False)
+
+            # Create model
+            self._log_start(table, "transforms model training")
+            model = self._project.create_model_obj(
+                model_config=named_config, data_source=str(transforms_train_path)
+            )
+            model.submit_cloud()
+            self._transforms_models[table] = model
+            self.transforms_train_statuses[table] = TrainStatus.InProgress
+
+        self._backup()
+
+        refresh_attempts: Dict[str, int] = defaultdict(int)
+
+        def _more_to_do() -> bool:
+            return any(
+                [
+                    status == TrainStatus.InProgress
+                    for status in self.transforms_train_statuses.values()
+                ]
+            )
+
+        while _more_to_do():
+            self._wait_refresh_interval()
+
+            for table_name in configs:
+                # No need to do anything with tables in terminal state
+                if self.transforms_train_statuses[table_name] in (
+                    TrainStatus.Completed,
+                    TrainStatus.Failed,
+                ):
+                    continue
+
+                # If we consistently failed to refresh the job status, fail the table
+                if refresh_attempts[table_name] >= MAX_REFRESH_ATTEMPTS:
+                    self._log_lost_contact(table_name)
+                    self.transforms_train_statuses[table_name] = TrainStatus.Failed
+                    continue
+
+                model = self._transforms_models[table_name]
+
+                status = cautiously_refresh_status(model, table_name, refresh_attempts)
+
+                if status == Status.COMPLETED:
+                    self._log_success(table_name, "model training")
+                    self.transforms_train_statuses[table_name] = TrainStatus.Completed
+                elif status in END_STATES:
+                    # already checked explicitly for completed; all other end states are effectively failures
+                    self._log_failed(table_name, "model training")
+                    self.transforms_train_statuses[table_name] = TrainStatus.Failed
+                else:
+                    self._log_in_progress(table_name, status, "model training")
+                    continue
+
+            self._backup()
+
+    def run_transforms(
+        self, in_place: bool = False, data: Optional[Dict[str, pd.DataFrame]] = None
+    ) -> None:
+        """
+        If `in_place` set to True, overwrites source data in all locations
+        (internal Python state, local working directory, project artifact archive).
+        Used for transforms->synthetics workflows.
+
+        If `data` is supplied, runs only the supplied data through the corresponding transforms models.
+        Otherwise runs source data through all existing transforms models.
+        """
+        transforms_run_paths = {}
+        if data is not None:
+            unrunnable_tables = [
+                table
+                for table in data
+                if self.transforms_train_statuses.get(table) != TrainStatus.Completed
+            ]
+            if len(unrunnable_tables) > 0:
+                raise MultiTableException(
+                    f"Cannot run transforms on provided data without successfully trained models for {unrunnable_tables}"
+                )
+
+            for table, df in data.items():
+                transforms_run_path = self._working_dir / f"transforms_run_{table}.csv"
+                df.to_csv(transforms_run_path, index=False)
+                transforms_run_paths[table] = transforms_run_path
+        else:
+            for table, model in self._transforms_models.items():
+                if self.transforms_train_statuses[table] == TrainStatus.Completed:
+                    transforms_run_paths[table] = model.data_source
+
+        transforms_record_handlers: Dict[str, RecordHandler] = {}
+        transforms_run_statuses: Dict[str, GenerateStatus] = {}
+
+        for table_name, transforms_run_path in transforms_run_paths.items():
+            self._log_start(table_name, "transforms run")
+            model = self._transforms_models[table_name]
+            record_handler = model.create_record_handler_obj(
+                data_source=str(transforms_run_path)
+            )
+            record_handler.submit_cloud()
+            transforms_run_statuses[table_name] = GenerateStatus.InProgress
+            transforms_record_handlers[table_name] = record_handler
+
+        output_tables: Dict[str, pd.DataFrame] = {}
+        refresh_attempts: Dict[str, int] = defaultdict(int)
+
+        def _more_to_do() -> bool:
+            return not all(
+                [
+                    _table_generation_in_terminal_state(transforms_run_statuses, table)
+                    for table in transforms_run_paths
+                ]
+            )
+
+        while _more_to_do():
+            self._wait_refresh_interval()
+
+            for table_name, record_handler in transforms_record_handlers.items():
+                # No need to do anything with tables in terminal state
+                if _table_generation_in_terminal_state(
+                    transforms_run_statuses, table_name
+                ):
+                    continue
+
+                # If we consistently failed to refresh the job via API, fail the table
+                if refresh_attempts[table_name] >= MAX_REFRESH_ATTEMPTS:
+                    self._log_lost_contact(table_name)
+                    transforms_run_statuses[table_name] = GenerateStatus.Failed
+                    continue
+
+                status = cautiously_refresh_status(
+                    record_handler, table_name, refresh_attempts
+                )
+
+                if status == Status.COMPLETED:
+                    self._log_success(table_name, "transforms run")
+                    transforms_run_statuses[table_name] = GenerateStatus.Completed
+                    record_handler_result = _get_data_from_record_handler(
+                        record_handler
+                    )
+                    output_tables[table_name] = record_handler_result
+                elif status in END_STATES:
+                    # already checked explicitly for completed; all other end states are effectively failures
+                    self._log_failed(table_name, "transforms run")
+                    transforms_run_statuses[table_name] = GenerateStatus.Failed
+                else:
+                    self._log_in_progress(table_name, status, "transforms run")
+
+        output_tables = self._strategy.label_encode_keys(
+            self.relational_data, output_tables
+        )
+
+        if in_place:
+            for table_name, transformed_table in output_tables.items():
+                self.relational_data.update_table_data(table_name, transformed_table)
+            self._upload_sources_to_project()
+
+        archive_path = self._working_dir / "transforms_outputs.tar.gz"
+        with tarfile.open(archive_path, "w:gz") as tar:
+            for table, df in output_tables.items():
+                out_path = self._working_dir / f"transformed_{table}.csv"
+                df.to_csv(out_path, index=False)
+                tar.add(out_path)
+
+        self._artifact_collection.upload_transforms_outputs_archive(
+            self._project, str(archive_path)
+        )
+        self._backup()
+        self.transform_output_tables = output_tables
 
     def transform(
         self,
@@ -1045,6 +1229,17 @@ def _generate_status_for_record_handler(rh: RecordHandler) -> GenerateStatus:
         return GenerateStatus.InProgress
     else:
         return GenerateStatus.NotStarted
+
+
+def _table_generation_in_terminal_state(
+    statuses: Dict[str, GenerateStatus], table: str
+) -> bool:
+    return statuses[table] in [
+        GenerateStatus.Completed,
+        GenerateStatus.SourcePreserved,
+        GenerateStatus.ModelUnavailable,
+        GenerateStatus.Failed,
+    ]
 
 
 def _mkdir(name: str) -> Path:
