@@ -33,6 +33,7 @@ from gretel_trainer.relational.backup import (
     BackupRelationalDataTable,
     BackupTrain,
     BackupTrainTable,
+    BackupTransforms,
 )
 from gretel_trainer.relational.core import (
     MultiTableException,
@@ -78,6 +79,7 @@ class RestoreConfig:
     artifact_collection: ArtifactCollection
     working_dir: Path
     log_message: str
+    transforms_models: Optional[Dict[str, Model]] = None
     synthetics_models: Optional[Dict[str, Model]] = None
     training_columns: Optional[Dict[str, List[str]]] = None
     record_size_ratio: Optional[float] = None
@@ -174,6 +176,12 @@ class MultiTable:
             )
             self._working_dir = restore_config.working_dir
             self._artifact_collection = restore_config.artifact_collection
+            self._transforms_models = (
+                restore_config.transforms_models or self._transforms_models
+            )
+            for table, model in self._transforms_models.items():
+                train_status = _train_status_for_model(model)
+                self.transforms_train_statuses[table] = train_status
             self._synthetics_models = (
                 restore_config.synthetics_models or self._synthetics_models
             )
@@ -257,6 +265,15 @@ class MultiTable:
                 foreign_key=fk_backup.foreign_key, referencing=fk_backup.referencing
             )
 
+        # Restore Transforms
+        backup_transforms = backup.transforms
+        if backup_transforms is not None:
+            restore_config.transforms_models = {
+                table: project.get_model(model_id)
+                for table, model_id in backup_transforms.model_ids.items()
+            }
+
+        # Restore Synthetics
         backup_train = backup.train
         if backup_train is None:
             restore_config.log_message = "No model train data present in backup. From here, your next step is to call `train`."
@@ -387,6 +404,15 @@ class MultiTable:
             artifact_collection=replace(self._artifact_collection),
             relational_data=backup_relational_data,
         )
+
+        # Transforms
+        if len(self._transforms_models) > 0:
+            backup.transforms = BackupTransforms(
+                model_ids={
+                    table: model.model_id
+                    for table, model in self._transforms_models.items()
+                }
+            )
 
         # Train
         if len(self._synthetics_models) > 0:
