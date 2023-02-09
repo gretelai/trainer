@@ -39,6 +39,11 @@ class BackupTrainTable:
 
 
 @dataclass
+class BackupTransforms:
+    model_ids: Dict[str, str]
+
+
+@dataclass
 class BackupTrain:
     tables: Dict[str, BackupTrainTable]
 
@@ -64,6 +69,7 @@ class Backup:
     refresh_interval: int
     artifact_collection: ArtifactCollection
     relational_data: BackupRelationalData
+    transforms: Optional[BackupTransforms] = None
     train: Optional[BackupTrain] = None
     generate: Optional[BackupGenerate] = None
 
@@ -97,6 +103,10 @@ class Backup:
             artifact_collection=ArtifactCollection(**b["artifact_collection"]),
             relational_data=brd,
         )
+
+        transforms = b.get("transforms")
+        if transforms is not None:
+            backup.transforms = BackupTransforms(**transforms)
 
         train = b.get("train")
         if train is not None:
