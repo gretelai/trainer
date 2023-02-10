@@ -127,8 +127,7 @@ class MultiTable:
         self._record_size_ratio = 1.0
         self.synthetics_train_statuses: Dict[str, TrainStatus] = {}
         self._training_columns: Dict[str, List[str]] = {}
-        self._reset_train_statuses(self.relational_data.list_all_tables())
-        self._reset_generation_statuses()
+        self.synthetics_generate_statuses: Dict[str, GenerateStatus] = {}
         self.synthetic_output_tables: Dict[str, pd.DataFrame] = {}
         self.evaluations = defaultdict(lambda: TableEvaluation())
 
@@ -254,14 +253,14 @@ class MultiTable:
 
         self._record_size_ratio = backup_generate.record_size_ratio
         for table in backup_generate.preserved:
-            self.generate_statuses[table] = GenerateStatus.SourcePreserved
+            self.synthetics_generate_statuses[table] = GenerateStatus.SourcePreserved
         for table, table_generate_backup in backup_generate.tables.items():
             record_handler = self._synthetics_models[table].get_record_handler(
                 table_generate_backup.record_handler_id
             )
             status = _generate_status_for_record_handler(record_handler)
             self._record_handlers[table] = record_handler
-            self.generate_statuses[table] = status
+            self.synthetics_generate_statuses[table] = status
             data_source = record_handler.data_source
             if data_source is not None:
                 download_file_artifact(
@@ -381,7 +380,7 @@ class MultiTable:
             }
             preserved = [
                 table
-                for table, status in self.generate_statuses.items()
+                for table, status in self.synthetics_generate_statuses.items()
                 if status == GenerateStatus.SourcePreserved
             ]
             backup.generate = BackupGenerate(
@@ -758,7 +757,7 @@ class MultiTable:
                 )
             preserve_tables = [
                 table
-                for table, status in self.generate_statuses.items()
+                for table, status in self.synthetics_generate_statuses.items()
                 if status == GenerateStatus.SourcePreserved
             ]
             for table_name, record_handler in self._record_handlers.items():
@@ -767,12 +766,20 @@ class MultiTable:
                 # seed generation is deterministic, because child tables may be in progress
                 # and we'd need the seed they were started with to be equivalent to the seed
                 # we "would" generate from the restored, post-processed parent.
-                if self.generate_statuses[table_name] == GenerateStatus.Completed:
-                    self.generate_statuses[table_name] = GenerateStatus.NotStarted
+                if (
+                    self.synthetics_generate_statuses.get(table_name)
+                    == GenerateStatus.Completed
+                ):
+                    self.synthetics_generate_statuses[
+                        table_name
+                    ] = GenerateStatus.NotStarted
         else:
             if record_size_ratio is not None:
                 self._record_size_ratio = record_size_ratio
-            self._reset_generation_statuses()
+            self.synthetics_generate_statuses = {
+                table_name: GenerateStatus.NotStarted
+                for table_name in self.relational_data.list_all_tables()
+            }
             preserve_tables = preserve_tables or []
             self._strategy.validate_preserved_tables(
                 preserve_tables, self.relational_data
@@ -807,7 +814,9 @@ class MultiTable:
                 # If we consistently failed to refresh the job via API, fail the table
                 if refresh_attempts[table_name] >= MAX_REFRESH_ATTEMPTS:
                     self._log_lost_contact(table_name)
-                    self.generate_statuses[table_name] = GenerateStatus.Failed
+                    self.synthetics_generate_statuses[
+                        table_name
+                    ] = GenerateStatus.Failed
                     continue
 
                 status = cautiously_refresh_status(
@@ -816,7 +825,9 @@ class MultiTable:
 
                 if status == Status.COMPLETED:
                     self._log_success(table_name, "synthetic data generation")
-                    self.generate_statuses[table_name] = GenerateStatus.Completed
+                    self.synthetics_generate_statuses[
+                        table_name
+                    ] = GenerateStatus.Completed
                     record_handler_result = _get_data_from_record_handler(
                         record_handler
                     )
@@ -828,7 +839,9 @@ class MultiTable:
                 elif status in END_STATES:
                     # already checked explicitly for completed; all other end states are effectively failures
                     self._log_failed(table_name, "synthetic data generation")
-                    self.generate_statuses[table_name] = GenerateStatus.Failed
+                    self.synthetics_generate_statuses[
+                        table_name
+                    ] = GenerateStatus.Failed
                 else:
                     self._log_in_progress(
                         table_name, status, "synthetic data generation"
@@ -861,7 +874,9 @@ class MultiTable:
                     self._training_columns[table_name],
                 )
                 self._log_start(table_name, "synthetic data generation")
-                self.generate_statuses[table_name] = GenerateStatus.InProgress
+                self.synthetics_generate_statuses[
+                    table_name
+                ] = GenerateStatus.InProgress
                 model = self._synthetics_models[table_name]
                 record_handler = model.create_record_handler_obj(**table_job)
                 record_handler.submit_cloud()
@@ -933,22 +948,15 @@ class MultiTable:
             html_content = ReportRenderer().render(presenter)
             report.write(html_content)
 
-    def _reset_generation_statuses(self) -> None:
-        """
-        Sets the GenerateStatus for all known tables to NotStarted.
-        """
-        self.generate_statuses = {
-            table_name: GenerateStatus.NotStarted
-            for table_name in self.relational_data.list_all_tables()
-        }
-
     def _skip_some_tables(
         self, preserve_tables: List[str], output_tables: Dict[str, pd.DataFrame]
     ) -> None:
         "Updates state for tables being preserved and tables lacking trained models."
         for table in self.relational_data.list_all_tables():
             if table in preserve_tables:
-                self.generate_statuses[table] = GenerateStatus.SourcePreserved
+                self.synthetics_generate_statuses[
+                    table
+                ] = GenerateStatus.SourcePreserved
                 output_tables[table] = self._strategy.get_preserved_data(
                     table, self.relational_data
                 )
@@ -956,18 +964,22 @@ class MultiTable:
                 logger.info(
                     f"Skipping synthetic data generation for `{table}` because it does not have a trained model"
                 )
-                self.generate_statuses[table] = GenerateStatus.ModelUnavailable
+                self.synthetics_generate_statuses[
+                    table
+                ] = GenerateStatus.ModelUnavailable
                 for descendant in self.relational_data.get_descendants(table):
                     logger.info(
                         f"Skipping synthetic data generation for `{descendant}` because it depends on `{table}`"
                     )
-                    self.generate_statuses[descendant] = GenerateStatus.ModelUnavailable
+                    self.synthetics_generate_statuses[
+                        descendant
+                    ] = GenerateStatus.ModelUnavailable
 
     def _table_generation_in_progress(self, table: str) -> bool:
-        return self.generate_statuses[table] == GenerateStatus.InProgress
+        return self.synthetics_generate_statuses.get(table) == GenerateStatus.InProgress
 
     def _table_generation_in_terminal_state(self, table: str) -> bool:
-        return self.generate_statuses[table] in [
+        return self.synthetics_generate_statuses.get(table) in [
             GenerateStatus.Completed,
             GenerateStatus.SourcePreserved,
             GenerateStatus.ModelUnavailable,
