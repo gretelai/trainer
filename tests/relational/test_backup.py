@@ -14,6 +14,22 @@ from gretel_trainer.relational.backup import (
 )
 
 
+def test_backup_relational_data(trips):
+    expected = BackupRelationalData(
+        tables={
+            "vehicle_types": BackupRelationalDataTable(primary_key="id"),
+            "trips": BackupRelationalDataTable(primary_key="id"),
+        },
+        foreign_keys=[
+            BackupForeignKey(
+                foreign_key="trips.vehicle_type_id", referencing="vehicle_types.id"
+            )
+        ],
+    )
+
+    assert BackupRelationalData.from_relational_data(trips) == expected
+
+
 def test_backup():
     backup_relational = BackupRelationalData(
         tables={

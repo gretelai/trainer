@@ -5,7 +5,7 @@ from dataclasses import asdict, dataclass
 from typing import Any, Dict, List, Optional, Tuple
 
 from gretel_trainer.relational.artifacts import ArtifactCollection
-from gretel_trainer.relational.core import ForeignKey
+from gretel_trainer.relational.core import ForeignKey, RelationalData
 
 
 @dataclass
@@ -30,6 +30,22 @@ class BackupForeignKey:
 class BackupRelationalData:
     tables: Dict[str, BackupRelationalDataTable]
     foreign_keys: List[BackupForeignKey]
+
+    @classmethod
+    def from_relational_data(cls, rel_data: RelationalData) -> BackupRelationalData:
+        tables = {}
+        foreign_keys = []
+        for table in rel_data.list_all_tables():
+            tables[table] = BackupRelationalDataTable(
+                primary_key=rel_data.get_primary_key(table),
+            )
+            foreign_keys.extend(
+                [
+                    BackupForeignKey.from_fk(key)
+                    for key in rel_data.get_foreign_keys(table)
+                ]
+            )
+        return BackupRelationalData(tables=tables, foreign_keys=foreign_keys)
 
 
 @dataclass
