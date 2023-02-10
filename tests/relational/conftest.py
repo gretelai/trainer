@@ -19,6 +19,19 @@ def patch_configure_session():
         yield
 
 
+@pytest.fixture()
+def project():
+    with patch(
+        "gretel_trainer.relational.multi_table.create_project"
+    ) as create_project, patch(
+        "gretel_trainer.relational.multi_table.get_project"
+    ) as get_project:
+        project = Mock()
+        create_project.return_value = project
+        get_project.return_value = project
+        yield project
+
+
 def rel_data_from_example_db(name):
     con = sqlite3.connect(f"file:{name}?mode=memory&cache=shared")
     cur = con.cursor()
