@@ -1,6 +1,7 @@
 import sqlite3
 import tempfile
 from pathlib import Path
+from typing import List, Tuple
 from unittest.mock import Mock, patch
 
 import pandas as pd
@@ -32,7 +33,7 @@ def project():
         yield project
 
 
-def rel_data_from_example_db(name):
+def rel_data_from_example_db(name) -> RelationalData:
     con = sqlite3.connect(f"file:{name}?mode=memory&cache=shared")
     cur = con.cursor()
     with open(EXAMPLE_DBS / f"{name}.sql") as f:
@@ -49,22 +50,22 @@ def example_dbs():
 
 
 @pytest.fixture()
-def pets():
+def pets() -> RelationalData:
     return rel_data_from_example_db("pets")
 
 
 @pytest.fixture()
-def ecom():
+def ecom() -> RelationalData:
     return rel_data_from_example_db("ecom")
 
 
 @pytest.fixture()
-def mutagenesis():
+def mutagenesis() -> RelationalData:
     return rel_data_from_example_db("mutagenesis")
 
 
 @pytest.fixture()
-def trips():
+def trips() -> RelationalData:
     rel_data = rel_data_from_example_db("trips")
     rel_data.update_table_data(
         table="trips",
@@ -80,16 +81,18 @@ def trips():
 
 
 @pytest.fixture()
-def source_nba():
+def source_nba() -> Tuple[RelationalData, List[str], List[str], List[str]]:
     return _setup_nba(synthetic=False)
 
 
 @pytest.fixture()
-def synthetic_nba():
+def synthetic_nba() -> Tuple[RelationalData, List[str], List[str], List[str]]:
     return _setup_nba(synthetic=True)
 
 
-def _setup_nba(synthetic: bool):
+def _setup_nba(
+    synthetic: bool,
+) -> Tuple[RelationalData, List[str], List[str], List[str]]:
     if synthetic:
         states = ["PA", "FL"]
         cities = ["Philadelphia", "Miami"]
