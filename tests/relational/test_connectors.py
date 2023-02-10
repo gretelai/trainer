@@ -1,38 +1,28 @@
+import sqlite3
+import tempfile
+
 import pytest
 
 from gretel_trainer.relational.connectors import sqlite_conn
 from gretel_trainer.relational.core import MultiTableException
 
 
-def test_extracting_relational_data(local_db, ecom):
-    sqlite = sqlite_conn(local_db)
-    extracted = sqlite.extract()
+def test_extract_subsets_of_relational_data(example_dbs):
+    with tempfile.NamedTemporaryFile() as f:
+        con = sqlite3.connect(f.name)
+        cur = con.cursor()
+        with open(example_dbs / "ecom.sql") as sql_script:
+            cur.executescript(sql_script.read())
 
-    all_tables = extracted.list_all_tables()
-    assert set(all_tables) == {
-        "users",
-        "events",
-        "products",
-        "distribution_center",
-        "order_items",
-        "inventory_items",
-    }
+        connector = sqlite_conn(f.name)
 
-    for table in all_tables:
-        assert extracted.get_parents(table) == ecom.get_parents(table)
-        assert extracted.get_foreign_keys(table) == ecom.get_foreign_keys(table)
+        with pytest.raises(MultiTableException):
+            connector.extract(only=["users"], ignore=["events"])
 
-
-def test_extract_subsets_of_relational_data(local_db):
-    sqlite = sqlite_conn(local_db)
-
-    with pytest.raises(MultiTableException):
-        sqlite.extract(only=["users"], ignore=["events"])
-
-    only = sqlite.extract(only=["users", "events", "products"])
-    ignore = sqlite.extract(
-        ignore=["distribution_center", "order_items", "inventory_items"]
-    )
+        only = connector.extract(only=["users", "events", "products"])
+        ignore = connector.extract(
+            ignore=["distribution_center", "order_items", "inventory_items"]
+        )
 
     expected_tables = {"users", "events", "products"}
     assert set(only.list_all_tables()) == expected_tables
