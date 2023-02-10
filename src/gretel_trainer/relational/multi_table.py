@@ -323,23 +323,6 @@ class MultiTable:
         self._latest_backup = backup
 
     def _build_backup(self) -> Backup:
-        # Relational Data
-        tables = {}
-        foreign_keys = []
-        for table in self.relational_data.list_all_tables():
-            tables[table] = BackupRelationalDataTable(
-                primary_key=self.relational_data.get_primary_key(table),
-            )
-            foreign_keys.extend(
-                [
-                    BackupForeignKey.from_fk(key)
-                    for key in self.relational_data.get_foreign_keys(table)
-                ]
-            )
-        backup_relational_data = BackupRelationalData(
-            tables=tables, foreign_keys=foreign_keys
-        )
-
         backup = Backup(
             project_name=self._project.name,
             strategy=self._strategy.name,
@@ -347,7 +330,9 @@ class MultiTable:
             working_dir=str(self._working_dir),
             refresh_interval=self._refresh_interval,
             artifact_collection=replace(self._artifact_collection),
-            relational_data=backup_relational_data,
+            relational_data=BackupRelationalData.from_relational_data(
+                self.relational_data
+            ),
         )
 
         # Transforms
