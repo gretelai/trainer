@@ -33,7 +33,7 @@ class Dataset(Protocol):
 @dataclass
 class BenchmarkConfig:
     project_display_name: str = "benchmark"
-    refresh_interval: int = 60
+    refresh_interval: int = 15
     trainer: bool = False
 
 

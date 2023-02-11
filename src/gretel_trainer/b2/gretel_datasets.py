@@ -18,10 +18,13 @@ class GretelDataset:
     name: str
     datatype: Datatype
     tags: List[str]
-    row_count: int = field(init=False)
+    _row_count: Optional[int] = field(repr=False, default=None)
 
-    def __post_init__(self):
-        self.row_count = len(pd.read_csv(self.data_source))
+    @property
+    def row_count(self) -> int:
+        if self._row_count is None:
+            self._row_count = len(pd.read_csv(self.data_source))
+        return self._row_count
 
     @property
     def data_source(self) -> str:
@@ -72,8 +75,15 @@ class GretelDatasetRepo:
         return {
             name: GretelDataset(
                 name=name,
-                datatype=Datatype(data["datatype"]),
+                datatype=_coerce_datatype(data["datatype"]),
                 tags=data["tags"],
             )
             for name, data in manifest.items()
         }
+
+
+def _coerce_datatype(datatype: str) -> Datatype:
+    if datatype in ("tabular_numeric", "tabular_mixed"):
+        return Datatype.tabular
+    else:
+        return Datatype(datatype)

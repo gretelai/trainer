@@ -1,5 +1,7 @@
+import logging
 import multiprocessing as mp
 from concurrent.futures import ThreadPoolExecutor
+from multiprocessing.managers import DictProxy
 from typing import Dict, List, Optional, Tuple, Type, Union
 
 import pandas as pd
@@ -11,7 +13,9 @@ from gretel_trainer.b2.custom_models import CustomModel
 from gretel_trainer.b2.gretel_models import GretelModel
 from gretel_trainer.b2.gretel_sdk_executor import GretelSDKExecutor
 # from gretel_trainer.b2.gretel_trainer_executor import GretelTrainerExecutor
-from gretel_trainer.b2.status import Status
+
+
+logger = logging.getLogger(__name__)
 
 
 ModelTypes = Union[Type[CustomModel], Type[GretelModel]]
@@ -34,7 +38,9 @@ class Comparison:
         self.thread_pool = ThreadPoolExecutor(5)
         self.futures = []
         self._manager = mp.Manager()
-        self.run_statuses = self._manager.dict() # Dict[RunIdentifier, Status]
+        # Cannot type-hint more specifically than DictProxy,
+        # but this functions as a Dict[RunIdentifier, RunStatus]
+        self.run_statuses: DictProxy = self._manager.dict()
 
         configure_session(api_key="prompt", cache="yes", validate=True)
         self._project = create_project(display_name=self.config.project_display_name)
@@ -43,6 +49,7 @@ class Comparison:
         for dataset in self.datasets:
             for model in self.gretel_models:
                 run_identifier = (dataset.name, model().name)
+                logger.info(f"Queueing run `{run_identifier}`")
                 # if self.config.trainer:
                 #     executor = GretelTrainerExecutor(...)
                 # else:

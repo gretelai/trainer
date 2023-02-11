@@ -54,4 +54,4 @@ class Failed:
         return f"Failed ({self.during})"
 
 
-Status = Union[NotStarted, Skipped, InProgress, Completed, Failed]
+RunStatus = Union[NotStarted, Skipped, InProgress, Completed, Failed]
