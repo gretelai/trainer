@@ -43,6 +43,7 @@ class Comparison:
         self.run_statuses: DictProxy = self._manager.dict()
 
         configure_session(api_key="prompt", cache="yes", validate=True)
+        # TODO: Only create the project here if using SDK; if using Trainer, we'll make separate projects for each run
         self._project = create_project(display_name=self.config.project_display_name)
 
     def execute(self):
