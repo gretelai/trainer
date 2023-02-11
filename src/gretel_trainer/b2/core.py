@@ -1,7 +1,7 @@
 import time
 from dataclasses import dataclass
 from enum import Enum
-from typing import Type, Union
+from typing import Tuple, Type, Union
 from typing_extensions import Protocol
 
 import pandas as pd
@@ -12,6 +12,7 @@ class BenchmarkException(Exception):
     pass
 
 
+RunIdentifier = Tuple[str, str]
 DataSourceTypes = client_common.DataSourceTypes
 
 
@@ -33,6 +34,7 @@ class Dataset(Protocol):
 class BenchmarkConfig:
     project_display_name: str = "benchmark"
     refresh_interval: int = 60
+    trainer: bool = False
 
 
 class Datatype(str, Enum):
