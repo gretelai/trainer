@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import json
-from dataclasses import dataclass, field
 from functools import wraps
 from typing import Dict, List, Optional, Union
 
@@ -13,28 +12,33 @@ from botocore.client import Config
 from gretel_trainer.b2.core import BenchmarkException, Datatype
 
 
-@dataclass
 class GretelDataset:
-    name: str
-    datatype: Datatype
-    tags: List[str]
-    _df: Optional[pd.DataFrame] = field(repr=False, default=None)
-
-    @property
-    def row_count(self) -> int:
-        if self._df is None:
-            self._df = pd.read_csv(self.data_source)
-        return self._df.shape[0]
-
-    @property
-    def column_count(self) -> int:
-        if self._df is None:
-            self._df = pd.read_csv(self.data_source)
-        return self._df.shape[1]
+    def __init__(self, name: str, datatype: Datatype, tags: List[str]):
+        self.name = name
+        self.datatype = datatype
+        self.tags = tags
+        self._df: Optional[pd.DataFrame] = None
 
     @property
     def data_source(self) -> str:
         return f"https://gretel-datasets.s3.amazonaws.com/{self.name}/data.csv"
+
+    @property
+    def row_count(self) -> int:
+        self._load_df()
+        return self._df.shape[0] # type: ignore
+
+    @property
+    def column_count(self) -> int:
+        self._load_df()
+        return self._df.shape[1] # type: ignore
+
+    def _load_df(self) -> None:
+        if self._df is None:
+            self._df = pd.read_csv(self.data_source)
+
+    def __repr__(self) -> str:
+        return f"GretelDataset(name={self.name}, datatype={self.datatype}, tags={self.tags})"
 
 
 class GretelDatasetRepo:
