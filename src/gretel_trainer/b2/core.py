@@ -16,9 +16,19 @@ RunIdentifier = Tuple[str, str]
 DataSourceTypes = client_common.DataSourceTypes
 
 
+class Datatype(str, Enum):
+    tabular = "tabular"
+    time_series = "time_series"
+    natural_language = "natural_language"
+
+
 class Dataset(Protocol):
     @property
     def data_source(self) -> DataSourceTypes:
+        ...
+
+    @property
+    def datatype(self) -> Datatype:
         ...
 
     @property
@@ -29,18 +39,16 @@ class Dataset(Protocol):
     def row_count(self) -> int:
         ...
 
+    @property
+    def column_count(self) -> int:
+        ...
+
 
 @dataclass
 class BenchmarkConfig:
     project_display_name: str = "benchmark"
     refresh_interval: int = 15
     trainer: bool = False
-
-
-class Datatype(str, Enum):
-    tabular = "tabular"
-    time_series = "time_series"
-    natural_language = "natural_language"
 
 
 class Timer:

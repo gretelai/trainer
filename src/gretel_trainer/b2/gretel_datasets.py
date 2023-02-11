@@ -18,13 +18,19 @@ class GretelDataset:
     name: str
     datatype: Datatype
     tags: List[str]
-    _row_count: Optional[int] = field(repr=False, default=None)
+    _df: Optional[pd.DataFrame] = field(repr=False, default=None)
 
     @property
     def row_count(self) -> int:
-        if self._row_count is None:
-            self._row_count = len(pd.read_csv(self.data_source))
-        return self._row_count
+        if self._df is None:
+            self._df = pd.read_csv(self.data_source)
+        return self._df.shape[0]
+
+    @property
+    def column_count(self) -> int:
+        if self._df is None:
+            self._df = pd.read_csv(self.data_source)
+        return self._df.shape[1]
 
     @property
     def data_source(self) -> str:

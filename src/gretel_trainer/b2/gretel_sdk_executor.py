@@ -21,19 +21,20 @@ class GretelSDKExecutor:
         self,
         project: Project,
         benchmark_model: GretelModel,
+        dataset: Dataset,
         run_identifier: RunIdentifier,
         statuses: DictProxy,
         refresh_interval: int,
     ):
         self.project = project
         self.benchmark_model = benchmark_model
+        self.dataset = dataset
         self.refresh_interval = refresh_interval
         self.run_identifier = run_identifier
         self.statuses = statuses
         self.set_status(NotStarted())
 
         self.model: Optional[Model] = None
-        self.dataset: Optional[Dataset] = None
         self.record_handler: Optional[RecordHandler] = None
         self.train_time: Optional[float] = None
         self.generate_time: Optional[float] = None
@@ -42,13 +43,12 @@ class GretelSDKExecutor:
         self.status = status
         self.statuses[self.run_identifier] = status
 
-    def train(self, dataset: Dataset) -> None:
+    def train(self) -> None:
         # TODO: potentially skip (datatype, col count, etc.)
         logger.info(f"Starting model training for run `{self.run_identifier}`")
         self.set_status(InProgress(stage="train"))
-        self.dataset = dataset
         self.model = self.project.create_model_obj(
-            model_config=self.benchmark_model.config, data_source=dataset.data_source
+            model_config=self.benchmark_model.config, data_source=self.dataset.data_source
         )
         train_time = Timer()
         with train_time:
@@ -60,7 +60,7 @@ class GretelSDKExecutor:
             logger.info(f"Run `{self.run_identifier}` failed")
 
     def generate(self) -> None:
-        if self.model is None or self.dataset is None or self.train_time is None:
+        if self.model is None or self.train_time is None:
             raise BenchmarkException("Cannot generate before training")
 
         if isinstance(self.status, Failed):
