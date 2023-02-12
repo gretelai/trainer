@@ -18,3 +18,6 @@ A v2 rewrite of Benchmark.
 - Custom CSV datasets need their names to be compatible with Gretel model name restrictions
 - CustomExecutor
 - Local working dir for Trainer runner json files (and also CSVs above)
+- GretelAuto (+ validation check only present when trainer=True)
+- GretelDGAN and GretelGPTX validations (check only present when trainer=False)
+- Port over the (auto) cleanup stuff?
