@@ -26,12 +26,12 @@ class GretelDataset:
     @property
     def row_count(self) -> int:
         self._load_df()
-        return self._df.shape[0] # type: ignore
+        return self._df.shape[0]  # type: ignore
 
     @property
     def column_count(self) -> int:
         self._load_df()
-        return self._df.shape[1] # type: ignore
+        return self._df.shape[1]  # type: ignore
 
     def _load_df(self) -> None:
         if self._df is None:

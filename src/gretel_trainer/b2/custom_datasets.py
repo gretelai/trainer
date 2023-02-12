@@ -29,24 +29,18 @@ class CustomDataset:
 
 
 def _make_dataset_from_str(
-    source: str,
-    datatype: Datatype,
-    name: Optional[str]
+    source: str, datatype: Datatype, name: Optional[str]
 ) -> CustomDataset:
-    return CustomDataset(
-        source=source,
-        datatype=datatype,
-        name=name or source
-    )
+    return CustomDataset(source=source, datatype=datatype, name=name or source)
 
 
 def _make_dataset_from_dataframe(
-    source: pd.DataFrame,
-    datatype: Datatype,
-    name: Optional[str]
+    source: pd.DataFrame, datatype: Datatype, name: Optional[str]
 ) -> CustomDataset:
     if name is None:
-        raise BenchmarkException("`name` is required for datasets created from Pandas DataFrames")
+        raise BenchmarkException(
+            "`name` is required for datasets created from Pandas DataFrames"
+        )
     return CustomDataset(
         source=source,
         datatype=datatype,
@@ -75,4 +69,6 @@ def make_dataset(
     elif isinstance(source, pd.DataFrame):
         return _make_dataset_from_dataframe(source, datatype, name)
     else:
-        raise BenchmarkException("`source` must be either a string path to a CSV or a Pandas DataFrame")
+        raise BenchmarkException(
+            "`source` must be either a string path to a CSV or a Pandas DataFrame"
+        )

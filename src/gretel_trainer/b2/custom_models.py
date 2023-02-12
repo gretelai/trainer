@@ -1,6 +1,5 @@
-from typing_extensions import Protocol
-
 import pandas as pd
+from typing_extensions import Protocol
 
 from gretel_trainer.b2.core import Dataset
 

@@ -6,7 +6,13 @@ import pandas as pd
 from gretel_trainer import Trainer
 from gretel_trainer.b2.core import BenchmarkException, Dataset, RunIdentifier, Timer
 from gretel_trainer.b2.gretel_models import GretelModel
-from gretel_trainer.b2.status import Completed, Failed, InProgress, NotStarted, RunStatus
+from gretel_trainer.b2.status import (
+    Completed,
+    Failed,
+    InProgress,
+    NotStarted,
+    RunStatus,
+)
 
 
 class GretelTrainerStrategy:
@@ -48,7 +54,9 @@ class GretelTrainerStrategy:
         generate_time = Timer()
         try:
             with generate_time:
-                self.synthetic_data = self.trainer.generate(num_records=self.dataset.row_count)
+                self.synthetic_data = self.trainer.generate(
+                    num_records=self.dataset.row_count
+                )
             self.generate_time = generate_time.duration()
             return None
         except Exception as e:

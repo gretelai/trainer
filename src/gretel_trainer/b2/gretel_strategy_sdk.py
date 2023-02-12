@@ -10,7 +10,13 @@ from gretel_client.projects.records import RecordHandler
 
 from gretel_trainer.b2.core import BenchmarkException, Dataset, RunIdentifier, Timer
 from gretel_trainer.b2.gretel_models import GretelModel, GretelModelConfig
-from gretel_trainer.b2.status import NotStarted, InProgress, Completed, Failed, RunStatus
+from gretel_trainer.b2.status import (
+    Completed,
+    Failed,
+    InProgress,
+    NotStarted,
+    RunStatus,
+)
 
 
 class GretelSDKStrategy:
@@ -84,7 +90,9 @@ class GretelSDKStrategy:
         if self.record_handler is None:
             raise BenchmarkException("Cannot get synthetic data before generating")
 
-        return pd.read_csv(self.record_handler.get_artifact_link("data"), compression="gzip")
+        return pd.read_csv(
+            self.record_handler.get_artifact_link("data"), compression="gzip"
+        )
 
 
 def _await_job(job: Job, refresh_interval: int) -> Status:
@@ -94,7 +102,9 @@ def _await_job(job: Job, refresh_interval: int) -> Status:
         if failed_refresh_attempts >= 5:
             return Status.LOST
         time.sleep(refresh_interval)
-        status, failed_refresh_attempts = _cautiously_refresh_status(job, failed_refresh_attempts)
+        status, failed_refresh_attempts = _cautiously_refresh_status(
+            job, failed_refresh_attempts
+        )
     return status
 
 

@@ -6,8 +6,8 @@ from gretel_trainer.b2.core import BenchmarkConfig, Dataset, Datatype
 from gretel_trainer.b2.custom_datasets import make_dataset
 from gretel_trainer.b2.gretel_datasets import GretelDatasetRepo
 from gretel_trainer.b2.gretel_models import (
-    GretelAmplify,
     GretelACTGAN,
+    GretelAmplify,
     GretelGPTX,
     GretelLSTM,
     GretelModel,
@@ -58,4 +58,3 @@ def compare(
         config=config,
     )
     return comparison.execute()
-

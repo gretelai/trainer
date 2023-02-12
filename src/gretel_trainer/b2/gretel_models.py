@@ -8,7 +8,6 @@ import gretel_trainer
 from gretel_trainer import models
 from gretel_trainer.b2.core import BenchmarkException, Dataset
 
-
 GretelModelConfig = Union[str, Path, Dict]
 
 
@@ -42,12 +41,16 @@ class GretelModel:
         if self.model_key == "synthetics":
             return dataset.column_count <= 150
         elif self.model_key == "gpt_x":
-            return dataset.column_count == 1 and dataset.datatype == Datatype.natural_language
+            return (
+                dataset.column_count == 1
+                and dataset.datatype == Datatype.natural_language
+            )
         else:
             return True
 
 
 # Defaults
+
 
 class GretelLSTM(GretelModel):
     config = "synthetics/tabular-lstm"

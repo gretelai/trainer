@@ -11,17 +11,16 @@ from gretel_client import configure_session
 from gretel_client.projects import create_project
 
 from gretel_trainer.b2.core import BenchmarkConfig, Dataset, RunIdentifier
-from gretel_trainer.b2.gretel_executor import GretelExecutor
 from gretel_trainer.b2.custom_models import CustomModel
+from gretel_trainer.b2.gretel_executor import GretelExecutor
 from gretel_trainer.b2.gretel_models import GretelModel
 from gretel_trainer.b2.status import Completed, Failed, InProgress
-
 
 logger = logging.getLogger(__name__)
 
 
 ModelTypes = Union[Type[CustomModel], Type[GretelModel]]
-Executor = GretelExecutor # Union[GretelExecutor, CustomExecutor]
+Executor = GretelExecutor  # Union[GretelExecutor, CustomExecutor]
 
 
 class Comparison:
@@ -47,7 +46,9 @@ class Comparison:
         configure_session(api_key="prompt", cache="yes", validate=True)
         self._project = None
         if not self.config.trainer:
-            self._project = create_project(display_name=self.config.project_display_name)
+            self._project = create_project(
+                display_name=self.config.project_display_name
+            )
 
     def execute(self) -> Comparison:
         for dataset in self.datasets:

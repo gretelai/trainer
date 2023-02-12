@@ -2,10 +2,10 @@ import time
 from dataclasses import dataclass
 from enum import Enum
 from typing import Tuple, Type, Union
-from typing_extensions import Protocol
 
-import pandas as pd
 import gretel_client.projects.common as client_common
+import pandas as pd
+from typing_extensions import Protocol
 
 
 class BenchmarkException(Exception):

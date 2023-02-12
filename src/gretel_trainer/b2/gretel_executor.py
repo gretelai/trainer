@@ -1,5 +1,5 @@
-import time
 import logging
+import time
 from multiprocessing.managers import DictProxy
 from typing import Callable, Optional, Tuple, Union
 
@@ -14,7 +14,14 @@ from gretel_trainer.b2.core import BenchmarkException, Dataset, RunIdentifier, T
 from gretel_trainer.b2.gretel_models import GretelModel, GretelModelConfig
 from gretel_trainer.b2.gretel_strategy_sdk import GretelSDKStrategy
 from gretel_trainer.b2.gretel_strategy_trainer import GretelTrainerStrategy
-from gretel_trainer.b2.status import NotStarted, InProgress, Completed, Failed, RunStatus, Skipped
+from gretel_trainer.b2.status import (
+    Completed,
+    Failed,
+    InProgress,
+    NotStarted,
+    RunStatus,
+    Skipped,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -43,6 +50,7 @@ def _set_strategy(
             project=project,
             refresh_interval=refresh_interval,
         )
+
 
 class GretelExecutor:
     def __init__(
@@ -99,27 +107,37 @@ class GretelExecutor:
         try:
             self._strategy.train()
         except:
-            self.set_status(Failed(during="train", train_secs=self._strategy.train_time))
+            self.set_status(
+                Failed(during="train", train_secs=self._strategy.train_time)
+            )
 
     def generate(self) -> None:
         if isinstance(self.status, (Skipped, Failed)):
             return None
 
-        logger.info(f"Starting synthetic data generation for run `{self.run_identifier}`")
-        self.set_status(InProgress(stage="generate", train_secs=self._strategy.train_time))
+        logger.info(
+            f"Starting synthetic data generation for run `{self.run_identifier}`"
+        )
+        self.set_status(
+            InProgress(stage="generate", train_secs=self._strategy.train_time)
+        )
         try:
             self._strategy.generate()
-            self.set_status(Completed(
-                sqs=self.get_sqs_score(),
-                train_secs=self._strategy.train_time,
-                generate_secs=self._strategy.generate_time,
-                synthetic_data=self._strategy.get_synthetic_data(),
-            ))
+            self.set_status(
+                Completed(
+                    sqs=self.get_sqs_score(),
+                    train_secs=self._strategy.train_time,
+                    generate_secs=self._strategy.generate_time,
+                    synthetic_data=self._strategy.get_synthetic_data(),
+                )
+            )
             logger.info(f"Run `{self.run_identifier}` completed successfully")
         except:
-            self.set_status(Failed(
-                during="generate",
-                train_secs=self._strategy.train_time,
-                generate_secs=self._strategy.generate_time,
-            ))
+            self.set_status(
+                Failed(
+                    during="generate",
+                    train_secs=self._strategy.train_time,
+                    generate_secs=self._strategy.generate_time,
+                )
+            )
             logger.info(f"Run `{self.run_identifier}` failed")
