@@ -60,10 +60,8 @@ class Comparison:
                     dataset=dataset,
                     run_identifier=run_identifier,
                     statuses=self.run_statuses,
-                    trainer=self.config.trainer,
-                    refresh_interval=self.config.refresh_interval,
+                    config=self.config,
                     project=self._project,
-                    project_prefix=self.config.project_display_name,
                 )
                 self.executors[run_identifier] = executor
                 self.futures.append(self.thread_pool.submit(_run, executor))

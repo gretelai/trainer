@@ -10,7 +10,13 @@ from gretel_client.projects.projects import Project
 from gretel_client.projects.records import RecordHandler
 
 from gretel_trainer import Trainer
-from gretel_trainer.b2.core import BenchmarkException, Dataset, RunIdentifier, Timer
+from gretel_trainer.b2.core import (
+    BenchmarkConfig,
+    BenchmarkException,
+    Dataset,
+    RunIdentifier,
+    Timer,
+)
 from gretel_trainer.b2.gretel_models import GretelModel, GretelModelConfig
 from gretel_trainer.b2.gretel_strategy_sdk import GretelSDKStrategy
 from gretel_trainer.b2.gretel_strategy_trainer import GretelTrainerStrategy
@@ -30,17 +36,15 @@ def _set_strategy(
     benchmark_model: GretelModel,
     dataset: Dataset,
     run_identifier: RunIdentifier,
-    trainer: bool,
-    refresh_interval: int,
+    config: BenchmarkConfig,
     project: Optional[Project],
-    project_prefix: str,
 ) -> Union[GretelSDKStrategy, GretelTrainerStrategy]:
-    if trainer:
+    if config.trainer:
         return GretelTrainerStrategy(
             benchmark_model=benchmark_model,
             dataset=dataset,
             run_identifier=run_identifier,
-            project_prefix=project_prefix,
+            project_prefix=config.project_display_name,
         )
     else:
         return GretelSDKStrategy(
@@ -48,7 +52,7 @@ def _set_strategy(
             dataset=dataset,
             run_identifier=run_identifier,
             project=project,
-            refresh_interval=refresh_interval,
+            refresh_interval=config.refresh_interval,
         )
 
 
@@ -59,10 +63,8 @@ class GretelExecutor:
         dataset: Dataset,
         run_identifier: RunIdentifier,
         statuses: DictProxy,
-        trainer: bool,
-        refresh_interval: int,
+        config: BenchmarkConfig,
         project: Optional[Project],
-        project_prefix: str,
     ):
         self.run_identifier = run_identifier
         self.statuses = statuses
@@ -71,11 +73,9 @@ class GretelExecutor:
         self._strategy = _set_strategy(
             benchmark_model=benchmark_model,
             dataset=dataset,
-            trainer=trainer,
-            refresh_interval=refresh_interval,
-            project=project,
-            project_prefix=project_prefix,
             run_identifier=run_identifier,
+            config=config,
+            project=project,
         )
 
     @property
