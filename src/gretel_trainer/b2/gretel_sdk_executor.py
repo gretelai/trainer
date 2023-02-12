@@ -5,12 +5,12 @@ from typing import Callable, Optional, Tuple
 
 import pandas as pd
 from gretel_client.projects.jobs import END_STATES, Job, Status
-from gretel_client.projects.models import Model
+from gretel_client.projects.models import Model, read_model_config
 from gretel_client.projects.projects import Project
 from gretel_client.projects.records import RecordHandler
 
 from gretel_trainer.b2.core import BenchmarkException, Dataset, RunIdentifier, Timer
-from gretel_trainer.b2.gretel_models import GretelModel
+from gretel_trainer.b2.gretel_models import GretelModel, GretelModelConfig
 from gretel_trainer.b2.status import NotStarted, InProgress, Completed, Failed, RunStatus
 
 logger = logging.getLogger(__name__)
@@ -43,12 +43,18 @@ class GretelSDKExecutor:
         self.status = status
         self.statuses[self.run_identifier] = status
 
+    def _format_model_config(self) -> GretelModelConfig:
+        config = read_model_config(self.benchmark_model.config)
+        config["name"] = f"{self.run_identifier[0]}-{self.run_identifier[1]}"
+        return config
+
     def train(self) -> None:
         # TODO: potentially skip (datatype, col count, etc.)
         logger.info(f"Starting model training for run `{self.run_identifier}`")
         self.set_status(InProgress(stage="train"))
+        model_config = self._format_model_config()
         self.model = self.project.create_model_obj(
-            model_config=self.benchmark_model.config, data_source=self.dataset.data_source
+            model_config=model_config, data_source=self.dataset.data_source
         )
         train_time = Timer()
         with train_time:
