@@ -13,7 +13,7 @@ from gretel_trainer.b2.gretel_models import GretelModel, GretelModelConfig
 from gretel_trainer.b2.status import NotStarted, InProgress, Completed, Failed, RunStatus
 
 
-class GretelSDKExecutor:
+class GretelSDKStrategy:
     def __init__(
         self,
         benchmark_model: GretelModel,

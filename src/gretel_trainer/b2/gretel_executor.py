@@ -12,8 +12,8 @@ from gretel_client.projects.records import RecordHandler
 from gretel_trainer import Trainer
 from gretel_trainer.b2.core import BenchmarkException, Dataset, RunIdentifier, Timer
 from gretel_trainer.b2.gretel_models import GretelModel, GretelModelConfig
-from gretel_trainer.b2.gretel_sdk_executor import GretelSDKExecutor
-from gretel_trainer.b2.gretel_trainer_executor import GretelTrainerExecutor
+from gretel_trainer.b2.gretel_strategy_sdk import GretelSDKStrategy
+from gretel_trainer.b2.gretel_strategy_trainer import GretelTrainerStrategy
 from gretel_trainer.b2.status import NotStarted, InProgress, Completed, Failed, RunStatus
 
 logger = logging.getLogger(__name__)
@@ -27,16 +27,16 @@ def _set_strategy(
     refresh_interval: int,
     project: Optional[Project],
     project_prefix: str,
-) -> Union[GretelSDKExecutor, GretelTrainerExecutor]:
+) -> Union[GretelSDKStrategy, GretelTrainerStrategy]:
     if trainer:
-        return GretelTrainerExecutor(
+        return GretelTrainerStrategy(
             benchmark_model=benchmark_model,
             dataset=dataset,
             run_identifier=run_identifier,
             project_prefix=project_prefix,
         )
     else:
-        return GretelSDKExecutor(
+        return GretelSDKStrategy(
             benchmark_model=benchmark_model,
             dataset=dataset,
             run_identifier=run_identifier,
