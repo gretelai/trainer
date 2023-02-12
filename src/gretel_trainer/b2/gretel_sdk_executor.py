@@ -1,5 +1,4 @@
 import time
-import logging
 from multiprocessing.managers import DictProxy
 from typing import Callable, Optional, Tuple
 
@@ -13,35 +12,26 @@ from gretel_trainer.b2.core import BenchmarkException, Dataset, RunIdentifier, T
 from gretel_trainer.b2.gretel_models import GretelModel, GretelModelConfig
 from gretel_trainer.b2.status import NotStarted, InProgress, Completed, Failed, RunStatus
 
-logger = logging.getLogger(__name__)
-
 
 class GretelSDKExecutor:
     def __init__(
         self,
-        project: Project,
         benchmark_model: GretelModel,
         dataset: Dataset,
         run_identifier: RunIdentifier,
-        statuses: DictProxy,
+        project: Project,
         refresh_interval: int,
     ):
-        self.project = project
         self.benchmark_model = benchmark_model
         self.dataset = dataset
-        self.refresh_interval = refresh_interval
         self.run_identifier = run_identifier
-        self.statuses = statuses
-        self.set_status(NotStarted())
+        self.project = project
+        self.refresh_interval = refresh_interval
 
         self.model: Optional[Model] = None
         self.record_handler: Optional[RecordHandler] = None
         self.train_time: Optional[float] = None
         self.generate_time: Optional[float] = None
-
-    def set_status(self, status: RunStatus) -> None:
-        self.status = status
-        self.statuses[self.run_identifier] = status
 
     def _format_model_config(self) -> GretelModelConfig:
         config = read_model_config(self.benchmark_model.config)
@@ -49,9 +39,6 @@ class GretelSDKExecutor:
         return config
 
     def train(self) -> None:
-        # TODO: potentially skip (datatype, col count, etc.)
-        logger.info(f"Starting model training for run `{self.run_identifier}`")
-        self.set_status(InProgress(stage="train"))
         model_config = self._format_model_config()
         self.model = self.project.create_model_obj(
             model_config=model_config, data_source=self.dataset.data_source
@@ -62,18 +49,12 @@ class GretelSDKExecutor:
             job_status = _await_job(self.model, self.refresh_interval)
         self.train_time = train_time.duration()
         if job_status in END_STATES and job_status != Status.COMPLETED:
-            self.set_status(Failed(during="train", train_secs=self.train_time))
-            logger.info(f"Run `{self.run_identifier}` failed")
+            raise BenchmarkException("Training failed")
 
     def generate(self) -> None:
         if self.model is None or self.train_time is None:
             raise BenchmarkException("Cannot generate before training")
 
-        if isinstance(self.status, Failed):
-            return None
-
-        logger.info(f"Starting synthetic data generation for run `{self.run_identifier}`")
-        self.set_status(InProgress(stage="generate", train_secs=self.train_time))
         self.record_handler = self.model.create_record_handler_obj(
             params={"num_records": self.dataset.row_count}
         )
@@ -83,20 +64,9 @@ class GretelSDKExecutor:
             job_status = _await_job(self.record_handler, self.refresh_interval)
         self.generate_time = generate_time.duration()
         if job_status == Status.COMPLETED:
-            self.set_status(Completed(
-                sqs=self.get_sqs_score(),
-                train_secs=self.train_time,
-                generate_secs=self.generate_time,
-                synthetic_data=self.get_synthetic_data(),
-            ))
-            logger.info(f"Run `{self.run_identifier}` completed successfully")
+            return None
         elif job_status in END_STATES:
-            self.set_status(Failed(
-                during="generate",
-                train_secs=self.train_time,
-                generate_secs=self.generate_time,
-            ))
-            logger.info(f"Run `{self.run_identifier}` failed")
+            raise BenchmarkException("Generate failed")
 
     def get_sqs_score(self) -> int:
         if self.model is None:

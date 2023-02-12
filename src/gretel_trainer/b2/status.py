@@ -32,8 +32,8 @@ class InProgress:
 @dataclass
 class Completed:
     sqs: int
-    train_secs: float
-    generate_secs: float
+    train_secs: Optional[float]
+    generate_secs: Optional[float]
     synthetic_data: pd.DataFrame = field(repr=False)
 
     @property

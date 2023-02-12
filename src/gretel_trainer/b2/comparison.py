@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import logging
 import multiprocessing as mp
 from concurrent.futures import ThreadPoolExecutor
@@ -9,10 +11,9 @@ from gretel_client import configure_session
 from gretel_client.projects import create_project
 
 from gretel_trainer.b2.core import BenchmarkConfig, Dataset, RunIdentifier
+from gretel_trainer.b2.gretel_executor import GretelExecutor
 from gretel_trainer.b2.custom_models import CustomModel
 from gretel_trainer.b2.gretel_models import GretelModel
-from gretel_trainer.b2.gretel_sdk_executor import GretelSDKExecutor
-from gretel_trainer.b2.gretel_trainer_executor import GretelTrainerExecutor
 from gretel_trainer.b2.status import Completed, Failed, InProgress
 
 
@@ -20,7 +21,7 @@ logger = logging.getLogger(__name__)
 
 
 ModelTypes = Union[Type[CustomModel], Type[GretelModel]]
-Executor = Union[GretelSDKExecutor, GretelTrainerExecutor] #, CustomExecutor]
+Executor = GretelExecutor # Union[GretelExecutor, CustomExecutor]
 
 
 class Comparison:
@@ -29,12 +30,12 @@ class Comparison:
         *,
         datasets: List[Dataset],
         models: List[ModelTypes],
-        config: Optional[BenchmarkConfig] = None,
+        config: BenchmarkConfig,
     ):
         self.datasets = datasets
         self.gretel_models = [m for m in models if issubclass(m, GretelModel)]
         self.custom_models = [m for m in models if not m in self.gretel_models]
-        self.config = config or BenchmarkConfig()
+        self.config = config
         self.executors: Dict[RunIdentifier, Executor] = {}
         self.thread_pool = ThreadPoolExecutor(5)
         self.futures = []
@@ -44,42 +45,37 @@ class Comparison:
         self.run_statuses: DictProxy = self._manager.dict()
 
         configure_session(api_key="prompt", cache="yes", validate=True)
+        self._project = None
         if not self.config.trainer:
             self._project = create_project(display_name=self.config.project_display_name)
 
-    def execute(self):
+    def execute(self) -> Comparison:
         for dataset in self.datasets:
             for model in self.gretel_models:
                 run_identifier = (dataset.name, model().name)
                 logger.info(f"Queueing run `{run_identifier}`")
-                if self.config.trainer:
-                    executor = GretelTrainerExecutor(
-                        project_prefix=self.config.project_display_name,
-                        benchmark_model=model(),
-                        dataset=dataset,
-                        run_identifier=run_identifier,
-                        statuses=self.run_statuses,
-                    )
-                else:
-                    executor = GretelSDKExecutor(
-                        project=self._project,
-                        benchmark_model=model(),
-                        dataset=dataset,
-                        run_identifier=run_identifier,
-                        statuses=self.run_statuses,
-                        refresh_interval=self.config.refresh_interval,
-                    )
+                executor = GretelExecutor(
+                    benchmark_model=model(),
+                    dataset=dataset,
+                    run_identifier=run_identifier,
+                    statuses=self.run_statuses,
+                    trainer=self.config.trainer,
+                    refresh_interval=self.config.refresh_interval,
+                    project=self._project,
+                    project_prefix=self.config.project_display_name,
+                )
                 self.executors[run_identifier] = executor
                 self.futures.append(self.thread_pool.submit(_run, executor))
             for model in self.custom_models:
                 pass
+        return self
 
     @property
     def results(self) -> pd.DataFrame:
         result_records = [self._result_dict(run_id) for run_id in self.executors]
         return pd.DataFrame.from_records(result_records)
 
-    def wait(self):
+    def wait(self) -> Comparison:
         [future.result() for future in self.futures]
         return self
 
@@ -117,6 +113,6 @@ class Comparison:
         }
 
 
-def _run(executor: GretelSDKExecutor) -> None:
+def _run(executor: GretelExecutor) -> None:
     executor.train()
     executor.generate()

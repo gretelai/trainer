@@ -1,7 +1,8 @@
 import logging
+from typing import List
 
-from gretel_trainer.b2.comparison import Comparison
-from gretel_trainer.b2.core import BenchmarkConfig, Datatype
+from gretel_trainer.b2.comparison import Comparison, ModelTypes
+from gretel_trainer.b2.core import BenchmarkConfig, Dataset, Datatype
 from gretel_trainer.b2.custom_datasets import make_dataset
 from gretel_trainer.b2.gretel_datasets import GretelDatasetRepo
 from gretel_trainer.b2.gretel_models import (
@@ -14,8 +15,7 @@ from gretel_trainer.b2.gretel_models import (
 
 log_levels = {
     "gretel_trainer.b2.comparison": "INFO",
-    "gretel_trainer.b2.gretel_sdk_executor": "INFO",
-    "gretel_trainer.b2.gretel_trainer_executor": "INFO",
+    "gretel_trainer.b2.gretel_executor": "INFO",
 }
 
 log_format = "%(levelname)s - %(asctime)s - %(message)s"
@@ -37,3 +37,25 @@ for name, level in log_levels.items():
     logger.handlers.clear()
     logger.addHandler(handler)
     logger.setLevel(level)
+
+
+def compare(
+    *,
+    datasets: List[Dataset],
+    models: List[ModelTypes],
+    project_display_name: str = "benchmark",
+    trainer: bool = False,
+    refresh_interval: int = 15,
+) -> Comparison:
+    config = BenchmarkConfig(
+        project_display_name=project_display_name,
+        trainer=trainer,
+        refresh_interval=refresh_interval,
+    )
+    comparison = Comparison(
+        datasets=datasets,
+        models=models,
+        config=config,
+    )
+    return comparison.execute()
+

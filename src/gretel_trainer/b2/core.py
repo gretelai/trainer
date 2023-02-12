@@ -46,9 +46,9 @@ class Dataset(Protocol):
 
 @dataclass
 class BenchmarkConfig:
-    project_display_name: str = "benchmark"
-    refresh_interval: int = 15
-    trainer: bool = True
+    project_display_name: str
+    refresh_interval: int
+    trainer: bool
 
 
 class Timer:

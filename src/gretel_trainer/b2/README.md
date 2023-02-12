@@ -16,4 +16,5 @@ A v2 rewrite of Benchmark.
 
 - Custom pd.DataFrame datasets need to be written to a CSV for GretelTrainerExecutor to work (trainer requires a file path, not a dataframe)
 - Custom CSV datasets need their names to be compatible with Gretel model name restrictions
-- Refactor the two Gretel executors to a single executor with two strategies (dedupe)
+- CustomExecutor
+- Local working dir for Trainer runner json files (and also CSVs above)

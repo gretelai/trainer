@@ -8,5 +8,5 @@ tiny = b2.make_dataset("~/Downloads/tiny.csv", datatype=b2.Datatype.tabular, nam
 repo = b2.GretelDatasetRepo()
 iris = repo.get_dataset("iris")
 
-# comparison = b2.Comparison(datasets=[bikes, tiny, iris], models=[b2.GretelACTGAN, b2.GretelAmplify])
-# comparison = b2.Comparison(datasets=[tiny], models=[b2.GretelAmplify])
+# comparison = b2.compare(datasets=[bikes, tiny, iris], models=[b2.GretelACTGAN, b2.GretelAmplify])
+# comparison = b2.compare(datasets=[tiny], models=[b2.GretelAmplify])
