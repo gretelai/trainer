@@ -11,3 +11,9 @@ A v2 rewrite of Benchmark.
   - the v2 Datatype enum is simplified
     - str and enum formats match (e.g. `Datatype.natural_language == "natural_language"`)
     - v1 "tabular_mixed" and "tabular_numeric" consolidated in v2 to just a singular "tabular"
+
+## TODOs
+
+- Custom pd.DataFrame datasets need to be written to a CSV for GretelTrainerExecutor to work (trainer requires a file path, not a dataframe)
+- Custom CSV datasets need their names to be compatible with Gretel model name restrictions
+- Refactor the two Gretel executors to a single executor with two strategies (dedupe)

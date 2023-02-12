@@ -92,7 +92,7 @@ class GretelSDKExecutor:
             logger.info(f"Run `{self.run_identifier}` completed successfully")
         elif job_status in END_STATES:
             self.set_status(Failed(
-                during="train",
+                during="generate",
                 train_secs=self.train_time,
                 generate_secs=self.generate_time,
             ))

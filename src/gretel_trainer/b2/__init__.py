@@ -15,6 +15,7 @@ from gretel_trainer.b2.gretel_models import (
 log_levels = {
     "gretel_trainer.b2.comparison": "INFO",
     "gretel_trainer.b2.gretel_sdk_executor": "INFO",
+    "gretel_trainer.b2.gretel_trainer_executor": "INFO",
 }
 
 log_format = "%(levelname)s - %(asctime)s - %(message)s"

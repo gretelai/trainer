@@ -12,7 +12,7 @@ from gretel_trainer.b2.core import BenchmarkConfig, Dataset, RunIdentifier
 from gretel_trainer.b2.custom_models import CustomModel
 from gretel_trainer.b2.gretel_models import GretelModel
 from gretel_trainer.b2.gretel_sdk_executor import GretelSDKExecutor
-# from gretel_trainer.b2.gretel_trainer_executor import GretelTrainerExecutor
+from gretel_trainer.b2.gretel_trainer_executor import GretelTrainerExecutor
 from gretel_trainer.b2.status import Completed, Failed, InProgress
 
 
@@ -20,7 +20,7 @@ logger = logging.getLogger(__name__)
 
 
 ModelTypes = Union[Type[CustomModel], Type[GretelModel]]
-Executor = GretelSDKExecutor #Union[GretelSDKExecutor, GretelTrainerExecutor, CustomExecutor]
+Executor = Union[GretelSDKExecutor, GretelTrainerExecutor] #, CustomExecutor]
 
 
 class Comparison:
@@ -44,26 +44,31 @@ class Comparison:
         self.run_statuses: DictProxy = self._manager.dict()
 
         configure_session(api_key="prompt", cache="yes", validate=True)
-        # TODO: Only create the project here if using SDK; if using Trainer, we'll make separate projects for each run
-        self._project = create_project(display_name=self.config.project_display_name)
+        if not self.config.trainer:
+            self._project = create_project(display_name=self.config.project_display_name)
 
     def execute(self):
         for dataset in self.datasets:
             for model in self.gretel_models:
                 run_identifier = (dataset.name, model().name)
                 logger.info(f"Queueing run `{run_identifier}`")
-                # if self.config.trainer:
-                #     executor = GretelTrainerExecutor(...)
-                # else:
-                #     exector = GretelSDKExecutor(...)
-                executor = GretelSDKExecutor(
-                    project=self._project,
-                    benchmark_model=model(),
-                    dataset=dataset,
-                    run_identifier=run_identifier,
-                    statuses=self.run_statuses,
-                    refresh_interval=self.config.refresh_interval,
-                )
+                if self.config.trainer:
+                    executor = GretelTrainerExecutor(
+                        project_prefix=self.config.project_display_name,
+                        benchmark_model=model(),
+                        dataset=dataset,
+                        run_identifier=run_identifier,
+                        statuses=self.run_statuses,
+                    )
+                else:
+                    executor = GretelSDKExecutor(
+                        project=self._project,
+                        benchmark_model=model(),
+                        dataset=dataset,
+                        run_identifier=run_identifier,
+                        statuses=self.run_statuses,
+                        refresh_interval=self.config.refresh_interval,
+                    )
                 self.executors[run_identifier] = executor
                 self.futures.append(self.thread_pool.submit(_run, executor))
             for model in self.custom_models:
