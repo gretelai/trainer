@@ -14,7 +14,7 @@ from gretel_trainer.b2.core import BenchmarkException, Dataset, RunIdentifier, T
 from gretel_trainer.b2.gretel_models import GretelModel, GretelModelConfig
 from gretel_trainer.b2.gretel_strategy_sdk import GretelSDKStrategy
 from gretel_trainer.b2.gretel_strategy_trainer import GretelTrainerStrategy
-from gretel_trainer.b2.status import NotStarted, InProgress, Completed, Failed, RunStatus
+from gretel_trainer.b2.status import NotStarted, InProgress, Completed, Failed, RunStatus, Skipped
 
 logger = logging.getLogger(__name__)
 
@@ -89,7 +89,11 @@ class GretelExecutor:
         self.statuses[self.run_identifier] = status
 
     def train(self) -> None:
-        # TODO: potentially skip (datatype, col count, etc.)
+        if not self.benchmark_model.runnable(self.dataset):
+            logger.info(f"Skipping model training for run `{self.run_identifier}`")
+            self.set_status(Skipped())
+            return None
+
         logger.info(f"Starting model training for run `{self.run_identifier}`")
         self.set_status(InProgress(stage="train"))
         try:
@@ -98,7 +102,7 @@ class GretelExecutor:
             self.set_status(Failed(during="train", train_secs=self._strategy.train_time))
 
     def generate(self) -> None:
-        if isinstance(self.status, Failed):
+        if isinstance(self.status, (Skipped, Failed)):
             return None
 
         logger.info(f"Starting synthetic data generation for run `{self.run_identifier}`")
