@@ -33,6 +33,7 @@ from gretel_trainer.relational.backup import (
     BackupRelationalDataTable,
     BackupTrain,
     BackupTrainTable,
+    BackupTransforms,
 )
 from gretel_trainer.relational.core import (
     MultiTableException,
@@ -72,32 +73,6 @@ class GenerateStatus(str, Enum):
     Failed = "Failed"
 
 
-@dataclass
-class RestoreConfig:
-    project: Project
-    artifact_collection: ArtifactCollection
-    working_dir: Path
-    log_message: str
-    train_models: Optional[Dict[str, Model]] = None
-    training_columns: Optional[Dict[str, List[str]]] = None
-    record_size_ratio: Optional[float] = None
-    preserved: Optional[List[str]] = None
-    record_handlers: Optional[Dict[str, RecordHandler]] = None
-    synthetic_output_tables: Optional[Dict[str, pd.DataFrame]] = None
-
-
-def _create_multitable(
-    rel_data: RelationalData, backup: Backup, restore_config: RestoreConfig
-) -> MultiTable:
-    return MultiTable(
-        relational_data=rel_data,
-        strategy=backup.strategy,
-        gretel_model=backup.gretel_model,
-        refresh_interval=backup.refresh_interval,
-        restore_config=restore_config,
-    )
-
-
 class MultiTable:
     """
     Relational data support for the Trainer SDK
@@ -108,7 +83,7 @@ class MultiTable:
         gretel_model (str, optional): The underlying Gretel model to use. Default and acceptable models vary based on strategy.
         project_display_name (str, optional): Display name in the console for a new Gretel project holding models and artifacts. Defaults to "multi-table".
         refresh_interval (int, optional): Frequency in seconds to poll Gretel Cloud for job statuses. Must be at least 30. Defaults to 60 (1m).
-        restore_config (RestoreConfig, optional): Data used to restore from backup. Should not be supplied manually; instead use the `restore` classmethod.
+        backup (Backup, optional): Should not be supplied manually; instead use the `restore` classmethod.
     """
 
     def __init__(
@@ -119,7 +94,7 @@ class MultiTable:
         gretel_model: Optional[str] = None,
         project_display_name: Optional[str] = None,
         refresh_interval: Optional[int] = None,
-        restore_config: Optional[RestoreConfig] = None,
+        backup: Optional[Backup] = None,
         # deprecated
         project_name: Optional[str] = None,
         working_dir: Optional[str] = None,
@@ -144,65 +119,177 @@ class MultiTable:
         self.relational_data = relational_data
         self._artifact_collection = ArtifactCollection()
         self._latest_backup: Optional[Backup] = None
-        self._models: Dict[str, Model] = {}
-        self._record_handlers: Dict[str, RecordHandler] = {}
+        self._transforms_models: Dict[str, Model] = {}
+        self.transforms_train_statuses: Dict[str, TrainStatus] = {}
+        self.transforms_output_tables: Dict[str, pd.DataFrame] = {}
+        self._synthetics_models: Dict[str, Model] = {}
+        self._synthetics_record_handlers: Dict[str, RecordHandler] = {}
         self._record_size_ratio = 1.0
-        self.train_statuses: Dict[str, TrainStatus] = {}
+        self.synthetics_train_statuses: Dict[str, TrainStatus] = {}
         self._training_columns: Dict[str, List[str]] = {}
-        self._reset_train_statuses(self.relational_data.list_all_tables())
-        self._reset_generation_statuses()
+        self.synthetics_generate_statuses: Dict[str, GenerateStatus] = {}
         self.synthetic_output_tables: Dict[str, pd.DataFrame] = {}
         self.evaluations = defaultdict(lambda: TableEvaluation())
 
-        if restore_config is None:
-            configure_session(api_key="prompt", cache="yes", validate=True)
-            project_display_name = project_display_name or "multi-table"
-            self._project = create_project(display_name=project_display_name)
-            logger.info(
-                f"Created project `{self._project.display_name}` with unique name `{self._project.name}`."
-            )
-            self._working_dir = _mkdir(self._project.name)
-            self._create_debug_summary()
-            self._upload_sources_to_project()
-        else:
-            self._project = restore_config.project
-            logger.info(
-                f"Connected to existing project `{self._project.display_name}` with unique name `{self._project.name}`."
-            )
-            self._working_dir = restore_config.working_dir
-            self._artifact_collection = restore_config.artifact_collection
-            self._models = restore_config.train_models or self._models
-            for table, model in self._models.items():
-                train_status = _train_status_for_model(model)
-                self.train_statuses[table] = train_status
-                if train_status == TrainStatus.Completed:
-                    self._strategy.update_evaluation_from_model(
-                        table, self.evaluations, model, self._working_dir
-                    )
-            self._record_handlers = (
-                restore_config.record_handlers or self._record_handlers
-            )
-            self._record_size_ratio = (
-                restore_config.record_size_ratio or self._record_size_ratio
-            )
-            self._training_columns = (
-                restore_config.training_columns or self._training_columns
-            )
-            if restore_config.preserved is not None:
-                for table in restore_config.preserved:
-                    self.generate_statuses[table] = GenerateStatus.SourcePreserved
-            if restore_config.record_handlers is not None:
-                for table, record_handler in restore_config.record_handlers.items():
-                    self.generate_statuses[table] = _generate_status_for_record_handler(
-                        record_handler
-                    )
-            synth_out_tables = restore_config.synthetic_output_tables
-            if synth_out_tables is not None:
-                self.synthetic_output_tables = synth_out_tables
-                for table in synth_out_tables:
-                    self._attach_existing_reports(table)
+        configure_session(api_key="prompt", cache="yes", validate=True)
 
-            logger.info(restore_config.log_message)
+        if backup is None:
+            self._complete_fresh_init(project_display_name)
+        else:
+            self._complete_init_from_backup(backup)
+
+    def _complete_fresh_init(self, project_display_name: Optional[str]) -> None:
+        project_display_name = project_display_name or "multi-table"
+        self._project = create_project(display_name=project_display_name)
+        logger.info(
+            f"Created project `{self._project.display_name}` with unique name `{self._project.name}`."
+        )
+        self._working_dir = _mkdir(self._project.name)
+        self._create_debug_summary()
+        self._upload_sources_to_project()
+
+    def _complete_init_from_backup(self, backup: Backup) -> None:
+        # Raises GretelProjectEror if not found
+        self._project = get_project(backup.project_name)
+        logger.info(
+            f"Connected to existing project `{self._project.display_name}` with unique name `{self._project.name}`."
+        )
+        self._working_dir = Path(backup.working_dir)
+        self._artifact_collection = backup.artifact_collection
+
+        # RelationalData
+        source_archive_id = backup.artifact_collection.source_archive
+        if source_archive_id is None:
+            raise MultiTableException(
+                "Cannot restore from backup: source archive is missing."
+            )
+        source_archive_path = self._working_dir / "source_tables.tar.gz"
+        download_tar_artifact(
+            self._project,
+            source_archive_id,
+            source_archive_path,
+        )
+        with tarfile.open(source_archive_path, "r:gz") as tar:
+            tar.extractall(path=self._working_dir)
+        for table_name, table_backup in backup.relational_data.tables.items():
+            source_data = pd.read_csv(self._working_dir / f"source_{table_name}.csv")
+            self.relational_data.add_table(
+                name=table_name, primary_key=table_backup.primary_key, data=source_data
+            )
+        for fk_backup in backup.relational_data.foreign_keys:
+            self.relational_data.add_foreign_key(
+                foreign_key=fk_backup.foreign_key, referencing=fk_backup.referencing
+            )
+
+        # Debug summary
+        debug_summary_id = backup.artifact_collection.gretel_debug_summary
+        if debug_summary_id is not None:
+            download_file_artifact(
+                self._project,
+                debug_summary_id,
+                self._working_dir / "_gretel_debug_summary.json",
+            )
+
+        # Transforms
+        backup_transforms = backup.transforms
+        if backup_transforms is not None:
+            logger.info("Restoring transforms models")
+            for table, model_id in backup_transforms.model_ids.items():
+                model = self._project.get_model(model_id)
+                self._transforms_models[table] = model
+                self.transforms_train_statuses[table] = _train_status_for_model(model)
+            logger.info("Restored transforms models")
+
+        # Synthetics Train
+        backup_train = backup.train
+        if backup_train is None:
+            logger.info(
+                "No model train data present in backup. From here, your next step is to call `train`."
+            )
+            return None
+
+        logger.info("Restoring synthetics models")
+        failed_to_train = []
+        for table, table_train_backup in backup_train.tables.items():
+            model = self._project.get_model(table_train_backup.model_id)
+            status = _train_status_for_model(model)
+            self._synthetics_models[table] = model
+            self._training_columns[table] = table_train_backup.training_columns
+            self.synthetics_train_statuses[table] = status
+            if status == TrainStatus.Completed:
+                download_file_artifact(
+                    self._project,
+                    model.data_source,
+                    self._working_dir / f"synthetics_train_{table}.csv",
+                )
+                self._strategy.update_evaluation_from_model(
+                    table, self.evaluations, model, self._working_dir
+                )
+            elif status == TrainStatus.InProgress:
+                logger.warning(
+                    f"Training still in progress for table `{table}`. From here, your next step is to wait for training to finish, and re-attempt restoring from backup once all models have completed training. You can view training progress in the Console under the `{table}` model page in the `{self._project.display_name} ({self._project.name})` project."
+                )
+                raise MultiTableException(
+                    "Cannot restore while model training is actively in progress."
+                )
+            else:
+                failed_to_train.append(table)
+
+        if len(failed_to_train) > 0:
+            logger.info(
+                f"Training failed for tables: {failed_to_train}. From here, your next step is to try retraining them with modified data by calling `retrain_tables`."
+            )
+            return None
+        else:
+            logger.info("Restored synthetics models")
+
+        # Synthetics Generate
+        backup_generate = backup.generate
+        if backup_generate is None:
+            logger.info(
+                "No generation data present in backup. From here, your next step is to call `generate`."
+            )
+            return None
+
+        self._record_size_ratio = backup_generate.record_size_ratio
+        for table in backup_generate.preserved:
+            self.synthetics_generate_statuses[table] = GenerateStatus.SourcePreserved
+        for table, table_generate_backup in backup_generate.tables.items():
+            record_handler = self._synthetics_models[table].get_record_handler(
+                table_generate_backup.record_handler_id
+            )
+            status = _generate_status_for_record_handler(record_handler)
+            self._synthetics_record_handlers[table] = record_handler
+            self.synthetics_generate_statuses[table] = status
+            data_source = record_handler.data_source
+            if data_source is not None:
+                download_file_artifact(
+                    self._project,
+                    data_source,
+                    self._working_dir / f"synthetics_seed_{table}.csv",
+                )
+
+        synthetics_outputs_archive_id = (
+            self._artifact_collection.synthetics_outputs_archive
+        )
+        if synthetics_outputs_archive_id is None:
+            logger.info(
+                f"At time of last backup, generation had not yet finished. From here, you can attempt to resume that job via `generate(resume=True)`, or restart generation from scratch via a regular call to `generate`."
+            )
+            return None
+        synthetics_output_archive_path = self._working_dir / "synthetics_outputs.tar.gz"
+        download_tar_artifact(
+            self._project, synthetics_outputs_archive_id, synthetics_output_archive_path
+        )
+        with tarfile.open(synthetics_output_archive_path, "r:gz") as tar:
+            tar.extractall(path=self._working_dir)
+        for table in backup_generate.tables:
+            synth_path = self._working_dir / f"synth_{table}.csv"
+            self.synthetic_output_tables[table] = pd.read_csv(str(synth_path))
+            self._attach_existing_reports(table)
+        logger.info(
+            "Generation jobs for all tables from previous run finished prior to backup. From here, you can access your synthetic data as Pandas DataFrames via `synthetic_output_tables`, or review them in CSV format along with the relational report in the local working directory."
+        )
 
     @classmethod
     def restore(cls, backup_file: str) -> MultiTable:
@@ -210,135 +297,13 @@ class MultiTable:
         with open(backup_file, "r") as b:
             backup = Backup.from_dict(json.load(b))
 
-        configure_session(api_key="prompt", cache="yes", validate=True)
-        project_name = backup.project_name
-        # Raises GretelProjectEror if not found
-        project = get_project(name=project_name)
-        working_dir = _mkdir(project_name)
-        restore_config = RestoreConfig(
-            project=project,
-            artifact_collection=backup.artifact_collection,
-            working_dir=working_dir,
-            log_message="",
+        return MultiTable(
+            relational_data=RelationalData(),
+            strategy=backup.strategy,
+            gretel_model=backup.gretel_model,
+            refresh_interval=backup.refresh_interval,
+            backup=backup,
         )
-
-        artifact_collection = backup.artifact_collection
-
-        debug_summary_id = artifact_collection.gretel_debug_summary
-        if debug_summary_id is not None:
-            debug_summary_path = working_dir / "_gretel_debug_summary.json"
-            download_file_artifact(project, debug_summary_id, debug_summary_path)
-
-        source_archive_id = artifact_collection.source_archive
-        if source_archive_id is None:
-            raise MultiTableException(
-                "Cannot restore from backup: source archive is missing."
-            )
-        source_archive_path = working_dir / "source_tables.tar.gz"
-        download_tar_artifact(project, source_archive_id, source_archive_path)
-        with tarfile.open(source_archive_path, "r:gz") as tar:
-            tar.extractall()
-
-        # Restore RelationalData instance
-        rel_data = RelationalData()
-        for table_name, table_backup in backup.relational_data.tables.items():
-            local_source_path = working_dir / f"source_{table_name}.csv"
-            source_data = pd.read_csv(str(local_source_path))
-            rel_data.add_table(
-                name=table_name, primary_key=table_backup.primary_key, data=source_data
-            )
-        for fk_backup in backup.relational_data.foreign_keys:
-            rel_data.add_foreign_key(
-                foreign_key=fk_backup.foreign_key, referencing=fk_backup.referencing
-            )
-
-        backup_train = backup.train
-        if backup_train is None:
-            restore_config.log_message = "No model train data present in backup. From here, your next step is to call `train`."
-            return _create_multitable(rel_data, backup, restore_config)
-
-        train_models: Dict[str, Model] = {}
-        training_columns: Dict[str, List[str]] = {}
-        failed_to_train = []
-        for table_name, table_train_backup in backup_train.tables.items():
-            model = project.get_model(table_train_backup.model_id)
-            train_models[table_name] = model
-            training_columns[table_name] = table_train_backup.training_columns
-
-            train_status = _train_status_for_model(model)
-            if train_status == TrainStatus.Failed:
-                failed_to_train.append(table_name)
-            elif train_status == TrainStatus.InProgress:
-                logger.warning(
-                    f"Training still in progress for table `{table_name}`. From here, your next step is to wait for training to finish, and re-attempt restoring from backup once all models have completed training. You can view training progress in the Console under the `{table_name}` model page in the `{project.display_name} ({project.name})` project."
-                )
-                raise MultiTableException(
-                    "Cannot restore while model training is actively in progress."
-                )
-            else:
-                download_file_artifact(
-                    project,
-                    model.data_source,
-                    working_dir / f"synthetics_train_{table_name}.csv",
-                )
-                logger.info(
-                    f"Restored model for `{table_name}` with status {train_status}."
-                )
-        restore_config.train_models = train_models
-        restore_config.training_columns = training_columns
-        if len(failed_to_train) > 0:
-            restore_config.log_message = f"Training failed for tables: {failed_to_train}. From here, your next step is to try retraining them with modified data by calling `retrain_tables`."
-            return _create_multitable(rel_data, backup, restore_config)
-        else:
-            logger.info("Training restoration complete.")
-
-        backup_generate = backup.generate
-        if backup_generate is None:
-            restore_config.log_message = "No generation data present in backup. From here, your next step is to call `generate`."
-            return _create_multitable(rel_data, backup, restore_config)
-
-        backup_copy_dest = f"{backup_file}.restoring"
-        logger.info(
-            f"Found backup generate data. Copying this backup file to `{backup_copy_dest}` since restoring generate data can alter the backup file."
-        )
-        shutil.copy(backup_file, backup_copy_dest)
-
-        restore_config.record_size_ratio = backup_generate.record_size_ratio
-        restore_config.preserved = backup_generate.preserved
-
-        record_handlers: Dict[str, RecordHandler] = {}
-        for table_name, table_generate_backup in backup_generate.tables.items():
-            record_handler = train_models[table_name].get_record_handler(
-                table_generate_backup.record_handler_id
-            )
-            record_handlers[table_name] = record_handler
-            data_source = record_handler.data_source
-            if data_source is not None:
-                out_path = working_dir / f"synthetics_seed_{table_name}.csv"
-                download_file_artifact(project, data_source, out_path)
-
-        restore_config.record_handlers = record_handlers
-
-        synthetics_output_archive_id = artifact_collection.synthetics_outputs_archive
-        if synthetics_output_archive_id is None:
-            restore_config.log_message = f"At time of last backup, generation had not yet finished. From here, you can attempt to resume that job via `generate(resume=True)`, or restart generation from scratch via a regular call to `generate`."
-        else:
-            synthetics_output_archive_path = (
-                working_dir / "synthetics_output_tables.tar.gz"
-            )
-            download_tar_artifact(
-                project, synthetics_output_archive_id, synthetics_output_archive_path
-            )
-            with tarfile.open(synthetics_output_archive_path, "r:gz") as tar:
-                tar.extractall()
-            synthetic_output_tables: Dict[str, pd.DataFrame] = {}
-            for table_name in backup.relational_data.tables:
-                local_synth_path = working_dir / f"synth_{table_name}.csv"
-                synthetic_output_tables[table_name] = pd.read_csv(str(local_synth_path))
-            restore_config.synthetic_output_tables = synthetic_output_tables
-            restore_config.log_message = "Generation jobs for all tables from previous run finished prior to backup. From here, you can access your synthetic data as Pandas DataFrames via `synthetic_output_tables`, or review them in CSV format along with the relational report in the local working directory."
-
-        return _create_multitable(rel_data, backup, restore_config)
 
     def _backup(self) -> None:
         backup = self._build_backup()
@@ -356,23 +321,6 @@ class MultiTable:
         self._latest_backup = backup
 
     def _build_backup(self) -> Backup:
-        # Relational Data
-        tables = {}
-        foreign_keys = []
-        for table in self.relational_data.list_all_tables():
-            tables[table] = BackupRelationalDataTable(
-                primary_key=self.relational_data.get_primary_key(table),
-            )
-            foreign_keys.extend(
-                [
-                    BackupForeignKey.from_fk(key)
-                    for key in self.relational_data.get_foreign_keys(table)
-                ]
-            )
-        backup_relational_data = BackupRelationalData(
-            tables=tables, foreign_keys=foreign_keys
-        )
-
         backup = Backup(
             project_name=self._project.name,
             strategy=self._strategy.name,
@@ -380,31 +328,42 @@ class MultiTable:
             working_dir=str(self._working_dir),
             refresh_interval=self._refresh_interval,
             artifact_collection=replace(self._artifact_collection),
-            relational_data=backup_relational_data,
+            relational_data=BackupRelationalData.from_relational_data(
+                self.relational_data
+            ),
         )
 
+        # Transforms
+        if len(self._transforms_models) > 0:
+            backup.transforms = BackupTransforms(
+                model_ids={
+                    table: model.model_id
+                    for table, model in self._transforms_models.items()
+                }
+            )
+
         # Train
-        if len(self._models) > 0:
+        if len(self._synthetics_models) > 0:
             backup_train_tables = {
                 table: BackupTrainTable(
                     model_id=model.model_id,
                     training_columns=self._training_columns.get(table, []),
                 )
-                for table, model in self._models.items()
+                for table, model in self._synthetics_models.items()
             }
             backup.train = BackupTrain(tables=backup_train_tables)
 
         # Generate
-        if len(self._record_handlers) > 0:
+        if len(self._synthetics_record_handlers) > 0:
             backup_generate_tables = {
                 table: BackupGenerateTable(
                     record_handler_id=rh.record_id,
                 )
-                for table, rh in self._record_handlers.items()
+                for table, rh in self._synthetics_record_handlers.items()
             }
             preserved = [
                 table
-                for table, status in self.generate_statuses.items()
+                for table, status in self.synthetics_generate_statuses.items()
                 if status == GenerateStatus.SourcePreserved
             ]
             backup.generate = BackupGenerate(
@@ -440,24 +399,165 @@ class MultiTable:
             self._project, str(debug_summary_path)
         )
 
-    def transform(
-        self,
-        configs: Dict[str, GretelModelConfig],
-        in_place: bool = False,
-    ) -> Dict[str, pd.DataFrame]:
-        """
-        Applies supplied transform model configurations to tables. Returned dictionary includes all transformed
-        tables, which may not include all known tables (i.e. if a transform config was not provided).
+    def train_transform_models(self, configs: Dict[str, GretelModelConfig]) -> None:
+        for table, config in configs.items():
+            # Set initial status
+            self.transforms_train_statuses[table] = TrainStatus.NotStarted
 
-        Args:
-            configs (dict[str, GretelModelConfig]): keys are table names and values are Transform model configs.
-            in_place (bool, optional): If True, overwrites internal source dataframes with transformed dataframes,
-            which means subsequent synthetic model training would be performed on the transform results.
+            # Ensure consistent, friendly model name in Console
+            named_config = read_model_config(config)
+            named_config["name"] = f"{table}-transforms"
 
-        Returns:
-            dict[str, pd.DataFrame]: keys are table names and values are transformed tables
+            # Ensure consistent, friendly data source names in Console
+            table_data = self.relational_data.get_table_data(table)
+            transforms_train_path = self._working_dir / f"transforms_train_{table}.csv"
+            table_data.to_csv(transforms_train_path, index=False)
+
+            # Create model
+            self._log_start(table, "transforms model training")
+            model = self._project.create_model_obj(
+                model_config=named_config, data_source=str(transforms_train_path)
+            )
+            model.submit_cloud()
+            self._transforms_models[table] = model
+            self.transforms_train_statuses[table] = TrainStatus.InProgress
+
+        self._backup()
+
+        refresh_attempts: Dict[str, int] = defaultdict(int)
+
+        def _more_to_do() -> bool:
+            return any(
+                [
+                    status == TrainStatus.InProgress
+                    for status in self.transforms_train_statuses.values()
+                ]
+            )
+
+        while _more_to_do():
+            self._wait_refresh_interval()
+
+            for table_name in configs:
+                # No need to do anything with tables in terminal state
+                if self.transforms_train_statuses[table_name] in (
+                    TrainStatus.Completed,
+                    TrainStatus.Failed,
+                ):
+                    continue
+
+                # If we consistently failed to refresh the job status, fail the table
+                if refresh_attempts[table_name] >= MAX_REFRESH_ATTEMPTS:
+                    self._log_lost_contact(table_name)
+                    self.transforms_train_statuses[table_name] = TrainStatus.Failed
+                    continue
+
+                model = self._transforms_models[table_name]
+
+                status = cautiously_refresh_status(model, table_name, refresh_attempts)
+
+                if status == Status.COMPLETED:
+                    self._log_success(table_name, "model training")
+                    self.transforms_train_statuses[table_name] = TrainStatus.Completed
+                elif status in END_STATES:
+                    # already checked explicitly for completed; all other end states are effectively failures
+                    self._log_failed(table_name, "model training")
+                    self.transforms_train_statuses[table_name] = TrainStatus.Failed
+                else:
+                    self._log_in_progress(table_name, status, "model training")
+                    continue
+
+            self._backup()
+
+    def run_transforms(
+        self, in_place: bool = False, data: Optional[Dict[str, pd.DataFrame]] = None
+    ) -> None:
         """
-        output_tables = self._execute_transform_jobs(configs)
+        If `in_place` set to True, overwrites source data in all locations
+        (internal Python state, local working directory, project artifact archive).
+        Used for transforms->synthetics workflows.
+
+        If `data` is supplied, runs only the supplied data through the corresponding transforms models.
+        Otherwise runs source data through all existing transforms models.
+        """
+        transforms_run_paths = {}
+        if data is not None:
+            unrunnable_tables = [
+                table
+                for table in data
+                if self.transforms_train_statuses.get(table) != TrainStatus.Completed
+            ]
+            if len(unrunnable_tables) > 0:
+                raise MultiTableException(
+                    f"Cannot run transforms on provided data without successfully trained models for {unrunnable_tables}"
+                )
+
+            for table, df in data.items():
+                transforms_run_path = self._working_dir / f"transforms_run_{table}.csv"
+                df.to_csv(transforms_run_path, index=False)
+                transforms_run_paths[table] = transforms_run_path
+        else:
+            for table, model in self._transforms_models.items():
+                if self.transforms_train_statuses[table] == TrainStatus.Completed:
+                    transforms_run_paths[table] = model.data_source
+
+        transforms_record_handlers: Dict[str, RecordHandler] = {}
+        transforms_run_statuses: Dict[str, GenerateStatus] = {}
+
+        for table_name, transforms_run_path in transforms_run_paths.items():
+            self._log_start(table_name, "transforms run")
+            model = self._transforms_models[table_name]
+            record_handler = model.create_record_handler_obj(
+                data_source=str(transforms_run_path)
+            )
+            record_handler.submit_cloud()
+            transforms_run_statuses[table_name] = GenerateStatus.InProgress
+            transforms_record_handlers[table_name] = record_handler
+
+        output_tables: Dict[str, pd.DataFrame] = {}
+        refresh_attempts: Dict[str, int] = defaultdict(int)
+
+        def _more_to_do() -> bool:
+            return not all(
+                [
+                    _table_generation_in_terminal_state(transforms_run_statuses, table)
+                    for table in transforms_run_paths
+                ]
+            )
+
+        while _more_to_do():
+            self._wait_refresh_interval()
+
+            for table_name, record_handler in transforms_record_handlers.items():
+                # No need to do anything with tables in terminal state
+                if _table_generation_in_terminal_state(
+                    transforms_run_statuses, table_name
+                ):
+                    continue
+
+                # If we consistently failed to refresh the job via API, fail the table
+                if refresh_attempts[table_name] >= MAX_REFRESH_ATTEMPTS:
+                    self._log_lost_contact(table_name)
+                    transforms_run_statuses[table_name] = GenerateStatus.Failed
+                    continue
+
+                status = cautiously_refresh_status(
+                    record_handler, table_name, refresh_attempts
+                )
+
+                if status == Status.COMPLETED:
+                    self._log_success(table_name, "transforms run")
+                    transforms_run_statuses[table_name] = GenerateStatus.Completed
+                    record_handler_result = _get_data_from_record_handler(
+                        record_handler
+                    )
+                    output_tables[table_name] = record_handler_result
+                elif status in END_STATES:
+                    # already checked explicitly for completed; all other end states are effectively failures
+                    self._log_failed(table_name, "transforms run")
+                    transforms_run_statuses[table_name] = GenerateStatus.Failed
+                else:
+                    self._log_in_progress(table_name, status, "transforms run")
+
         output_tables = self._strategy.label_encode_keys(
             self.relational_data, output_tables
         )
@@ -465,102 +565,20 @@ class MultiTable:
         if in_place:
             for table_name, transformed_table in output_tables.items():
                 self.relational_data.update_table_data(table_name, transformed_table)
+            self._upload_sources_to_project()
 
+        archive_path = self._working_dir / "transforms_outputs.tar.gz"
+        with tarfile.open(archive_path, "w:gz") as tar:
+            for table, df in output_tables.items():
+                out_path = self._working_dir / f"transformed_{table}.csv"
+                df.to_csv(out_path, index=False)
+                tar.add(out_path)
+
+        self._artifact_collection.upload_transforms_outputs_archive(
+            self._project, str(archive_path)
+        )
+        self._backup()
         self.transform_output_tables = output_tables
-        return self.transform_output_tables
-
-    def _execute_transform_jobs(
-        self, configs: Dict[str, GretelModelConfig]
-    ) -> Dict[str, pd.DataFrame]:
-        # Ensure consistent, friendly names in the console
-        named_configs = {}
-        for table_name, config in configs.items():
-            config_dict = read_model_config(config)
-            config_dict["name"] = f"{table_name}-transforms"
-            named_configs[table_name] = config_dict
-
-        output_tables: Dict[str, pd.DataFrame] = {}
-        models: Dict[str, Model] = {}
-        record_handlers: Dict[str, RecordHandler] = {}
-        model_statuses: Dict[str, Status] = {}
-        record_handler_statuses: Dict[str, Status] = {}
-        refresh_attempts: Dict[str, int] = defaultdict(int)
-
-        # Create all models for training
-        for table_name, config in named_configs.items():
-            self._log_start(table_name, "transforms model training")
-            table_data = self.relational_data.get_table_data(table_name)
-            model = self._project.create_model_obj(
-                model_config=config, data_source=table_data
-            )
-            model.submit_cloud()
-            models[table_name] = model
-
-        def _more_to_do() -> bool:
-            return len(record_handler_statuses) != len(named_configs) or not all(
-                status in END_STATES for status in record_handler_statuses.values()
-            )
-
-        while _more_to_do():
-            self._wait_refresh_interval()
-
-            for table_name in named_configs:
-                # No need to re-check tables that are totally finished
-                if record_handler_statuses.get(table_name) in END_STATES:
-                    continue
-
-                # If we consistently failed to refresh the job status, fail the table
-                if refresh_attempts[table_name] >= MAX_REFRESH_ATTEMPTS:
-                    self._log_lost_contact(table_name)
-                    record_handler_statuses[table_name] = Status.LOST
-                    continue
-
-                # If RH is not finished but model training is, update RH status and handle
-                if model_statuses.get(table_name) in END_STATES:
-                    record_handler = record_handlers[table_name]
-                    rh_status = cautiously_refresh_status(
-                        record_handler, table_name, refresh_attempts
-                    )
-                    record_handler_statuses[table_name] = rh_status
-
-                    if rh_status == Status.COMPLETED:
-                        self._log_success(table_name, "transforms data generation")
-                        out_table = _get_data_from_record_handler(record_handler)
-                        output_tables[table_name] = out_table
-                    elif rh_status in END_STATES:
-                        self._log_failed(table_name, "transforms data generation")
-                    else:
-                        self._log_in_progress(
-                            table_name, rh_status, "transforms data generation"
-                        )
-
-                    continue
-
-                # Here = model training was last seen in progress. Update model status and handle.
-                model = models[table_name]
-                model_status = cautiously_refresh_status(
-                    model, table_name, refresh_attempts
-                )
-                model_statuses[table_name] = model_status
-
-                if model_status == Status.COMPLETED:
-                    self._log_success(table_name, "transforms model training")
-                    self._log_start(table_name, "transforms data generation")
-                    table_data = self.relational_data.get_table_data(table_name)
-                    rh = model.create_record_handler_obj(data_source=table_data)
-                    rh.submit_cloud()
-                    record_handlers[table_name] = rh
-                elif model_status in END_STATES:
-                    self._log_failed(table_name, "transforms model training")
-                    # Set a terminal RH status for this table so we don't keep checking it.
-                    # In this case, CANCELLED is standing in for "Won't Attempt"
-                    record_handler_statuses[table_name] = Status.CANCELLED
-                else:
-                    self._log_in_progress(
-                        table_name, model_status, "transforms model training"
-                    )
-
-        return output_tables
 
     def _prepare_training_data(self, tables: List[str]) -> Dict[str, Path]:
         """
@@ -585,16 +603,16 @@ class MultiTable:
         config_dict["name"] = table_name
         return config_dict
 
-    def _train_models(self, training_data: Dict[str, Path]) -> None:
+    def _train_synthetics_models(self, training_data: Dict[str, Path]) -> None:
         for table_name, training_csv in training_data.items():
             self._log_start(table_name, "model training")
-            self.train_statuses[table_name] = TrainStatus.InProgress
+            self.synthetics_train_statuses[table_name] = TrainStatus.InProgress
             table_model_config = self._table_model_config(table_name)
             model = self._project.create_model_obj(
                 model_config=table_model_config, data_source=str(training_csv)
             )
             model.submit_cloud()
-            self._models[table_name] = model
+            self._synthetics_models[table_name] = model
 
         self._backup()
 
@@ -604,7 +622,7 @@ class MultiTable:
             return any(
                 [
                     status == TrainStatus.InProgress
-                    for status in self.train_statuses.values()
+                    for status in self.synthetics_train_statuses.values()
                 ]
             )
 
@@ -613,7 +631,7 @@ class MultiTable:
 
             for table_name in training_data:
                 # No need to do anything with tables in terminal state
-                if self.train_statuses[table_name] in (
+                if self.synthetics_train_statuses[table_name] in (
                     TrainStatus.Completed,
                     TrainStatus.Failed,
                 ):
@@ -622,23 +640,23 @@ class MultiTable:
                 # If we consistently failed to refresh the job status, fail the table
                 if refresh_attempts[table_name] >= MAX_REFRESH_ATTEMPTS:
                     self._log_lost_contact(table_name)
-                    self.train_statuses[table_name] = TrainStatus.Failed
+                    self.synthetics_train_statuses[table_name] = TrainStatus.Failed
                     continue
 
-                model = self._models[table_name]
+                model = self._synthetics_models[table_name]
 
                 status = cautiously_refresh_status(model, table_name, refresh_attempts)
 
                 if status == Status.COMPLETED:
                     self._log_success(table_name, "model training")
-                    self.train_statuses[table_name] = TrainStatus.Completed
+                    self.synthetics_train_statuses[table_name] = TrainStatus.Completed
                     self._strategy.update_evaluation_from_model(
                         table_name, self.evaluations, model, self._working_dir
                     )
                 elif status in END_STATES:
                     # already checked explicitly for completed; all other end states are effectively failures
                     self._log_failed(table_name, "model training")
-                    self.train_statuses[table_name] = TrainStatus.Failed
+                    self.synthetics_train_statuses[table_name] = TrainStatus.Failed
                 else:
                     self._log_in_progress(table_name, status, "model training")
                     continue
@@ -651,7 +669,7 @@ class MultiTable:
         self._reset_train_statuses(tables)
 
         training_data = self._prepare_training_data(tables)
-        self._train_models(training_data)
+        self._train_synthetics_models(training_data)
 
     def retrain_tables(self, tables: Dict[str, pd.DataFrame]) -> None:
         """
@@ -670,7 +688,7 @@ class MultiTable:
 
         self._reset_train_statuses(tables_to_retrain)
         training_data = self._prepare_training_data(tables_to_retrain)
-        self._train_models(training_data)
+        self._train_synthetics_models(training_data)
 
     def _upload_sources_to_project(self) -> None:
         archive_path = self._working_dir / "source_tables.tar.gz"
@@ -687,7 +705,7 @@ class MultiTable:
 
     def _reset_train_statuses(self, tables: List[str]) -> None:
         for table in tables:
-            self.train_statuses[table] = TrainStatus.NotStarted
+            self.synthetics_train_statuses[table] = TrainStatus.NotStarted
 
     def generate(
         self,
@@ -722,26 +740,34 @@ class MultiTable:
                 )
             preserve_tables = [
                 table
-                for table, status in self.generate_statuses.items()
+                for table, status in self.synthetics_generate_statuses.items()
                 if status == GenerateStatus.SourcePreserved
             ]
-            for table_name, record_handler in self._record_handlers.items():
+            for table_name, record_handler in self._synthetics_record_handlers.items():
                 # Reset statuses of completed record handlers to usher them (immediately)
                 # through post-processing. Note that in ancestral strategy, this assumes
                 # seed generation is deterministic, because child tables may be in progress
                 # and we'd need the seed they were started with to be equivalent to the seed
                 # we "would" generate from the restored, post-processed parent.
-                if self.generate_statuses[table_name] == GenerateStatus.Completed:
-                    self.generate_statuses[table_name] = GenerateStatus.NotStarted
+                if (
+                    self.synthetics_generate_statuses.get(table_name)
+                    == GenerateStatus.Completed
+                ):
+                    self.synthetics_generate_statuses[
+                        table_name
+                    ] = GenerateStatus.NotStarted
         else:
             if record_size_ratio is not None:
                 self._record_size_ratio = record_size_ratio
-            self._reset_generation_statuses()
+            self.synthetics_generate_statuses = {
+                table_name: GenerateStatus.NotStarted
+                for table_name in self.relational_data.list_all_tables()
+            }
             preserve_tables = preserve_tables or []
             self._strategy.validate_preserved_tables(
                 preserve_tables, self.relational_data
             )
-            self._record_handlers: Dict[str, RecordHandler] = {}
+            self._synthetics_record_handlers: Dict[str, RecordHandler] = {}
 
         self._skip_some_tables(preserve_tables, output_tables)
         all_tables = self.relational_data.list_all_tables()
@@ -763,7 +789,7 @@ class MultiTable:
             else:
                 self._wait_refresh_interval()
 
-            for table_name, record_handler in self._record_handlers.items():
+            for table_name, record_handler in self._synthetics_record_handlers.items():
                 # No need to do anything with tables in terminal state
                 if self._table_generation_in_terminal_state(table_name):
                     continue
@@ -771,7 +797,9 @@ class MultiTable:
                 # If we consistently failed to refresh the job via API, fail the table
                 if refresh_attempts[table_name] >= MAX_REFRESH_ATTEMPTS:
                     self._log_lost_contact(table_name)
-                    self.generate_statuses[table_name] = GenerateStatus.Failed
+                    self.synthetics_generate_statuses[
+                        table_name
+                    ] = GenerateStatus.Failed
                     continue
 
                 status = cautiously_refresh_status(
@@ -780,7 +808,9 @@ class MultiTable:
 
                 if status == Status.COMPLETED:
                     self._log_success(table_name, "synthetic data generation")
-                    self.generate_statuses[table_name] = GenerateStatus.Completed
+                    self.synthetics_generate_statuses[
+                        table_name
+                    ] = GenerateStatus.Completed
                     record_handler_result = _get_data_from_record_handler(
                         record_handler
                     )
@@ -792,7 +822,9 @@ class MultiTable:
                 elif status in END_STATES:
                     # already checked explicitly for completed; all other end states are effectively failures
                     self._log_failed(table_name, "synthetic data generation")
-                    self.generate_statuses[table_name] = GenerateStatus.Failed
+                    self.synthetics_generate_statuses[
+                        table_name
+                    ] = GenerateStatus.Failed
                 else:
                     self._log_in_progress(
                         table_name, status, "synthetic data generation"
@@ -825,11 +857,13 @@ class MultiTable:
                     self._training_columns[table_name],
                 )
                 self._log_start(table_name, "synthetic data generation")
-                self.generate_statuses[table_name] = GenerateStatus.InProgress
-                model = self._models[table_name]
+                self.synthetics_generate_statuses[
+                    table_name
+                ] = GenerateStatus.InProgress
+                model = self._synthetics_models[table_name]
                 record_handler = model.create_record_handler_obj(**table_job)
                 record_handler.submit_cloud()
-                self._record_handlers[table_name] = record_handler
+                self._synthetics_record_handlers[table_name] = record_handler
 
             self._backup()
 
@@ -897,41 +931,38 @@ class MultiTable:
             html_content = ReportRenderer().render(presenter)
             report.write(html_content)
 
-    def _reset_generation_statuses(self) -> None:
-        """
-        Sets the GenerateStatus for all known tables to NotStarted.
-        """
-        self.generate_statuses = {
-            table_name: GenerateStatus.NotStarted
-            for table_name in self.relational_data.list_all_tables()
-        }
-
     def _skip_some_tables(
         self, preserve_tables: List[str], output_tables: Dict[str, pd.DataFrame]
     ) -> None:
         "Updates state for tables being preserved and tables lacking trained models."
         for table in self.relational_data.list_all_tables():
             if table in preserve_tables:
-                self.generate_statuses[table] = GenerateStatus.SourcePreserved
+                self.synthetics_generate_statuses[
+                    table
+                ] = GenerateStatus.SourcePreserved
                 output_tables[table] = self._strategy.get_preserved_data(
                     table, self.relational_data
                 )
-            elif self.train_statuses[table] != TrainStatus.Completed:
+            elif self.synthetics_train_statuses[table] != TrainStatus.Completed:
                 logger.info(
                     f"Skipping synthetic data generation for `{table}` because it does not have a trained model"
                 )
-                self.generate_statuses[table] = GenerateStatus.ModelUnavailable
+                self.synthetics_generate_statuses[
+                    table
+                ] = GenerateStatus.ModelUnavailable
                 for descendant in self.relational_data.get_descendants(table):
                     logger.info(
                         f"Skipping synthetic data generation for `{descendant}` because it depends on `{table}`"
                     )
-                    self.generate_statuses[descendant] = GenerateStatus.ModelUnavailable
+                    self.synthetics_generate_statuses[
+                        descendant
+                    ] = GenerateStatus.ModelUnavailable
 
     def _table_generation_in_progress(self, table: str) -> bool:
-        return self.generate_statuses[table] == GenerateStatus.InProgress
+        return self.synthetics_generate_statuses.get(table) == GenerateStatus.InProgress
 
     def _table_generation_in_terminal_state(self, table: str) -> bool:
-        return self.generate_statuses[table] in [
+        return self.synthetics_generate_statuses.get(table) in [
             GenerateStatus.Completed,
             GenerateStatus.SourcePreserved,
             GenerateStatus.ModelUnavailable,
@@ -947,7 +978,7 @@ class MultiTable:
         )
 
         individual_report_json = json.loads(smart_open.open(individual_path).read())
-        cross_table_report_json = json.loads(smart_open.open(individual_path).read())
+        cross_table_report_json = json.loads(smart_open.open(cross_table_path).read())
 
         self.evaluations[table].individual_report_json = individual_report_json
         self.evaluations[table].individual_sqs = sqs_score_from_full_report(
@@ -1043,6 +1074,17 @@ def _generate_status_for_record_handler(rh: RecordHandler) -> GenerateStatus:
         return GenerateStatus.InProgress
     else:
         return GenerateStatus.NotStarted
+
+
+def _table_generation_in_terminal_state(
+    statuses: Dict[str, GenerateStatus], table: str
+) -> bool:
+    return statuses[table] in [
+        GenerateStatus.Completed,
+        GenerateStatus.SourcePreserved,
+        GenerateStatus.ModelUnavailable,
+        GenerateStatus.Failed,
+    ]
 
 
 def _mkdir(name: str) -> Path:

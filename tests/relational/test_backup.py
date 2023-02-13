@@ -10,7 +10,24 @@ from gretel_trainer.relational.backup import (
     BackupRelationalDataTable,
     BackupTrain,
     BackupTrainTable,
+    BackupTransforms,
 )
+
+
+def test_backup_relational_data(trips):
+    expected = BackupRelationalData(
+        tables={
+            "vehicle_types": BackupRelationalDataTable(primary_key="id"),
+            "trips": BackupRelationalDataTable(primary_key="id"),
+        },
+        foreign_keys=[
+            BackupForeignKey(
+                foreign_key="trips.vehicle_type_id", referencing="vehicle_types.id"
+            )
+        ],
+    )
+
+    assert BackupRelationalData.from_relational_data(trips) == expected
 
 
 def test_backup():
@@ -28,6 +45,12 @@ def test_backup():
                 foreign_key="address.customer_id", referencing="customer.id"
             )
         ],
+    )
+    backup_transforms = BackupTransforms(
+        model_ids={
+            "customer": "222333444",
+            "address": "888777666",
+        }
     )
     backup_train = BackupTrain(
         tables={
@@ -65,6 +88,7 @@ def test_backup():
         refresh_interval=120,
         artifact_collection=artifact_collection,
         relational_data=backup_relational,
+        transforms=backup_transforms,
         train=backup_train,
         generate=backup_generate,
     )

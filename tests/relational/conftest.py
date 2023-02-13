@@ -1,161 +1,102 @@
 import sqlite3
 import tempfile
+from pathlib import Path
+from typing import List, Tuple
 from unittest.mock import Mock, patch
 
 import pandas as pd
 import pytest
+from sqlalchemy import create_engine
 
+from gretel_trainer.relational.connectors import Connector
 from gretel_trainer.relational.core import RelationalData
 
+EXAMPLE_DBS = Path(__file__).parent.resolve() / "example_dbs"
+
+
+@pytest.fixture(autouse=True)
+def patch_configure_session():
+    with patch("gretel_trainer.relational.multi_table.configure_session"):
+        yield
+
 
 @pytest.fixture()
-def trips():
-    vehicle_types = pd.DataFrame(
-        data={
-            "name": ["car", "train", "bike", "plane"],
-            "id": [1, 2, 3, 4],
-        }
+def project():
+    with patch(
+        "gretel_trainer.relational.multi_table.create_project"
+    ) as create_project, patch(
+        "gretel_trainer.relational.multi_table.get_project"
+    ) as get_project:
+        project = Mock()
+        project.name = "name"
+        project.display_name = "display_name"
+
+        create_project.return_value = project
+        get_project.return_value = project
+
+        yield project
+
+
+def rel_data_from_example_db(name) -> RelationalData:
+    con = sqlite3.connect(f"file:{name}?mode=memory&cache=shared")
+    cur = con.cursor()
+    with open(EXAMPLE_DBS / f"{name}.sql") as f:
+        cur.executescript(f.read())
+    connector = Connector(
+        create_engine(f"sqlite:///file:{name}?mode=memory&cache=shared&uri=true")
     )
-    vehicle_type_ids = [1] * 60 + [2] * 30 + [3] * 5 + [4] * 5
-    trips = pd.DataFrame(
-        data={
-            "id": list(range(100)),
-            "vehicle_type_id": vehicle_type_ids,
-            "purpose": ["work"] * 100,
-        }
-    )
-    rel_data = RelationalData()
-    rel_data.add_table(name="vehicle_types", primary_key="id", data=vehicle_types)
-    rel_data.add_table(name="trips", primary_key="id", data=trips)
-    rel_data.add_foreign_key(
-        foreign_key="trips.vehicle_type_id", referencing="vehicle_types.id"
+    return connector.extract()
+
+
+@pytest.fixture()
+def example_dbs():
+    return EXAMPLE_DBS
+
+
+@pytest.fixture()
+def pets() -> RelationalData:
+    return rel_data_from_example_db("pets")
+
+
+@pytest.fixture()
+def ecom() -> RelationalData:
+    return rel_data_from_example_db("ecom")
+
+
+@pytest.fixture()
+def mutagenesis() -> RelationalData:
+    return rel_data_from_example_db("mutagenesis")
+
+
+@pytest.fixture()
+def trips() -> RelationalData:
+    rel_data = rel_data_from_example_db("trips")
+    rel_data.update_table_data(
+        table="trips",
+        data=pd.DataFrame(
+            data={
+                "id": list(range(100)),
+                "vehicle_type_id": [1] * 60 + [2] * 30 + [3] * 5 + [4] * 5,
+                "purpose": ["work"] * 100,
+            }
+        ),
     )
     return rel_data
 
 
 @pytest.fixture()
-def pets():
-    humans = pd.DataFrame(
-        data={
-            "name": ["John", "Paul", "George", "Ringo", "Billy"],
-            "city": ["Liverpool", "Liverpool", "Liverpool", "Liverpool", "Houston"],
-            "id": [1, 2, 3, 4, 5],
-        }
-    )
-    pets = pd.DataFrame(
-        data={
-            "name": ["Lennon", "McCartney", "Harrison", "Starr", "Preston"],
-            "age": [6, 14, 8, 7, 2],
-            "id": [1, 2, 3, 4, 5],
-            "human_id": [1, 2, 3, 4, 5],
-        }
-    )
-    rel_data = RelationalData()
-    rel_data.add_table(name="humans", primary_key="id", data=humans)
-    rel_data.add_table(name="pets", primary_key="id", data=pets)
-    rel_data.add_foreign_key(foreign_key="pets.human_id", referencing="humans.id")
-    return rel_data
-
-
-@pytest.fixture()
-def ecom():
-    ecommerce = RelationalData()
-    ecommerce.add_table(
-        name="events",
-        primary_key="id",
-        data=pd.DataFrame(columns=["id", "browser", "traffic_source", "user_id"]),
-    )
-    ecommerce.add_table(
-        name="users",
-        primary_key="id",
-        data=pd.DataFrame(columns=["id", "first_name", "last_name"]),
-    )
-    ecommerce.add_table(
-        name="inventory_items",
-        primary_key="id",
-        data=pd.DataFrame(
-            columns=[
-                "id",
-                "sold_at",
-                "cost",
-                "product_id",
-                "product_distribution_center_id",
-            ]
-        ),
-    )
-    ecommerce.add_table(
-        name="products",
-        primary_key="id",
-        data=pd.DataFrame(columns=["id", "name", "brand", "distribution_center_id"]),
-    )
-    ecommerce.add_table(
-        name="distribution_center",
-        primary_key="id",
-        data=pd.DataFrame(columns=["id", "name"]),
-    )
-    ecommerce.add_table(
-        name="order_items",
-        primary_key="id",
-        data=pd.DataFrame(
-            columns=["id", "sale_price", "status", "user_id", "inventory_item_id"]
-        ),
-    )
-    ecommerce.add_foreign_key(foreign_key="events.user_id", referencing="users.id")
-    ecommerce.add_foreign_key(foreign_key="order_items.user_id", referencing="users.id")
-    ecommerce.add_foreign_key(
-        foreign_key="order_items.inventory_item_id", referencing="inventory_items.id"
-    )
-    ecommerce.add_foreign_key(
-        foreign_key="inventory_items.product_id", referencing="products.id"
-    )
-    ecommerce.add_foreign_key(
-        foreign_key="inventory_items.product_distribution_center_id",
-        referencing="distribution_center.id",
-    )
-    ecommerce.add_foreign_key(
-        foreign_key="products.distribution_center_id",
-        referencing="distribution_center.id",
-    )
-    return ecommerce
-
-
-@pytest.fixture()
-def mutagenesis():
-    mutagenesis = RelationalData()
-    mutagenesis.add_table(
-        name="bond",
-        primary_key=None,
-        data=pd.DataFrame(columns=["type", "atom1_id", "atom2_id"]),
-    )
-    mutagenesis.add_table(
-        name="atom",
-        primary_key="atom_id",
-        data=pd.DataFrame(columns=["atom_id", "element", "charge", "molecule_id"]),
-    )
-    mutagenesis.add_table(
-        name="molecule",
-        primary_key="molecule_id",
-        data=pd.DataFrame(columns=["molecule_id", "mutagenic"]),
-    )
-    mutagenesis.add_foreign_key(foreign_key="bond.atom1_id", referencing="atom.atom_id")
-    mutagenesis.add_foreign_key(foreign_key="bond.atom2_id", referencing="atom.atom_id")
-    mutagenesis.add_foreign_key(
-        foreign_key="atom.molecule_id", referencing="molecule.molecule_id"
-    )
-    return mutagenesis
-
-
-@pytest.fixture()
-def source_nba():
+def source_nba() -> Tuple[RelationalData, List[str], List[str], List[str]]:
     return _setup_nba(synthetic=False)
 
 
 @pytest.fixture()
-def synthetic_nba():
+def synthetic_nba() -> Tuple[RelationalData, List[str], List[str], List[str]]:
     return _setup_nba(synthetic=True)
 
 
-def _setup_nba(synthetic: bool):
+def _setup_nba(
+    synthetic: bool,
+) -> Tuple[RelationalData, List[str], List[str], List[str]]:
     if synthetic:
         states = ["PA", "FL"]
         cities = ["Philadelphia", "Miami"]
@@ -177,69 +118,3 @@ def _setup_nba(synthetic: bool):
     rel_data.add_foreign_key(foreign_key="cities.state_id", referencing="states.id")
 
     return rel_data, states, cities, teams
-
-
-# Same ecommerce schema as `ecom`, but written to a temporary local sqlite db
-@pytest.fixture()
-def local_db():
-    commands = [
-        """
-create table users (
-  id integer primary key,
-  first_name varchar(30) not null,
-  last_name varchar(30) not null
-);
-        """,
-        """
-create table events (
-  id integer primary key,
-  browser varchar(30) not null,
-  traffic_source varchar(30) not null,
-  user_id integer not null,
-  foreign key (user_id) references users (id)
-);
-        """,
-        """
-create table distribution_center (
-  id integer primary key,
-  name varchar(30) not null
-);
-        """,
-        """
-create table products (
-  id integer primary key,
-  name varchar(30) not null,
-  brand varchar(30) not null,
-  distribution_center_id integer not null,
-  foreign key (distribution_center_id) references distribution_center (id)
-)
-        """,
-        """
-create table inventory_items (
-  id integer primary key,
-  sold_at text not null,
-  cost integer not null,
-  product_id integer not null,
-  product_distribution_center_id integer not null,
-  foreign key (product_id) references products (id)
-  foreign key (product_distribution_center_id) references distribution_center (id)
-)
-        """,
-        """
-create table order_items (
-  id integer primary key,
-  sale_price integer not null,
-  status varchar(30) not null,
-  user_id integer not null,
-  inventory_item_id integer not null,
-  foreign key (user_id) references users (id)
-  foreign key (inventory_item_id) references inventory_items (id)
-)
-        """,
-    ]
-    with tempfile.NamedTemporaryFile() as f:
-        con = sqlite3.connect(f.name)
-        cur = con.cursor()
-        for command in commands:
-            cur.execute(command)
-        yield f.name
