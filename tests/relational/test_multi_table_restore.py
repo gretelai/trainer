@@ -464,7 +464,7 @@ def test_restore_generate_completed(project, pets):
             working_dir / "synthetics_cross_table_evaluation_pets.html"
         )
         assert set(mt.synthetics_generate_statuses.values()) == {TrainStatus.Completed}
-        assert len(mt._record_handlers) == 2
+        assert len(mt._synthetics_record_handlers) == 2
         assert len(mt.synthetic_output_tables) == 2
         assert mt.evaluations["humans"].individual_sqs == 90
         assert mt.evaluations["humans"].cross_table_sqs == 91
@@ -521,7 +521,7 @@ def test_restore_generate_in_progress(project, pets):
 
         # Generate state is partially restored
         assert set(mt.synthetics_generate_statuses.values()) == {TrainStatus.Completed}
-        assert len(mt._record_handlers) == 2
+        assert len(mt._synthetics_record_handlers) == 2
         assert len(mt.synthetic_output_tables) == 0
         assert mt.evaluations["humans"].individual_sqs == 94
         assert mt.evaluations["humans"].cross_table_sqs is None

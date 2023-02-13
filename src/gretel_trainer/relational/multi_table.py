@@ -123,7 +123,7 @@ class MultiTable:
         self.transforms_train_statuses: Dict[str, TrainStatus] = {}
         self.transforms_output_tables: Dict[str, pd.DataFrame] = {}
         self._synthetics_models: Dict[str, Model] = {}
-        self._record_handlers: Dict[str, RecordHandler] = {}
+        self._synthetics_record_handlers: Dict[str, RecordHandler] = {}
         self._record_size_ratio = 1.0
         self.synthetics_train_statuses: Dict[str, TrainStatus] = {}
         self._training_columns: Dict[str, List[str]] = {}
@@ -259,7 +259,7 @@ class MultiTable:
                 table_generate_backup.record_handler_id
             )
             status = _generate_status_for_record_handler(record_handler)
-            self._record_handlers[table] = record_handler
+            self._synthetics_record_handlers[table] = record_handler
             self.synthetics_generate_statuses[table] = status
             data_source = record_handler.data_source
             if data_source is not None:
@@ -354,12 +354,12 @@ class MultiTable:
             backup.train = BackupTrain(tables=backup_train_tables)
 
         # Generate
-        if len(self._record_handlers) > 0:
+        if len(self._synthetics_record_handlers) > 0:
             backup_generate_tables = {
                 table: BackupGenerateTable(
                     record_handler_id=rh.record_id,
                 )
-                for table, rh in self._record_handlers.items()
+                for table, rh in self._synthetics_record_handlers.items()
             }
             preserved = [
                 table
@@ -743,7 +743,7 @@ class MultiTable:
                 for table, status in self.synthetics_generate_statuses.items()
                 if status == GenerateStatus.SourcePreserved
             ]
-            for table_name, record_handler in self._record_handlers.items():
+            for table_name, record_handler in self._synthetics_record_handlers.items():
                 # Reset statuses of completed record handlers to usher them (immediately)
                 # through post-processing. Note that in ancestral strategy, this assumes
                 # seed generation is deterministic, because child tables may be in progress
@@ -767,7 +767,7 @@ class MultiTable:
             self._strategy.validate_preserved_tables(
                 preserve_tables, self.relational_data
             )
-            self._record_handlers: Dict[str, RecordHandler] = {}
+            self._synthetics_record_handlers: Dict[str, RecordHandler] = {}
 
         self._skip_some_tables(preserve_tables, output_tables)
         all_tables = self.relational_data.list_all_tables()
@@ -789,7 +789,7 @@ class MultiTable:
             else:
                 self._wait_refresh_interval()
 
-            for table_name, record_handler in self._record_handlers.items():
+            for table_name, record_handler in self._synthetics_record_handlers.items():
                 # No need to do anything with tables in terminal state
                 if self._table_generation_in_terminal_state(table_name):
                     continue
@@ -863,7 +863,7 @@ class MultiTable:
                 model = self._synthetics_models[table_name]
                 record_handler = model.create_record_handler_obj(**table_job)
                 record_handler.submit_cloud()
-                self._record_handlers[table_name] = record_handler
+                self._synthetics_record_handlers[table_name] = record_handler
 
             self._backup()
 
