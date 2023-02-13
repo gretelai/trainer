@@ -34,8 +34,8 @@ ARTIFACTS = {
         "local_name": "synthetics_train_pets.csv",
     },
     "synthetics_outputs_archive": {
-        "artifact_id": "gretel_abc_synthetics_output_tables.tar.gz",
-        "local_name": "synthetics_output_tables.tar.gz",
+        "artifact_id": "gretel_abc_synthetics_outputs.tar.gz",
+        "local_name": "synthetics_outputs.tar.gz",
     },
 }
 

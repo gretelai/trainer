@@ -277,9 +277,7 @@ class MultiTable:
                 f"At time of last backup, generation had not yet finished. From here, you can attempt to resume that job via `generate(resume=True)`, or restart generation from scratch via a regular call to `generate`."
             )
             return None
-        synthetics_output_archive_path = (
-            self._working_dir / "synthetics_output_tables.tar.gz"
-        )
+        synthetics_output_archive_path = self._working_dir / "synthetics_outputs.tar.gz"
         download_tar_artifact(
             self._project, synthetics_outputs_archive_id, synthetics_output_archive_path
         )
