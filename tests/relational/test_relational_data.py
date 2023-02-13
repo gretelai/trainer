@@ -3,8 +3,9 @@ import tempfile
 
 import pandas as pd
 import pandas.testing as pdtest
+import pytest
 
-from gretel_trainer.relational.core import RelationalData
+from gretel_trainer.relational.core import MultiTableException, RelationalData
 
 
 def test_ecommerce_relational_data(ecom):
@@ -41,6 +42,61 @@ def test_add_foreign_key_checks_if_tables_exist():
     # add a foreign key correctly
     rel_data.add_foreign_key(foreign_key="events.user_id", referencing="users.id")
     assert len(rel_data.get_foreign_keys("events")) == 1
+
+
+def test_remove_foreign_key():
+    rel_data = RelationalData()
+    rel_data.add_table(
+        name="users", primary_key="id", data=pd.DataFrame(data={"id": [1]})
+    )
+    rel_data.add_table(
+        name="events",
+        primary_key="id",
+        data=pd.DataFrame(data={"id": [1], "user_id": [1], "other_user_id": [1]}),
+    )
+
+    # Can't remove a foreign key from a nonexistent table
+    with pytest.raises(MultiTableException):
+        rel_data.remove_foreign_key("not_a_table.user_id")
+
+    # Can't remove a foreign key that is not a column on the table
+    with pytest.raises(MultiTableException):
+        rel_data.remove_foreign_key("events.not_a_column")
+
+    # Can't remove a foreign key that is not a foreign key
+    with pytest.raises(MultiTableException):
+        rel_data.remove_foreign_key("events.id")
+
+    rel_data.add_foreign_key(foreign_key="events.user_id", referencing="users.id")
+    assert len(rel_data.get_foreign_keys("events")) == 1
+
+    rel_data.remove_foreign_key("events.user_id")
+    assert len(rel_data.get_foreign_keys("events")) == 0
+
+    # You can remove one FK from a table without affecting another FK to the same table
+    rel_data.add_foreign_key(foreign_key="events.user_id", referencing="users.id")
+    rel_data.add_foreign_key(foreign_key="events.other_user_id", referencing="users.id")
+    assert len(rel_data.get_foreign_keys("events")) == 2
+    rel_data.remove_foreign_key("events.user_id")
+    assert len(rel_data.get_foreign_keys("events")) == 1
+
+
+def test_set_primary_key(ecom):
+    assert ecom.get_primary_key("users") == "id"
+
+    ecom.set_primary_key(table="users", primary_key=None)
+    assert ecom.get_primary_key("users") is None
+
+    ecom.set_primary_key(table="users", primary_key="id")
+    assert ecom.get_primary_key("users") == "id"
+
+    # Can't set primary key on an unknown table
+    with pytest.raises(MultiTableException):
+        ecom.set_primary_key(table="not_a_table", primary_key="id")
+
+    # Can't set primary key to a non-existent column
+    with pytest.raises(MultiTableException):
+        ecom.set_primary_key(table="users", primary_key="not_a_column")
 
 
 def test_relational_data_as_dict(ecom):
