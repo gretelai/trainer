@@ -44,6 +44,7 @@ def make_backup(
     rel_data: RelationalData,
     working_dir: Path,
     artifact_collection: ArtifactCollection,
+    transforms_models: Dict[str, Mock] = {},
     synthetics_models: Dict[str, Mock] = {},
     synthetics_record_handlers: Dict[str, Mock] = {},
 ) -> b.Backup:
@@ -56,6 +57,12 @@ def make_backup(
         artifact_collection=artifact_collection,
         relational_data=b.BackupRelationalData.from_relational_data(rel_data),
     )
+    if len(transforms_models) > 0:
+        backup.transforms = b.BackupTransforms(
+            model_ids={
+                table: mock.model_id for table, mock in transforms_models.items()
+            }
+        )
     if len(synthetics_models) > 0:
         backup.train = b.BackupTrain(
             tables={
@@ -91,6 +98,7 @@ def create_backup(
     synthetics_models: Dict[str, Mock] = {},
     synthetics_record_handlers: Dict[str, Mock] = {},
     output_archive_present: bool = False,
+    transforms_models: Dict[str, Mock] = {},
 ) -> str:
     artifact_collection = ArtifactCollection(
         gretel_debug_summary=ARTIFACTS["debug_summary"]["artifact_id"],
@@ -105,6 +113,7 @@ def create_backup(
         rel_data,
         working_dir,
         artifact_collection,
+        transforms_models,
         synthetics_models,
         synthetics_record_handlers,
     )
@@ -270,6 +279,40 @@ def test_restore_not_yet_trained(project, pets):
         assert mt.relational_data.debug_summary() == pets.debug_summary()
 
 
+def test_restore_transforms(project, pets):
+    with tempfile.TemporaryDirectory() as working_dir, tempfile.TemporaryDirectory() as testsetup_dir, patch(
+        "gretel_trainer.relational.multi_table.download_tar_artifact"
+    ) as download_tar_artifact:
+        working_dir = Path(working_dir)
+        testsetup_dir = Path(testsetup_dir)
+
+        transforms_models = {
+            "humans": make_mock_model(name="humans", status="completed"),
+            "pets": make_mock_model(name="pets", status="completed"),
+        }
+
+        create_standin_project_artifacts(pets, testsetup_dir)
+        configure_mocks(
+            project,
+            download_tar_artifact,
+            testsetup_dir,
+            working_dir,
+            transforms_models,
+        )
+        backup_file = create_backup(
+            pets, working_dir, transforms_models=transforms_models
+        )
+
+        mt = MultiTable.restore(backup_file)
+
+        # Backup + Debug summary + Source archive + (2) Source CSVs
+        assert len(os.listdir(working_dir)) == 5
+
+        # Transforms state is restored
+        assert set(mt.transforms_train_statuses.values()) == {TrainStatus.Completed}
+        assert len(mt._transforms_models) == 2
+
+
 def test_restore_synthetics_training_still_in_progress(project, pets):
     with tempfile.TemporaryDirectory() as working_dir, tempfile.TemporaryDirectory() as testsetup_dir, patch(
         "gretel_trainer.relational.multi_table.download_tar_artifact"
@@ -290,7 +333,9 @@ def test_restore_synthetics_training_still_in_progress(project, pets):
             working_dir,
             synthetics_models,
         )
-        backup_file = create_backup(pets, working_dir, synthetics_models)
+        backup_file = create_backup(
+            pets, working_dir, synthetics_models=synthetics_models
+        )
 
         with pytest.raises(MultiTableException):
             mt = MultiTable.restore(backup_file)
@@ -316,7 +361,9 @@ def test_restore_training_complete(project, pets):
             working_dir,
             synthetics_models,
         )
-        backup_file = create_backup(pets, working_dir, synthetics_models)
+        backup_file = create_backup(
+            pets, working_dir, synthetics_models=synthetics_models
+        )
 
         mt = MultiTable.restore(backup_file)
 
@@ -367,7 +414,9 @@ def test_restore_training_one_failed(project, pets):
             working_dir,
             synthetics_models,
         )
-        backup_file = create_backup(pets, working_dir, synthetics_models)
+        backup_file = create_backup(
+            pets, working_dir, synthetics_models=synthetics_models
+        )
 
         mt = MultiTable.restore(backup_file)
 
@@ -437,8 +486,8 @@ def test_restore_generate_completed(project, pets):
         backup_file = create_backup(
             pets,
             working_dir,
-            synthetics_models,
-            synthetics_record_handlers,
+            synthetics_models=synthetics_models,
+            synthetics_record_handlers=synthetics_record_handlers,
             output_archive_present=True,
         )
 
@@ -508,8 +557,8 @@ def test_restore_generate_in_progress(project, pets):
         backup_file = create_backup(
             pets,
             working_dir,
-            synthetics_models,
-            synthetics_record_handlers,
+            synthetics_models=synthetics_models,
+            synthetics_record_handlers=synthetics_record_handlers,
             output_archive_present=False,
         )
 
