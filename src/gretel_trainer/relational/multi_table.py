@@ -170,7 +170,7 @@ class MultiTable:
             source_archive_path,
         )
         with tarfile.open(source_archive_path, "r:gz") as tar:
-            tar.extractall()
+            tar.extractall(path=self._working_dir)
         for table_name, table_backup in backup.relational_data.tables.items():
             source_data = pd.read_csv(self._working_dir / f"source_{table_name}.csv")
             self.relational_data.add_table(
@@ -284,7 +284,7 @@ class MultiTable:
             self._project, synthetics_outputs_archive_id, synthetics_output_archive_path
         )
         with tarfile.open(synthetics_output_archive_path, "r:gz") as tar:
-            tar.extractall()
+            tar.extractall(path=self._working_dir)
         for table in backup_generate.tables:
             synth_path = self._working_dir / f"synth_{table}.csv"
             self.synthetic_output_tables[table] = pd.read_csv(str(synth_path))

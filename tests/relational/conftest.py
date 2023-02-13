@@ -28,8 +28,12 @@ def project():
         "gretel_trainer.relational.multi_table.get_project"
     ) as get_project:
         project = Mock()
+        project.name = "name"
+        project.display_name = "display_name"
+
         create_project.return_value = project
         get_project.return_value = project
+
         yield project
 
 
