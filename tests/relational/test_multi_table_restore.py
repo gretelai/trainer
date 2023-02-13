@@ -341,6 +341,10 @@ def test_restore_training_complete(project, pets):
         )
         assert set(mt.synthetics_train_statuses.values()) == {TrainStatus.Completed}
         assert len(mt._synthetics_models) == 2
+        assert mt.evaluations["humans"].individual_sqs == 94
+        assert mt.evaluations["humans"].cross_table_sqs is None
+        assert mt.evaluations["pets"].individual_sqs == 94
+        assert mt.evaluations["pets"].cross_table_sqs is None
 
 
 def test_restore_training_one_failed(project, pets):
@@ -391,6 +395,10 @@ def test_restore_training_one_failed(project, pets):
             TrainStatus.Failed,
         }
         assert len(mt._synthetics_models) == 2
+        assert mt.evaluations["humans"].individual_sqs is None
+        assert mt.evaluations["humans"].cross_table_sqs is None
+        assert mt.evaluations["pets"].individual_sqs == 94
+        assert mt.evaluations["pets"].cross_table_sqs is None
 
 
 def test_restore_generate_completed(project, pets):
