@@ -980,7 +980,7 @@ class MultiTable:
         )
 
         individual_report_json = json.loads(smart_open.open(individual_path).read())
-        cross_table_report_json = json.loads(smart_open.open(individual_path).read())
+        cross_table_report_json = json.loads(smart_open.open(cross_table_path).read())
 
         self.evaluations[table].individual_report_json = individual_report_json
         self.evaluations[table].individual_sqs = sqs_score_from_full_report(
