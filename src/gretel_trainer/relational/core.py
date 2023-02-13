@@ -91,6 +91,35 @@ class RelationalData:
         )
         edge["via"] = via
 
+    def remove_foreign_key(self, foreign_key: str) -> None:
+        fk_table, fk_column = foreign_key.split(".")
+
+        if fk_table not in self.list_all_tables():
+            raise MultiTableException(f"Unrecognized table name: `{fk_table}`")
+
+        if fk_column not in self.get_table_data(fk_table).columns:
+            raise MultiTableException(
+                f"Column `{fk_column}` does not exist on table `{fk_table}`"
+            )
+
+        key_to_remove = None
+        for fk in self.get_foreign_keys(fk_table):
+            if fk.column_name == fk_column:
+                key_to_remove = fk
+
+        if key_to_remove is None:
+            raise MultiTableException(
+                f"Column `{fk_column}` on table `{fk_table}` is not a foreign key"
+            )
+
+        edge = self.graph.edges[fk_table, key_to_remove.parent_table_name]
+        via = edge.get("via")
+        via.remove(key_to_remove)
+        if len(via) == 0:
+            self.graph.remove_edge(fk_table, key_to_remove.parent_table_name)
+        else:
+            edge["via"] = via
+
     def update_table_data(self, table: str, data: pd.DataFrame) -> None:
         try:
             self.graph.nodes[table]["data"] = data
