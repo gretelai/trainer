@@ -3,8 +3,9 @@ import tempfile
 
 import pandas as pd
 import pandas.testing as pdtest
+import pytest
 
-from gretel_trainer.relational.core import RelationalData
+from gretel_trainer.relational.core import MultiTableException, RelationalData
 
 
 def test_ecommerce_relational_data(ecom):
@@ -41,6 +42,24 @@ def test_add_foreign_key_checks_if_tables_exist():
     # add a foreign key correctly
     rel_data.add_foreign_key(foreign_key="events.user_id", referencing="users.id")
     assert len(rel_data.get_foreign_keys("events")) == 1
+
+
+def test_set_primary_key(ecom):
+    assert ecom.get_primary_key("users") == "id"
+
+    ecom.set_primary_key(table="users", primary_key=None)
+    assert ecom.get_primary_key("users") is None
+
+    ecom.set_primary_key(table="users", primary_key="id")
+    assert ecom.get_primary_key("users") == "id"
+
+    # Can't set primary key on an unknown table
+    with pytest.raises(MultiTableException):
+        ecom.set_primary_key(table="not_a_table", primary_key="id")
+
+    # Can't set primary key to a non-existent column
+    with pytest.raises(MultiTableException):
+        ecom.set_primary_key(table="users", primary_key="not_a_column")
 
 
 def test_relational_data_as_dict(ecom):

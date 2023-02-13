@@ -49,6 +49,18 @@ class RelationalData:
     ) -> None:
         self.graph.add_node(name, primary_key=primary_key, data=data)
 
+    def set_primary_key(self, *, table: str, primary_key: Optional[str]) -> None:
+        if table not in self.list_all_tables():
+            raise MultiTableException(f"Unrecognized table name: `{table}`")
+
+        if (
+            primary_key is not None
+            and primary_key not in self.get_table_data(table).columns
+        ):
+            raise MultiTableException(f"Unrecognized column name: `{primary_key}`")
+
+        self.graph.nodes[table]["primary_key"] = primary_key
+
     def add_foreign_key(self, *, foreign_key: str, referencing: str) -> None:
         """Format of both str arguments should be `table_name.column_name`"""
         known_tables = self.list_all_tables()
