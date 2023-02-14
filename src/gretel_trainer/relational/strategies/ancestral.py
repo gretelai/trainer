@@ -51,7 +51,7 @@ class AncestralStrategy:
 
         # First, create a new table set identical to source data
         for table_name in all_tables:
-            tableset_with_altered_keys[table_name] = rel_data.get_table_data(table_name)
+            tableset_with_altered_keys[table_name] = rel_data.get_table_data(table_name).copy()
 
         # On each table, alter the PKs in the first two rows for the
         # min/max seed range, plus alter all FK references to those records
