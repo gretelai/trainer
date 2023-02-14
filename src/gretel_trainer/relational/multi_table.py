@@ -570,9 +570,10 @@ class MultiTable:
         archive_path = self._working_dir / "transforms_outputs.tar.gz"
         with tarfile.open(archive_path, "w:gz") as tar:
             for table, df in output_tables.items():
-                out_path = self._working_dir / f"transformed_{table}.csv"
+                filename = f"transformed_{table}.csv"
+                out_path = self._working_dir / filename
                 df.to_csv(out_path, index=False)
-                tar.add(out_path)
+                tar.add(out_path, arcname=filename)
 
         self._artifact_collection.upload_transforms_outputs_archive(
             self._project, str(archive_path)
@@ -694,10 +695,11 @@ class MultiTable:
         archive_path = self._working_dir / "source_tables.tar.gz"
         with tarfile.open(archive_path, "w:gz") as tar:
             for table in self.relational_data.list_all_tables():
-                out_path = self._working_dir / f"source_{table}.csv"
+                filename = f"source_{table}.csv"
+                out_path = self._working_dir / filename
                 df = self.relational_data.get_table_data(table)
                 df.to_csv(out_path, index=False)
-                tar.add(out_path)
+                tar.add(out_path, arcname=filename)
         self._artifact_collection.upload_source_archive(
             self._project, str(archive_path)
         )
@@ -883,19 +885,23 @@ class MultiTable:
 
         archive_path = self._working_dir / "synthetics_outputs.tar.gz"
         with tarfile.open(archive_path, "w:gz") as tar:
-            tar.add(self._working_dir / "relational_report.html")
+            tar.add(
+                self._working_dir / "relational_report.html",
+                arcname="relational_report.html",
+            )
             for table in self.relational_data.list_all_tables():
                 # Add synthetic output table
                 synthetic_df = output_tables[table]
-                out_path = self._working_dir / f"synth_{table}.csv"
+                filename = f"synth_{table}.csv"
+                out_path = self._working_dir / filename
                 synthetic_df.to_csv(out_path, index=False)
-                tar.add(out_path)
+                tar.add(out_path, arcname=filename)
                 # Add individual and cross_table reports
                 for eval_type in ["individual", "cross_table"]:
                     for ext in ["html", "json"]:
                         filename = f"synthetics_{eval_type}_evaluation_{table}.{ext}"
                         try:
-                            tar.add(self._working_dir / filename)
+                            tar.add(self._working_dir / filename, arcname=filename)
                         except FileNotFoundError:
                             logger.warning(
                                 f"Could not find `{filename}` in working directory"
