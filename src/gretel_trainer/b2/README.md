@@ -14,6 +14,7 @@ A v2 rewrite of Benchmark.
 
 ## TODOs
 
+- Trainer model names seem inconsistent but I haven't identified the exact pattern yet. Can we clean it up?
 - Enforce (?) Custom Dataset names adhere to Gretel model name restrictions
 - CustomExecutor
 - GretelAuto (+ validation check only present when trainer=True)
