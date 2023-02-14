@@ -36,6 +36,8 @@ class GretelTrainerStrategy:
         self.train_time: Optional[float] = None
         self.generate_time: Optional[float] = None
 
+        self.working_dir.mkdir(exist_ok=True)
+
     def train(self) -> None:
         self.trainer = Trainer(
             project_name=f"{self.project_prefix}-{self.run_identifier}",
