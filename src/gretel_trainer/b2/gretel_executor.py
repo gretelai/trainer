@@ -107,9 +107,9 @@ class GretelExecutor:
         self.set_status(InProgress(stage="train"))
         try:
             self._strategy.train()
-        except:
+        except Exception as e:
             self.set_status(
-                Failed(during="train", train_secs=self._strategy.train_time)
+                Failed(during="train", error=e, train_secs=self._strategy.train_time)
             )
 
     def generate(self) -> None:
@@ -133,10 +133,11 @@ class GretelExecutor:
                 )
             )
             logger.info(f"Run `{self.run_identifier}` completed successfully")
-        except:
+        except Exception as e:
             self.set_status(
                 Failed(
                     during="generate",
+                    error=e,
                     train_secs=self._strategy.train_time,
                     generate_secs=self._strategy.generate_time,
                 )

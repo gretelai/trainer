@@ -44,7 +44,7 @@ class Completed:
 @dataclass
 class Failed:
     during: str
-    # error: Exception
+    error: Optional[Exception] = None
     train_secs: Optional[float] = None
     generate_secs: Optional[float] = None
     synthetic_data: Optional[pd.DataFrame] = field(default=None, repr=False)
