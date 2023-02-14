@@ -1,4 +1,5 @@
 from multiprocessing.managers import DictProxy
+from pathlib import Path
 from typing import Optional
 
 import pandas as pd
@@ -22,11 +23,13 @@ class GretelTrainerStrategy:
         dataset: Dataset,
         run_identifier: RunIdentifier,
         project_prefix: str,
+        working_dir: Path,
     ):
         self.benchmark_model = benchmark_model
         self.dataset = dataset
         self.run_identifier = run_identifier
         self.project_prefix = project_prefix
+        self.working_dir = working_dir
 
         self.trainer: Optional[Trainer] = None
         self.synthetic_data: Optional[pd.DataFrame] = None
@@ -35,14 +38,19 @@ class GretelTrainerStrategy:
 
     def train(self) -> None:
         self.trainer = Trainer(
-            project_name=f"{self.project_prefix}-{self.run_identifier[0]}-{self.run_identifier[1]}",
+            project_name=f"{self.project_prefix}-{self.run_identifier}",
             model_type=self.benchmark_model.trainer_model_type,
-            # cache_file=cache_file,
+            cache_file=self.working_dir / f"{self.run_identifier}.json",
         )
         train_time = Timer()
         try:
             with train_time:
-                self.trainer.train(self.dataset.data_source)
+                data_source = self.dataset.data_source
+                if isinstance(data_source, pd.DataFrame):
+                    csv_path = self.working_dir / f"{self.run_identifier}.csv"
+                    data_source.to_csv(csv_path, index=False)
+                    data_source = csv_path
+                self.trainer.train(data_source)
             self.train_time = train_time.duration()
         except Exception as e:
             raise BenchmarkException("Training failed") from e

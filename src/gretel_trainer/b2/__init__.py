@@ -1,4 +1,5 @@
 import logging
+from pathlib import Path
 from typing import List
 
 from gretel_trainer.b2.comparison import Comparison, ModelTypes
@@ -46,11 +47,13 @@ def compare(
     project_display_name: str = "benchmark",
     trainer: bool = False,
     refresh_interval: int = 15,
+    working_dir: str = "benchmark",
 ) -> Comparison:
     config = BenchmarkConfig(
         project_display_name=project_display_name,
         trainer=trainer,
         refresh_interval=refresh_interval,
+        working_dir=Path(working_dir),
     )
     comparison = Comparison(
         datasets=datasets,

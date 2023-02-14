@@ -53,7 +53,7 @@ class Comparison:
     def execute(self) -> Comparison:
         for dataset in self.datasets:
             for model in self.gretel_models:
-                run_identifier = (dataset.name, model().name)
+                run_identifier = RunIdentifier((dataset.name, model().name))
                 logger.info(f"Queueing run `{run_identifier}`")
                 executor = GretelExecutor(
                     benchmark_model=model(),

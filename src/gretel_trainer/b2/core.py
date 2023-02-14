@@ -1,6 +1,7 @@
 import time
 from dataclasses import dataclass
 from enum import Enum
+from pathlib import Path
 from typing import Tuple, Type, Union
 
 import gretel_client.projects.common as client_common
@@ -12,7 +13,11 @@ class BenchmarkException(Exception):
     pass
 
 
-RunIdentifier = Tuple[str, str]
+class RunIdentifier(Tuple[str, str]):
+    def __repr__(self) -> str:
+        return f"{self[0]}-{self[1]}"
+
+
 DataSourceTypes = client_common.DataSourceTypes
 
 
@@ -49,6 +54,7 @@ class BenchmarkConfig:
     project_display_name: str
     refresh_interval: int
     trainer: bool
+    working_dir: Path
 
 
 class Timer:

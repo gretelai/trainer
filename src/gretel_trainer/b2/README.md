@@ -14,10 +14,8 @@ A v2 rewrite of Benchmark.
 
 ## TODOs
 
-- Custom pd.DataFrame datasets need to be written to a CSV for GretelTrainerExecutor to work (trainer requires a file path, not a dataframe)
-- Custom CSV datasets need their names to be compatible with Gretel model name restrictions
+- Enforce (?) Custom Dataset names adhere to Gretel model name restrictions
 - CustomExecutor
-- Local working dir for Trainer runner json files (and also CSVs above)
 - GretelAuto (+ validation check only present when trainer=True)
 - GretelDGAN and GretelGPTX validations (check only present when trainer=False)
 - Port over the (auto) cleanup stuff?

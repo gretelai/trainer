@@ -45,6 +45,7 @@ def _set_strategy(
             dataset=dataset,
             run_identifier=run_identifier,
             project_prefix=config.project_display_name,
+            working_dir=config.working_dir,
         )
     else:
         return GretelSDKStrategy(
