@@ -154,7 +154,7 @@ class MultiTable:
         logger.info(
             f"Connected to existing project `{self._project.display_name}` with unique name `{self._project.name}`."
         )
-        self._working_dir = Path(backup.working_dir)
+        self._working_dir = _mkdir(backup.working_dir)
         self._artifact_collection = backup.artifact_collection
 
         # RelationalData
