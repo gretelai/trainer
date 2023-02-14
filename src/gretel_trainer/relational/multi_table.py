@@ -150,7 +150,7 @@ class MultiTable:
 
     def _complete_init_from_backup(self, backup: Backup) -> None:
         # Raises GretelProjectEror if not found
-        self._project = get_project(backup.project_name)
+        self._project = get_project(name=backup.project_name)
         logger.info(
             f"Connected to existing project `{self._project.display_name}` with unique name `{self._project.name}`."
         )
