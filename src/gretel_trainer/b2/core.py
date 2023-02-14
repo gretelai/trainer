@@ -55,6 +55,7 @@ class BenchmarkConfig:
     refresh_interval: int
     trainer: bool
     working_dir: Path
+    timestamp: str
 
 
 class Timer:

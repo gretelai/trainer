@@ -1,4 +1,5 @@
 import logging
+from datetime import datetime
 from pathlib import Path
 from typing import List
 
@@ -40,6 +41,10 @@ for name, level in log_levels.items():
     logger.setLevel(level)
 
 
+def _current_timestamp() -> str:
+    return datetime.now().strftime("%Y%m%d%H%M%S")
+
+
 def compare(
     *,
     datasets: List[Dataset],
@@ -54,6 +59,7 @@ def compare(
         trainer=trainer,
         refresh_interval=refresh_interval,
         working_dir=Path(working_dir),
+        timestamp=_current_timestamp(),
     )
     comparison = Comparison(
         datasets=datasets,
