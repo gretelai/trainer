@@ -87,41 +87,38 @@ def label_encode_keys(
     """
     for table_name, df in tables.items():
         primary_key = rel_data.get_primary_key(table_name)
-        if primary_key is not None:
-            # Get a set of the tables and columns in `tables` referencing this PK
-            fk_references: Set[Tuple[str, str]] = set()
-            for descendant in rel_data.get_descendants(table_name):
-                desc_table = tables.get(descendant)
-                if desc_table is None:
-                    continue
-                fks = rel_data.get_foreign_keys(descendant)
-                for fk in fks:
-                    if (
-                        fk.parent_table_name == table_name
-                        and fk.parent_column_name == primary_key
-                    ):
-                        fk_references.add((descendant, fk.column_name))
+        if primary_key is None:
+            continue
 
-            # Collect column values from PK and FK columns into a set
-            source_values = set()
+        # Get a set of the tables and columns in `tables` referencing this PK
+        fk_references: Set[Tuple[str, str]] = set()
+        for descendant in rel_data.get_descendants(table_name):
+            if tables.get(descendant) is None:
+                continue
+            fks = rel_data.get_foreign_keys(descendant)
+            for fk in fks:
+                if (
+                    fk.parent_table_name == table_name
+                    and fk.parent_column_name == primary_key
+                ):
+                    fk_references.add((descendant, fk.column_name))
 
-            for col_value in df[primary_key]:
-                source_values.add(col_value)
+        # Collect column values from PK and FK columns into a set
+        source_values = set()
+        source_values.update(df[primary_key].to_list())
+        for fk_ref in fk_references:
+            fk_tbl, fk_col = fk_ref
+            source_values.update(tables[fk_tbl][fk_col].to_list())
 
-            for fk_ref in fk_references:
-                fk_tbl, fk_col = fk_ref
-                for col_value in tables[fk_tbl][fk_col]:
-                    source_values.add(col_value)
+        # Fit a label encoder on all values
+        le = preprocessing.LabelEncoder()
+        le.fit(list(source_values))
 
-            # Fit a label encoder on all values
-            le = preprocessing.LabelEncoder()
-            le.fit(list(source_values))
+        # Update PK and FK columns using the label encoder
+        df[primary_key] = le.transform(df[primary_key])
 
-            # Update PK and FK columns using the label encoder
-            df[primary_key] = le.transform(df[primary_key])
-
-            for fk_ref in fk_references:
-                fk_tbl, fk_col = fk_ref
-                tables[fk_tbl][fk_col] = le.transform(tables[fk_tbl][fk_col])
+        for fk_ref in fk_references:
+            fk_tbl, fk_col = fk_ref
+            tables[fk_tbl][fk_col] = le.transform(tables[fk_tbl][fk_col])
 
     return tables
