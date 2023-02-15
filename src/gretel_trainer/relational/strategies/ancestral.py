@@ -53,43 +53,43 @@ class AncestralStrategy:
         for table_name in all_tables:
             tableset_with_altered_keys[table_name] = rel_data.get_table_data(table_name).copy()
 
-        # On each table, alter the PKs in the first two rows for the
-        # min/max seed range, plus alter all FK references to those records
+        # Translate all PKs to a contiguous list of integers
+        tableset_with_altered_keys = common.label_encode_keys(rel_data, tableset_with_altered_keys)
+
+        # On each table, add an artifical row with the max possible PK value
+        max_pk_values = {}
         for table_name, data in tableset_with_altered_keys.items():
             pk = rel_data.get_primary_key(table_name)
             if pk is None:
                 continue
 
-            orig_pk_min = data.loc[0][pk]
-            orig_pk_max = data.loc[1][pk]
+            max_pk_values[table_name] = len(data) * 50
 
-            new_pk_min = 0
-            new_pk_max = len(data) * 50
+            last_record_copy = tableset_with_altered_keys[table_name].tail(1).copy()
+            last_record_copy[pk] = max_pk_values[table_name]
+            tableset_with_altered_keys[table_name] = pd.concat([data, last_record_copy]).reset_index(drop=True)
 
-            # Mutate pk values on table
-            data.loc[0, [pk]] = [new_pk_min]
-            data.loc[1, [pk]] = [new_pk_max]
+        # On each table with foreign keys, add two more artificial rows containing the min and max FK values
+        for table_name, data in tableset_with_altered_keys.items():
+            foreign_keys = rel_data.get_foreign_keys(table_name)
+            if len(foreign_keys) == 0:
+                continue
 
-            # Update FKs to match
-            for other_table_name in all_tables:
-                if other_table_name == table_name:
-                    continue
-                fks = rel_data.get_foreign_keys(other_table_name)
-                for fk in fks:
-                    if (
-                        fk.parent_table_name == table_name
-                        and fk.parent_column_name == pk
-                    ):
-                        other_table_data = tableset_with_altered_keys[other_table_name]
-                        modified = other_table_data.replace(
-                            {
-                                fk.column_name: {
-                                    orig_pk_min: new_pk_min,
-                                    orig_pk_max: new_pk_max,
-                                }
-                            }
-                        )
-                        tableset_with_altered_keys[other_table_name] = modified
+            pk = rel_data.get_primary_key(table_name)
+
+            artificial_record = tableset_with_altered_keys[table_name].tail(1)
+            min_fk_record = artificial_record.copy()
+            max_fk_record = artificial_record.copy()
+
+            for foreign_key in foreign_keys:
+                min_fk_record[foreign_key.column_name] = 0
+                max_fk_record[foreign_key.column_name] = max_pk_values[foreign_key.parent_table_name]
+
+                if pk is not None:
+                    min_fk_record[pk] = max_pk_values[table_name] + 1
+                    max_fk_record[pk] = max_pk_values[table_name] + 2
+
+            tableset_with_altered_keys[table_name] = pd.concat([data, min_fk_record, max_fk_record]).reset_index(drop=True)
 
         # Next, collect all data in multigenerational format
         for table_name in all_tables:

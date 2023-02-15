@@ -32,6 +32,48 @@ def test_prepare_training_data_returns_multigenerational_data_without_keys_or_hi
     }
 
 
+def test_prepare_training_data_translates_alphanumeric_keys_and_adds_min_max_records(art):
+    strategy = AncestralStrategy()
+
+    training_data = strategy.prepare_training_data(art)
+    art.get_table_data("artists").to_csv("/Users/mike/Desktop/source_artists.csv")
+    art.get_table_data("paintings").to_csv("/Users/mike/Desktop/source_paintings.csv")
+    training_data["artists"].to_csv("/Users/mike/Desktop/train_artists.csv")
+    training_data["paintings"].to_csv("/Users/mike/Desktop/train_paintings.csv")
+
+    expected_train_artists = pd.DataFrame(
+        data={
+            "self|id": [0, 1, 2, 3, 200],
+            "self|name": [
+                "Wassily Kandinsky",
+                "Pablo Picasso",
+                "Vincent van Gogh",
+                "Leonardo da Vinci",
+                "Leonardo da Vinci", # artificial max
+            ],
+        }
+    )
+    pdtest.assert_frame_equal(training_data["artists"], expected_train_artists)
+
+    # Paintings, as a child table, should have 3 additional rows
+    # - artificial max PK
+    # - artificial min FKs
+    # - artificial max FKs
+    assert len(training_data["paintings"]) == len(art.get_table_data("paintings")) + 3
+
+    last_three = training_data["paintings"].tail(3)
+
+    # PKs are max, +1, +2
+    assert last_three["self|id"].to_list() == [350, 351, 352]
+    # FKs are original, min, max
+    assert last_three["self|artist_id"].to_list() == [2, 0, 200]
+    assert last_three["self.artist_id|id"].to_list() == [2, 0, 200]
+    # Other fields from self table are duplicated
+    assert last_three["self|name"].to_list() == ["Irises", "Irises", "Irises"]
+    # Other fields from parent tables pick up values via JOIN
+    assert last_three["self.artist_id|name"].to_list() == ["Vincent van Gogh", "Wassily Kandinsky", "Leonardo da Vinci"]
+
+
 def test_retraining_a_set_of_tables_forces_retraining_descendants_as_well(ecom):
     strategy = AncestralStrategy()
     assert set(strategy.tables_to_retrain(["users"], ecom)) == {
