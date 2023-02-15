@@ -51,10 +51,14 @@ class AncestralStrategy:
 
         # First, create a new table set identical to source data
         for table_name in all_tables:
-            tableset_with_altered_keys[table_name] = rel_data.get_table_data(table_name).copy()
+            tableset_with_altered_keys[table_name] = rel_data.get_table_data(
+                table_name
+            ).copy()
 
         # Translate all PKs to a contiguous list of integers
-        tableset_with_altered_keys = common.label_encode_keys(rel_data, tableset_with_altered_keys)
+        tableset_with_altered_keys = common.label_encode_keys(
+            rel_data, tableset_with_altered_keys
+        )
 
         # On each table, add an artifical row with the max possible PK value
         max_pk_values = {}
@@ -67,7 +71,9 @@ class AncestralStrategy:
 
             last_record_copy = tableset_with_altered_keys[table_name].sample().copy()
             last_record_copy[pk] = max_pk_values[table_name]
-            tableset_with_altered_keys[table_name] = pd.concat([data, last_record_copy]).reset_index(drop=True)
+            tableset_with_altered_keys[table_name] = pd.concat(
+                [data, last_record_copy]
+            ).reset_index(drop=True)
 
         # On each table with foreign keys, add two more artificial rows containing the min and max FK values
         for table_name, data in tableset_with_altered_keys.items():
@@ -83,13 +89,17 @@ class AncestralStrategy:
 
             for foreign_key in foreign_keys:
                 min_fk_record[foreign_key.column_name] = 0
-                max_fk_record[foreign_key.column_name] = max_pk_values[foreign_key.parent_table_name]
+                max_fk_record[foreign_key.column_name] = max_pk_values[
+                    foreign_key.parent_table_name
+                ]
 
             if pk is not None:
                 min_fk_record[pk] = max_pk_values[table_name] + 1
                 max_fk_record[pk] = max_pk_values[table_name] + 2
 
-            tableset_with_altered_keys[table_name] = pd.concat([data, min_fk_record, max_fk_record]).reset_index(drop=True)
+            tableset_with_altered_keys[table_name] = pd.concat(
+                [data, min_fk_record, max_fk_record]
+            ).reset_index(drop=True)
 
         # Next, collect all data in multigenerational format
         for table_name in all_tables:

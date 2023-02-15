@@ -33,7 +33,9 @@ def test_preparing_training_data_does_not_mutate_source_data(pets, art):
         strategy.prepare_training_data(rel_data)
 
         for table in rel_data.list_all_tables():
-            pdtest.assert_frame_equal(original_tables[table], rel_data.get_table_data(table))
+            pdtest.assert_frame_equal(
+                original_tables[table], rel_data.get_table_data(table)
+            )
 
 
 def test_retraining_a_set_of_tables_only_retrains_those_tables(ecom):
