@@ -65,7 +65,7 @@ class AncestralStrategy:
 
             max_pk_values[table_name] = len(data) * 50
 
-            last_record_copy = tableset_with_altered_keys[table_name].tail(1).copy()
+            last_record_copy = tableset_with_altered_keys[table_name].sample().copy()
             last_record_copy[pk] = max_pk_values[table_name]
             tableset_with_altered_keys[table_name] = pd.concat([data, last_record_copy]).reset_index(drop=True)
 
@@ -77,17 +77,17 @@ class AncestralStrategy:
 
             pk = rel_data.get_primary_key(table_name)
 
-            artificial_record = tableset_with_altered_keys[table_name].tail(1)
-            min_fk_record = artificial_record.copy()
-            max_fk_record = artificial_record.copy()
+            two_records = tableset_with_altered_keys[table_name].sample(2)
+            min_fk_record = two_records.head(1).copy()
+            max_fk_record = two_records.tail(1).copy()
 
             for foreign_key in foreign_keys:
                 min_fk_record[foreign_key.column_name] = 0
                 max_fk_record[foreign_key.column_name] = max_pk_values[foreign_key.parent_table_name]
 
-                if pk is not None:
-                    min_fk_record[pk] = max_pk_values[table_name] + 1
-                    max_fk_record[pk] = max_pk_values[table_name] + 2
+            if pk is not None:
+                min_fk_record[pk] = max_pk_values[table_name] + 1
+                max_fk_record[pk] = max_pk_values[table_name] + 2
 
             tableset_with_altered_keys[table_name] = pd.concat([data, min_fk_record, max_fk_record]).reset_index(drop=True)
 

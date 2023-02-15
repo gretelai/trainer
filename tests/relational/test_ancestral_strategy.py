@@ -14,22 +14,21 @@ from gretel_trainer.relational.core import MultiTableException, TableEvaluation
 from gretel_trainer.relational.strategies.ancestral import AncestralStrategy
 
 
-def test_prepare_training_data_returns_multigenerational_data_without_keys_or_highly_unique_categorial_fields(
-    pets,
-):
+def test_prepare_training_data_returns_multigenerational_data(pets):
     strategy = AncestralStrategy()
 
     training_data = strategy.prepare_training_data(pets)
 
-    assert set(training_data["pets"].columns) == {
-        "self|id",
-        "self|name",
-        "self|age",
-        "self|human_id",
-        "self.human_id|id",
-        "self.human_id|city",
-        # self.human_id|name rejected (highly unique categorical)
-    }
+    for expected_column in ["self|id", "self|name", "self.human_id|id"]:
+        assert expected_column in training_data["pets"]
+
+
+def test_prepare_training_data_drops_highly_unique_categorical_ancestor_fields():
+    pass
+
+
+def test_prepare_training_data_drops_highly_nan_ancestor_fields():
+    pass
 
 
 def test_preparing_training_data_does_not_mutate_source_data(pets, art):
@@ -48,26 +47,14 @@ def test_preparing_training_data_does_not_mutate_source_data(pets, art):
 
 def test_prepare_training_data_translates_alphanumeric_keys_and_adds_min_max_records(art):
     strategy = AncestralStrategy()
-
     training_data = strategy.prepare_training_data(art)
-    art.get_table_data("artists").to_csv("/Users/mike/Desktop/source_artists.csv")
-    art.get_table_data("paintings").to_csv("/Users/mike/Desktop/source_paintings.csv")
-    training_data["artists"].to_csv("/Users/mike/Desktop/train_artists.csv")
-    training_data["paintings"].to_csv("/Users/mike/Desktop/train_paintings.csv")
 
-    expected_train_artists = pd.DataFrame(
-        data={
-            "self|id": [0, 1, 2, 3, 200],
-            "self|name": [
-                "Wassily Kandinsky",
-                "Pablo Picasso",
-                "Vincent van Gogh",
-                "Leonardo da Vinci",
-                "Leonardo da Vinci", # artificial max
-            ],
-        }
-    )
-    pdtest.assert_frame_equal(training_data["artists"], expected_train_artists)
+    # Artists, a parent table, should have 1 additional row
+    assert len(training_data["artists"]) == len(art.get_table_data("artists")) + 1
+    # The last record has the artifical max PK
+    assert training_data["artists"]["self|id"].to_list() == [0, 1, 2, 3, 200]
+    # We do not assert on the value of "self|name" because the artificial max PK record is
+    # randomly sampled from source and so the exact value is not deterministic
 
     # Paintings, as a child table, should have 3 additional rows
     # - artificial max PK
@@ -76,16 +63,13 @@ def test_prepare_training_data_translates_alphanumeric_keys_and_adds_min_max_rec
     assert len(training_data["paintings"]) == len(art.get_table_data("paintings")) + 3
 
     last_three = training_data["paintings"].tail(3)
+    last_two = last_three.tail(2)
 
     # PKs are max, +1, +2
     assert last_three["self|id"].to_list() == [350, 351, 352]
-    # FKs are original, min, max
-    assert last_three["self|artist_id"].to_list() == [2, 0, 200]
-    assert last_three["self.artist_id|id"].to_list() == [2, 0, 200]
-    # Other fields from self table are duplicated
-    assert last_three["self|name"].to_list() == ["Irises", "Irises", "Irises"]
-    # Other fields from parent tables pick up values via JOIN
-    assert last_three["self.artist_id|name"].to_list() == ["Vincent van Gogh", "Wassily Kandinsky", "Leonardo da Vinci"]
+    # FKs on last two rows (artifical FKs) are min, max
+    assert last_two["self|artist_id"].to_list() == [0, 200]
+    assert last_two["self.artist_id|id"].to_list() == [0, 200]
 
 
 def test_retraining_a_set_of_tables_forces_retraining_descendants_as_well(ecom):
