@@ -110,13 +110,9 @@ class AncestralStrategy:
 
         # Finally, drop highly-unique categorical ancestor fields
         for table_name, data in training_data.items():
-            columns_to_drop = []
-
-            for column in data.columns:
-                if ancestry.is_ancestral_column(
-                    column
-                ) and _is_highly_unique_categorical(column, data):
-                    columns_to_drop.append(column)
+            columns_to_drop = [
+                col for col in data.columns if _drop_from_training(col, data)
+            ]
             training_data[table_name] = data.drop(columns=columns_to_drop)
 
         return training_data
@@ -349,6 +345,18 @@ class AncestralStrategy:
 
         evaluation.individual_sqs = report.peek().get("score")
         evaluation.individual_report_json = report.as_dict
+
+
+def _drop_from_training(col: str, df: pd.DataFrame) -> bool:
+    return ancestry.is_ancestral_column(col) and (
+        _is_highly_unique_categorical(col, df) or _is_highly_nan(col, df)
+    )
+
+
+def _is_highly_nan(col: str, df: pd.DataFrame) -> bool:
+    missing = df[col].isnull().sum()
+    missing_perc = missing / len(df)
+    return missing_perc > 0.2
 
 
 def _is_highly_unique_categorical(col: str, df: pd.DataFrame) -> bool:

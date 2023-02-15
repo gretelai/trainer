@@ -39,12 +39,76 @@ def test_prepare_training_data_returns_multigenerational_data(pets):
         assert expected_column in training_data["pets"]
 
 
-def test_prepare_training_data_drops_highly_unique_categorical_ancestor_fields():
-    pass
+def test_prepare_training_data_drops_highly_unique_categorical_ancestor_fields(art):
+    art.update_table_data(
+        table="artists",
+        data=pd.DataFrame(
+            data={
+                "id": [f"A{i}" for i in range(100)],
+                "name": [str(i) for i in range(100)],
+            }
+        ),
+    )
+    art.update_table_data(
+        table="paintings",
+        data=pd.DataFrame(
+            data={
+                "id": [f"P{i}" for i in range(100)],
+                "artist_id": [f"A{i}" for i in range(100)],
+                "name": [str(i) for i in range(100)],
+            }
+        ),
+    )
+
+    strategy = AncestralStrategy()
+    training_data = strategy.prepare_training_data(art)
+
+    # Does not contain `self.artist_id|name` because it is highly unique categorical
+    assert set(training_data["paintings"].columns) == {
+        "self|id",
+        "self|name",
+        "self|artist_id",
+        "self.artist_id|id",
+    }
 
 
-def test_prepare_training_data_drops_highly_nan_ancestor_fields():
-    pass
+def test_prepare_training_data_drops_highly_nan_ancestor_fields(art):
+    highly_nan_names = []
+    for i in range(100):
+        if i > 70:
+            highly_nan_names.append(None)
+        else:
+            highly_nan_names.append("some name")
+    art.update_table_data(
+        table="artists",
+        data=pd.DataFrame(
+            data={
+                "id": [f"A{i}" for i in range(100)],
+                "name": highly_nan_names,
+            }
+        ),
+    )
+    art.update_table_data(
+        table="paintings",
+        data=pd.DataFrame(
+            data={
+                "id": [f"P{i}" for i in range(100)],
+                "artist_id": [f"A{i}" for i in range(100)],
+                "name": [str(i) for i in range(100)],
+            }
+        ),
+    )
+
+    strategy = AncestralStrategy()
+    training_data = strategy.prepare_training_data(art)
+
+    # Does not contain `self.artist_id|name` because it is highly NaN
+    assert set(training_data["paintings"].columns) == {
+        "self|id",
+        "self|name",
+        "self|artist_id",
+        "self.artist_id|id",
+    }
 
 
 def test_prepare_training_data_translates_alphanumeric_keys_and_adds_min_max_records(
