@@ -14,6 +14,22 @@ from gretel_trainer.relational.core import MultiTableException, TableEvaluation
 from gretel_trainer.relational.strategies.ancestral import AncestralStrategy
 
 
+def test_preparing_training_data_does_not_mutate_source_data(pets, art):
+    for rel_data in [pets, art]:
+        original_tables = {
+            table: rel_data.get_table_data(table).copy()
+            for table in rel_data.list_all_tables()
+        }
+
+        strategy = AncestralStrategy()
+        strategy.prepare_training_data(rel_data)
+
+        for table in rel_data.list_all_tables():
+            pdtest.assert_frame_equal(
+                original_tables[table], rel_data.get_table_data(table)
+            )
+
+
 def test_prepare_training_data_returns_multigenerational_data(pets):
     strategy = AncestralStrategy()
 
@@ -29,22 +45,6 @@ def test_prepare_training_data_drops_highly_unique_categorical_ancestor_fields()
 
 def test_prepare_training_data_drops_highly_nan_ancestor_fields():
     pass
-
-
-def test_preparing_training_data_does_not_mutate_source_data(pets, art):
-    for rel_data in [pets, art]:
-        original_tables = {
-            table: rel_data.get_table_data(table).copy()
-            for table in rel_data.list_all_tables()
-        }
-
-        strategy = AncestralStrategy()
-        strategy.prepare_training_data(rel_data)
-
-        for table in rel_data.list_all_tables():
-            pdtest.assert_frame_equal(
-                original_tables[table], rel_data.get_table_data(table)
-            )
 
 
 def test_prepare_training_data_translates_alphanumeric_keys_and_adds_min_max_records(
