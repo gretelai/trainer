@@ -14,6 +14,22 @@ from gretel_trainer.relational.core import TableEvaluation
 from gretel_trainer.relational.strategies.independent import IndependentStrategy
 
 
+def test_preparing_training_data_does_not_mutate_source_data(pets, art):
+    for rel_data in [pets, art]:
+        original_tables = {
+            table: rel_data.get_table_data(table).copy()
+            for table in rel_data.list_all_tables()
+        }
+
+        strategy = IndependentStrategy()
+        strategy.prepare_training_data(rel_data)
+
+        for table in rel_data.list_all_tables():
+            pdtest.assert_frame_equal(
+                original_tables[table], rel_data.get_table_data(table)
+            )
+
+
 def test_prepare_training_data_removes_primary_and_foreign_keys(pets):
     strategy = IndependentStrategy()
 

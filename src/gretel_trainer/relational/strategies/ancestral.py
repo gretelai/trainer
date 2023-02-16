@@ -39,74 +39,39 @@ class AncestralStrategy:
         self, rel_data: RelationalData
     ) -> Dict[str, pd.DataFrame]:
         """
-        Returns tables with all ancestor fields added,
-        minus any highly-unique categorical fields from ancestors.
-        Primary keys are modified on two records to accommodate a
-        sufficiently wide range of synthetic values during seeding.
-        Corresponding foreign keys are also modified accordingly.
+        Returns tables with:
+        - all ancestor fields added
+        - columns in multigenerational format
+        - all keys translated to contiguous integers
+        - artificial min/max seed records added
+        - known-problematic fields removed
         """
         all_tables = rel_data.list_all_tables()
-        tableset_with_altered_keys = {}
+        altered_tableset = {}
         training_data = {}
 
-        # First, create a new table set identical to source data
+        # Create a new table set identical to source data
         for table_name in all_tables:
-            tableset_with_altered_keys[table_name] = rel_data.get_table_data(table_name)
+            altered_tableset[table_name] = rel_data.get_table_data(table_name).copy()
 
-        # On each table, alter the PKs in the first two rows for the
-        # min/max seed range, plus alter all FK references to those records
-        for table_name, data in tableset_with_altered_keys.items():
-            pk = rel_data.get_primary_key(table_name)
-            if pk is None:
-                continue
+        # Translate all keys to a contiguous list of integers
+        altered_tableset = common.label_encode_keys(rel_data, altered_tableset)
 
-            orig_pk_min = data.loc[0][pk]
-            orig_pk_max = data.loc[1][pk]
+        # Add artificial rows to support seeding
+        altered_tableset = _add_artifical_rows_for_seeding(rel_data, altered_tableset)
 
-            new_pk_min = 0
-            new_pk_max = len(data) * 50
-
-            # Mutate pk values on table
-            data.loc[0, [pk]] = [new_pk_min]
-            data.loc[1, [pk]] = [new_pk_max]
-
-            # Update FKs to match
-            for other_table_name in all_tables:
-                if other_table_name == table_name:
-                    continue
-                fks = rel_data.get_foreign_keys(other_table_name)
-                for fk in fks:
-                    if (
-                        fk.parent_table_name == table_name
-                        and fk.parent_column_name == pk
-                    ):
-                        other_table_data = tableset_with_altered_keys[other_table_name]
-                        modified = other_table_data.replace(
-                            {
-                                fk.column_name: {
-                                    orig_pk_min: new_pk_min,
-                                    orig_pk_max: new_pk_max,
-                                }
-                            }
-                        )
-                        tableset_with_altered_keys[other_table_name] = modified
-
-        # Next, collect all data in multigenerational format
+        # Collect all data in multigenerational format
         for table_name in all_tables:
             data = ancestry.get_table_data_with_ancestors(
-                rel_data, table_name, tableset_with_altered_keys
+                rel_data, table_name, altered_tableset
             )
             training_data[table_name] = data
 
-        # Finally, drop highly-unique categorical ancestor fields
+        # Drop some columns known to be problematic
         for table_name, data in training_data.items():
-            columns_to_drop = []
-
-            for column in data.columns:
-                if ancestry.is_ancestral_column(
-                    column
-                ) and _is_highly_unique_categorical(column, data):
-                    columns_to_drop.append(column)
+            columns_to_drop = [
+                col for col in data.columns if _drop_from_training(col, data)
+            ]
             training_data[table_name] = data.drop(columns=columns_to_drop)
 
         return training_data
@@ -339,6 +304,63 @@ class AncestralStrategy:
 
         evaluation.individual_sqs = report.peek().get("score")
         evaluation.individual_report_json = report.as_dict
+
+
+def _add_artifical_rows_for_seeding(
+    rel_data: RelationalData, tables: Dict[str, pd.DataFrame]
+) -> Dict[str, pd.DataFrame]:
+    # On each table, add an artifical row with the max possible PK value
+    max_pk_values = {}
+    for table_name, data in tables.items():
+        pk = rel_data.get_primary_key(table_name)
+        if pk is None:
+            continue
+
+        max_pk_values[table_name] = len(data) * 50
+
+        random_record = tables[table_name].sample().copy()
+        random_record[pk] = max_pk_values[table_name]
+        tables[table_name] = pd.concat([data, random_record]).reset_index(drop=True)
+
+    # On each table with foreign keys, add two more artificial rows containing the min and max FK values
+    for table_name, data in tables.items():
+        foreign_keys = rel_data.get_foreign_keys(table_name)
+        if len(foreign_keys) == 0:
+            continue
+
+        pk = rel_data.get_primary_key(table_name)
+
+        two_records = tables[table_name].sample(2)
+        min_fk_record = two_records.head(1).copy()
+        max_fk_record = two_records.tail(1).copy()
+
+        for foreign_key in foreign_keys:
+            min_fk_record[foreign_key.column_name] = 0
+            max_fk_record[foreign_key.column_name] = max_pk_values[
+                foreign_key.parent_table_name
+            ]
+
+        if pk is not None:
+            min_fk_record[pk] = max_pk_values[table_name] + 1
+            max_fk_record[pk] = max_pk_values[table_name] + 2
+
+        tables[table_name] = pd.concat(
+            [data, min_fk_record, max_fk_record]
+        ).reset_index(drop=True)
+
+    return tables
+
+
+def _drop_from_training(col: str, df: pd.DataFrame) -> bool:
+    return ancestry.is_ancestral_column(col) and (
+        _is_highly_unique_categorical(col, df) or _is_highly_nan(col, df)
+    )
+
+
+def _is_highly_nan(col: str, df: pd.DataFrame) -> bool:
+    missing = df[col].isnull().sum()
+    missing_perc = missing / len(df)
+    return missing_perc > 0.2
 
 
 def _is_highly_unique_categorical(col: str, df: pd.DataFrame) -> bool:

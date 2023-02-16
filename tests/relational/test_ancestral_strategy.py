@@ -14,22 +14,130 @@ from gretel_trainer.relational.core import MultiTableException, TableEvaluation
 from gretel_trainer.relational.strategies.ancestral import AncestralStrategy
 
 
-def test_prepare_training_data_returns_multigenerational_data_without_keys_or_highly_unique_categorial_fields(
-    pets,
-):
+def test_preparing_training_data_does_not_mutate_source_data(pets, art):
+    for rel_data in [pets, art]:
+        original_tables = {
+            table: rel_data.get_table_data(table).copy()
+            for table in rel_data.list_all_tables()
+        }
+
+        strategy = AncestralStrategy()
+        strategy.prepare_training_data(rel_data)
+
+        for table in rel_data.list_all_tables():
+            pdtest.assert_frame_equal(
+                original_tables[table], rel_data.get_table_data(table)
+            )
+
+
+def test_prepare_training_data_returns_multigenerational_data(pets):
     strategy = AncestralStrategy()
 
     training_data = strategy.prepare_training_data(pets)
 
-    assert set(training_data["pets"].columns) == {
+    for expected_column in ["self|id", "self|name", "self.human_id|id"]:
+        assert expected_column in training_data["pets"]
+
+
+def test_prepare_training_data_drops_highly_unique_categorical_ancestor_fields(art):
+    art.update_table_data(
+        table="artists",
+        data=pd.DataFrame(
+            data={
+                "id": [f"A{i}" for i in range(100)],
+                "name": [str(i) for i in range(100)],
+            }
+        ),
+    )
+    art.update_table_data(
+        table="paintings",
+        data=pd.DataFrame(
+            data={
+                "id": [f"P{i}" for i in range(100)],
+                "artist_id": [f"A{i}" for i in range(100)],
+                "name": [str(i) for i in range(100)],
+            }
+        ),
+    )
+
+    strategy = AncestralStrategy()
+    training_data = strategy.prepare_training_data(art)
+
+    # Does not contain `self.artist_id|name` because it is highly unique categorical
+    assert set(training_data["paintings"].columns) == {
         "self|id",
         "self|name",
-        "self|age",
-        "self|human_id",
-        "self.human_id|id",
-        "self.human_id|city",
-        # self.human_id|name rejected (highly unique categorical)
+        "self|artist_id",
+        "self.artist_id|id",
     }
+
+
+def test_prepare_training_data_drops_highly_nan_ancestor_fields(art):
+    highly_nan_names = []
+    for i in range(100):
+        if i > 70:
+            highly_nan_names.append(None)
+        else:
+            highly_nan_names.append("some name")
+    art.update_table_data(
+        table="artists",
+        data=pd.DataFrame(
+            data={
+                "id": [f"A{i}" for i in range(100)],
+                "name": highly_nan_names,
+            }
+        ),
+    )
+    art.update_table_data(
+        table="paintings",
+        data=pd.DataFrame(
+            data={
+                "id": [f"P{i}" for i in range(100)],
+                "artist_id": [f"A{i}" for i in range(100)],
+                "name": [str(i) for i in range(100)],
+            }
+        ),
+    )
+
+    strategy = AncestralStrategy()
+    training_data = strategy.prepare_training_data(art)
+
+    # Does not contain `self.artist_id|name` because it is highly NaN
+    assert set(training_data["paintings"].columns) == {
+        "self|id",
+        "self|name",
+        "self|artist_id",
+        "self.artist_id|id",
+    }
+
+
+def test_prepare_training_data_translates_alphanumeric_keys_and_adds_min_max_records(
+    art,
+):
+    strategy = AncestralStrategy()
+    training_data = strategy.prepare_training_data(art)
+
+    # Artists, a parent table, should have 1 additional row
+    assert len(training_data["artists"]) == len(art.get_table_data("artists")) + 1
+    # The last record has the artifical max PK
+    assert training_data["artists"]["self|id"].to_list() == [0, 1, 2, 3, 200]
+    # We do not assert on the value of "self|name" because the artificial max PK record is
+    # randomly sampled from source and so the exact value is not deterministic
+
+    # Paintings, as a child table, should have 3 additional rows
+    # - artificial max PK
+    # - artificial min FKs
+    # - artificial max FKs
+    assert len(training_data["paintings"]) == len(art.get_table_data("paintings")) + 3
+
+    last_three = training_data["paintings"].tail(3)
+    last_two = last_three.tail(2)
+
+    # PKs are max, +1, +2
+    assert last_three["self|id"].to_list() == [350, 351, 352]
+    # FKs on last two rows (artifical FKs) are min, max
+    assert last_two["self|artist_id"].to_list() == [0, 200]
+    assert last_two["self.artist_id|id"].to_list() == [0, 200]
 
 
 def test_retraining_a_set_of_tables_forces_retraining_descendants_as_well(ecom):
