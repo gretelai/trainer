@@ -490,6 +490,7 @@ def test_restore_generate_completed(project, pets):
             pets,
             working_dir,
             synthetics_models=synthetics_models,
+            synthetics_record_handlers=synthetics_record_handlers,
             output_archive_present=True,
         )
 
@@ -514,12 +515,12 @@ def test_restore_generate_completed(project, pets):
         assert os.path.exists(
             working_dir / "run-id" / "synthetics_cross_table_evaluation_pets.html"
         )
-        assert mt._synthetics_run is None
-        assert len(mt.synthetic_output_tables) == 0
-        assert mt.evaluations["humans"].individual_sqs == 94
-        assert mt.evaluations["humans"].cross_table_sqs is None
-        assert mt.evaluations["pets"].individual_sqs == 94
-        assert mt.evaluations["pets"].cross_table_sqs is None
+        assert mt._synthetics_run is not None
+        assert len(mt.synthetic_output_tables) == 2
+        assert mt.evaluations["humans"].individual_sqs == 90
+        assert mt.evaluations["humans"].cross_table_sqs is 91
+        assert mt.evaluations["pets"].individual_sqs == 90
+        assert mt.evaluations["pets"].cross_table_sqs == 91
 
 
 def test_restore_generate_in_progress(project, pets):

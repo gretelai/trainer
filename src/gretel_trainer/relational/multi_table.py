@@ -270,12 +270,14 @@ class MultiTable:
             with tarfile.open(synthetics_output_archive_path, "r:gz") as tar:
                 tar.extractall(path=self._working_dir)
 
-        ## Then, restore in-progress run data if present
+        ## Then, restore latest, potentially in-progress run data if present
         backup_generate = backup.generate
         if backup_generate is None:
             if any_outputs:
-                msg = "No in-progress generation data found in backup. Review previous runs' outputs (see CSVs and reports in the local directory), or start a new one by calling `generate`."
+                # We shouldn't ever encounter this branch in the wild, but we define some guidance to log just in case.
+                msg = "Backup included synthetics outputs archive but no detailed run history. Review previous runs' outputs (see CSVs and reports in the local directory), or start a new one by calling `generate`."
             else:
+                # This branch is definitely possible / more likely.
                 msg = "No generation jobs had been started in previous instance. From here, your next step is to call `generate`."
             logger.info(msg)
             return None
@@ -292,20 +294,40 @@ class MultiTable:
             lost_contact=backup_generate.lost_contact,
             record_handlers=record_handlers,
         )
-        for table, rh in record_handlers.items():
-            data_source = rh.data_source
-            if data_source is not None:
-                download_file_artifact(
-                    self._project,
-                    data_source,
-                    self._working_dir
-                    / backup_generate.identifier
-                    / f"synthetics_seed_{table}.csv",
-                )
-        logger.info(
-            f"At time of last backup, a generation run was in progress. From here, you can attempt to resume that generate job via `generate(resume=True)`, or restart generation from scratch via a regular call to `generate`."
-        )
-        return None
+
+        latest_run_id = self._synthetics_run.identifier
+        if latest_run_id in os.listdir(self._working_dir):
+            # Latest backup was taken at a stable point (nothing actively in progress).
+            logger.info(
+                f"Found artifacts for latest run ID `{latest_run_id}` in outputs archive."
+            )
+            for table in self.relational_data.list_all_tables():
+                try:
+                    self.synthetic_output_tables[table] = pd.read_csv(
+                        self._working_dir / latest_run_id / f"synth_{table}.csv"
+                    )
+                    self._attach_existing_reports(latest_run_id, table)
+                except FileNotFoundError:
+                    logger.info(
+                        f"Could not find data for table `{table}` in run outputs."
+                    )
+            return None
+        else:
+            # Latest run was still in progress. Download any seeds we may have previously created.
+            for table, rh in record_handlers.items():
+                data_source = rh.data_source
+                if data_source is not None:
+                    download_file_artifact(
+                        self._project,
+                        data_source,
+                        self._working_dir
+                        / backup_generate.identifier
+                        / f"synthetics_seed_{table}.csv",
+                    )
+            logger.info(
+                f"At time of last backup, generation run `{latest_run_id}` was still in progress. From here, you can attempt to resume that generate job via `generate(resume=True)`, or restart generation from scratch via a regular call to `generate`."
+            )
+            return None
 
     @classmethod
     def restore(cls, backup_file: str) -> MultiTable:
@@ -905,7 +927,6 @@ class MultiTable:
             self._project, str(archive_path)
         )
         self.synthetic_output_tables = output_tables
-        self._synthetics_run = None
         self._backup()
 
     def create_relational_report(self, target_dir: Path) -> None:
@@ -934,12 +955,16 @@ class MultiTable:
                     missing_model.add(table)
         return list(missing_model)
 
-    def _attach_existing_reports(self, table: str) -> None:
+    def _attach_existing_reports(self, run_id: str, table: str) -> None:
         individual_path = (
-            self._working_dir / f"synthetics_individual_evaluation_{table}.json"
+            self._working_dir
+            / run_id
+            / f"synthetics_individual_evaluation_{table}.json"
         )
         cross_table_path = (
-            self._working_dir / f"synthetics_cross_table_evaluation_{table}.json"
+            self._working_dir
+            / run_id
+            / f"synthetics_cross_table_evaluation_{table}.json"
         )
 
         individual_report_json = json.loads(smart_open.open(individual_path).read())
