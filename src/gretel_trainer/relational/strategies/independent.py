@@ -101,7 +101,7 @@ class IndependentStrategy:
         rel_data: RelationalData,
         record_size_ratio: float,
         output_tables: Dict[str, pd.DataFrame],
-        working_dir: Path,
+        target_dir: Path,
         training_columns: List[str],
     ) -> Dict[str, Any]:
         """

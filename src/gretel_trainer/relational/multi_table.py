@@ -801,6 +801,8 @@ class MultiTable:
                 lost_contact=[],
             )
 
+        run_dir = _mkdir(str(self._working_dir / self._synthetics_run.identifier))
+
         for table in self._synthetics_run.preserved:
             output_tables[table] = self._strategy.get_preserved_data(
                 table, self.relational_data
@@ -882,7 +884,7 @@ class MultiTable:
                     self.relational_data,
                     self._synthetics_run.record_size_ratio,
                     output_tables,
-                    self._working_dir,
+                    run_dir,
                     self._training_columns[table_name],
                 )
                 self._log_start(table_name, "synthetic data generation")
@@ -897,24 +899,23 @@ class MultiTable:
             output_tables, self._synthetics_run.preserved, self.relational_data
         )
 
-        run_dir = _mkdir(str(self._working_dir / self._synthetics_run.identifier))
+        for table, data in output_tables.items():
+            if data is not None:
+                # Get "opposite" evaluation metrics
+                self._strategy.update_evaluation_via_evaluate(
+                    evaluation=self.evaluations[table],
+                    table=table,
+                    rel_data=self.relational_data,
+                    synthetic_tables=output_tables,
+                    target_dir=run_dir,
+                )
 
-        for table in output_tables:
-            # Get "opposite" evaluation metrics
-            self._strategy.update_evaluation_via_evaluate(
-                evaluation=self.evaluations[table],
-                table=table,
-                rel_data=self.relational_data,
-                synthetic_tables=output_tables,
-                target_dir=run_dir,
-            )
-
-            # Copy all evaluation data (model-based and evaluate-based) to run_dir
-            for eval_type in ["individual", "cross_table"]:
-                for ext in ["html", "json"]:
-                    filename = f"synthetics_{eval_type}_evaluation_{table}.{ext}"
-                    with suppress(FileNotFoundError):
-                        shutil.copyfile(filename, f"{run_dir}/{filename}")
+                # Copy all evaluation data (model-based and evaluate-based) to run_dir
+                for eval_type in ["individual", "cross_table"]:
+                    for ext in ["html", "json"]:
+                        filename = f"synthetics_{eval_type}_evaluation_{table}.{ext}"
+                        with suppress(FileNotFoundError):
+                            shutil.copyfile(filename, f"{run_dir}/{filename}")
 
         logger.info("Creating relational report")
         self.create_relational_report(run_dir)
