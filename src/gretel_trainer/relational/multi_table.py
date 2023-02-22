@@ -758,7 +758,7 @@ class MultiTable:
         Args:
             record_size_ratio (float, optional): Ratio to upsample real world data size with. Defaults to 1.
             preserve_tables (list[str], optional): List of tables to skip sampling and leave (mostly) identical to source.
-            identifier (str, optional): Unique string identifying a specific call to this method. Defaults to current timestamp.
+            identifier (str, optional): Unique string identifying a specific call to this method. Defaults to "synthetics_" + current timestamp.
             resume (bool, optional): Set to True when restoring from a backup to complete a previous, interrupted run.
 
         Returns:
@@ -789,7 +789,7 @@ class MultiTable:
                 preserve_tables, self.relational_data
             )
 
-            identifier = identifier or _timestamp()
+            identifier = identifier or f"synthetics_{_timestamp()}"
             missing_model = self._list_tables_with_missing_models()
 
             self._synthetics_run = SyntheticsRun(
