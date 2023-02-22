@@ -53,4 +53,4 @@ def create_report(multitable: MultiTable) -> None:
     logger.info(
         "The `create_report` function is deprecated and will be removed in a future release. Instead call the `MultiTable#create_relational_report` instance method."
     )
-    multitable.create_relational_report()
+    multitable.create_relational_report(multitable._working_dir)

@@ -5,7 +5,6 @@ from gretel_trainer.relational.backup import (
     Backup,
     BackupForeignKey,
     BackupGenerate,
-    BackupGenerateTable,
     BackupRelationalData,
     BackupRelationalDataTable,
     BackupTrain,
@@ -65,15 +64,14 @@ def test_backup():
         }
     )
     backup_generate = BackupGenerate(
+        identifier="run-id",
         preserved=[],
         record_size_ratio=1.0,
-        tables={
-            "customer": BackupGenerateTable(
-                record_handler_id="555444666",
-            ),
-            "address": BackupGenerateTable(
-                record_handler_id="333111222",
-            ),
+        lost_contact=[],
+        missing_model=[],
+        record_handler_ids={
+            "customer": "555444666",
+            "address": "333111222",
         },
     )
     artifact_collection = ArtifactCollection(

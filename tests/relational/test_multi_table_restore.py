@@ -12,7 +12,7 @@ import pytest
 import gretel_trainer.relational.backup as b
 from gretel_trainer.relational.artifacts import ArtifactCollection
 from gretel_trainer.relational.core import MultiTableException, RelationalData
-from gretel_trainer.relational.multi_table import MultiTable, TrainStatus
+from gretel_trainer.relational.multi_table import MultiTable, SyntheticsRun, TrainStatus
 
 DEBUG_SUMMARY_CONTENT = {"debug": "summary"}
 
@@ -75,10 +75,13 @@ def make_backup(
         )
     if len(synthetics_record_handlers) > 0:
         backup.generate = b.BackupGenerate(
+            identifier="run-id",
             preserved=[],
             record_size_ratio=1.0,
-            tables={
-                table: b.BackupGenerateTable(record_handler_id=mock.record_handler_id)
+            lost_contact=[],
+            missing_model=[],
+            record_handler_ids={
+                table: mock.record_id
                 for table, mock in synthetics_record_handlers.items()
             },
         )
@@ -172,7 +175,7 @@ def make_mock_model(
 def make_mock_record_handler(name: str, status: str) -> Mock:
     record_handler = Mock()
     record_handler.status = status
-    record_handler.record_handler_id = name
+    record_handler.record_id = name
     record_handler.data_source = None
     return record_handler
 
@@ -208,13 +211,13 @@ def create_standin_project_artifacts(
         for table in rel_data.list_all_tables():
             table_path = setup_path / f"synth_{table}.csv"
             rel_data.get_table_data(table).to_csv(table_path, index=False)
-            tar.add(table_path, arcname=f"synth_{table}.csv")
+            tar.add(table_path, arcname=f"run-id/synth_{table}.csv")
             for kind, score in [("individual", 90), ("cross_table", 91)]:
                 html_filename = f"synthetics_{kind}_evaluation_{table}.html"
                 html_path = setup_path / html_filename
                 with open(html_path, "w") as f:
                     f.write("<html></html>")
-                tar.add(html_path, arcname=html_filename)
+                tar.add(html_path, arcname=f"run-id/{html_filename}")
                 json_filename = f"synthetics_{kind}_evaluation_{table}.json"
                 json_path = setup_path / json_filename
                 with open(json_path, "w") as f:
@@ -229,7 +232,7 @@ def create_standin_project_artifacts(
                         },
                         f,
                     )
-                tar.add(json_path, arcname=json_filename)
+                tar.add(json_path, arcname=f"run-id/{json_filename}")
 
 
 # For non-archive files, we patch Project#get_artifact_link to return paths to files
@@ -487,38 +490,36 @@ def test_restore_generate_completed(project, pets):
             pets,
             working_dir,
             synthetics_models=synthetics_models,
-            synthetics_record_handlers=synthetics_record_handlers,
             output_archive_present=True,
         )
 
         mt = MultiTable.restore(backup_file)
 
         # Backup + Debug summary + Source archive + (2) Source CSVs
-        # + (2) Train CSVs + (8) Reports + Outputs archive + 2 Synth CSVs
-        assert len(os.listdir(working_dir)) == 18
+        # + (2) Train CSVs + (4) Reports + Outputs archive + Previous run subdirectory
+        assert len(os.listdir(working_dir)) == 13
 
         # Generate state is restored
-        assert os.path.exists(working_dir / "synth_humans.csv")
+        assert os.path.exists(working_dir / "run-id" / "synth_humans.csv")
         assert os.path.exists(
-            working_dir / "synthetics_cross_table_evaluation_humans.json"
+            working_dir / "run-id" / "synthetics_cross_table_evaluation_humans.json"
         )
         assert os.path.exists(
-            working_dir / "synthetics_cross_table_evaluation_humans.html"
+            working_dir / "run-id" / "synthetics_cross_table_evaluation_humans.html"
         )
-        assert os.path.exists(working_dir / "synth_pets.csv")
+        assert os.path.exists(working_dir / "run-id" / "synth_pets.csv")
         assert os.path.exists(
-            working_dir / "synthetics_cross_table_evaluation_pets.json"
+            working_dir / "run-id" / "synthetics_cross_table_evaluation_pets.json"
         )
         assert os.path.exists(
-            working_dir / "synthetics_cross_table_evaluation_pets.html"
+            working_dir / "run-id" / "synthetics_cross_table_evaluation_pets.html"
         )
-        assert set(mt.synthetics_generate_statuses.values()) == {TrainStatus.Completed}
-        assert len(mt._synthetics_record_handlers) == 2
-        assert len(mt.synthetic_output_tables) == 2
-        assert mt.evaluations["humans"].individual_sqs == 90
-        assert mt.evaluations["humans"].cross_table_sqs == 91
-        assert mt.evaluations["pets"].individual_sqs == 90
-        assert mt.evaluations["pets"].cross_table_sqs == 91
+        assert mt._synthetics_run is None
+        assert len(mt.synthetic_output_tables) == 0
+        assert mt.evaluations["humans"].individual_sqs == 94
+        assert mt.evaluations["humans"].cross_table_sqs is None
+        assert mt.evaluations["pets"].individual_sqs == 94
+        assert mt.evaluations["pets"].cross_table_sqs is None
 
 
 def test_restore_generate_in_progress(project, pets):
@@ -569,8 +570,14 @@ def test_restore_generate_in_progress(project, pets):
         assert len(os.listdir(working_dir)) == 11
 
         # Generate state is partially restored
-        assert set(mt.synthetics_generate_statuses.values()) == {TrainStatus.Completed}
-        assert len(mt._synthetics_record_handlers) == 2
+        assert mt._synthetics_run == SyntheticsRun(
+            identifier="run-id",
+            preserved=[],
+            record_size_ratio=1.0,
+            lost_contact=[],
+            missing_model=[],
+            record_handlers=synthetics_record_handlers,
+        )
         assert len(mt.synthetic_output_tables) == 0
         assert mt.evaluations["humans"].individual_sqs == 94
         assert mt.evaluations["humans"].cross_table_sqs is None

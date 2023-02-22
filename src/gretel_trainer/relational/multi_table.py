@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import datetime
 import json
 import logging
 import os
@@ -9,7 +8,9 @@ import tarfile
 import time
 from collections import defaultdict
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from contextlib import suppress
 from dataclasses import dataclass, replace
+from datetime import datetime
 from enum import Enum
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple, Union
@@ -28,7 +29,6 @@ from gretel_trainer.relational.backup import (
     Backup,
     BackupForeignKey,
     BackupGenerate,
-    BackupGenerateTable,
     BackupRelationalData,
     BackupRelationalDataTable,
     BackupTrain,
@@ -71,6 +71,16 @@ class GenerateStatus(str, Enum):
     ModelUnavailable = "ModelUnavailable"
     SourcePreserved = "SourcePreserved"
     Failed = "Failed"
+
+
+@dataclass
+class SyntheticsRun:
+    identifier: str
+    record_size_ratio: float
+    preserved: List[str]
+    record_handlers: Dict[str, RecordHandler]
+    lost_contact: List[str]
+    missing_model: List[str]
 
 
 class MultiTable:
@@ -122,12 +132,10 @@ class MultiTable:
         self._transforms_models: Dict[str, Model] = {}
         self.transforms_train_statuses: Dict[str, TrainStatus] = {}
         self.transforms_output_tables: Dict[str, pd.DataFrame] = {}
-        self._synthetics_models: Dict[str, Model] = {}
-        self._synthetics_record_handlers: Dict[str, RecordHandler] = {}
-        self._record_size_ratio = 1.0
         self.synthetics_train_statuses: Dict[str, TrainStatus] = {}
+        self._synthetics_models: Dict[str, Model] = {}
+        self._synthetics_run: Optional[SyntheticsRun] = None
         self._training_columns: Dict[str, List[str]] = {}
-        self.synthetics_generate_statuses: Dict[str, GenerateStatus] = {}
         self.synthetic_output_tables: Dict[str, pd.DataFrame] = {}
         self.evaluations = defaultdict(lambda: TableEvaluation())
 
@@ -244,52 +252,60 @@ class MultiTable:
             logger.info("Restored synthetics models")
 
         # Synthetics Generate
+        ## First, download the outputs archive if present and extract the data.
+        synthetics_outputs_archive_id = (
+            self._artifact_collection.synthetics_outputs_archive
+        )
+        any_outputs = False
+        if synthetics_outputs_archive_id is not None:
+            any_outputs = True
+            synthetics_output_archive_path = (
+                self._working_dir / "synthetics_outputs.tar.gz"
+            )
+            download_tar_artifact(
+                self._project,
+                synthetics_outputs_archive_id,
+                synthetics_output_archive_path,
+            )
+            with tarfile.open(synthetics_output_archive_path, "r:gz") as tar:
+                tar.extractall(path=self._working_dir)
+
+        ## Then, restore in-progress run data if present
         backup_generate = backup.generate
         if backup_generate is None:
-            logger.info(
-                "No generation data present in backup. From here, your next step is to call `generate`."
-            )
+            if any_outputs:
+                msg = "No in-progress generation data found in backup. Review previous runs' outputs (see CSVs and reports in the local directory), or start a new one by calling `generate`."
+            else:
+                msg = "No generation jobs had been started in previous instance. From here, your next step is to call `generate`."
+            logger.info(msg)
             return None
 
-        self._record_size_ratio = backup_generate.record_size_ratio
-        for table in backup_generate.preserved:
-            self.synthetics_generate_statuses[table] = GenerateStatus.SourcePreserved
-        for table, table_generate_backup in backup_generate.tables.items():
-            record_handler = self._synthetics_models[table].get_record_handler(
-                table_generate_backup.record_handler_id
-            )
-            status = _generate_status_for_record_handler(record_handler)
-            self._synthetics_record_handlers[table] = record_handler
-            self.synthetics_generate_statuses[table] = status
-            data_source = record_handler.data_source
+        record_handlers = {
+            table: self._synthetics_models[table].get_record_handler(rh_id)
+            for table, rh_id in backup_generate.record_handler_ids.items()
+        }
+        self._synthetics_run = SyntheticsRun(
+            identifier=backup_generate.identifier,
+            record_size_ratio=backup_generate.record_size_ratio,
+            preserved=backup_generate.preserved,
+            missing_model=backup_generate.missing_model,
+            lost_contact=backup_generate.lost_contact,
+            record_handlers=record_handlers,
+        )
+        for table, rh in record_handlers.items():
+            data_source = rh.data_source
             if data_source is not None:
                 download_file_artifact(
                     self._project,
                     data_source,
-                    self._working_dir / f"synthetics_seed_{table}.csv",
+                    self._working_dir
+                    / backup_generate.identifier
+                    / f"synthetics_seed_{table}.csv",
                 )
-
-        synthetics_outputs_archive_id = (
-            self._artifact_collection.synthetics_outputs_archive
-        )
-        if synthetics_outputs_archive_id is None:
-            logger.info(
-                f"At time of last backup, generation had not yet finished. From here, you can attempt to resume that job via `generate(resume=True)`, or restart generation from scratch via a regular call to `generate`."
-            )
-            return None
-        synthetics_output_archive_path = self._working_dir / "synthetics_outputs.tar.gz"
-        download_tar_artifact(
-            self._project, synthetics_outputs_archive_id, synthetics_output_archive_path
-        )
-        with tarfile.open(synthetics_output_archive_path, "r:gz") as tar:
-            tar.extractall(path=self._working_dir)
-        for table in backup_generate.tables:
-            synth_path = self._working_dir / f"synth_{table}.csv"
-            self.synthetic_output_tables[table] = pd.read_csv(str(synth_path))
-            self._attach_existing_reports(table)
         logger.info(
-            "Generation jobs for all tables from previous run finished prior to backup. From here, you can access your synthetic data as Pandas DataFrames via `synthetic_output_tables`, or review them in CSV format along with the relational report in the local working directory."
+            f"At time of last backup, a generation run was in progress. From here, you can attempt to resume that generate job via `generate(resume=True)`, or restart generation from scratch via a regular call to `generate`."
         )
+        return None
 
     @classmethod
     def restore(cls, backup_file: str) -> MultiTable:
@@ -354,22 +370,17 @@ class MultiTable:
             backup.train = BackupTrain(tables=backup_train_tables)
 
         # Generate
-        if len(self._synthetics_record_handlers) > 0:
-            backup_generate_tables = {
-                table: BackupGenerateTable(
-                    record_handler_id=rh.record_id,
-                )
-                for table, rh in self._synthetics_record_handlers.items()
-            }
-            preserved = [
-                table
-                for table, status in self.synthetics_generate_statuses.items()
-                if status == GenerateStatus.SourcePreserved
-            ]
+        if self._synthetics_run is not None:
             backup.generate = BackupGenerate(
-                tables=backup_generate_tables,
-                preserved=preserved,
-                record_size_ratio=self._record_size_ratio,
+                identifier=self._synthetics_run.identifier,
+                record_size_ratio=self._synthetics_run.record_size_ratio,
+                preserved=self._synthetics_run.preserved,
+                missing_model=self._synthetics_run.missing_model,
+                lost_contact=self._synthetics_run.lost_contact,
+                record_handler_ids={
+                    table: rh.record_id
+                    for table, rh in self._synthetics_run.record_handlers.items()
+                },
             )
 
         return backup
@@ -711,8 +722,9 @@ class MultiTable:
 
     def generate(
         self,
-        record_size_ratio: Optional[float] = None,
+        record_size_ratio: float = 1.0,
         preserve_tables: Optional[List[str]] = None,
+        identifier: Optional[str] = None,
         resume: bool = False,
     ) -> None:
         """
@@ -724,6 +736,7 @@ class MultiTable:
         Args:
             record_size_ratio (float, optional): Ratio to upsample real world data size with. Defaults to 1.
             preserve_tables (list[str], optional): List of tables to skip sampling and leave (mostly) identical to source.
+            identifier (str, optional): Unique string identifying a specific call to this method. Defaults to current timestamp.
             resume (bool, optional): Set to True when restoring from a backup to complete a previous, interrupted run.
 
         Returns:
@@ -732,6 +745,10 @@ class MultiTable:
         output_tables = {}
 
         if resume:
+            if identifier is not None:
+                logger.warning(
+                    "Cannot set identifier when resuming previous generation. Ignoring."
+                )
             if record_size_ratio is not None:
                 logger.warning(
                     "Cannot set record_size_ratio when resuming previous generation. Ignoring."
@@ -740,48 +757,37 @@ class MultiTable:
                 logger.warning(
                     "Cannot set preserve_tables when resuming previous generation. Ignoring."
                 )
-            preserve_tables = [
-                table
-                for table, status in self.synthetics_generate_statuses.items()
-                if status == GenerateStatus.SourcePreserved
-            ]
-            for table_name, record_handler in self._synthetics_record_handlers.items():
-                # Reset statuses of completed record handlers to usher them (immediately)
-                # through post-processing. Note that in ancestral strategy, this assumes
-                # seed generation is deterministic, because child tables may be in progress
-                # and we'd need the seed they were started with to be equivalent to the seed
-                # we "would" generate from the restored, post-processed parent.
-                if (
-                    self.synthetics_generate_statuses.get(table_name)
-                    == GenerateStatus.Completed
-                ):
-                    self.synthetics_generate_statuses[
-                        table_name
-                    ] = GenerateStatus.NotStarted
+            if self._synthetics_run is None:
+                raise MultiTableException(
+                    "Cannot resume a synthetics generation run without existing run information."
+                )
         else:
-            if record_size_ratio is not None:
-                self._record_size_ratio = record_size_ratio
-            self.synthetics_generate_statuses = {
-                table_name: GenerateStatus.NotStarted
-                for table_name in self.relational_data.list_all_tables()
-            }
             preserve_tables = preserve_tables or []
             self._strategy.validate_preserved_tables(
                 preserve_tables, self.relational_data
             )
-            self._synthetics_record_handlers: Dict[str, RecordHandler] = {}
 
-        self._skip_some_tables(preserve_tables, output_tables)
+            identifier = identifier or _timestamp()
+            missing_model = self._list_tables_with_missing_models()
+
+            self._synthetics_run = SyntheticsRun(
+                identifier=identifier,
+                record_size_ratio=record_size_ratio,
+                preserved=preserve_tables,
+                missing_model=missing_model,
+                record_handlers={},
+                lost_contact=[],
+            )
+
+        for table in self._synthetics_run.preserved:
+            output_tables[table] = self._strategy.get_preserved_data(
+                table, self.relational_data
+            )
         all_tables = self.relational_data.list_all_tables()
         refresh_attempts: Dict[str, int] = defaultdict(int)
 
         def _more_to_do() -> bool:
-            return not all(
-                [
-                    self._table_generation_in_terminal_state(table)
-                    for table in all_tables
-                ]
-            )
+            return len(output_tables) != len(all_tables)
 
         first_pass = True
         while _more_to_do():
@@ -791,17 +797,19 @@ class MultiTable:
             else:
                 self._wait_refresh_interval()
 
-            for table_name, record_handler in self._synthetics_record_handlers.items():
-                # No need to do anything with tables in terminal state
-                if self._table_generation_in_terminal_state(table_name):
+            for (
+                table_name,
+                record_handler,
+            ) in self._synthetics_run.record_handlers.items():
+                if table_name in output_tables:
                     continue
 
                 # If we consistently failed to refresh the job via API, fail the table
                 if refresh_attempts[table_name] >= MAX_REFRESH_ATTEMPTS:
                     self._log_lost_contact(table_name)
-                    self.synthetics_generate_statuses[
-                        table_name
-                    ] = GenerateStatus.Failed
+                    self._synthetics_run.lost_contact.append(table_name)
+                    output_tables[table_name] = None
+                    self._backup()
                     continue
 
                 status = cautiously_refresh_status(
@@ -810,9 +818,6 @@ class MultiTable:
 
                 if status == Status.COMPLETED:
                     self._log_success(table_name, "synthetic data generation")
-                    self.synthetics_generate_statuses[
-                        table_name
-                    ] = GenerateStatus.Completed
                     record_handler_result = _get_data_from_record_handler(
                         record_handler
                     )
@@ -824,9 +829,12 @@ class MultiTable:
                 elif status in END_STATES:
                     # already checked explicitly for completed; all other end states are effectively failures
                     self._log_failed(table_name, "synthetic data generation")
-                    self.synthetics_generate_statuses[
-                        table_name
-                    ] = GenerateStatus.Failed
+                    output_tables[table_name] = None
+                    for descendant in self.relational_data.get_descendants(table_name):
+                        logger.info(
+                            f"Skipping synthetic data generation for `{descendant}` because it depends on `{table_name}`"
+                        )
+                        output_tables[descendant] = None
                 else:
                     self._log_in_progress(
                         table_name, status, "synthetic data generation"
@@ -837,13 +845,10 @@ class MultiTable:
             in_progress_tables = [
                 table
                 for table in all_tables
-                if self._table_generation_in_progress(table)
+                if _synthetics_run_table_status(self._synthetics_run, table)
+                == GenerateStatus.InProgress
             ]
-            finished_tables = [
-                table
-                for table in all_tables
-                if self._table_generation_in_terminal_state(table)
-            ]
+            finished_tables = [table for table in output_tables]
 
             ready_tables = self._strategy.ready_to_generate(
                 self.relational_data, in_progress_tables, finished_tables
@@ -853,127 +858,81 @@ class MultiTable:
                 table_job = self._strategy.get_generation_job(
                     table_name,
                     self.relational_data,
-                    self._record_size_ratio,
+                    self._synthetics_run.record_size_ratio,
                     output_tables,
                     self._working_dir,
                     self._training_columns[table_name],
                 )
                 self._log_start(table_name, "synthetic data generation")
-                self.synthetics_generate_statuses[
-                    table_name
-                ] = GenerateStatus.InProgress
                 model = self._synthetics_models[table_name]
                 record_handler = model.create_record_handler_obj(**table_job)
                 record_handler.submit_cloud()
-                self._synthetics_record_handlers[table_name] = record_handler
+                self._synthetics_run.record_handlers[table_name] = record_handler
 
             self._backup()
 
         output_tables = self._strategy.post_process_synthetic_results(
-            output_tables, preserve_tables, self.relational_data
+            output_tables, self._synthetics_run.preserved, self.relational_data
         )
 
-        tables_with_incomplete_evaluations = {
-            table: df
-            for table, df in output_tables.items()
-            if not self.evaluations[table].is_complete()
-        }
-        self._expand_evaluations(tables_with_incomplete_evaluations)
+        run_dir = _mkdir(str(self._working_dir / self._synthetics_run.identifier))
+
+        for table in output_tables:
+            # Get "opposite" evaluation metrics
+            self._strategy.update_evaluation_via_evaluate(
+                evaluation=self.evaluations[table],
+                table=table,
+                rel_data=self.relational_data,
+                synthetic_tables=output_tables,
+                target_dir=run_dir,
+            )
+
+            # Copy all evaluation data (model-based and evaluate-based) to run_dir
+            for eval_type in ["individual", "cross_table"]:
+                for ext in ["html", "json"]:
+                    filename = f"synthetics_{eval_type}_evaluation_{table}.{ext}"
+                    with suppress(FileNotFoundError):
+                        shutil.copyfile(filename, f"{run_dir}/{filename}")
 
         logger.info("Creating relational report")
-        self.create_relational_report()
+        self.create_relational_report(run_dir)
 
-        archive_path = self._working_dir / "synthetics_outputs.tar.gz"
+        archive_path = self._working_dir / f"synthetics_outputs.tar.gz"
         with tarfile.open(archive_path, "w:gz") as tar:
-            tar.add(
-                self._working_dir / "relational_report.html",
-                arcname="relational_report.html",
-            )
-            for table in self.relational_data.list_all_tables():
-                # Add synthetic output table
-                synthetic_df = output_tables[table]
-                filename = f"synth_{table}.csv"
-                out_path = self._working_dir / filename
-                synthetic_df.to_csv(out_path, index=False)
-                tar.add(out_path, arcname=filename)
-                # Add individual and cross_table reports
-                for eval_type in ["individual", "cross_table"]:
-                    for ext in ["html", "json"]:
-                        filename = f"synthetics_{eval_type}_evaluation_{table}.{ext}"
-                        try:
-                            tar.add(self._working_dir / filename, arcname=filename)
-                        except FileNotFoundError:
-                            logger.warning(
-                                f"Could not find `{filename}` in working directory"
-                            )
+            tar.add(run_dir, arcname=identifier)
 
         self._artifact_collection.upload_synthetics_outputs_archive(
             self._project, str(archive_path)
         )
-        self._backup()
         self.synthetic_output_tables = output_tables
+        self._synthetics_run = None
+        self._backup()
 
-    def _expand_evaluations(self, output_tables: Dict[str, pd.DataFrame]) -> None:
-        """
-        Adds evaluation metrics for the "opposite" correlation strategy using the Gretel Evaluate API.
-        """
-        for table_name in output_tables:
-            self._strategy.update_evaluation_via_evaluate(
-                evaluation=self.evaluations[table_name],
-                table=table_name,
-                rel_data=self.relational_data,
-                synthetic_tables=output_tables,
-                working_dir=self._working_dir,
-            )
-
-    def create_relational_report(self) -> None:
+    def create_relational_report(self, target_dir: Path) -> None:
         presenter = ReportPresenter(
             rel_data=self.relational_data,
             evaluations=self.evaluations,
-            now=datetime.datetime.utcnow(),
+            now=datetime.utcnow(),
         )
-        output_path = self._working_dir / "relational_report.html"
+        output_path = target_dir / "relational_report.html"
         with open(output_path, "w") as report:
             html_content = ReportRenderer().render(presenter)
             report.write(html_content)
 
-    def _skip_some_tables(
-        self, preserve_tables: List[str], output_tables: Dict[str, pd.DataFrame]
-    ) -> None:
-        "Updates state for tables being preserved and tables lacking trained models."
+    def _list_tables_with_missing_models(self) -> List[str]:
+        missing_model = set()
         for table in self.relational_data.list_all_tables():
-            if table in preserve_tables:
-                self.synthetics_generate_statuses[
-                    table
-                ] = GenerateStatus.SourcePreserved
-                output_tables[table] = self._strategy.get_preserved_data(
-                    table, self.relational_data
-                )
-            elif self.synthetics_train_statuses[table] != TrainStatus.Completed:
+            if self.synthetics_train_statuses.get(table) != TrainStatus.Completed:
                 logger.info(
                     f"Skipping synthetic data generation for `{table}` because it does not have a trained model"
                 )
-                self.synthetics_generate_statuses[
-                    table
-                ] = GenerateStatus.ModelUnavailable
+                missing_model.add(table)
                 for descendant in self.relational_data.get_descendants(table):
                     logger.info(
                         f"Skipping synthetic data generation for `{descendant}` because it depends on `{table}`"
                     )
-                    self.synthetics_generate_statuses[
-                        descendant
-                    ] = GenerateStatus.ModelUnavailable
-
-    def _table_generation_in_progress(self, table: str) -> bool:
-        return self.synthetics_generate_statuses.get(table) == GenerateStatus.InProgress
-
-    def _table_generation_in_terminal_state(self, table: str) -> bool:
-        return self.synthetics_generate_statuses.get(table) in [
-            GenerateStatus.Completed,
-            GenerateStatus.SourcePreserved,
-            GenerateStatus.ModelUnavailable,
-            GenerateStatus.Failed,
-        ]
+                    missing_model.add(table)
+        return list(missing_model)
 
     def _attach_existing_reports(self, table: str) -> None:
         individual_path = (
@@ -1071,17 +1030,6 @@ def _train_status_for_model(model: Model) -> TrainStatus:
         return TrainStatus.NotStarted
 
 
-def _generate_status_for_record_handler(rh: RecordHandler) -> GenerateStatus:
-    if rh.status == Status.COMPLETED:
-        return GenerateStatus.Completed
-    elif rh.status in END_STATES:
-        return GenerateStatus.Failed
-    elif rh.status in ACTIVE_STATES:
-        return GenerateStatus.InProgress
-    else:
-        return GenerateStatus.NotStarted
-
-
 def _table_generation_in_terminal_state(
     statuses: Dict[str, GenerateStatus], table: str
 ) -> bool:
@@ -1091,6 +1039,31 @@ def _table_generation_in_terminal_state(
         GenerateStatus.ModelUnavailable,
         GenerateStatus.Failed,
     ]
+
+
+def _synthetics_run_table_status(run: SyntheticsRun, table: str) -> GenerateStatus:
+    if table in run.preserved:
+        return GenerateStatus.SourcePreserved
+
+    if table in run.lost_contact:
+        return GenerateStatus.Failed
+
+    if table in run.missing_model:
+        return GenerateStatus.ModelUnavailable
+
+    record_handler = run.record_handlers.get(table)
+    if record_handler is None:
+        return GenerateStatus.NotStarted
+
+    rh_status = record_handler.status
+    if rh_status == Status.COMPLETED:
+        return GenerateStatus.Completed
+    elif rh_status in END_STATES:
+        return GenerateStatus.Failed
+    elif rh_status in ACTIVE_STATES:
+        return GenerateStatus.InProgress
+    else:
+        return GenerateStatus.NotStarted
 
 
 def _mkdir(name: str) -> Path:
@@ -1105,3 +1078,7 @@ def _upload_gretel_backup(project: Project, path: str) -> None:
         key = artifact["key"]
         if key != latest and key.endswith("__gretel_backup.json"):
             project.delete_artifact(key)
+
+
+def _timestamp() -> str:
+    return datetime.now().strftime("%Y%m%d%H%M%S")

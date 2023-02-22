@@ -65,15 +65,13 @@ class BackupTrain:
 
 
 @dataclass
-class BackupGenerateTable:
-    record_handler_id: str
-
-
-@dataclass
 class BackupGenerate:
+    identifier: str
     preserved: List[str]
     record_size_ratio: float
-    tables: Dict[str, BackupGenerateTable]
+    record_handler_ids: Dict[str, str]
+    lost_contact: List[str]
+    missing_model: List[str]
 
 
 @dataclass
@@ -133,13 +131,6 @@ class Backup:
 
         generate = b.get("generate")
         if generate is not None:
-            bg = BackupGenerate(
-                preserved=generate["preserved"],
-                record_size_ratio=generate["record_size_ratio"],
-                tables={
-                    k: BackupGenerateTable(**v) for k, v in generate["tables"].items()
-                },
-            )
-            backup.generate = bg
+            backup.generate = BackupGenerate(**generate)
 
         return backup

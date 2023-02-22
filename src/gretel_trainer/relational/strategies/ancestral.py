@@ -290,7 +290,7 @@ class AncestralStrategy:
         table: str,
         rel_data: RelationalData,
         synthetic_tables: Dict[str, pd.DataFrame],
-        working_dir: Path,
+        target_dir: Path,
     ) -> None:
         source_data = rel_data.get_table_data(table)
         synth_data = synthetic_tables[table]
@@ -299,7 +299,7 @@ class AncestralStrategy:
         report = common.get_quality_report(
             source_data=source_data, synth_data=synth_data
         )
-        out_filepath = working_dir / f"synthetics_individual_evaluation_{table}"
+        out_filepath = target_dir / f"synthetics_individual_evaluation_{table}"
         common.write_report(report, out_filepath)
 
         evaluation.individual_sqs = report.peek().get("score")
