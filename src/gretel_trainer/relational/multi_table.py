@@ -509,6 +509,7 @@ class MultiTable:
         Otherwise runs source data through all existing transforms models.
         """
         identifier = identifier or f"transforms_{_timestamp()}"
+        logger.info(f"Starting transforms run `{identifier}`")
         run_dir = _mkdir(str(self._working_dir / identifier))
         transforms_run_paths = {}
         if data is not None:
@@ -771,6 +772,7 @@ class MultiTable:
                 raise MultiTableException(
                     "Cannot resume a synthetics generation run without existing run information."
                 )
+            logger.info(f"Resuming synthetics run `{self._synthetics_run.identifier}`")
         else:
             preserve_tables = preserve_tables or []
             self._strategy.validate_preserved_tables(
@@ -788,6 +790,7 @@ class MultiTable:
                 record_handlers={},
                 lost_contact=[],
             )
+            logger.info(f"Starting synthetics run `{self._synthetics_run.identifier}`")
 
         run_dir = _mkdir(str(self._working_dir / self._synthetics_run.identifier))
 
