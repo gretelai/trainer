@@ -502,9 +502,14 @@ class MultiTable:
             self._backup()
 
     def run_transforms(
-        self, in_place: bool = False, data: Optional[Dict[str, pd.DataFrame]] = None
+        self,
+        identifier: Optional[str] = None,
+        in_place: bool = False,
+        data: Optional[Dict[str, pd.DataFrame]] = None,
     ) -> None:
         """
+        identifier: (str, optional): Unique string identifying a specific call to this method. Defaults to "transforms_" + current timestamp
+
         If `in_place` set to True, overwrites source data in all locations
         (internal Python state, local working directory, project artifact archive).
         Used for transforms->synthetics workflows.
@@ -512,6 +517,8 @@ class MultiTable:
         If `data` is supplied, runs only the supplied data through the corresponding transforms models.
         Otherwise runs source data through all existing transforms models.
         """
+        identifier = identifier or f"transforms_{_timestamp()}"
+        run_dir = _mkdir(str(self._working_dir / identifier))
         transforms_run_paths = {}
         if data is not None:
             unrunnable_tables = [
@@ -525,7 +532,7 @@ class MultiTable:
                 )
 
             for table, df in data.items():
-                transforms_run_path = self._working_dir / f"transforms_run_{table}.csv"
+                transforms_run_path = run_dir / f"transforms_run_{table}.csv"
                 df.to_csv(transforms_run_path, index=False)
                 transforms_run_paths[table] = transforms_run_path
         else:
@@ -534,7 +541,6 @@ class MultiTable:
                     transforms_run_paths[table] = model.data_source
 
         transforms_record_handlers: Dict[str, RecordHandler] = {}
-        transforms_run_statuses: Dict[str, GenerateStatus] = {}
 
         for table_name, transforms_run_path in transforms_run_paths.items():
             self._log_start(table_name, "transforms run")
@@ -543,34 +549,25 @@ class MultiTable:
                 data_source=str(transforms_run_path)
             )
             record_handler.submit_cloud()
-            transforms_run_statuses[table_name] = GenerateStatus.InProgress
             transforms_record_handlers[table_name] = record_handler
 
         output_tables: Dict[str, pd.DataFrame] = {}
         refresh_attempts: Dict[str, int] = defaultdict(int)
 
         def _more_to_do() -> bool:
-            return not all(
-                [
-                    _table_generation_in_terminal_state(transforms_run_statuses, table)
-                    for table in transforms_run_paths
-                ]
-            )
+            return len(output_tables) != len(transforms_run_paths)
 
         while _more_to_do():
             self._wait_refresh_interval()
 
             for table_name, record_handler in transforms_record_handlers.items():
-                # No need to do anything with tables in terminal state
-                if _table_generation_in_terminal_state(
-                    transforms_run_statuses, table_name
-                ):
+                if table_name in output_tables:
                     continue
 
                 # If we consistently failed to refresh the job via API, fail the table
                 if refresh_attempts[table_name] >= MAX_REFRESH_ATTEMPTS:
                     self._log_lost_contact(table_name)
-                    transforms_run_statuses[table_name] = GenerateStatus.Failed
+                    output_tables[table_name] = None
                     continue
 
                 status = cautiously_refresh_status(
@@ -579,7 +576,6 @@ class MultiTable:
 
                 if status == Status.COMPLETED:
                     self._log_success(table_name, "transforms run")
-                    transforms_run_statuses[table_name] = GenerateStatus.Completed
                     record_handler_result = _get_data_from_record_handler(
                         record_handler
                     )
@@ -587,7 +583,7 @@ class MultiTable:
                 elif status in END_STATES:
                     # already checked explicitly for completed; all other end states are effectively failures
                     self._log_failed(table_name, "transforms run")
-                    transforms_run_statuses[table_name] = GenerateStatus.Failed
+                    output_tables[table_name] = None
                 else:
                     self._log_in_progress(table_name, status, "transforms run")
 
@@ -600,13 +596,14 @@ class MultiTable:
                 self.relational_data.update_table_data(table_name, transformed_table)
             self._upload_sources_to_project()
 
+        for table, df in output_tables.items():
+            filename = f"transformed_{table}.csv"
+            out_path = run_dir / filename
+            df.to_csv(out_path, index=False)
+
         archive_path = self._working_dir / "transforms_outputs.tar.gz"
         with tarfile.open(archive_path, "w:gz") as tar:
-            for table, df in output_tables.items():
-                filename = f"transformed_{table}.csv"
-                out_path = self._working_dir / filename
-                df.to_csv(out_path, index=False)
-                tar.add(out_path, arcname=filename)
+            tar.add(run_dir, arcname=identifier)
 
         self._artifact_collection.upload_transforms_outputs_archive(
             self._project, str(archive_path)
