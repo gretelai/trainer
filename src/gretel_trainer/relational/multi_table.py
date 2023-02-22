@@ -24,7 +24,7 @@ from gretel_client.projects.jobs import ACTIVE_STATES, END_STATES, Job, Status
 from gretel_client.projects.models import Model, read_model_config
 from gretel_client.projects.records import RecordHandler
 
-from gretel_trainer.relational.artifacts import ArtifactCollection
+from gretel_trainer.relational.artifacts import ArtifactCollection, add_to_tar
 from gretel_trainer.relational.backup import (
     Backup,
     BackupForeignKey,
@@ -594,8 +594,7 @@ class MultiTable:
             df.to_csv(out_path, index=False)
 
         archive_path = self._working_dir / "transforms_outputs.tar.gz"
-        with tarfile.open(archive_path, "w:gz") as tar:
-            tar.add(run_dir, arcname=identifier)
+        add_to_tar(archive_path, run_dir, identifier)
 
         self._artifact_collection.upload_transforms_outputs_archive(
             self._project, str(archive_path)
@@ -911,8 +910,7 @@ class MultiTable:
         self.create_relational_report(run_dir)
 
         archive_path = self._working_dir / f"synthetics_outputs.tar.gz"
-        with tarfile.open(archive_path, "w:gz") as tar:
-            tar.add(run_dir, arcname=identifier)
+        add_to_tar(archive_path, run_dir, self._synthetics_run.identifier)
 
         self._artifact_collection.upload_synthetics_outputs_archive(
             self._project, str(archive_path)
