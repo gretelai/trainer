@@ -64,15 +64,6 @@ class TrainStatus(str, Enum):
     Failed = "Failed"
 
 
-class GenerateStatus(str, Enum):
-    NotStarted = "NotStarted"
-    InProgress = "InProgress"
-    Completed = "Completed"
-    ModelUnavailable = "ModelUnavailable"
-    SourcePreserved = "SourcePreserved"
-    Failed = "Failed"
-
-
 @dataclass
 class SyntheticsRun:
     identifier: str
@@ -866,8 +857,7 @@ class MultiTable:
             in_progress_tables = [
                 table
                 for table in all_tables
-                if _synthetics_run_table_status(self._synthetics_run, table)
-                == GenerateStatus.InProgress
+                if _table_is_in_progress(self._synthetics_run, table)
             ]
             finished_tables = [table for table in output_tables]
 
@@ -1053,40 +1043,12 @@ def _train_status_for_model(model: Model) -> TrainStatus:
         return TrainStatus.NotStarted
 
 
-def _table_generation_in_terminal_state(
-    statuses: Dict[str, GenerateStatus], table: str
-) -> bool:
-    return statuses[table] in [
-        GenerateStatus.Completed,
-        GenerateStatus.SourcePreserved,
-        GenerateStatus.ModelUnavailable,
-        GenerateStatus.Failed,
-    ]
-
-
-def _synthetics_run_table_status(run: SyntheticsRun, table: str) -> GenerateStatus:
-    if table in run.preserved:
-        return GenerateStatus.SourcePreserved
-
-    if table in run.lost_contact:
-        return GenerateStatus.Failed
-
-    if table in run.missing_model:
-        return GenerateStatus.ModelUnavailable
-
+def _table_is_in_progress(run: SyntheticsRun, table: str) -> bool:
+    in_progress = False
     record_handler = run.record_handlers.get(table)
-    if record_handler is None:
-        return GenerateStatus.NotStarted
-
-    rh_status = record_handler.status
-    if rh_status == Status.COMPLETED:
-        return GenerateStatus.Completed
-    elif rh_status in END_STATES:
-        return GenerateStatus.Failed
-    elif rh_status in ACTIVE_STATES:
-        return GenerateStatus.InProgress
-    else:
-        return GenerateStatus.NotStarted
+    if record_handler is not None:
+        in_progress = record_handler.status in ACTIVE_STATES
+    return in_progress
 
 
 def _mkdir(name: str) -> Path:
