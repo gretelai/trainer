@@ -935,7 +935,8 @@ class MultiTable:
         self.synthetic_output_tables = output_tables
         self._backup()
 
-    def create_relational_report(self, target_dir: Path) -> None:
+    def create_relational_report(self, target_dir: Optional[Path] = None) -> None:
+        target_dir = target_dir or self._working_dir
         presenter = ReportPresenter(
             rel_data=self.relational_data,
             evaluations=self.evaluations,
