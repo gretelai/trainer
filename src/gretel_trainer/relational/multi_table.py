@@ -884,6 +884,10 @@ class MultiTable:
 
         for table, data in output_tables.items():
             if data is not None:
+                data.to_csv(run_dir / f"synth_{table}.csv", index=False)
+
+        for table, data in output_tables.items():
+            if data is not None:
                 # Get "opposite" evaluation metrics
                 self._strategy.update_evaluation_via_evaluate(
                     evaluation=self.evaluations[table],
@@ -898,7 +902,10 @@ class MultiTable:
                     for ext in ["html", "json"]:
                         filename = f"synthetics_{eval_type}_evaluation_{table}.{ext}"
                         with suppress(FileNotFoundError):
-                            shutil.copyfile(filename, f"{run_dir}/{filename}")
+                            shutil.copyfile(
+                                src=self._working_dir / filename,
+                                dst=run_dir / filename,
+                            )
 
         logger.info("Creating relational report")
         self.create_relational_report(run_dir)
