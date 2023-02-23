@@ -452,7 +452,7 @@ class MultiTable:
         for table, config in configs.items():
             # Ensure consistent, friendly model name in Console
             named_config = read_model_config(config)
-            named_config["name"] = f"{table}-transforms"
+            named_config["name"] = _model_name("transforms", table)
 
             # Ensure consistent, friendly data source names in Console
             table_data = self.relational_data.get_table_data(table)
@@ -638,7 +638,7 @@ class MultiTable:
 
     def _table_model_config(self, table_name: str) -> Dict:
         config_dict = read_model_config(self._model_config)
-        config_dict["name"] = table_name
+        config_dict["name"] = _model_name("synthetics", table_name)
         return config_dict
 
     def _train_synthetics_models(self, training_data: Dict[str, Path]) -> None:
@@ -1080,6 +1080,11 @@ def _upload_gretel_backup(project: Project, path: str) -> None:
         key = artifact["key"]
         if key != latest and key.endswith("__gretel_backup.json"):
             project.delete_artifact(key)
+
+
+def _model_name(workflow: str, table: str) -> str:
+    ok_table_name = table.replace("--", "__")
+    return f"{workflow}-{ok_table_name}"
 
 
 def _timestamp() -> str:
