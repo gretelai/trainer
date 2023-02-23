@@ -284,7 +284,7 @@ class MultiTable:
         if backup_generate is None:
             if any_outputs:
                 # We shouldn't ever encounter this branch in the wild, but we define some guidance to log just in case.
-                msg = "Backup included synthetics outputs archive but no detailed run history. Review previous runs' outputs (see CSVs and reports in the local directory), or start a new one by calling `generate`."
+                msg = "Backup included synthetics outputs archive but no latest run detail. Review previous runs' outputs (see CSVs and reports in the local directory), or start a new one by calling `generate`."
             else:
                 # This branch is definitely possible / more likely.
                 msg = "No generation jobs had been started in previous instance. From here, your next step is to call `generate`."
@@ -307,9 +307,6 @@ class MultiTable:
         latest_run_id = self._synthetics_run.identifier
         if latest_run_id in os.listdir(self._working_dir):
             # Latest backup was taken at a stable point (nothing actively in progress).
-            logger.info(
-                f"Found artifacts for latest run ID `{latest_run_id}` in outputs archive."
-            )
             for table in self.relational_data.list_all_tables():
                 try:
                     self.synthetic_output_tables[table] = pd.read_csv(
@@ -326,6 +323,9 @@ class MultiTable:
                     logger.info(
                         f"Could not find report data for table `{table}` in run outputs."
                     )
+            logger.info(
+                f"All tasks for generation run `{latest_run_id}` finished prior to backup. From here, you can access your synthetic data as Pandas DataFrames via `synthetic_output_tables`, or review them in CSV format along with the relational report in the local working directory."
+            )
             return None
         else:
             # Latest run was still in progress. Download any seeds we may have previously created.
