@@ -49,19 +49,16 @@ class BackupRelationalData:
 
 
 @dataclass
-class BackupTrainTable:
-    model_id: str
-    training_columns: List[str]
-
-
-@dataclass
-class BackupTransforms:
+class BackupTransformsTrain:
     model_ids: Dict[str, str]
+    lost_contact: List[str]
 
 
 @dataclass
-class BackupTrain:
-    tables: Dict[str, BackupTrainTable]
+class BackupSyntheticsTrain:
+    model_ids: Dict[str, str]
+    lost_contact: List[str]
+    training_columns: Dict[str, List[str]]
 
 
 @dataclass
@@ -83,8 +80,8 @@ class Backup:
     refresh_interval: int
     artifact_collection: ArtifactCollection
     relational_data: BackupRelationalData
-    transforms: Optional[BackupTransforms] = None
-    train: Optional[BackupTrain] = None
+    transforms_train: Optional[BackupTransformsTrain] = None
+    synthetics_train: Optional[BackupSyntheticsTrain] = None
     generate: Optional[BackupGenerate] = None
 
     @property
@@ -118,16 +115,13 @@ class Backup:
             relational_data=brd,
         )
 
-        transforms = b.get("transforms")
-        if transforms is not None:
-            backup.transforms = BackupTransforms(**transforms)
+        transforms_train = b.get("transforms_train")
+        if transforms_train is not None:
+            backup.transforms_train = BackupTransformsTrain(**transforms_train)
 
-        train = b.get("train")
-        if train is not None:
-            bt = BackupTrain(
-                tables={k: BackupTrainTable(**v) for k, v in train["tables"].items()}
-            )
-            backup.train = bt
+        synthetics_train = b.get("synthetics_train")
+        if synthetics_train is not None:
+            backup.synthetics_train = BackupSyntheticsTrain(**synthetics_train)
 
         generate = b.get("generate")
         if generate is not None:

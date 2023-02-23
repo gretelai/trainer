@@ -9,7 +9,7 @@ import time
 from collections import defaultdict
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from contextlib import suppress
-from dataclasses import dataclass, replace
+from dataclasses import dataclass, field, replace
 from datetime import datetime
 from enum import Enum
 from pathlib import Path
@@ -31,9 +31,8 @@ from gretel_trainer.relational.backup import (
     BackupGenerate,
     BackupRelationalData,
     BackupRelationalDataTable,
-    BackupTrain,
-    BackupTrainTable,
-    BackupTransforms,
+    BackupSyntheticsTrain,
+    BackupTransformsTrain,
 )
 from gretel_trainer.relational.core import (
     MultiTableException,
@@ -57,11 +56,17 @@ MAX_REFRESH_ATTEMPTS = 3
 logger = logging.getLogger(__name__)
 
 
-class TrainStatus(str, Enum):
-    NotStarted = "NotStarted"
-    InProgress = "InProgress"
-    Completed = "Completed"
-    Failed = "Failed"
+@dataclass
+class TransformsTrain:
+    models: Dict[str, Model] = field(default_factory=dict)
+    lost_contact: List[str] = field(default_factory=list)
+
+
+@dataclass
+class SyntheticsTrain:
+    models: Dict[str, Model] = field(default_factory=dict)
+    lost_contact: List[str] = field(default_factory=list)
+    training_columns: Dict[str, List[str]] = field(default_factory=dict)
 
 
 @dataclass
@@ -120,13 +125,10 @@ class MultiTable:
         self.relational_data = relational_data
         self._artifact_collection = ArtifactCollection()
         self._latest_backup: Optional[Backup] = None
-        self._transforms_models: Dict[str, Model] = {}
-        self.transforms_train_statuses: Dict[str, TrainStatus] = {}
+        self._transforms_train = TransformsTrain()
         self.transforms_output_tables: Dict[str, pd.DataFrame] = {}
-        self.synthetics_train_statuses: Dict[str, TrainStatus] = {}
-        self._synthetics_models: Dict[str, Model] = {}
+        self._synthetics_train = SyntheticsTrain()
         self._synthetics_run: Optional[SyntheticsRun] = None
-        self._training_columns: Dict[str, List[str]] = {}
         self.synthetic_output_tables: Dict[str, pd.DataFrame] = {}
         self.evaluations = defaultdict(lambda: TableEvaluation())
 
@@ -189,58 +191,59 @@ class MultiTable:
                 self._working_dir / "_gretel_debug_summary.json",
             )
 
-        # Transforms
-        backup_transforms = backup.transforms
-        if backup_transforms is not None:
+        # Transforms Train
+        backup_transforms_train = backup.transforms_train
+        if backup_transforms_train is None:
+            logger.info("No transforms training data found in backup.")
+        else:
             logger.info("Restoring transforms models")
-            for table, model_id in backup_transforms.model_ids.items():
-                model = self._project.get_model(model_id)
-                self._transforms_models[table] = model
-                self.transforms_train_statuses[table] = _train_status_for_model(model)
-            logger.info("Restored transforms models")
+            self._transforms_train.models = {
+                table: self._project.get_model(model_id)
+                for table, model_id in backup_transforms_train.model_ids.items()
+            }
 
         # Synthetics Train
-        backup_train = backup.train
-        if backup_train is None:
+        backup_synthetics_train = backup.synthetics_train
+        if backup_synthetics_train is None:
             logger.info(
-                "No model train data present in backup. From here, your next step is to call `train`."
+                "No synthetics training data found in backup. From here, your next step is to call `train`."
             )
             return None
 
         logger.info("Restoring synthetics models")
-        failed_to_train = []
-        for table, table_train_backup in backup_train.tables.items():
-            model = self._project.get_model(table_train_backup.model_id)
-            status = _train_status_for_model(model)
-            self._synthetics_models[table] = model
-            self._training_columns[table] = table_train_backup.training_columns
-            self.synthetics_train_statuses[table] = status
-            if status == TrainStatus.Completed:
-                download_file_artifact(
-                    self._project,
-                    model.data_source,
-                    self._working_dir / f"synthetics_train_{table}.csv",
-                )
-                self._strategy.update_evaluation_from_model(
-                    table, self.evaluations, model, self._working_dir
-                )
-            elif status == TrainStatus.InProgress:
-                logger.warning(
-                    f"Training still in progress for table `{table}`. From here, your next step is to wait for training to finish, and re-attempt restoring from backup once all models have completed training. You can view training progress in the Console under the `{table}` model page in the `{self._project.display_name} ({self._project.name})` project."
-                )
-                raise MultiTableException(
-                    "Cannot restore while model training is actively in progress."
-                )
-            else:
-                failed_to_train.append(table)
 
-        if len(failed_to_train) > 0:
+        self._synthetics_train.training_columns = backup_synthetics_train.training_columns
+        self._synthetics_train.lost_contact = backup_synthetics_train.lost_contact
+        self._synthetics_train.models = {
+            table: self._project.get_model(model_id)
+            for table, model_id in backup_synthetics_train.model_ids.items()
+        }
+
+        still_in_progress = [table for table, model in self._synthetics_train.models.items() if model.status in ACTIVE_STATES]
+        if len(still_in_progress) > 0:
+            logger.warning(
+                f"Training still in progress for tables `{still_in_progress}`. From here, your next step is to wait for training to finish, and re-attempt restoring from backup once all models have completed training. You can view training progress in the Console in the `{self._project.display_name} ({self._project.name})` project."
+            )
+            raise MultiTableException(
+                "Cannot restore while model training is actively in progress."
+            )
+
+        training_succeeded = [table for table, model in self._synthetics_train.models.items() if model.status == Status.COMPLETED]
+        for table in training_succeeded:
+            model = self._synthetics_train.models[table]
+            download_file_artifact(
+                self._project, model.data_source, self._working_dir / f"synthetics_train_{table}.csv",
+            )
+            self._strategy.update_evaluation_from_model(
+                table, self.evaluations, model, self._working_dir
+            )
+
+        training_failed = [table for table, model in self._synthetics_train.models.items() if model.status in END_STATES and table not in training_succeeded]
+        if len(training_failed) > 0:
             logger.info(
-                f"Training failed for tables: {failed_to_train}. From here, your next step is to try retraining them with modified data by calling `retrain_tables`."
+                f"Training failed for tables: {training_failed}. From here, your next step is to try retraining them with modified data by calling `retrain_tables`."
             )
             return None
-        else:
-            logger.info("Restored synthetics models")
 
         # Synthetics Generate
         ## First, download the outputs archive if present and extract the data.
@@ -274,7 +277,7 @@ class MultiTable:
             return None
 
         record_handlers = {
-            table: self._synthetics_models[table].get_record_handler(rh_id)
+            table: self._synthetics_train.models[table].get_record_handler(rh_id)
             for table, rh_id in backup_generate.record_handler_ids.items()
         }
         self._synthetics_run = SyntheticsRun(
@@ -362,25 +365,26 @@ class MultiTable:
             ),
         )
 
-        # Transforms
-        if len(self._transforms_models) > 0:
-            backup.transforms = BackupTransforms(
+        # Transforms Train
+        if len(self._transforms_train.models) > 0:
+            backup.transforms_train = BackupTransformsTrain(
                 model_ids={
                     table: model.model_id
-                    for table, model in self._transforms_models.items()
-                }
+                    for table, model in self._transforms_train.models.items()
+                },
+                lost_contact=self._transforms_train.lost_contact,
             )
 
-        # Train
-        if len(self._synthetics_models) > 0:
-            backup_train_tables = {
-                table: BackupTrainTable(
-                    model_id=model.model_id,
-                    training_columns=self._training_columns.get(table, []),
-                )
-                for table, model in self._synthetics_models.items()
-            }
-            backup.train = BackupTrain(tables=backup_train_tables)
+        # Synthetics Train
+        if len(self._synthetics_train.models) > 0:
+            backup.synthetics_train = BackupSyntheticsTrain(
+                model_ids={
+                    table: model.model_id
+                    for table, model in self._synthetics_train.models.items()
+                },
+                lost_contact=self._synthetics_train.lost_contact,
+                training_columns=self._synthetics_train.training_columns,
+            )
 
         # Generate
         if self._synthetics_run is not None:
@@ -425,9 +429,6 @@ class MultiTable:
 
     def train_transform_models(self, configs: Dict[str, GretelModelConfig]) -> None:
         for table, config in configs.items():
-            # Set initial status
-            self.transforms_train_statuses[table] = TrainStatus.NotStarted
-
             # Ensure consistent, friendly model name in Console
             named_config = read_model_config(config)
             named_config["name"] = f"{table}-transforms"
@@ -443,49 +444,43 @@ class MultiTable:
                 model_config=named_config, data_source=str(transforms_train_path)
             )
             model.submit_cloud()
-            self._transforms_models[table] = model
-            self.transforms_train_statuses[table] = TrainStatus.InProgress
+            self._transforms_train.models[table] = model
 
         self._backup()
 
         refresh_attempts: Dict[str, int] = defaultdict(int)
+        completed = []
+        failed = []
 
         def _more_to_do() -> bool:
-            return any(
-                [
-                    status == TrainStatus.InProgress
-                    for status in self.transforms_train_statuses.values()
-                ]
-            )
+            return len(completed + failed) < len(configs)
 
         while _more_to_do():
             self._wait_refresh_interval()
 
             for table_name in configs:
                 # No need to do anything with tables in terminal state
-                if self.transforms_train_statuses[table_name] in (
-                    TrainStatus.Completed,
-                    TrainStatus.Failed,
-                ):
+                if table_name in (completed + failed):
                     continue
 
                 # If we consistently failed to refresh the job status, fail the table
                 if refresh_attempts[table_name] >= MAX_REFRESH_ATTEMPTS:
                     self._log_lost_contact(table_name)
-                    self.transforms_train_statuses[table_name] = TrainStatus.Failed
+                    self._transforms_train.lost_contact.append(table_name)
+                    failed.append(table_name)
                     continue
 
-                model = self._transforms_models[table_name]
+                model = self._transforms_train.models[table_name]
 
                 status = cautiously_refresh_status(model, table_name, refresh_attempts)
 
                 if status == Status.COMPLETED:
                     self._log_success(table_name, "model training")
-                    self.transforms_train_statuses[table_name] = TrainStatus.Completed
+                    completed.append(table_name)
                 elif status in END_STATES:
                     # already checked explicitly for completed; all other end states are effectively failures
                     self._log_failed(table_name, "model training")
-                    self.transforms_train_statuses[table_name] = TrainStatus.Failed
+                    failed.append(table_name)
                 else:
                     self._log_in_progress(table_name, status, "model training")
                     continue
@@ -516,7 +511,7 @@ class MultiTable:
             unrunnable_tables = [
                 table
                 for table in data
-                if self.transforms_train_statuses.get(table) != TrainStatus.Completed
+                if not _table_trained_successfully(self._transforms_train, table)
             ]
             if len(unrunnable_tables) > 0:
                 raise MultiTableException(
@@ -528,15 +523,15 @@ class MultiTable:
                 df.to_csv(transforms_run_path, index=False)
                 transforms_run_paths[table] = transforms_run_path
         else:
-            for table, model in self._transforms_models.items():
-                if self.transforms_train_statuses[table] == TrainStatus.Completed:
+            for table, model in self._transforms_train.models.items():
+                if _table_trained_successfully(self._transforms_train, table):
                     transforms_run_paths[table] = model.data_source
 
         transforms_record_handlers: Dict[str, RecordHandler] = {}
 
         for table_name, transforms_run_path in transforms_run_paths.items():
             self._log_start(table_name, "transforms run")
-            model = self._transforms_models[table_name]
+            model = self._transforms_train.models[table_name]
             record_handler = model.create_record_handler_obj(
                 data_source=str(transforms_run_path)
             )
@@ -610,7 +605,7 @@ class MultiTable:
         """
         training_data = self._strategy.prepare_training_data(self.relational_data)
         for table, df in training_data.items():
-            self._training_columns[table] = list(df.columns)
+            self._synthetics_train.training_columns[table] = list(df.columns)
         training_paths = {}
 
         for table_name in tables:
@@ -628,57 +623,51 @@ class MultiTable:
     def _train_synthetics_models(self, training_data: Dict[str, Path]) -> None:
         for table_name, training_csv in training_data.items():
             self._log_start(table_name, "model training")
-            self.synthetics_train_statuses[table_name] = TrainStatus.InProgress
             table_model_config = self._table_model_config(table_name)
             model = self._project.create_model_obj(
                 model_config=table_model_config, data_source=str(training_csv)
             )
             model.submit_cloud()
-            self._synthetics_models[table_name] = model
+            self._synthetics_train.models[table_name] = model
 
         self._backup()
 
         refresh_attempts: Dict[str, int] = defaultdict(int)
+        completed = []
+        failed = []
 
         def _more_to_do() -> bool:
-            return any(
-                [
-                    status == TrainStatus.InProgress
-                    for status in self.synthetics_train_statuses.values()
-                ]
-            )
+            return len(completed + failed) < len(training_data)
 
         while _more_to_do():
             self._wait_refresh_interval()
 
             for table_name in training_data:
                 # No need to do anything with tables in terminal state
-                if self.synthetics_train_statuses[table_name] in (
-                    TrainStatus.Completed,
-                    TrainStatus.Failed,
-                ):
+                if table_name in (completed + failed):
                     continue
 
                 # If we consistently failed to refresh the job status, fail the table
                 if refresh_attempts[table_name] >= MAX_REFRESH_ATTEMPTS:
                     self._log_lost_contact(table_name)
-                    self.synthetics_train_statuses[table_name] = TrainStatus.Failed
+                    self._synthetics_train.lost_contact.append(table_name)
+                    failed.append(table_name)
                     continue
 
-                model = self._synthetics_models[table_name]
+                model = self._synthetics_train.models[table_name]
 
                 status = cautiously_refresh_status(model, table_name, refresh_attempts)
 
                 if status == Status.COMPLETED:
                     self._log_success(table_name, "model training")
-                    self.synthetics_train_statuses[table_name] = TrainStatus.Completed
+                    completed.append(table_name)
                     self._strategy.update_evaluation_from_model(
                         table_name, self.evaluations, model, self._working_dir
                     )
                 elif status in END_STATES:
                     # already checked explicitly for completed; all other end states are effectively failures
                     self._log_failed(table_name, "model training")
-                    self.synthetics_train_statuses[table_name] = TrainStatus.Failed
+                    failed.append(table_name)
                 else:
                     self._log_in_progress(table_name, status, "model training")
                     continue
@@ -688,7 +677,7 @@ class MultiTable:
     def train(self) -> None:
         """Train synthetic data models on each table in the relational dataset"""
         tables = self.relational_data.list_all_tables()
-        self._reset_train_statuses(tables)
+        self._synthetics_train = SyntheticsTrain()
 
         training_data = self._prepare_training_data(tables)
         self._train_synthetics_models(training_data)
@@ -708,7 +697,10 @@ class MultiTable:
             list(tables.keys()), self.relational_data
         )
 
-        self._reset_train_statuses(tables_to_retrain)
+        for table in tables_to_retrain:
+            with suppress(KeyError):
+                del self._synthetics_train.models[table]
+                del self._synthetics_train.training_columns[table]
         training_data = self._prepare_training_data(tables_to_retrain)
         self._train_synthetics_models(training_data)
 
@@ -725,10 +717,6 @@ class MultiTable:
             self._project, str(archive_path)
         )
         self._backup()
-
-    def _reset_train_statuses(self, tables: List[str]) -> None:
-        for table in tables:
-            self.synthetics_train_statuses[table] = TrainStatus.NotStarted
 
     def generate(
         self,
@@ -874,10 +862,10 @@ class MultiTable:
                     self._synthetics_run.record_size_ratio,
                     output_tables,
                     run_dir,
-                    self._training_columns[table_name],
+                    self._synthetics_train.training_columns[table_name],
                 )
                 self._log_start(table_name, "synthetic data generation")
-                model = self._synthetics_models[table_name]
+                model = self._synthetics_train.models[table_name]
                 record_handler = model.create_record_handler_obj(**table_job)
                 record_handler.submit_cloud()
                 self._synthetics_run.record_handlers[table_name] = record_handler
@@ -932,7 +920,7 @@ class MultiTable:
     def _list_tables_with_missing_models(self) -> List[str]:
         missing_model = set()
         for table in self.relational_data.list_all_tables():
-            if self.synthetics_train_statuses.get(table) != TrainStatus.Completed:
+            if not _table_trained_successfully(self._synthetics_train, table):
                 logger.info(
                     f"Skipping synthetic data generation for `{table}` because it does not have a trained model"
                 )
@@ -1033,15 +1021,14 @@ def _validate_strategy(strategy: str) -> Union[IndependentStrategy, AncestralStr
         raise MultiTableException(msg)
 
 
-def _train_status_for_model(model: Model) -> TrainStatus:
-    if model.status == Status.COMPLETED:
-        return TrainStatus.Completed
-    elif model.status in END_STATES:
-        return TrainStatus.Failed
-    elif model.status in ACTIVE_STATES:
-        return TrainStatus.InProgress
+def _table_trained_successfully(
+    train_state: Union[TransformsTrain, SyntheticsTrain], table: str
+) -> bool:
+    model = train_state.models.get(table)
+    if model is None:
+        return False
     else:
-        return TrainStatus.NotStarted
+        return model.status == Status.COMPLETED
 
 
 def _table_is_in_progress(run: SyntheticsRun, table: str) -> bool:

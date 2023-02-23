@@ -12,7 +12,7 @@ import pytest
 import gretel_trainer.relational.backup as b
 from gretel_trainer.relational.artifacts import ArtifactCollection
 from gretel_trainer.relational.core import MultiTableException, RelationalData
-from gretel_trainer.relational.multi_table import MultiTable, SyntheticsRun, TrainStatus
+from gretel_trainer.relational.multi_table import MultiTable, SyntheticsRun
 
 DEBUG_SUMMARY_CONTENT = {"debug": "summary"}
 
@@ -58,20 +58,21 @@ def make_backup(
         relational_data=b.BackupRelationalData.from_relational_data(rel_data),
     )
     if len(transforms_models) > 0:
-        backup.transforms = b.BackupTransforms(
+        backup.transforms_train = b.BackupTransformsTrain(
             model_ids={
                 table: mock.model_id for table, mock in transforms_models.items()
-            }
+            },
+            lost_contact=[],
         )
     if len(synthetics_models) > 0:
-        backup.train = b.BackupTrain(
-            tables={
-                table: b.BackupTrainTable(
-                    model_id=mock.model_id,
-                    training_columns=["col1", "col2"],
-                )
-                for table, mock in synthetics_models.items()
-            }
+        backup.synthetics_train = b.BackupSyntheticsTrain(
+            model_ids={
+                table: mock.model_id for table, mock in synthetics_models.items()
+            },
+            training_columns={
+                table: ["col1", "col2"] for table in synthetics_models
+            },
+            lost_contact=[],
         )
     if len(synthetics_record_handlers) > 0:
         backup.generate = b.BackupGenerate(
@@ -312,8 +313,8 @@ def test_restore_transforms(project, pets):
         assert len(os.listdir(working_dir)) == 5
 
         # Transforms state is restored
-        assert set(mt.transforms_train_statuses.values()) == {TrainStatus.Completed}
-        assert len(mt._transforms_models) == 2
+        assert len(mt._transforms_train.models) == 2
+        assert len(mt._transforms_train.lost_contact) == 0
 
 
 def test_restore_synthetics_training_still_in_progress(project, pets):
@@ -389,8 +390,7 @@ def test_restore_training_complete(project, pets):
         assert os.path.exists(
             working_dir / "synthetics_individual_evaluation_pets.html"
         )
-        assert set(mt.synthetics_train_statuses.values()) == {TrainStatus.Completed}
-        assert len(mt._synthetics_models) == 2
+        assert len(mt._synthetics_train.models) == 2
         assert mt.evaluations["humans"].individual_sqs == 94
         assert mt.evaluations["humans"].cross_table_sqs is None
         assert mt.evaluations["pets"].individual_sqs == 94
@@ -442,11 +442,7 @@ def test_restore_training_one_failed(project, pets):
         assert os.path.exists(
             working_dir / "synthetics_individual_evaluation_pets.html"
         )
-        assert set(mt.synthetics_train_statuses.values()) == {
-            TrainStatus.Completed,
-            TrainStatus.Failed,
-        }
-        assert len(mt._synthetics_models) == 2
+        assert len(mt._synthetics_train.models) == 2
         assert mt.evaluations["humans"].individual_sqs is None
         assert mt.evaluations["humans"].cross_table_sqs is None
         assert mt.evaluations["pets"].individual_sqs == 94

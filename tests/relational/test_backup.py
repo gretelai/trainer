@@ -7,9 +7,8 @@ from gretel_trainer.relational.backup import (
     BackupGenerate,
     BackupRelationalData,
     BackupRelationalDataTable,
-    BackupTrain,
-    BackupTrainTable,
-    BackupTransforms,
+    BackupSyntheticsTrain,
+    BackupTransformsTrain,
 )
 
 
@@ -45,23 +44,23 @@ def test_backup():
             )
         ],
     )
-    backup_transforms = BackupTransforms(
+    backup_transforms_train = BackupTransformsTrain(
         model_ids={
             "customer": "222333444",
             "address": "888777666",
-        }
+        },
+        lost_contact=[],
     )
-    backup_train = BackupTrain(
-        tables={
-            "customer": BackupTrainTable(
-                model_id="1234567890",
-                training_columns=["id", "first", "last"],
-            ),
-            "address": BackupTrainTable(
-                model_id="0987654321",
-                training_columns=["customer_id", "street", "city"],
-            ),
-        }
+    backup_synthetics_train = BackupSyntheticsTrain(
+        model_ids={
+            "customer": "1234567890",
+            "address": "0987654321",
+        },
+        training_columns={
+            "customer": ["id", "first", "last"],
+            "address": ["customer_id", "street", "city"],
+        },
+        lost_contact=[],
     )
     backup_generate = BackupGenerate(
         identifier="run-id",
@@ -86,8 +85,8 @@ def test_backup():
         refresh_interval=120,
         artifact_collection=artifact_collection,
         relational_data=backup_relational,
-        transforms=backup_transforms,
-        train=backup_train,
+        transforms_train=backup_transforms_train,
+        synthetics_train=backup_synthetics_train,
         generate=backup_generate,
     )
 
