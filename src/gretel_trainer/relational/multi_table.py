@@ -212,14 +212,20 @@ class MultiTable:
 
         logger.info("Restoring synthetics models")
 
-        self._synthetics_train.training_columns = backup_synthetics_train.training_columns
+        self._synthetics_train.training_columns = (
+            backup_synthetics_train.training_columns
+        )
         self._synthetics_train.lost_contact = backup_synthetics_train.lost_contact
         self._synthetics_train.models = {
             table: self._project.get_model(model_id)
             for table, model_id in backup_synthetics_train.model_ids.items()
         }
 
-        still_in_progress = [table for table, model in self._synthetics_train.models.items() if model.status in ACTIVE_STATES]
+        still_in_progress = [
+            table
+            for table, model in self._synthetics_train.models.items()
+            if model.status in ACTIVE_STATES
+        ]
         if len(still_in_progress) > 0:
             logger.warning(
                 f"Training still in progress for tables `{still_in_progress}`. From here, your next step is to wait for training to finish, and re-attempt restoring from backup once all models have completed training. You can view training progress in the Console in the `{self._project.display_name} ({self._project.name})` project."
@@ -228,17 +234,27 @@ class MultiTable:
                 "Cannot restore while model training is actively in progress."
             )
 
-        training_succeeded = [table for table, model in self._synthetics_train.models.items() if model.status == Status.COMPLETED]
+        training_succeeded = [
+            table
+            for table, model in self._synthetics_train.models.items()
+            if model.status == Status.COMPLETED
+        ]
         for table in training_succeeded:
             model = self._synthetics_train.models[table]
             download_file_artifact(
-                self._project, model.data_source, self._working_dir / f"synthetics_train_{table}.csv",
+                self._project,
+                model.data_source,
+                self._working_dir / f"synthetics_train_{table}.csv",
             )
             self._strategy.update_evaluation_from_model(
                 table, self.evaluations, model, self._working_dir
             )
 
-        training_failed = [table for table, model in self._synthetics_train.models.items() if model.status in END_STATES and table not in training_succeeded]
+        training_failed = [
+            table
+            for table, model in self._synthetics_train.models.items()
+            if model.status in END_STATES and table not in training_succeeded
+        ]
         if len(training_failed) > 0:
             logger.info(
                 f"Training failed for tables: {training_failed}. From here, your next step is to try retraining them with modified data by calling `retrain_tables`."

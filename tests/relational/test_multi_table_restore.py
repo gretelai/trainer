@@ -69,9 +69,7 @@ def make_backup(
             model_ids={
                 table: mock.model_id for table, mock in synthetics_models.items()
             },
-            training_columns={
-                table: ["col1", "col2"] for table in synthetics_models
-            },
+            training_columns={table: ["col1", "col2"] for table in synthetics_models},
             lost_contact=[],
         )
     if len(synthetics_record_handlers) > 0:
