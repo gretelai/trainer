@@ -300,10 +300,16 @@ class MultiTable:
                     self.synthetic_output_tables[table] = pd.read_csv(
                         self._working_dir / latest_run_id / f"synth_{table}.csv"
                     )
+                except FileNotFoundError:
+                    logger.info(
+                        f"Could not find synthetic CSV for table `{table}` in run outputs."
+                    )
+
+                try:
                     self._attach_existing_reports(latest_run_id, table)
                 except FileNotFoundError:
                     logger.info(
-                        f"Could not find data for table `{table}` in run outputs."
+                        f"Could not find report data for table `{table}` in run outputs."
                     )
             return None
         else:
