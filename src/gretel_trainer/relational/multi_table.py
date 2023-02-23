@@ -30,7 +30,6 @@ from gretel_trainer.relational.backup import (
     BackupForeignKey,
     BackupGenerate,
     BackupRelationalData,
-    BackupRelationalDataTable,
     BackupSyntheticsTrain,
     BackupTransformsTrain,
 )
