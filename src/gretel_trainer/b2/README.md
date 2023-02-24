@@ -11,6 +11,10 @@ A v2 rewrite of Benchmark.
   - the v2 Datatype enum is simplified
     - str and enum formats match (e.g. `Datatype.natural_language == "natural_language"`)
     - v1 "tabular_mixed" and "tabular_numeric" consolidated in v2 to just a singular "tabular"
+- User can decide if running Gretel models via SDK or Trainer
+- SDK models use a smarter polling mechanism than the `poll` helper
+- When using SDK, all runs are grouped in a single project
+- Quieter, more informative log output
 
 ## TODOs
 
