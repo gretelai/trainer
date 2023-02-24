@@ -16,6 +16,19 @@ def test_ecommerce_relational_data(ecom):
         "distribution_center",
     }
 
+    # get_parents goes back one generation,
+    # get_ancestors goes back all generations
+    assert set(ecom.get_parents("order_items")) == {
+        "users",
+        "inventory_items",
+    }
+    assert set(ecom.get_ancestors("order_items")) == {
+        "users",
+        "inventory_items",
+        "products",
+        "distribution_center",
+    }
+
 
 def test_mutagenesis_relational_data(mutagenesis):
     assert mutagenesis.get_parents("bond") == ["atom"]
