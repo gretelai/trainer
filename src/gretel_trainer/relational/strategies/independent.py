@@ -8,7 +8,11 @@ from gretel_client.projects.models import Model
 
 import gretel_trainer.relational.ancestry as ancestry
 import gretel_trainer.relational.strategies.common as common
-from gretel_trainer.relational.core import RelationalData, TableEvaluation
+from gretel_trainer.relational.core import (
+    MultiTableException,
+    RelationalData,
+    TableEvaluation,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -112,6 +116,11 @@ class IndependentStrategy:
         synth_size = int(source_data_size * record_size_ratio)
         return {"params": {"num_records": synth_size}}
 
+    def tables_to_skip_when_failed(
+        self, table: str, rel_data: RelationalData
+    ) -> List[str]:
+        return []
+
     def post_process_individual_synthetic_result(
         self,
         table_name: str,
@@ -160,6 +169,17 @@ class IndependentStrategy:
         synthetic_tables: Dict[str, pd.DataFrame],
         target_dir: Path,
     ) -> None:
+        missing_ancestors = [
+            ancestor
+            for ancestor in rel_data.get_ancestors(table)
+            if ancestor not in synthetic_tables
+        ]
+        if len(missing_ancestors) > 0:
+            logger.info(
+                f"Cannot run cross_table evaluations for `{table}` because no synthetic data exists for ancestor tables {missing_ancestors}."
+            )
+            return None
+
         source_data = ancestry.get_table_data_with_ancestors(rel_data, table)
         synth_data = ancestry.get_table_data_with_ancestors(
             rel_data, table, synthetic_tables
@@ -216,8 +236,17 @@ def _synthesize_foreign_keys(
     for table_name, synth_data in synth_tables.items():
         out_df = synth_data.copy()
         for foreign_key in rel_data.get_foreign_keys(table_name):
-            parent_synth_table = synth_tables[foreign_key.parent_table_name]
-            synth_pk_values = list(parent_synth_table[foreign_key.parent_column_name])
+            parent_synth_table = synth_tables.get(foreign_key.parent_table_name)
+            if parent_synth_table is None:
+                # Parent table generation job may have failed and therefore not be present in synth_tables.
+                # The synthetic data for this table may still be useful, but we do not have valid synthetic
+                # primary key values to set in this table's foreign key column. Instead of introducing dangling
+                # pointers, set the entire column to None.
+                synth_pk_values = [None]
+            else:
+                synth_pk_values = list(
+                    parent_synth_table[foreign_key.parent_column_name]
+                )
 
             original_table_data = rel_data.get_table_data(table_name)
             original_fk_frequencies = (

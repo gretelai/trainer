@@ -484,16 +484,15 @@ class MultiTable:
                 if table_name in (completed + failed):
                     continue
 
+                model = self._transforms_train.models[table_name]
+                status = cautiously_refresh_status(model, table_name, refresh_attempts)
+
                 # If we consistently failed to refresh the job status, fail the table
                 if refresh_attempts[table_name] >= MAX_REFRESH_ATTEMPTS:
                     self._log_lost_contact(table_name)
                     self._transforms_train.lost_contact.append(table_name)
                     failed.append(table_name)
                     continue
-
-                model = self._transforms_train.models[table_name]
-
-                status = cautiously_refresh_status(model, table_name, refresh_attempts)
 
                 if status == Status.COMPLETED:
                     self._log_success(table_name, "model training")
@@ -572,15 +571,15 @@ class MultiTable:
                 if table_name in output_tables:
                     continue
 
+                status = cautiously_refresh_status(
+                    record_handler, table_name, refresh_attempts
+                )
+
                 # If we consistently failed to refresh the job via API, fail the table
                 if refresh_attempts[table_name] >= MAX_REFRESH_ATTEMPTS:
                     self._log_lost_contact(table_name)
                     output_tables[table_name] = None
                     continue
-
-                status = cautiously_refresh_status(
-                    record_handler, table_name, refresh_attempts
-                )
 
                 if status == Status.COMPLETED:
                     self._log_success(table_name, "transforms run")
@@ -594,6 +593,10 @@ class MultiTable:
                     output_tables[table_name] = None
                 else:
                     self._log_in_progress(table_name, status, "transforms run")
+
+        output_tables = {
+            table: data for table, data in output_tables.items() if data is not None
+        }
 
         output_tables = self._strategy.label_encode_keys(
             self.relational_data, output_tables
@@ -668,16 +671,15 @@ class MultiTable:
                 if table_name in (completed + failed):
                     continue
 
+                model = self._synthetics_train.models[table_name]
+                status = cautiously_refresh_status(model, table_name, refresh_attempts)
+
                 # If we consistently failed to refresh the job status, fail the table
                 if refresh_attempts[table_name] >= MAX_REFRESH_ATTEMPTS:
                     self._log_lost_contact(table_name)
                     self._synthetics_train.lost_contact.append(table_name)
                     failed.append(table_name)
                     continue
-
-                model = self._synthetics_train.models[table_name]
-
-                status = cautiously_refresh_status(model, table_name, refresh_attempts)
 
                 if status == Status.COMPLETED:
                     self._log_success(table_name, "model training")
@@ -827,17 +829,24 @@ class MultiTable:
                 if table_name in output_tables:
                     continue
 
+                status = cautiously_refresh_status(
+                    record_handler, table_name, refresh_attempts
+                )
+
                 # If we consistently failed to refresh the job via API, fail the table
                 if refresh_attempts[table_name] >= MAX_REFRESH_ATTEMPTS:
                     self._log_lost_contact(table_name)
                     self._synthetics_run.lost_contact.append(table_name)
                     output_tables[table_name] = None
+                    for other_table in self._strategy.tables_to_skip_when_failed(
+                        table_name, self.relational_data
+                    ):
+                        logger.info(
+                            f"Skipping synthetic data generation for `{other_table}` because it depends on `{table_name}`"
+                        )
+                        output_tables[other_table] = None
                     self._backup()
                     continue
-
-                status = cautiously_refresh_status(
-                    record_handler, table_name, refresh_attempts
-                )
 
                 if status == Status.COMPLETED:
                     self._log_success(table_name, "synthetic data generation")
@@ -853,11 +862,13 @@ class MultiTable:
                     # already checked explicitly for completed; all other end states are effectively failures
                     self._log_failed(table_name, "synthetic data generation")
                     output_tables[table_name] = None
-                    for descendant in self.relational_data.get_descendants(table_name):
+                    for other_table in self._strategy.tables_to_skip_when_failed(
+                        table_name, self.relational_data
+                    ):
                         logger.info(
-                            f"Skipping synthetic data generation for `{descendant}` because it depends on `{table_name}`"
+                            f"Skipping synthetic data generation for `{other_table}` because it depends on `{table_name}`"
                         )
-                        output_tables[descendant] = None
+                        output_tables[other_table] = None
                 else:
                     self._log_in_progress(
                         table_name, status, "synthetic data generation"
@@ -893,34 +904,36 @@ class MultiTable:
 
             self._backup()
 
+        output_tables = {
+            table: data for table, data in output_tables.items() if data is not None
+        }
+
         output_tables = self._strategy.post_process_synthetic_results(
             output_tables, self._synthetics_run.preserved, self.relational_data
         )
 
         for table, data in output_tables.items():
-            if data is not None:
-                data.to_csv(run_dir / f"synth_{table}.csv", index=False)
+            data.to_csv(run_dir / f"synth_{table}.csv", index=False)
 
         for table, data in output_tables.items():
-            if data is not None:
-                # Get "opposite" evaluation metrics
-                self._strategy.update_evaluation_via_evaluate(
-                    evaluation=self.evaluations[table],
-                    table=table,
-                    rel_data=self.relational_data,
-                    synthetic_tables=output_tables,
-                    target_dir=run_dir,
-                )
+            # Get "opposite" evaluation metrics
+            self._strategy.update_evaluation_via_evaluate(
+                evaluation=self.evaluations[table],
+                table=table,
+                rel_data=self.relational_data,
+                synthetic_tables=output_tables,
+                target_dir=run_dir,
+            )
 
-                # Copy all evaluation data (model-based and evaluate-based) to run_dir
-                for eval_type in ["individual", "cross_table"]:
-                    for ext in ["html", "json"]:
-                        filename = f"synthetics_{eval_type}_evaluation_{table}.{ext}"
-                        with suppress(FileNotFoundError):
-                            shutil.copyfile(
-                                src=self._working_dir / filename,
-                                dst=run_dir / filename,
-                            )
+            # Copy all evaluation data (model-based and evaluate-based) to run_dir
+            for eval_type in ["individual", "cross_table"]:
+                for ext in ["html", "json"]:
+                    filename = f"synthetics_{eval_type}_evaluation_{table}.{ext}"
+                    with suppress(FileNotFoundError):
+                        shutil.copyfile(
+                            src=self._working_dir / filename,
+                            dst=run_dir / filename,
+                        )
 
         logger.info("Creating relational report")
         self.create_relational_report(run_dir)

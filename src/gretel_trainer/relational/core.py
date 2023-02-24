@@ -134,6 +134,19 @@ class RelationalData:
     def get_parents(self, table: str) -> List[str]:
         return list(self.graph.successors(table))
 
+    def get_ancestors(self, table: str) -> List[str]:
+        def _add_parents(ancestors, table):
+            parents = self.get_parents(table)
+            if len(parents) > 0:
+                ancestors.update(parents)
+                for parent in parents:
+                    _add_parents(ancestors, parent)
+
+        ancestors = set()
+        _add_parents(ancestors, table)
+
+        return list(ancestors)
+
     def get_descendants(self, table: str) -> List[str]:
         def _add_children(descendants, table):
             children = list(self.graph.predecessors(table))

@@ -108,7 +108,10 @@ def label_encode_keys(
         source_values.update(df[primary_key].to_list())
         for fk_ref in fk_references:
             fk_tbl, fk_col = fk_ref
-            source_values.update(tables[fk_tbl][fk_col].to_list())
+            fk_df = tables.get(fk_tbl)
+            if fk_df is None:
+                continue
+            source_values.update(fk_df[fk_col].to_list())
 
         # Fit a label encoder on all values
         le = preprocessing.LabelEncoder()
@@ -119,6 +122,9 @@ def label_encode_keys(
 
         for fk_ref in fk_references:
             fk_tbl, fk_col = fk_ref
-            tables[fk_tbl][fk_col] = le.transform(tables[fk_tbl][fk_col])
+            fk_df = tables.get(fk_tbl)
+            if fk_df is None:
+                continue
+            fk_df[fk_col] = le.transform(fk_df[fk_col])
 
     return tables

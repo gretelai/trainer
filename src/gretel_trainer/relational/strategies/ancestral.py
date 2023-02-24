@@ -229,6 +229,11 @@ class AncestralStrategy:
 
         return seed_df
 
+    def tables_to_skip_when_failed(
+        self, table: str, rel_data: RelationalData
+    ) -> List[str]:
+        return rel_data.get_descendants(table)
+
     def post_process_individual_synthetic_result(
         self,
         table_name: str,
@@ -261,7 +266,6 @@ class AncestralStrategy:
         """
         Restores tables from multigenerational to original shape
         """
-        # TODO: do we need to do any additional PK/FK manipulation?
         return {
             table_name: ancestry.drop_ancestral_data(df)
             for table_name, df in output_tables.items()
