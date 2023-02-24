@@ -229,6 +229,11 @@ class AncestralStrategy:
 
         return seed_df
 
+    def tables_to_skip_when_failed(
+        self, table: str, rel_data: RelationalData
+    ) -> List[str]:
+        return rel_data.get_descendants(table)
+
     def post_process_individual_synthetic_result(
         self,
         table_name: str,

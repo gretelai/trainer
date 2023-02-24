@@ -838,11 +838,13 @@ class MultiTable:
                     self._log_lost_contact(table_name)
                     self._synthetics_run.lost_contact.append(table_name)
                     output_tables[table_name] = None
-                    for descendant in self.relational_data.get_descendants(table_name):
+                    for other_table in self._strategy.tables_to_skip_when_failed(
+                        table_name, self.relational_data
+                    ):
                         logger.info(
-                            f"Skipping synthetic data generation for `{descendant}` because it depends on `{table_name}`"
+                            f"Skipping synthetic data generation for `{other_table}` because it depends on `{table_name}`"
                         )
-                        output_tables[descendant] = None
+                        output_tables[other_table] = None
                     self._backup()
                     continue
 
@@ -860,11 +862,13 @@ class MultiTable:
                     # already checked explicitly for completed; all other end states are effectively failures
                     self._log_failed(table_name, "synthetic data generation")
                     output_tables[table_name] = None
-                    for descendant in self.relational_data.get_descendants(table_name):
+                    for other_table in self._strategy.tables_to_skip_when_failed(
+                        table_name, self.relational_data
+                    ):
                         logger.info(
-                            f"Skipping synthetic data generation for `{descendant}` because it depends on `{table_name}`"
+                            f"Skipping synthetic data generation for `{other_table}` because it depends on `{table_name}`"
                         )
-                        output_tables[descendant] = None
+                        output_tables[other_table] = None
                 else:
                     self._log_in_progress(
                         table_name, status, "synthetic data generation"

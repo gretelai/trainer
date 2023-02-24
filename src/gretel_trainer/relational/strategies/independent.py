@@ -116,6 +116,11 @@ class IndependentStrategy:
         synth_size = int(source_data_size * record_size_ratio)
         return {"params": {"num_records": synth_size}}
 
+    def tables_to_skip_when_failed(
+        self, table: str, rel_data: RelationalData
+    ) -> List[str]:
+        return []
+
     def post_process_individual_synthetic_result(
         self,
         table_name: str,
@@ -222,14 +227,15 @@ def _synthesize_foreign_keys(
         for foreign_key in rel_data.get_foreign_keys(table_name):
             parent_synth_table = synth_tables.get(foreign_key.parent_table_name)
             if parent_synth_table is None:
-                # This should never happen because when a table fails,
-                # MultiTable's generation logic cascades the failure to all descendants,
-                # so if parent_synth_table is not in synth_tables, then table_name should not be present either
-                raise MultiTableException(
-                    f"Table `{parent_synth_table}`, parent of table `{table_name}`, missing from synthetic outputs."
+                # Parent table generation job may have failed and therefore not be present in synth_tables.
+                # The synthetic data for this table may still be useful, but we do not have valid synthetic
+                # primary key values to set in this table's foreign key column. Instead of introducing dangling
+                # pointers, set the entire column to None.
+                synth_pk_values = [None]
+            else:
+                synth_pk_values = list(
+                    parent_synth_table[foreign_key.parent_column_name]
                 )
-
-            synth_pk_values = list(parent_synth_table[foreign_key.parent_column_name])
 
             original_table_data = rel_data.get_table_data(table_name)
             original_fk_frequencies = (
