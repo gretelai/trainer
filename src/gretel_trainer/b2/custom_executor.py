@@ -61,13 +61,13 @@ class CustomExecutor:
         logger.info(
             f"Starting synthetic data generation for run `{self.run_identifier}`"
         )
-        self.set_status(
-            InProgress(stage="generate", train_secs=self.train_time)
-        )
+        self.set_status(InProgress(stage="generate", train_secs=self.train_time))
         generate_time = Timer()
         with generate_time:
             try:
-                self.synthetic_data = self.model.generate(num_records=self.dataset.row_count)
+                self.synthetic_data = self.model.generate(
+                    num_records=self.dataset.row_count
+                )
                 self.generate_time = generate_time.duration()
                 self.set_status(
                     Completed(

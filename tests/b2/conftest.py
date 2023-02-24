@@ -1,8 +1,8 @@
-import pytest
 from unittest.mock import patch
 
-from gretel_trainer.b2 import GretelDatasetRepo
+import pytest
 
+from gretel_trainer.b2 import GretelDatasetRepo
 
 REPO = GretelDatasetRepo()
 IRIS = REPO.get_dataset("iris")

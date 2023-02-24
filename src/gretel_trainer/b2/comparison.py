@@ -57,10 +57,10 @@ class Comparison:
             for model in self.gretel_models:
                 self._setup_gretel_run(dataset, model)
             for model_type in self.custom_models:
-                self._setup_custom_run(dataset, model_type, custom_executors) # type:ignore
-        self.futures.append(
-            self.thread_pool.submit(_run_custom, custom_executors)
-        )
+                self._setup_custom_run(
+                    dataset, model_type, custom_executors
+                )  # type:ignore
+        self.futures.append(self.thread_pool.submit(_run_custom, custom_executors))
         return self
 
     @property
@@ -120,7 +120,10 @@ class Comparison:
         self.futures.append(self.thread_pool.submit(_run_gretel, executor))
 
     def _setup_custom_run(
-        self, dataset: Dataset, model_type: Type[CustomModel], collection: List[CustomExecutor]
+        self,
+        dataset: Dataset,
+        model_type: Type[CustomModel],
+        collection: List[CustomExecutor],
     ) -> None:
         run_identifier = RunIdentifier((dataset.name, model_type.__name__))
         executor = CustomExecutor(
