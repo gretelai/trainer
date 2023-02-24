@@ -52,31 +52,12 @@ class Comparison:
             )
 
     def execute(self) -> Comparison:
-        custom_executors = []
+        custom_executors: List[CustomExecutor] = []
         for dataset in self.datasets:
             for model in self.gretel_models:
-                run_identifier = RunIdentifier((dataset.name, model().name))
-                logger.info(f"Queueing run `{run_identifier}`")
-                executor = GretelExecutor(
-                    benchmark_model=model(),
-                    dataset=dataset,
-                    run_identifier=run_identifier,
-                    statuses=self.run_statuses,
-                    config=self.config,
-                    project=self._project,
-                )
-                self.executors[run_identifier] = executor
-                self.futures.append(self.thread_pool.submit(_run_gretel, executor))
+                self._setup_gretel_run(dataset, model)
             for model_type in self.custom_models:
-                run_identifier = RunIdentifier((dataset.name, model_type.__name__))
-                executor = CustomExecutor(
-                    model=model_type(), # type:ignore
-                    dataset=dataset,
-                    run_identifier=run_identifier,
-                    statuses=self.run_statuses,
-                )
-                self.executors[run_identifier] = executor
-                custom_executors.append(executor)
+                self._setup_custom_run(dataset, model_type, custom_executors) # type:ignore
         self.futures.append(
             self.thread_pool.submit(_run_custom, custom_executors)
         )
@@ -123,6 +104,33 @@ class Comparison:
             "Generate time (sec)": generate_time,
             "Total time (sec)": total_time,
         }
+
+    def _setup_gretel_run(self, dataset: Dataset, model: Type[GretelModel]) -> None:
+        run_identifier = RunIdentifier((dataset.name, model().name))
+        logger.info(f"Queueing run `{run_identifier}`")
+        executor = GretelExecutor(
+            benchmark_model=model(),
+            dataset=dataset,
+            run_identifier=run_identifier,
+            statuses=self.run_statuses,
+            config=self.config,
+            project=self._project,
+        )
+        self.executors[run_identifier] = executor
+        self.futures.append(self.thread_pool.submit(_run_gretel, executor))
+
+    def _setup_custom_run(
+        self, dataset: Dataset, model_type: Type[CustomModel], collection: List[CustomExecutor]
+    ) -> None:
+        run_identifier = RunIdentifier((dataset.name, model_type.__name__))
+        executor = CustomExecutor(
+            model=model_type(),
+            dataset=dataset,
+            run_identifier=run_identifier,
+            statuses=self.run_statuses,
+        )
+        self.executors[run_identifier] = executor
+        collection.append(executor)
 
 
 def _run_gretel(executor: GretelExecutor) -> None:
