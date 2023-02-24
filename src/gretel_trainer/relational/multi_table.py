@@ -484,16 +484,15 @@ class MultiTable:
                 if table_name in (completed + failed):
                     continue
 
+                model = self._transforms_train.models[table_name]
+                status = cautiously_refresh_status(model, table_name, refresh_attempts)
+
                 # If we consistently failed to refresh the job status, fail the table
                 if refresh_attempts[table_name] >= MAX_REFRESH_ATTEMPTS:
                     self._log_lost_contact(table_name)
                     self._transforms_train.lost_contact.append(table_name)
                     failed.append(table_name)
                     continue
-
-                model = self._transforms_train.models[table_name]
-
-                status = cautiously_refresh_status(model, table_name, refresh_attempts)
 
                 if status == Status.COMPLETED:
                     self._log_success(table_name, "model training")
@@ -572,15 +571,15 @@ class MultiTable:
                 if table_name in output_tables:
                     continue
 
+                status = cautiously_refresh_status(
+                    record_handler, table_name, refresh_attempts
+                )
+
                 # If we consistently failed to refresh the job via API, fail the table
                 if refresh_attempts[table_name] >= MAX_REFRESH_ATTEMPTS:
                     self._log_lost_contact(table_name)
                     output_tables[table_name] = None
                     continue
-
-                status = cautiously_refresh_status(
-                    record_handler, table_name, refresh_attempts
-                )
 
                 if status == Status.COMPLETED:
                     self._log_success(table_name, "transforms run")
@@ -672,16 +671,15 @@ class MultiTable:
                 if table_name in (completed + failed):
                     continue
 
+                model = self._synthetics_train.models[table_name]
+                status = cautiously_refresh_status(model, table_name, refresh_attempts)
+
                 # If we consistently failed to refresh the job status, fail the table
                 if refresh_attempts[table_name] >= MAX_REFRESH_ATTEMPTS:
                     self._log_lost_contact(table_name)
                     self._synthetics_train.lost_contact.append(table_name)
                     failed.append(table_name)
                     continue
-
-                model = self._synthetics_train.models[table_name]
-
-                status = cautiously_refresh_status(model, table_name, refresh_attempts)
 
                 if status == Status.COMPLETED:
                     self._log_success(table_name, "model training")
@@ -831,6 +829,10 @@ class MultiTable:
                 if table_name in output_tables:
                     continue
 
+                status = cautiously_refresh_status(
+                    record_handler, table_name, refresh_attempts
+                )
+
                 # If we consistently failed to refresh the job via API, fail the table
                 if refresh_attempts[table_name] >= MAX_REFRESH_ATTEMPTS:
                     self._log_lost_contact(table_name)
@@ -838,10 +840,6 @@ class MultiTable:
                     output_tables[table_name] = None
                     self._backup()
                     continue
-
-                status = cautiously_refresh_status(
-                    record_handler, table_name, refresh_attempts
-                )
 
                 if status == Status.COMPLETED:
                     self._log_success(table_name, "synthetic data generation")
