@@ -101,7 +101,7 @@ class IndependentStrategy:
         rel_data: RelationalData,
         record_size_ratio: float,
         output_tables: Dict[str, pd.DataFrame],
-        working_dir: Path,
+        target_dir: Path,
         training_columns: List[str],
     ) -> Dict[str, Any]:
         """
@@ -158,7 +158,7 @@ class IndependentStrategy:
         table: str,
         rel_data: RelationalData,
         synthetic_tables: Dict[str, pd.DataFrame],
-        working_dir: Path,
+        target_dir: Path,
     ) -> None:
         source_data = ancestry.get_table_data_with_ancestors(rel_data, table)
         synth_data = ancestry.get_table_data_with_ancestors(
@@ -169,7 +169,7 @@ class IndependentStrategy:
         report = common.get_quality_report(
             source_data=source_data, synth_data=synth_data
         )
-        out_filepath = working_dir / f"synthetics_cross_table_evaluation_{table}"
+        out_filepath = target_dir / f"synthetics_cross_table_evaluation_{table}"
         common.write_report(report, out_filepath)
 
         evaluation.cross_table_sqs = report.peek().get("score")
