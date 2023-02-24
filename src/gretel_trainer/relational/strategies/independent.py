@@ -8,7 +8,11 @@ from gretel_client.projects.models import Model
 
 import gretel_trainer.relational.ancestry as ancestry
 import gretel_trainer.relational.strategies.common as common
-from gretel_trainer.relational.core import RelationalData, TableEvaluation
+from gretel_trainer.relational.core import (
+    MultiTableException,
+    RelationalData,
+    TableEvaluation,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -216,7 +220,15 @@ def _synthesize_foreign_keys(
     for table_name, synth_data in synth_tables.items():
         out_df = synth_data.copy()
         for foreign_key in rel_data.get_foreign_keys(table_name):
-            parent_synth_table = synth_tables[foreign_key.parent_table_name]
+            parent_synth_table = synth_tables.get(foreign_key.parent_table_name)
+            if parent_synth_table is None:
+                # This should never happen because when a table fails,
+                # MultiTable's generation logic cascades the failure to all descendants,
+                # so if parent_synth_table is not in synth_tables, then table_name should not be present either
+                raise MultiTableException(
+                    f"Table `{parent_synth_table}`, parent of table `{table_name}`, missing from synthetic outputs."
+                )
+
             synth_pk_values = list(parent_synth_table[foreign_key.parent_column_name])
 
             original_table_data = rel_data.get_table_data(table_name)

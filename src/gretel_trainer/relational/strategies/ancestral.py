@@ -261,7 +261,6 @@ class AncestralStrategy:
         """
         Restores tables from multigenerational to original shape
         """
-        # TODO: do we need to do any additional PK/FK manipulation?
         return {
             table_name: ancestry.drop_ancestral_data(df)
             for table_name, df in output_tables.items()
