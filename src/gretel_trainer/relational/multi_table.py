@@ -838,6 +838,11 @@ class MultiTable:
                     self._log_lost_contact(table_name)
                     self._synthetics_run.lost_contact.append(table_name)
                     output_tables[table_name] = None
+                    for descendant in self.relational_data.get_descendants(table_name):
+                        logger.info(
+                            f"Skipping synthetic data generation for `{descendant}` because it depends on `{table_name}`"
+                        )
+                        output_tables[descendant] = None
                     self._backup()
                     continue
 
