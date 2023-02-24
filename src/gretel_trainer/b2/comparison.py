@@ -34,7 +34,7 @@ class Comparison:
     ):
         self.datasets = datasets
         self.gretel_models = [m for m in models if issubclass(m, GretelModel)]
-        self.custom_models = [m for m in models if not m in self.gretel_models]
+        self.custom_models = [m for m in models if not issubclass(m, GretelModel)]
         self.config = config
         self.executors: Dict[RunIdentifier, Executor] = {}
         self.thread_pool = ThreadPoolExecutor(5)
@@ -57,9 +57,7 @@ class Comparison:
             for model in self.gretel_models:
                 self._setup_gretel_run(dataset, model)
             for model_type in self.custom_models:
-                self._setup_custom_run(
-                    dataset, model_type, custom_executors
-                )  # type:ignore
+                self._setup_custom_run(dataset, model_type, custom_executors)
         self.futures.append(self.thread_pool.submit(_run_custom, custom_executors))
         return self
 
