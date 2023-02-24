@@ -11,6 +11,7 @@ from gretel_client import configure_session
 from gretel_client.projects import create_project
 
 from gretel_trainer.b2.core import BenchmarkConfig, Dataset, RunIdentifier
+from gretel_trainer.b2.custom_executor import CustomExecutor
 from gretel_trainer.b2.custom_models import CustomModel
 from gretel_trainer.b2.gretel_executor import GretelExecutor
 from gretel_trainer.b2.gretel_models import GretelModel
@@ -20,7 +21,7 @@ logger = logging.getLogger(__name__)
 
 
 ModelTypes = Union[Type[CustomModel], Type[GretelModel]]
-Executor = GretelExecutor  # Union[GretelExecutor, CustomExecutor]
+Executor = Union[GretelExecutor, CustomExecutor]
 
 
 class Comparison:
@@ -51,6 +52,7 @@ class Comparison:
             )
 
     def execute(self) -> Comparison:
+        custom_executors = []
         for dataset in self.datasets:
             for model in self.gretel_models:
                 run_identifier = RunIdentifier((dataset.name, model().name))
@@ -64,9 +66,20 @@ class Comparison:
                     project=self._project,
                 )
                 self.executors[run_identifier] = executor
-                self.futures.append(self.thread_pool.submit(_run, executor))
-            for model in self.custom_models:
-                pass
+                self.futures.append(self.thread_pool.submit(_run_gretel, executor))
+            for model_type in self.custom_models:
+                run_identifier = RunIdentifier((dataset.name, model_type.__name__))
+                executor = CustomExecutor(
+                    model=model_type(), # type:ignore
+                    dataset=dataset,
+                    run_identifier=run_identifier,
+                    statuses=self.run_statuses,
+                )
+                self.executors[run_identifier] = executor
+                custom_executors.append(executor)
+        self.futures.append(
+            self.thread_pool.submit(_run_custom, custom_executors)
+        )
         return self
 
     @property
@@ -100,7 +113,7 @@ class Comparison:
 
         return {
             "Input data": executor.dataset.name,
-            "Model": executor.benchmark_model.name,
+            "Model": executor.model_name,
             "DataType": executor.dataset.datatype,
             "Rows": executor.dataset.row_count,
             "Columns": executor.dataset.column_count,
@@ -112,6 +125,12 @@ class Comparison:
         }
 
 
-def _run(executor: GretelExecutor) -> None:
+def _run_gretel(executor: GretelExecutor) -> None:
     executor.train()
     executor.generate()
+
+
+def _run_custom(executors: List[CustomExecutor]) -> None:
+    for executor in executors:
+        executor.train()
+        executor.generate()

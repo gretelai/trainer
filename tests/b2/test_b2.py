@@ -1,3 +1,25 @@
+import pandas as pd
+
+from gretel_trainer.b2 import compare
+
+
+class DoNothingModel:
+    def train(self, source, **kwargs):
+        pass
+
+    def generate(self, **kwargs):
+        return pd.DataFrame()
+
+
+def test_things_work(iris):
+    comparison = compare(
+        datasets=[iris],
+        models=[DoNothingModel],
+    ).wait()
+
+    assert len(comparison.results) == 1
+
+
 def test_run_with_gretel_dataset():
     pass
 
@@ -11,7 +33,7 @@ def test_run_with_custom_dataframe_dataset():
 
 
 # parametrize
-def test_run_with_default_gretel_model():
+def test_run_with_default_gretel_model_through_sdk():
     pass
 
 

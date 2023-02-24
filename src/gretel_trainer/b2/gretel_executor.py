@@ -80,6 +80,10 @@ class GretelExecutor:
         )
 
     @property
+    def model_name(self) -> str:
+        return self.benchmark_model.name
+
+    @property
     def benchmark_model(self) -> GretelModel:
         return self._strategy.benchmark_model
 
