@@ -55,17 +55,18 @@ class CustomExecutor:
         logger.info(f"Starting model training for run `{self.run_identifier}`")
         self.set_status(InProgress(stage="train"))
         train_time = Timer()
-        with train_time:
-            try:
+        try:
+            with train_time:
                 self.model.train(self.dataset)
-                self.train_time = train_time.duration()
-                logger.info(f"Training completed successfully for run `{self.run_identifier}`")
-            except Exception as e:
-                logger.info(f"Training failed for run `{self.run_identifier}`")
-                self.train_time = train_time.duration()
-                self.set_status(
-                    Failed(during="train", error=e, train_secs=train_time.duration())
-                )
+        except Exception as e:
+            self.train_time = train_time.duration()
+            logger.info(f"Training failed for run `{self.run_identifier}`")
+            self.set_status(
+                Failed(during="train", error=e, train_secs=train_time.duration())
+            )
+
+        self.train_time = train_time.duration()
+        logger.info(f"Training completed successfully for run `{self.run_identifier}`")
 
     def generate(self) -> None:
         logger.info(
@@ -73,34 +74,35 @@ class CustomExecutor:
         )
         self.set_status(InProgress(stage="generate", train_secs=self.train_time))
         generate_time = Timer()
-        with generate_time:
-            try:
+        try:
+            with generate_time:
                 preferred_out_path = run_out_path(self.working_dir, self.run_identifier)
                 synthetic_data_path = self.model.generate(
                     num_records=self.dataset.row_count,
                     preferred_out_path=preferred_out_path,
                 )
-                self.generate_time = generate_time.duration()
-                self.set_status(
-                    Completed(
-                        sqs=self.get_sqs_score(),
-                        train_secs=self.train_time,
-                        generate_secs=self.generate_time,
-                        synthetic_data=synthetic_data_path,
-                    )
+        except Exception as e:
+            self.generate_time = generate_time.duration()
+            logger.info(f"Synthetic data generation failed for run `{self.run_identifier}`")
+            self.set_status(
+                Failed(
+                    during="generate",
+                    error=e,
+                    train_secs=self.train_time,
+                    generate_secs=self.generate_time,
                 )
-                logger.info(f"Synthetic data generation completed successfully for run `{self.run_identifier}`")
-            except Exception as e:
-                logger.info(f"Synthetic data generation failed for run `{self.run_identifier}`")
-                self.generate_time = generate_time.duration()
-                self.set_status(
-                    Failed(
-                        during="generate",
-                        error=e,
-                        train_secs=self.train_time,
-                        generate_secs=self.generate_time,
-                    )
-                )
+            )
+
+        self.generate_time = generate_time.duration()
+        self.set_status(
+            Completed(
+                sqs=self.get_sqs_score(),
+                train_secs=self.train_time,
+                generate_secs=self.generate_time,
+                synthetic_data=synthetic_data_path,
+            )
+        )
+        logger.info(f"Synthetic data generation completed successfully for run `{self.run_identifier}`")
 
     def get_sqs_score(self) -> int:
         # TODO: run a QualityReport here
