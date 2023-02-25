@@ -53,3 +53,7 @@ class Timer:
 
     def duration(self) -> float:
         return round(self.total_time, 2)
+
+
+def run_out_path(working_dir: Path, run_identifier: RunIdentifier) -> Path:
+    return working_dir / "out" / f"{run_identifier}.csv"

@@ -134,6 +134,7 @@ class Comparison:
             model=model_type(),
             dataset=dataset,
             run_identifier=run_identifier,
+            working_dir=self.config.working_dir,
             statuses=self.run_statuses,
         )
         self.executors[run_identifier] = executor

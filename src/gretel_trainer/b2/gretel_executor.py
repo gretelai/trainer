@@ -54,6 +54,7 @@ def _set_strategy(
             run_identifier=run_identifier,
             project=project,
             refresh_interval=config.refresh_interval,
+            working_dir=config.working_dir,
         )
 
 
@@ -94,9 +95,6 @@ class GretelExecutor:
     def get_sqs_score(self) -> int:
         return self._strategy.get_sqs_score()
 
-    def get_synthetic_data(self) -> pd.DataFrame:
-        return self._strategy.get_synthetic_data()
-
     def set_status(self, status: RunStatus) -> None:
         self.status = status
         self.statuses[self.run_identifier] = status
@@ -127,13 +125,13 @@ class GretelExecutor:
             InProgress(stage="generate", train_secs=self._strategy.train_time)
         )
         try:
-            self._strategy.generate()
+            synthetic_data_path = self._strategy.generate()
             self.set_status(
                 Completed(
                     sqs=self.get_sqs_score(),
                     train_secs=self._strategy.train_time,
                     generate_secs=self._strategy.generate_time,
-                    synthetic_data=self._strategy.get_synthetic_data(),
+                    synthetic_data=synthetic_data_path,
                 )
             )
             logger.info(f"Run `{self.run_identifier}` completed successfully")

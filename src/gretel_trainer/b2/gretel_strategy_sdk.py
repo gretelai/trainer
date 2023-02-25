@@ -1,5 +1,6 @@
 import time
 from multiprocessing.managers import DictProxy
+from pathlib import Path
 from typing import Callable, Optional, Tuple
 
 import pandas as pd
@@ -8,7 +9,7 @@ from gretel_client.projects.models import Model, read_model_config
 from gretel_client.projects.projects import Project
 from gretel_client.projects.records import RecordHandler
 
-from gretel_trainer.b2.core import BenchmarkException, Dataset, RunIdentifier, Timer
+from gretel_trainer.b2.core import BenchmarkException, Dataset, RunIdentifier, Timer, run_out_path
 from gretel_trainer.b2.gretel_models import GretelModel, GretelModelConfig
 from gretel_trainer.b2.status import (
     Completed,
@@ -27,12 +28,14 @@ class GretelSDKStrategy:
         run_identifier: RunIdentifier,
         project: Project,
         refresh_interval: int,
+        working_dir: Path,
     ):
         self.benchmark_model = benchmark_model
         self.dataset = dataset
         self.run_identifier = run_identifier
         self.project = project
         self.refresh_interval = refresh_interval
+        self.working_dir = working_dir
 
         self.model: Optional[Model] = None
         self.record_handler: Optional[RecordHandler] = None
@@ -57,7 +60,7 @@ class GretelSDKStrategy:
         if job_status in END_STATES and job_status != Status.COMPLETED:
             raise BenchmarkException("Training failed")
 
-    def generate(self) -> None:
+    def generate(self) -> Path:
         if self.model is None or self.train_time is None:
             raise BenchmarkException("Cannot generate before training")
 
@@ -70,8 +73,13 @@ class GretelSDKStrategy:
             job_status = _await_job(self.record_handler, self.refresh_interval)
         self.generate_time = generate_time.duration()
         if job_status == Status.COMPLETED:
-            return None
-        elif job_status in END_STATES:
+            synthetic_data = pd.read_csv(
+                self.record_handler.get_artifact_link("data"), compression="gzip"
+            )
+            out_path = run_out_path(self.working_dir, self.run_identifier)
+            synthetic_data.to_csv(out_path, index=False)
+            return out_path
+        else:
             raise BenchmarkException("Generate failed")
 
     def get_sqs_score(self) -> int:

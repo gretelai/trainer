@@ -1,4 +1,5 @@
-from dataclasses import dataclass, field
+from dataclasses import dataclass
+from pathlib import Path
 from typing import Optional, Union
 
 import pandas as pd
@@ -34,7 +35,7 @@ class Completed:
     sqs: int
     train_secs: Optional[float]
     generate_secs: Optional[float]
-    synthetic_data: pd.DataFrame = field(repr=False)
+    synthetic_data: Path
 
     @property
     def display(self) -> str:
@@ -47,7 +48,7 @@ class Failed:
     error: Optional[Exception] = None
     train_secs: Optional[float] = None
     generate_secs: Optional[float] = None
-    synthetic_data: Optional[pd.DataFrame] = field(default=None, repr=False)
+    synthetic_data: Optional[Path] = None
 
     @property
     def display(self) -> str:

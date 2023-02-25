@@ -1,10 +1,11 @@
 import logging
 from multiprocessing.managers import DictProxy
+from pathlib import Path
 from typing import Optional
 
 import pandas as pd
 
-from gretel_trainer.b2.core import BenchmarkException, Dataset, RunIdentifier, Timer
+from gretel_trainer.b2.core import BenchmarkException, Dataset, RunIdentifier, Timer, run_out_path
 from gretel_trainer.b2.custom_models import CustomModel
 from gretel_trainer.b2.status import (
     Completed,
@@ -23,17 +24,18 @@ class CustomExecutor:
         model: CustomModel,
         dataset: Dataset,
         run_identifier: RunIdentifier,
+        working_dir: Path,
         statuses: DictProxy,
     ):
         self.model = model
         self.dataset = dataset
         self.run_identifier = run_identifier
+        self.working_dir = working_dir
         self.statuses = statuses
         self.set_status(NotStarted())
 
         self.train_time: Optional[float] = None
         self.generate_time: Optional[float] = None
-        self.synthetic_data: Optional[pd.DataFrame] = None
 
     @property
     def model_name(self) -> str:
@@ -65,8 +67,10 @@ class CustomExecutor:
         generate_time = Timer()
         with generate_time:
             try:
-                self.synthetic_data = self.model.generate(
-                    num_records=self.dataset.row_count
+                preferred_out_path = run_out_path(self.working_dir, self.run_identifier)
+                synthetic_data_path = self.model.generate(
+                    num_records=self.dataset.row_count,
+                    preferred_out_path=preferred_out_path,
                 )
                 self.generate_time = generate_time.duration()
                 self.set_status(
@@ -74,7 +78,7 @@ class CustomExecutor:
                         sqs=self.get_sqs_score(),
                         train_secs=self.train_time,
                         generate_secs=self.generate_time,
-                        synthetic_data=self.get_synthetic_data(),
+                        synthetic_data=synthetic_data_path,
                     )
                 )
                 logger.info(f"Run `{self.run_identifier}` completed successfully")
@@ -89,11 +93,6 @@ class CustomExecutor:
                     )
                 )
                 logger.info(f"Run `{self.run_identifier}` failed")
-
-    def get_synthetic_data(self) -> pd.DataFrame:
-        if self.synthetic_data is None:
-            raise BenchmarkException("Synthetic data not present")
-        return self.synthetic_data
 
     def get_sqs_score(self) -> int:
         # TODO: run a QualityReport here
