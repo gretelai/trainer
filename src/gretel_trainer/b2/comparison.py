@@ -4,6 +4,7 @@ import logging
 import multiprocessing as mp
 from concurrent.futures import ThreadPoolExecutor
 from multiprocessing.managers import DictProxy
+from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple, Type, Union
 
 import pandas as pd
@@ -11,8 +12,10 @@ from gretel_client import configure_session
 from gretel_client.projects import create_project
 
 from gretel_trainer.b2.core import BenchmarkConfig, Dataset, RunIdentifier
+from gretel_trainer.b2.custom_datasets import CustomDataset
 from gretel_trainer.b2.custom_executor import CustomExecutor
 from gretel_trainer.b2.custom_models import CustomModel
+from gretel_trainer.b2.gretel_datasets import GretelDataset
 from gretel_trainer.b2.gretel_executor import GretelExecutor
 from gretel_trainer.b2.gretel_models import GretelModel
 from gretel_trainer.b2.status import Completed, Failed, InProgress
@@ -20,22 +23,25 @@ from gretel_trainer.b2.status import Completed, Failed, InProgress
 logger = logging.getLogger(__name__)
 
 
+DatasetTypes = Union[CustomDataset, GretelDataset]
 ModelTypes = Union[Type[CustomModel], Type[GretelModel]]
-Executor = Union[GretelExecutor, CustomExecutor]
+Executor = Union[CustomExecutor, GretelExecutor]
 
 
 class Comparison:
     def __init__(
         self,
         *,
-        datasets: List[Dataset],
+        datasets: List[DatasetTypes],
         models: List[ModelTypes],
         config: BenchmarkConfig,
     ):
-        self.datasets = datasets
+        self.config = config
+        self.datasets = [
+            _make_dataset(dataset, self.config.working_dir) for dataset in datasets
+        ]
         self.gretel_models = [m for m in models if issubclass(m, GretelModel)]
         self.custom_models = [m for m in models if not issubclass(m, GretelModel)]
-        self.config = config
         self.executors: Dict[RunIdentifier, Executor] = {}
         self.thread_pool = ThreadPoolExecutor(5)
         self.futures = []
@@ -143,3 +149,19 @@ def _run_custom(executors: List[CustomExecutor]) -> None:
     for executor in executors:
         executor.train()
         executor.generate()
+
+
+def _make_dataset(dataset: DatasetTypes, working_dir: Path) -> Dataset:
+    source = dataset.data_source
+    if isinstance(source, pd.DataFrame):
+        csv_path = working_dir / f"{dataset.name}.csv"
+        source.to_csv(csv_path, index=False)
+        source = str(csv_path)
+
+    return Dataset(
+        name=dataset.name,
+        datatype=dataset.datatype,
+        row_count=dataset.row_count,
+        column_count=dataset.column_count,
+        data_source=source,
+    )

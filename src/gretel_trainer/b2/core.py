@@ -4,7 +4,6 @@ from enum import Enum
 from pathlib import Path
 from typing import Tuple, Type, Union
 
-import gretel_client.projects.common as client_common
 import pandas as pd
 from typing_extensions import Protocol
 
@@ -18,35 +17,19 @@ class RunIdentifier(Tuple[str, str]):
         return f"{self[0]}-{self[1]}"
 
 
-DataSourceTypes = client_common.DataSourceTypes
-
-
 class Datatype(str, Enum):
     tabular = "tabular"
     time_series = "time_series"
     natural_language = "natural_language"
 
 
-class Dataset(Protocol):
-    @property
-    def data_source(self) -> DataSourceTypes:
-        ...
-
-    @property
-    def datatype(self) -> Datatype:
-        ...
-
-    @property
-    def name(self) -> str:
-        ...
-
-    @property
-    def row_count(self) -> int:
-        ...
-
-    @property
-    def column_count(self) -> int:
-        ...
+@dataclass
+class Dataset:
+    name: str
+    datatype: Datatype
+    data_source: str
+    row_count: int
+    column_count: int
 
 
 @dataclass

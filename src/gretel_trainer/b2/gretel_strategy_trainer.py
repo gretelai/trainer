@@ -48,11 +48,7 @@ class GretelTrainerStrategy:
         try:
             with train_time:
                 data_source = self.dataset.data_source
-                if isinstance(data_source, pd.DataFrame):
-                    csv_path = self.working_dir / f"{self.run_identifier}.csv"
-                    data_source.to_csv(csv_path, index=False)
-                    data_source = csv_path
-                self.trainer.train(data_source)
+                self.trainer.train(self.dataset.data_source)
             self.train_time = train_time.duration()
         except Exception as e:
             raise BenchmarkException("Training failed") from e

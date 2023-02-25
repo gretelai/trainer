@@ -1,35 +1,27 @@
+import os
 from dataclasses import dataclass, field
 from typing import Optional, Union
 
 import pandas as pd
 
-from gretel_trainer.b2.core import BenchmarkException, DataSourceTypes, Datatype
+from gretel_trainer.b2.core import BenchmarkException, Datatype
 
 
 @dataclass
 class CustomDataset:
-    source: Union[str, pd.DataFrame] = field(repr=False)
-    datatype: Datatype
     name: str
-    df: pd.DataFrame = field(init=False)
+    datatype: Datatype
+    data_source: Union[str, pd.DataFrame] = field(repr=False)
+    row_count: int = field(init=False, repr=False)
+    column_count: int = field(init=False, repr=False)
 
     def __post_init__(self):
-        if isinstance(self.source, str):
-            self.df = pd.read_csv(self.source)
+        if isinstance(self.data_source, str):
+            df = pd.read_csv(self.data_source)
         else:
-            self.df = self.source
-
-    @property
-    def row_count(self) -> int:
-        return self.df.shape[0]
-
-    @property
-    def column_count(self) -> int:
-        return self.df.shape[1]
-
-    @property
-    def data_source(self) -> Union[str, pd.DataFrame]:
-        return self.source
+            df = self.data_source
+        self.row_count = df.shape[0]
+        self.column_count = df.shape[1]
 
 
 def _to_datatype(d: Union[str, Datatype]) -> Datatype:
@@ -52,4 +44,7 @@ def make_dataset(
         raise BenchmarkException(
             "`source` must be either a string path to a CSV or a Pandas DataFrame"
         )
-    return CustomDataset(source=source, datatype=datatype, name=name)
+    if isinstance(source, str) and not os.path.isfile(source):
+        raise BenchmarkException("String `source` must be a path to a file")
+
+    return CustomDataset(data_source=source, datatype=datatype, name=name)

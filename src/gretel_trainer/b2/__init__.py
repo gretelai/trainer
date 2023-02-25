@@ -3,8 +3,8 @@ from datetime import datetime
 from pathlib import Path
 from typing import List
 
-from gretel_trainer.b2.comparison import Comparison, ModelTypes
-from gretel_trainer.b2.core import BenchmarkConfig, Dataset, Datatype
+from gretel_trainer.b2.comparison import Comparison, DatasetTypes, ModelTypes
+from gretel_trainer.b2.core import BenchmarkConfig, Datatype
 from gretel_trainer.b2.custom_datasets import make_dataset
 from gretel_trainer.b2.gretel_datasets import GretelDatasetRepo
 from gretel_trainer.b2.gretel_models import (
@@ -47,7 +47,7 @@ def _current_timestamp() -> str:
 
 def compare(
     *,
-    datasets: List[Dataset],
+    datasets: List[DatasetTypes],
     models: List[ModelTypes],
     project_display_name: str = "benchmark",
     trainer: bool = False,
