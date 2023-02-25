@@ -56,4 +56,4 @@ class Timer:
 
 
 def run_out_path(working_dir: Path, run_identifier: RunIdentifier) -> Path:
-    return working_dir / "out" / f"{run_identifier}.csv"
+    return working_dir / f"synth_{run_identifier}.csv"
