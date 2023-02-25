@@ -1,5 +1,6 @@
 import os
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Optional, Union
 
 import pandas as pd
@@ -44,7 +45,7 @@ def make_dataset(
         raise BenchmarkException(
             "`source` must be either a string path to a CSV or a Pandas DataFrame"
         )
-    if isinstance(source, str) and not os.path.isfile(source):
+    if isinstance(source, str) and not Path(os.path.expanduser(source)).exists():
         raise BenchmarkException("String `source` must be a path to a file")
 
     return CustomDataset(data_source=source, datatype=datatype, name=name)
