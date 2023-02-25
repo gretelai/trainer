@@ -52,7 +52,7 @@ class Comparison:
 
         configure_session(api_key="prompt", cache="yes", validate=True)
         self._project = None
-        if not self.config.trainer:
+        if not self.config.trainer and len(self.gretel_models) > 0:
             self._project = create_project(
                 display_name=self.config.project_display_name
             )
