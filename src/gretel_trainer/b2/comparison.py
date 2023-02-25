@@ -37,6 +37,7 @@ class Comparison:
         config: BenchmarkConfig,
     ):
         self.config = config
+        self.config.working_dir.mkdir(exist_ok=True)
         self.datasets = [
             _make_dataset(dataset, self.config.working_dir) for dataset in datasets
         ]
