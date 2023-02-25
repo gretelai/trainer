@@ -52,14 +52,16 @@ class CustomExecutor:
         self.statuses[self.run_identifier] = status
 
     def train(self) -> None:
-        logger.info(f"Startig model training for run `{self.run_identifier}`")
+        logger.info(f"Starting model training for run `{self.run_identifier}`")
         self.set_status(InProgress(stage="train"))
         train_time = Timer()
         with train_time:
             try:
                 self.model.train(self.dataset)
                 self.train_time = train_time.duration()
+                logger.info(f"Training completed successfully for run `{self.run_identifier}`")
             except Exception as e:
+                logger.info(f"Training failed for run `{self.run_identifier}`")
                 self.train_time = train_time.duration()
                 self.set_status(
                     Failed(during="train", error=e, train_secs=train_time.duration())
@@ -87,8 +89,9 @@ class CustomExecutor:
                         synthetic_data=synthetic_data_path,
                     )
                 )
-                logger.info(f"Run `{self.run_identifier}` completed successfully")
+                logger.info(f"Synthetic data generation completed successfully for run `{self.run_identifier}`")
             except Exception as e:
+                logger.info(f"Synthetic data generation failed for run `{self.run_identifier}`")
                 self.generate_time = generate_time.duration()
                 self.set_status(
                     Failed(
@@ -98,7 +101,6 @@ class CustomExecutor:
                         generate_secs=self.generate_time,
                     )
                 )
-                logger.info(f"Run `{self.run_identifier}` failed")
 
     def get_sqs_score(self) -> int:
         # TODO: run a QualityReport here

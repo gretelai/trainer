@@ -109,7 +109,9 @@ class GretelExecutor:
         self.set_status(InProgress(stage="train"))
         try:
             self._strategy.train()
+            logger.info(f"Training completed successfully for run `{self.run_identifier}`")
         except Exception as e:
+            logger.info(f"Training failed for run `{self.run_identifier}`")
             self.set_status(
                 Failed(during="train", error=e, train_secs=self._strategy.train_time)
             )
@@ -134,8 +136,9 @@ class GretelExecutor:
                     synthetic_data=synthetic_data_path,
                 )
             )
-            logger.info(f"Run `{self.run_identifier}` completed successfully")
+            logger.info(f"Synthetic data generation completed successfully for run `{self.run_identifier}`")
         except Exception as e:
+            logger.info(f"Synthetic data generation failed for run `{self.run_identifier}`")
             self.set_status(
                 Failed(
                     during="generate",
@@ -144,4 +147,3 @@ class GretelExecutor:
                     generate_secs=self._strategy.generate_time,
                 )
             )
-            logger.info(f"Run `{self.run_identifier}` failed")
