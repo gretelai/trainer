@@ -131,6 +131,7 @@ class Comparison:
         collection: List[CustomExecutor],
     ) -> None:
         run_identifier = RunIdentifier((dataset.name, model_type.__name__))
+        logger.info(f"Queueing run `{run_identifier}`")
         executor = CustomExecutor(
             model=model_type(),
             dataset=dataset,

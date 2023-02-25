@@ -17,6 +17,7 @@ from gretel_trainer.b2.gretel_models import (
 
 log_levels = {
     "gretel_trainer.b2.comparison": "INFO",
+    "gretel_trainer.b2.custom_executor": "INFO",
     "gretel_trainer.b2.gretel_executor": "INFO",
 }
 
