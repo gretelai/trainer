@@ -16,6 +16,22 @@ A v2 rewrite of Benchmark.
 - When using SDK, all runs are grouped in a single project
 - Quieter, more informative log output
 
+
+## CSVs over DataFrames
+
+I've updated datasets to no longer carry the weight of pandas dataframes in memory;
+instead, they read the dataframe to get the row and column counts and then drop the dataframe on the floor,
+keeping just a pointer to a CSV (either local or in S3).
+
+I wonder if we could do something similar for generated synthetic data.
+Instead of carrying the synthetic data as a DF, write it to a CSV someplace and just keep the path pointer.
+- Trainer: `generate` returns a pandas DF; we could write that to the working dir and store the path (maybe on the RunStatus object)
+- SDK: data exists in the cloud, can be downloaded from record handler; we can do the same thing as above, write to working dir and store the path
+- Custom: instruct users to write their synthetic data to CSV; we can pass in keyword args for them to use (e.g. working directory path, or maybe output filename to use)
+
+To that last point above, maybe the custom `generate` signature should return a `Path`?
+
+
 ## TODOs
 
 - Trainer model names seem inconsistent but I haven't identified the exact pattern yet. Can we clean it up?
