@@ -5,7 +5,13 @@ from typing import Optional
 import pandas as pd
 
 from gretel_trainer import Trainer
-from gretel_trainer.b2.core import BenchmarkException, Dataset, RunIdentifier, Timer, run_out_path
+from gretel_trainer.b2.core import (
+    BenchmarkException,
+    Dataset,
+    RunIdentifier,
+    Timer,
+    run_out_path,
+)
 from gretel_trainer.b2.gretel_models import GretelModel
 from gretel_trainer.b2.status import (
     Completed,

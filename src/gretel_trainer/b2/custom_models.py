@@ -1,4 +1,5 @@
 from pathlib import Path
+
 from typing_extensions import Protocol
 
 from gretel_trainer.b2.core import Dataset

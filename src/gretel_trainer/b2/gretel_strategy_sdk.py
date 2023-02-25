@@ -9,7 +9,13 @@ from gretel_client.projects.models import Model, read_model_config
 from gretel_client.projects.projects import Project
 from gretel_client.projects.records import RecordHandler
 
-from gretel_trainer.b2.core import BenchmarkException, Dataset, RunIdentifier, Timer, run_out_path
+from gretel_trainer.b2.core import (
+    BenchmarkException,
+    Dataset,
+    RunIdentifier,
+    Timer,
+    run_out_path,
+)
 from gretel_trainer.b2.gretel_models import GretelModel, GretelModelConfig
 from gretel_trainer.b2.status import (
     Completed,
