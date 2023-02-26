@@ -61,13 +61,13 @@ class Comparison:
         models: List[ModelTypes],
         config: BenchmarkConfig,
     ):
+        self.gretel_models = [m() for m in models if issubclass(m, GretelModel)]
+        self.custom_models = [m() for m in models if not issubclass(m, GretelModel)]
         self.config = config
         self.config.working_dir.mkdir(exist_ok=True)
         self.datasets = [
             _make_dataset(dataset, self.config.working_dir) for dataset in datasets
         ]
-        self.gretel_models = [m for m in models if issubclass(m, GretelModel)]
-        self.custom_models = [m for m in models if not issubclass(m, GretelModel)]
         self.executors: Dict[RunIdentifier, Executor] = {}
         self.thread_pool = ThreadPoolExecutor(5)
         self.futures = []
@@ -88,8 +88,8 @@ class Comparison:
         for dataset in self.datasets:
             for model in self.gretel_models:
                 self._setup_gretel_run(dataset, model)
-            for model_type in self.custom_models:
-                self._setup_custom_run(dataset, model_type, custom_executors)
+            for model in self.custom_models:
+                self._setup_custom_run(dataset, model, custom_executors)
         self.futures.append(self.thread_pool.submit(_run_custom, custom_executors))
         return self
 
@@ -135,11 +135,11 @@ class Comparison:
             "Total time (sec)": total_time,
         }
 
-    def _setup_gretel_run(self, dataset: Dataset, model: Type[GretelModel]) -> None:
-        run_identifier = RunIdentifier((dataset.name, model().name))
+    def _setup_gretel_run(self, dataset: Dataset, model: GretelModel) -> None:
+        run_identifier = RunIdentifier((dataset.name, model.name))
         logger.info(f"Queueing run `{run_identifier}`")
         executor = GretelExecutor(
-            benchmark_model=model(),
+            benchmark_model=model,
             dataset=dataset,
             run_identifier=run_identifier,
             statuses=self.run_statuses,
@@ -152,13 +152,15 @@ class Comparison:
     def _setup_custom_run(
         self,
         dataset: Dataset,
-        model_type: Type[CustomModel],
+        model: CustomModel,
         collection: List[CustomExecutor],
     ) -> None:
-        run_identifier = RunIdentifier((dataset.name, model_type.__name__))
+        model_name = type(model).__name__
+        run_identifier = RunIdentifier((dataset.name, model_name))
         logger.info(f"Queueing run `{run_identifier}`")
         executor = CustomExecutor(
-            model=model_type(),
+            model=model,
+            model_name=model_name,
             dataset=dataset,
             run_identifier=run_identifier,
             working_dir=self.config.working_dir,

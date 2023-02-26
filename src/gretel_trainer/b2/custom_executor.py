@@ -28,12 +28,14 @@ class CustomExecutor:
     def __init__(
         self,
         model: CustomModel,
+        model_name: str,
         dataset: Dataset,
         run_identifier: RunIdentifier,
         working_dir: Path,
         statuses: DictProxy,
     ):
         self.model = model
+        self.model_name = model_name,
         self.dataset = dataset
         self.run_identifier = run_identifier
         self.working_dir = working_dir
@@ -42,10 +44,6 @@ class CustomExecutor:
 
         self.train_time: Optional[float] = None
         self.generate_time: Optional[float] = None
-
-    @property
-    def model_name(self) -> str:
-        return type(self.model).__name__
 
     def set_status(self, status: RunStatus) -> None:
         self.status = status
