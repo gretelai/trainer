@@ -73,13 +73,13 @@ class CustomExecutor:
             f"Starting synthetic data generation for run `{self.run_identifier}`"
         )
         self.set_status(InProgress(stage="generate", train_secs=self.train_time))
+        synthetic_data_path = run_out_path(self.working_dir, self.run_identifier)
         generate_time = Timer()
         try:
             with generate_time:
-                preferred_out_path = run_out_path(self.working_dir, self.run_identifier)
                 synthetic_data_path = self.model.generate(
                     num_records=self.dataset.row_count,
-                    preferred_out_path=preferred_out_path,
+                    preferred_out_path=synthetic_data_path,
                 )
         except Exception as e:
             self.generate_time = generate_time.duration()
