@@ -62,7 +62,7 @@ class Comparison:
         config: BenchmarkConfig,
     ):
         self.gretel_models = [m() for m in models if issubclass(m, GretelModel)]
-        self.custom_models = [m() for m in models if not issubclass(m, GretelModel)]
+        self.custom_models = [m for m in models if not issubclass(m, GretelModel)]
         self.config = config
         self.config.working_dir.mkdir(exist_ok=True)
         self.datasets = [
@@ -88,8 +88,8 @@ class Comparison:
         for dataset in self.datasets:
             for model in self.gretel_models:
                 self._setup_gretel_run(dataset, model)
-            for model in self.custom_models:
-                self._setup_custom_run(dataset, model, custom_executors)
+            for model_type in self.custom_models:
+                self._setup_custom_run(dataset, model_type, custom_executors)
         self.futures.append(self.thread_pool.submit(_run_custom, custom_executors))
         return self
 
@@ -152,14 +152,14 @@ class Comparison:
     def _setup_custom_run(
         self,
         dataset: Dataset,
-        model: CustomModel,
+        model_type: Type[CustomModel],
         collection: List[CustomExecutor],
     ) -> None:
-        model_name = type(model).__name__
+        model_name = model_type.__name__
         run_identifier = RunIdentifier((dataset.name, model_name))
         logger.info(f"Queueing run `{run_identifier}`")
         executor = CustomExecutor(
-            model=model,
+            model=model_type(),
             model_name=model_name,
             dataset=dataset,
             run_identifier=run_identifier,
