@@ -12,7 +12,12 @@ import pandas as pd
 from gretel_client import configure_session
 from gretel_client.projects import create_project
 
-from gretel_trainer.b2.core import BenchmarkConfig, BenchmarkException, Dataset, RunIdentifier
+from gretel_trainer.b2.core import (
+    BenchmarkConfig,
+    BenchmarkException,
+    Dataset,
+    RunIdentifier,
+)
 from gretel_trainer.b2.custom_datasets import CustomDataset
 from gretel_trainer.b2.custom_executor import CustomExecutor
 from gretel_trainer.b2.custom_models import CustomModel
@@ -202,9 +207,7 @@ def _current_timestamp() -> str:
     return datetime.now().strftime("%Y%m%d%H%M%S")
 
 
-def _validate_setup(
-    config: BenchmarkConfig, gretel_models: List[GretelModel]
-) -> None:
+def _validate_setup(config: BenchmarkConfig, gretel_models: List[GretelModel]) -> None:
     if config.trainer:
         unsupported_models = []
         for model in gretel_models:

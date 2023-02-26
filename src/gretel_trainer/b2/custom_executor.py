@@ -35,7 +35,7 @@ class CustomExecutor:
         statuses: DictProxy,
     ):
         self.model = model
-        self.model_name = model_name,
+        self.model_name = model_name
         self.dataset = dataset
         self.run_identifier = run_identifier
         self.working_dir = working_dir
