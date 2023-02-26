@@ -83,7 +83,9 @@ class CustomExecutor:
                 )
         except Exception as e:
             self.generate_time = generate_time.duration()
-            logger.info(f"Synthetic data generation failed for run `{self.run_identifier}`")
+            logger.info(
+                f"Synthetic data generation failed for run `{self.run_identifier}`"
+            )
             self.set_status(
                 Failed(
                     during="generate",
@@ -102,7 +104,9 @@ class CustomExecutor:
                 synthetic_data=synthetic_data_path,
             )
         )
-        logger.info(f"Synthetic data generation completed successfully for run `{self.run_identifier}`")
+        logger.info(
+            f"Synthetic data generation completed successfully for run `{self.run_identifier}`"
+        )
 
     def get_sqs_score(self) -> int:
         # TODO: run a QualityReport here
