@@ -64,7 +64,7 @@ class Comparison:
         self.gretel_models = [m() for m in models if issubclass(m, GretelModel)]
         self.custom_models = [m for m in models if not issubclass(m, GretelModel)]
         self.config = config
-        self._validate_setup()
+        _validate_setup(self.config, self.gretel_models)
         self.config.working_dir.mkdir(exist_ok=True)
         self.datasets = [
             _make_dataset(dataset, self.config.working_dir) for dataset in datasets
@@ -136,19 +136,6 @@ class Comparison:
             "Total time (sec)": total_time,
         }
 
-    def _validate_setup(self) -> None:
-        if self.config.trainer:
-            unsupported_models = []
-            for model in self.gretel_models:
-                if model.trainer_model_type is None:
-                    logger.error(
-                        f"Model `{model.name}` (model key `{model.model_key}`) is not supported by Trainer. "
-                        "Either remove it from this comparison, or configure this comparison to use the SDK (trainer=False)"
-                    )
-                    unsupported_models.append(model)
-            if len(unsupported_models) > 0:
-                raise BenchmarkException("Invalid configuration")
-
     def _setup_gretel_run(self, dataset: Dataset, model: GretelModel) -> None:
         run_identifier = RunIdentifier((dataset.name, model.name))
         logger.info(f"Queueing run `{run_identifier}`")
@@ -213,3 +200,19 @@ def _make_dataset(dataset: DatasetTypes, working_dir: Path) -> Dataset:
 
 def _current_timestamp() -> str:
     return datetime.now().strftime("%Y%m%d%H%M%S")
+
+
+def _validate_setup(
+    config: BenchmarkConfig, gretel_models: List[GretelModel]
+) -> None:
+    if config.trainer:
+        unsupported_models = []
+        for model in gretel_models:
+            if model.trainer_model_type is None:
+                logger.error(
+                    f"Model `{model.name}` (model key `{model.model_key}`) is not supported by Trainer. "
+                    "Either remove it from this comparison, or configure this comparison to use the SDK (trainer=False)"
+                )
+                unsupported_models.append(model)
+        if len(unsupported_models) > 0:
+            raise BenchmarkException("Invalid configuration")
