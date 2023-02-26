@@ -3,6 +3,7 @@ from __future__ import annotations
 import logging
 import multiprocessing as mp
 from concurrent.futures import ThreadPoolExecutor
+from datetime import datetime
 from multiprocessing.managers import DictProxy
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple, Type, Union
@@ -26,6 +27,30 @@ logger = logging.getLogger(__name__)
 DatasetTypes = Union[CustomDataset, GretelDataset]
 ModelTypes = Union[Type[CustomModel], Type[GretelModel]]
 Executor = Union[CustomExecutor, GretelExecutor]
+
+
+def compare(
+    *,
+    datasets: List[DatasetTypes],
+    models: List[ModelTypes],
+    project_display_name: str = "benchmark",
+    trainer: bool = False,
+    refresh_interval: int = 15,
+    working_dir: str = "benchmark",
+) -> Comparison:
+    config = BenchmarkConfig(
+        project_display_name=project_display_name,
+        trainer=trainer,
+        refresh_interval=refresh_interval,
+        working_dir=Path(working_dir),
+        timestamp=_current_timestamp(),
+    )
+    comparison = Comparison(
+        datasets=datasets,
+        models=models,
+        config=config,
+    )
+    return comparison.execute()
 
 
 class Comparison:
@@ -168,3 +193,7 @@ def _make_dataset(dataset: DatasetTypes, working_dir: Path) -> Dataset:
         column_count=dataset.column_count,
         data_source=source,
     )
+
+
+def _current_timestamp() -> str:
+    return datetime.now().strftime("%Y%m%d%H%M%S")
