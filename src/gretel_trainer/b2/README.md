@@ -25,5 +25,4 @@ A v2 rewrite of Benchmark.
 - Trainer model names seem inconsistent but I haven't identified the exact pattern yet. Can we clean it up?
 - Enforce (?) Custom Dataset names adhere to Gretel model name restrictions
     - Maybe flip Run Identifier from "dset-model" to "model-dset" to avoid a short-dset name causing a "too-early" hyphen
-- GretelAuto (+ validation check only present when trainer=True)
 - Port over the (auto) cleanup stuff?

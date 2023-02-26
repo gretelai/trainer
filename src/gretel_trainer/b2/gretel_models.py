@@ -15,6 +15,8 @@ TRAINER_MODEL_TYPE_CONSTRUCTORS = {
     "actgan": models.GretelACTGAN,
     "amplify": models.GretelAmplify,
     "synthetics": models.GretelLSTM,
+    # Benchmark GretelAuto sends None model_type to Trainer to trigger dynamic model selection
+    "AUTO": lambda _: None,
 }
 
 
@@ -27,6 +29,9 @@ class GretelModel:
 
     @property
     def model_key(self) -> str:
+        if self.config == "AUTO":
+            return "AUTO"
+
         try:
             config_dict = read_model_config(self.config)
             return list(config_dict["models"][0])[0]
@@ -64,8 +69,8 @@ class GretelAmplify(GretelModel):
     config = "synthetics/amplify"
 
 
-# class GretelAuto(GretelModel):
-#     config = "AUTO"
+class GretelAuto(GretelModel):
+    config = "AUTO"
 
 
 class GretelACTGAN(GretelModel):

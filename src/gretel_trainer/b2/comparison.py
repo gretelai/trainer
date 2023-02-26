@@ -23,7 +23,7 @@ from gretel_trainer.b2.custom_executor import CustomExecutor
 from gretel_trainer.b2.custom_models import CustomModel
 from gretel_trainer.b2.gretel_datasets import GretelDataset
 from gretel_trainer.b2.gretel_executor import GretelExecutor
-from gretel_trainer.b2.gretel_models import GretelModel
+from gretel_trainer.b2.gretel_models import GretelAuto, GretelModel
 from gretel_trainer.b2.status import Completed, Failed, InProgress
 
 logger = logging.getLogger(__name__)
@@ -209,13 +209,28 @@ def _current_timestamp() -> str:
 
 def _validate_setup(config: BenchmarkConfig, gretel_models: List[GretelModel]) -> None:
     if config.trainer:
-        unsupported_models = []
-        for model in gretel_models:
-            if model.trainer_model_type is None:
-                logger.error(
-                    f"Model `{model.name}` (model key `{model.model_key}`) is not supported by Trainer. "
-                    "Either remove it from this comparison, or configure this comparison to use the SDK (trainer=False)"
-                )
-                unsupported_models.append(model)
-        if len(unsupported_models) > 0:
-            raise BenchmarkException("Invalid configuration")
+        _validate_trainer_setup(gretel_models)
+    else:
+        _validate_sdk_setup(gretel_models)
+
+
+def _validate_trainer_setup(gretel_models: List[GretelModel]) -> None:
+    unsupported_models = []
+    for model in gretel_models:
+        if model.trainer_model_type is None:
+            logger.error(
+                f"Model `{model.name}` (model key `{model.model_key}`) is not supported by Trainer. "
+                "Either remove it from this comparison, or configure this comparison to use the SDK (trainer=False)"
+            )
+            unsupported_models.append(model)
+    if len(unsupported_models) > 0:
+        raise BenchmarkException("Invalid configuration")
+
+
+def _validate_sdk_setup(gretel_models: List[GretelModel]) -> None:
+    if any(isinstance(m, GretelAuto) for m in gretel_models):
+        logger.error(
+            "GretelAuto is only supported when using Trainer. "
+            "Either remove it from this comparison, or configure this comparison to use Trainer (trainer=True)"
+        )
+        raise BenchmarkException("Invalid configuration")
