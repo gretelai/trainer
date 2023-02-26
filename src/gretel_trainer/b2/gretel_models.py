@@ -35,7 +35,11 @@ class GretelModel:
 
     @property
     def trainer_model_type(self) -> Optional[gretel_trainer.models._BaseConfig]:
-        return TRAINER_MODEL_TYPE_CONSTRUCTORS[self.model_key](self.config)
+        constructor = TRAINER_MODEL_TYPE_CONSTRUCTORS.get(self.model_key)
+        if constructor is None:
+            return None
+        else:
+            return constructor(config=self.config)
 
     def runnable(self, dataset: Dataset) -> bool:
         if self.model_key == "synthetics":

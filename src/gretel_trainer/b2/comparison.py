@@ -12,7 +12,7 @@ import pandas as pd
 from gretel_client import configure_session
 from gretel_client.projects import create_project
 
-from gretel_trainer.b2.core import BenchmarkConfig, Dataset, RunIdentifier
+from gretel_trainer.b2.core import BenchmarkConfig, BenchmarkException, Dataset, RunIdentifier
 from gretel_trainer.b2.custom_datasets import CustomDataset
 from gretel_trainer.b2.custom_executor import CustomExecutor
 from gretel_trainer.b2.custom_models import CustomModel
@@ -64,6 +64,7 @@ class Comparison:
         self.gretel_models = [m() for m in models if issubclass(m, GretelModel)]
         self.custom_models = [m for m in models if not issubclass(m, GretelModel)]
         self.config = config
+        self._validate_setup()
         self.config.working_dir.mkdir(exist_ok=True)
         self.datasets = [
             _make_dataset(dataset, self.config.working_dir) for dataset in datasets
@@ -134,6 +135,19 @@ class Comparison:
             "Generate time (sec)": generate_time,
             "Total time (sec)": total_time,
         }
+
+    def _validate_setup(self) -> None:
+        if self.config.trainer:
+            unsupported_models = []
+            for model in self.gretel_models:
+                if model.trainer_model_type is None:
+                    logger.error(
+                        f"Model `{model.name}` (model key `{model.model_key}`) is not supported by Trainer. "
+                        "Either remove it from this comparison, or configure this comparison to use the SDK (trainer=False)"
+                    )
+                    unsupported_models.append(model)
+            if len(unsupported_models) > 0:
+                raise BenchmarkException("Invalid configuration")
 
     def _setup_gretel_run(self, dataset: Dataset, model: GretelModel) -> None:
         run_identifier = RunIdentifier((dataset.name, model.name))

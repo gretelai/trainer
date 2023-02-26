@@ -26,5 +26,4 @@ A v2 rewrite of Benchmark.
 - Enforce (?) Custom Dataset names adhere to Gretel model name restrictions
     - Maybe flip Run Identifier from "dset-model" to "model-dset" to avoid a short-dset name causing a "too-early" hyphen
 - GretelAuto (+ validation check only present when trainer=True)
-- GretelDGAN and GretelGPTX validations (check only present when trainer=False)
 - Port over the (auto) cleanup stuff?
