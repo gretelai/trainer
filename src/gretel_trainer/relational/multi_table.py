@@ -558,17 +558,17 @@ class MultiTable:
             record_handler.submit_cloud()
             transforms_record_handlers[table_name] = record_handler
 
-        output_tables: Dict[str, pd.DataFrame] = {}
+        working_tables: Dict[str, Optional[pd.DataFrame]] = {}
         refresh_attempts: Dict[str, int] = defaultdict(int)
 
         def _more_to_do() -> bool:
-            return len(output_tables) != len(transforms_run_paths)
+            return len(working_tables) != len(transforms_run_paths)
 
         while _more_to_do():
             self._wait_refresh_interval()
 
             for table_name, record_handler in transforms_record_handlers.items():
-                if table_name in output_tables:
+                if table_name in working_tables:
                     continue
 
                 status = cautiously_refresh_status(
@@ -578,7 +578,7 @@ class MultiTable:
                 # If we consistently failed to refresh the job via API, fail the table
                 if refresh_attempts[table_name] >= MAX_REFRESH_ATTEMPTS:
                     self._log_lost_contact(table_name)
-                    output_tables[table_name] = None
+                    working_tables[table_name] = None
                     continue
 
                 if status == Status.COMPLETED:
@@ -586,16 +586,16 @@ class MultiTable:
                     record_handler_result = _get_data_from_record_handler(
                         record_handler
                     )
-                    output_tables[table_name] = record_handler_result
+                    working_tables[table_name] = record_handler_result
                 elif status in END_STATES:
                     # already checked explicitly for completed; all other end states are effectively failures
                     self._log_failed(table_name, "transforms run")
-                    output_tables[table_name] = None
+                    working_tables[table_name] = None
                 else:
                     self._log_in_progress(table_name, status, "transforms run")
 
-        output_tables = {
-            table: data for table, data in output_tables.items() if data is not None
+        output_tables: Dict[str, pd.DataFrame] = {
+            table: data for table, data in working_tables.items() if data is not None
         }
 
         output_tables = self._strategy.label_encode_keys(
@@ -763,7 +763,7 @@ class MultiTable:
         Returns:
             dict[str, pd.DataFrame]: Return a dictionary of table names and output data.
         """
-        output_tables = {}
+        working_tables: Dict[str, Optional[pd.DataFrame]] = {}
 
         if resume:
             if identifier is not None:
@@ -805,14 +805,14 @@ class MultiTable:
         run_dir = _mkdir(str(self._working_dir / self._synthetics_run.identifier))
 
         for table in self._synthetics_run.preserved:
-            output_tables[table] = self._strategy.get_preserved_data(
+            working_tables[table] = self._strategy.get_preserved_data(
                 table, self.relational_data
             )
         all_tables = self.relational_data.list_all_tables()
         refresh_attempts: Dict[str, int] = defaultdict(int)
 
         def _more_to_do() -> bool:
-            return len(output_tables) != len(all_tables)
+            return len(working_tables) != len(all_tables)
 
         first_pass = True
         while _more_to_do():
@@ -826,7 +826,7 @@ class MultiTable:
                 table_name,
                 record_handler,
             ) in self._synthetics_run.record_handlers.items():
-                if table_name in output_tables:
+                if table_name in working_tables:
                     continue
 
                 status = cautiously_refresh_status(
@@ -837,14 +837,14 @@ class MultiTable:
                 if refresh_attempts[table_name] >= MAX_REFRESH_ATTEMPTS:
                     self._log_lost_contact(table_name)
                     self._synthetics_run.lost_contact.append(table_name)
-                    output_tables[table_name] = None
+                    working_tables[table_name] = None
                     for other_table in self._strategy.tables_to_skip_when_failed(
                         table_name, self.relational_data
                     ):
                         logger.info(
                             f"Skipping synthetic data generation for `{other_table}` because it depends on `{table_name}`"
                         )
-                        output_tables[other_table] = None
+                        working_tables[other_table] = None
                     self._backup()
                     continue
 
@@ -853,7 +853,7 @@ class MultiTable:
                     record_handler_result = _get_data_from_record_handler(
                         record_handler
                     )
-                    output_tables[
+                    working_tables[
                         table_name
                     ] = self._strategy.post_process_individual_synthetic_result(
                         table_name, self.relational_data, record_handler_result
@@ -861,14 +861,14 @@ class MultiTable:
                 elif status in END_STATES:
                     # already checked explicitly for completed; all other end states are effectively failures
                     self._log_failed(table_name, "synthetic data generation")
-                    output_tables[table_name] = None
+                    working_tables[table_name] = None
                     for other_table in self._strategy.tables_to_skip_when_failed(
                         table_name, self.relational_data
                     ):
                         logger.info(
                             f"Skipping synthetic data generation for `{other_table}` because it depends on `{table_name}`"
                         )
-                        output_tables[other_table] = None
+                        working_tables[other_table] = None
                 else:
                     self._log_in_progress(
                         table_name, status, "synthetic data generation"
@@ -881,18 +881,23 @@ class MultiTable:
                 for table in all_tables
                 if _table_is_in_progress(self._synthetics_run, table)
             ]
-            finished_tables = [table for table in output_tables]
+            finished_tables = [table for table in working_tables]
 
             ready_tables = self._strategy.ready_to_generate(
                 self.relational_data, in_progress_tables, finished_tables
             )
 
             for table_name in ready_tables:
+                present_working_tables = {
+                    table: data
+                    for table, data in working_tables.items()
+                    if data is not None
+                }
                 table_job = self._strategy.get_generation_job(
                     table_name,
                     self.relational_data,
                     self._synthetics_run.record_size_ratio,
-                    output_tables,
+                    present_working_tables,
                     run_dir,
                     self._synthetics_train.training_columns[table_name],
                 )
@@ -904,8 +909,8 @@ class MultiTable:
 
             self._backup()
 
-        output_tables = {
-            table: data for table, data in output_tables.items() if data is not None
+        output_tables: Dict[str, pd.DataFrame] = {
+            table: data for table, data in working_tables.items() if data is not None
         }
 
         output_tables = self._strategy.post_process_synthetic_results(
