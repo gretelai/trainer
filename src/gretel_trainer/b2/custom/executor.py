@@ -12,7 +12,7 @@ from gretel_trainer.b2.core import (
     Timer,
     run_out_path,
 )
-from gretel_trainer.b2.custom_models import CustomModel
+from gretel_trainer.b2.custom.models import CustomModel
 from gretel_trainer.b2.status import (
     Completed,
     Failed,

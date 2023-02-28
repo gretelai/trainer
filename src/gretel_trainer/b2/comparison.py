@@ -18,12 +18,12 @@ from gretel_trainer.b2.core import (
     Dataset,
     RunIdentifier,
 )
-from gretel_trainer.b2.custom_datasets import CustomDataset
-from gretel_trainer.b2.custom_executor import CustomExecutor
-from gretel_trainer.b2.custom_models import CustomModel
-from gretel_trainer.b2.gretel_datasets import GretelDataset
-from gretel_trainer.b2.gretel_executor import GretelExecutor
-from gretel_trainer.b2.gretel_models import GretelAuto, GretelModel
+from gretel_trainer.b2.custom.datasets import CustomDataset
+from gretel_trainer.b2.custom.executor import CustomExecutor
+from gretel_trainer.b2.custom.models import CustomModel
+from gretel_trainer.b2.gretel.datasets import GretelDataset
+from gretel_trainer.b2.gretel.executor import GretelExecutor
+from gretel_trainer.b2.gretel.models import GretelAuto, GretelModel
 from gretel_trainer.b2.status import Completed, Failed, InProgress
 
 logger = logging.getLogger(__name__)

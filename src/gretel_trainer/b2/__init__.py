@@ -2,9 +2,9 @@ import logging
 
 from gretel_trainer.b2.comparison import compare
 from gretel_trainer.b2.core import Datatype
-from gretel_trainer.b2.custom_datasets import make_dataset
-from gretel_trainer.b2.gretel_datasets import GretelDatasetRepo
-from gretel_trainer.b2.gretel_models import (
+from gretel_trainer.b2.custom.datasets import make_dataset
+from gretel_trainer.b2.gretel.datasets import GretelDatasetRepo
+from gretel_trainer.b2.gretel.models import (
     GretelACTGAN,
     GretelAmplify,
     GretelGPTX,
@@ -14,8 +14,8 @@ from gretel_trainer.b2.gretel_models import (
 
 log_levels = {
     "gretel_trainer.b2.comparison": "INFO",
-    "gretel_trainer.b2.custom_executor": "INFO",
-    "gretel_trainer.b2.gretel_executor": "INFO",
+    "gretel_trainer.b2.custom.executor": "INFO",
+    "gretel_trainer.b2.gretel.executor": "INFO",
 }
 
 log_format = "%(levelname)s - %(asctime)s - %(message)s"

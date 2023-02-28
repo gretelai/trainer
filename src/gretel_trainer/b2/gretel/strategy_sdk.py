@@ -16,7 +16,7 @@ from gretel_trainer.b2.core import (
     Timer,
     run_out_path,
 )
-from gretel_trainer.b2.gretel_models import GretelModel, GretelModelConfig
+from gretel_trainer.b2.gretel.models import GretelModel, GretelModelConfig
 from gretel_trainer.b2.status import (
     Completed,
     Failed,

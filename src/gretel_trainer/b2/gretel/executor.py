@@ -17,9 +17,9 @@ from gretel_trainer.b2.core import (
     RunIdentifier,
     Timer,
 )
-from gretel_trainer.b2.gretel_models import GretelModel, GretelModelConfig
-from gretel_trainer.b2.gretel_strategy_sdk import GretelSDKStrategy
-from gretel_trainer.b2.gretel_strategy_trainer import GretelTrainerStrategy
+from gretel_trainer.b2.gretel.models import GretelModel
+from gretel_trainer.b2.gretel.strategy_sdk import GretelSDKStrategy
+from gretel_trainer.b2.gretel.strategy_trainer import GretelTrainerStrategy
 from gretel_trainer.b2.status import (
     Completed,
     Failed,
