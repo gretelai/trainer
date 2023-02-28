@@ -2,27 +2,37 @@
 
 A v2 rewrite of Benchmark.
 
-## Changes/improvements
 
-- v1 went overboard with dependency injection and protocols; v2 code is overall easier to follow
+## User-facing interface changes
+
+- Custom datasets `make_dataset`
+  - Accepts single source instead of a list
+  - Requires a user-specified name
+  - Drops namespace
+- `Datatype` enum
+  - v1 "tabular_mixed" and "tabular_numeric" have been consolidated to just "tabular"
+  - enum variant casing is lower-cased to more closely match string format
+- Gretel dataset functions are no longer "free-standing" but rather methods on a `GretelDatasetRepo` object
+- When running with SDK, all runs are grouped in a single project
+- Auto-cleanup replaced by explicit `clean` function that must be manually called
+
+
+## Benefits
+
+- Code is easier to follow, less indirection
+- Significant performance improvements
+- Log output is higher level and more useful
 - v2 Gretel Datasets are much more useful; you could conceivably use the v2 `GretelDatasetRepo` to get datasets for non-Benchmark usage
 - v2 Custom Datasets are more intuitive to create
-  - instead of providing a list of sources, you just pass a single source (either a string path to CSV or a pd.DataFrame)
-  - the v2 Datatype enum is simplified
-    - str and enum formats match (e.g. `Datatype.natural_language == "natural_language"`)
-    - v1 "tabular_mixed" and "tabular_numeric" consolidated in v2 to just a singular "tabular"
-- User can decide if running Gretel models via SDK or Trainer
-- SDK models use a smarter polling mechanism than the `poll` helper
-- When using SDK, all runs are grouped in a single project
-- Quieter, more informative log output
-- CSVs as contract instead of DataFrames
-  - Significantly improves performance!
-  - Generated data is written as CSV to the working directory so that it is accessible/reviewable
+- User can choose explicitly whether to run Trainer or standard SDK for all models
+- Generated synthetic data is written to the working directory so it is immediately accessible/reviewable
 
 
 ## TODOs
 
+- Nicole: downstream evaluations
 - Sami: resume functionality
 - Sami: skip SQS and data preview when training, and instead always run Evaluate afterwards
   - Improves training time + is more accurate for Trainer models than average SQS from N models
 - Sami: suggestion to not chain `compare->execute`. Not sure how I feel about this one. Maybe we keep `compare` the way it is but make it easier for people to instantiate a `Comparison` explicitly?
+- More precise train/generate times (blocked: requires adding status history to job response in SDK)
