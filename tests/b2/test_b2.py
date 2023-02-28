@@ -1,4 +1,4 @@
-from pathlib import Path
+import pandas as pd
 
 from gretel_trainer.b2 import compare
 
@@ -8,7 +8,7 @@ class DoNothingModel:
         pass
 
     def generate(self, **kwargs):
-        return Path()
+        return pd.DataFrame()
 
 
 def test_things_work(iris):

@@ -75,10 +75,10 @@ class CustomExecutor:
         generate_time = Timer()
         try:
             with generate_time:
-                synthetic_data_path = self.model.generate(
+                synthetic_df = self.model.generate(
                     num_records=self.dataset.row_count,
-                    preferred_out_path=synthetic_data_path,
                 )
+                synthetic_df.to_csv(synthetic_data_path, index=False)
         except Exception as e:
             self.generate_time = generate_time.duration()
             logger.info(
