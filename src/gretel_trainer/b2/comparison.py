@@ -10,7 +10,9 @@ from typing import Any, Dict, List, Optional, Tuple, Type, Union
 
 import pandas as pd
 from gretel_client import configure_session
+from gretel_client.helpers import poll
 from gretel_client.projects import create_project, search_projects
+from gretel_client.projects.jobs import Job
 
 from gretel_trainer.b2.core import (
     BenchmarkConfig,
@@ -24,6 +26,7 @@ from gretel_trainer.b2.custom.models import CustomModel
 from gretel_trainer.b2.gretel.datasets import GretelDataset
 from gretel_trainer.b2.gretel.executor import GretelExecutor
 from gretel_trainer.b2.gretel.models import GretelAuto, GretelModel
+from gretel_trainer.b2.gretel.strategy_trainer import GretelTrainerStrategy
 from gretel_trainer.b2.status import Completed, Failed, InProgress
 
 logger = logging.getLogger(__name__)
@@ -107,6 +110,38 @@ class Comparison:
     def wait(self) -> Comparison:
         [future.result() for future in self.futures]
         return self
+
+    def poll_job(self, model: str, dataset: str, action: str):
+        job = self._get_gretel_job(model, dataset, action)
+        poll(job)
+
+    def get_logs(self, model: str, dataset: str, action: str):
+        job = self._get_gretel_job(model, dataset, action)
+        return job.logs
+
+    def _get_gretel_job(self, model: str, dataset: str, action: str) -> Job:
+        run_id = RunIdentifier((model, dataset))
+        executor = self.executors[run_id]
+        if not isinstance(executor, GretelExecutor):
+            raise BenchmarkException("Cannot get Gretel job for non-Gretel model runs")
+
+        strategy = executor._strategy
+        if isinstance(strategy, GretelTrainerStrategy):
+            raise BenchmarkException("Cannot get Gretel job when using Trainer")
+
+        if action == "train":
+            job = strategy.model
+        elif action == "generate":
+            job = strategy.record_handler
+        else:
+            raise BenchmarkException(
+                f"Unrecognized action `{action}` (must be `train` or `generate`)"
+            )
+
+        if job is None:
+            raise BenchmarkException("Gretel Job does not exist")
+
+        return job
 
     def cleanup(self) -> None:
         if self.config.trainer:
