@@ -142,7 +142,7 @@ class Comparison:
         }
 
     def _setup_gretel_run(self, dataset: Dataset, model: GretelModel) -> None:
-        run_identifier = RunIdentifier((dataset.name, model.name))
+        run_identifier = RunIdentifier((model.name, dataset.name))
         logger.info(f"Queueing run `{run_identifier}`")
         executor = GretelExecutor(
             benchmark_model=model,
@@ -162,7 +162,7 @@ class Comparison:
         collection: List[CustomExecutor],
     ) -> None:
         model_name = model_type.__name__
-        run_identifier = RunIdentifier((dataset.name, model_name))
+        run_identifier = RunIdentifier((model_name, dataset.name))
         logger.info(f"Queueing run `{run_identifier}`")
         executor = CustomExecutor(
             model=model_type(),

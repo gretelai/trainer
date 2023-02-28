@@ -50,7 +50,7 @@ class GretelSDKStrategy:
 
     def _format_model_config(self) -> GretelModelConfig:
         config = read_model_config(self.benchmark_model.config)
-        config["name"] = f"{self.run_identifier[0]}-{self.run_identifier[1]}"
+        config["name"] = str(self.run_identifier)
         return config
 
     def train(self) -> None:
