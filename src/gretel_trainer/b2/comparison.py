@@ -10,7 +10,7 @@ from typing import Any, Dict, List, Optional, Tuple, Type, Union
 
 import pandas as pd
 from gretel_client import configure_session
-from gretel_client.projects import create_project
+from gretel_client.projects import create_project, search_projects
 
 from gretel_trainer.b2.core import (
     BenchmarkConfig,
@@ -107,6 +107,14 @@ class Comparison:
     def wait(self) -> Comparison:
         [future.result() for future in self.futures]
         return self
+
+    def cleanup(self) -> None:
+        if self.config.trainer:
+            for project in search_projects(self.config.trainer_project_prefix):
+                project.delete()
+        else:
+            if self._project is not None:
+                self._project.delete()
 
     def _result_dict(self, run_identifier: RunIdentifier) -> Dict[str, Any]:
         executor = self.executors[run_identifier]

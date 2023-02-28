@@ -44,7 +44,7 @@ def _set_strategy(
             benchmark_model=benchmark_model,
             dataset=dataset,
             run_identifier=run_identifier,
-            project_prefix=config.project_display_name,
+            project_prefix=config.trainer_project_prefix,
             working_dir=config.working_dir,
         )
     else:

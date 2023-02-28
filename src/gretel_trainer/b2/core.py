@@ -40,6 +40,10 @@ class BenchmarkConfig:
     working_dir: Path
     timestamp: str
 
+    @property
+    def trainer_project_prefix(self) -> str:
+        return f"{self.project_display_name}-{self.timestamp}"
+
 
 class Timer:
     def __init__(self):
