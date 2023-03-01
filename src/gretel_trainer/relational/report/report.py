@@ -28,11 +28,8 @@ class ReportRenderer:
 class ReportPresenter:
     rel_data: RelationalData
     now: datetime.datetime
+    run_identifier: str
     evaluations: Dict[str, TableEvaluation]
-
-    @property
-    def generated_at(self) -> str:
-        return self.now.strftime("%m/%d/%Y, %H:%M")
 
     @property
     def copyright_year(self) -> str:
