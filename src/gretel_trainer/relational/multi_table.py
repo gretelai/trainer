@@ -941,7 +941,10 @@ class MultiTable:
                         )
 
         logger.info("Creating relational report")
-        self.create_relational_report(run_dir)
+        self.create_relational_report(
+            run_identifier=self._synthetics_run.identifier,
+            target_dir=run_dir,
+        )
 
         archive_path = self._working_dir / f"synthetics_outputs.tar.gz"
         add_to_tar(archive_path, run_dir, self._synthetics_run.identifier)
@@ -952,12 +955,12 @@ class MultiTable:
         self.synthetic_output_tables = output_tables
         self._backup()
 
-    def create_relational_report(self, target_dir: Optional[Path] = None) -> None:
-        target_dir = target_dir or self._working_dir
+    def create_relational_report(self, run_identifier: str, target_dir: Path) -> None:
         presenter = ReportPresenter(
             rel_data=self.relational_data,
             evaluations=self.evaluations,
             now=datetime.utcnow(),
+            run_identifier=run_identifier,
         )
         output_path = target_dir / "relational_report.html"
         with open(output_path, "w") as report:
