@@ -32,7 +32,6 @@ A v2 rewrite of Benchmark.
 
 - Nicole: downstream evaluations
 - Sami: resume functionality
-- Sami: skip SQS and data preview when training, and instead always run Evaluate afterwards
-  - Improves training time + is more accurate for Trainer models than average SQS from N models
+- Sami: skip SQS and data preview when training, and instead always run Evaluate afterwards (improves training time + is more accurate for Trainer models than average SQS from N models)
 - Sami: suggestion to not chain `compare->execute`. Not sure how I feel about this one. Maybe we keep `compare` the way it is but make it easier for people to instantiate a `Comparison` explicitly?
 - More precise train/generate times (blocked: requires adding status history to job response in SDK)
