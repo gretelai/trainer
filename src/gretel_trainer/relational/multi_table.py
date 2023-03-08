@@ -100,21 +100,7 @@ class MultiTable:
         project_display_name: Optional[str] = None,
         refresh_interval: Optional[int] = None,
         backup: Optional[Backup] = None,
-        # deprecated
-        project_name: Optional[str] = None,
-        working_dir: Optional[str] = None,
     ):
-        # Deprecation warnings
-        if project_name is not None:
-            logger.warning(
-                "The 'project_name' parameter is deprecated and will be removed in a future release. Please use 'project_display_name' instead."
-            )
-            project_display_name = project_display_name or project_name
-        if working_dir is not None:
-            logger.warning(
-                "The 'working_dir' parameter is deprecated and will be removed in a future release. Local working directory names will always match the project's unique name."
-            )
-
         self._strategy = _validate_strategy(strategy)
         model_name, model_config = self._validate_gretel_model(gretel_model)
         self._gretel_model = model_name
@@ -1051,18 +1037,8 @@ def _get_data_from_record_handler(record_handler: RecordHandler) -> pd.DataFrame
 def _validate_strategy(strategy: str) -> Union[IndependentStrategy, AncestralStrategy]:
     strategy = strategy.lower()
 
-    if strategy == "single-table":
-        logger.warning(
-            "The 'single-table' value for the 'strategy' parameter is deprecated and will be removed in a future release. Please use 'independent' instead."
-        )
+    if strategy == "independent":
         return IndependentStrategy()
-    elif strategy == "independent":
-        return IndependentStrategy()
-    elif strategy == "cross-table":
-        logger.warning(
-            "The 'cross-table' value for the 'strategy' parameter is deprecated and will be removed in a future release. Please use 'ancestral' instead."
-        )
-        return AncestralStrategy()
     elif strategy == "ancestral":
         return AncestralStrategy()
     else:
