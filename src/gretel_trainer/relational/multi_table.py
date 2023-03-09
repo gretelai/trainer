@@ -41,8 +41,10 @@ from gretel_trainer.relational.core import (
 from gretel_trainer.relational.report.report import ReportPresenter, ReportRenderer
 from gretel_trainer.relational.sdk_extras import (
     cautiously_refresh_status,
+    delete_data_source,
     download_file_artifact,
     download_tar_artifact,
+    room_in_project,
     sqs_score_from_full_report,
 )
 from gretel_trainer.relational.strategies.ancestral import AncestralStrategy
@@ -132,6 +134,7 @@ class MultiTable:
         )
         self._working_dir = _mkdir(self._project.name)
         self._create_debug_summary()
+        logger.info("Uploading initial configuration state to project.")
         self._upload_sources_to_project()
 
     def _complete_init_from_backup(self, backup: Backup) -> None:
@@ -446,11 +449,9 @@ class MultiTable:
             table_data.to_csv(transforms_train_path, index=False)
 
             # Create model
-            self._log_start(table, "transforms model training")
             model = self._project.create_model_obj(
                 model_config=named_config, data_source=str(transforms_train_path)
             )
-            model.submit_cloud()
             self._transforms_train.models[table] = model
 
         self._backup()
@@ -462,8 +463,13 @@ class MultiTable:
         def _more_to_do() -> bool:
             return len(completed + failed) < len(configs)
 
+        first_pass = True
         while _more_to_do():
-            self._wait_refresh_interval()
+            # Don't wait needlessly the first time through.
+            if first_pass:
+                first_pass = False
+            else:
+                self._wait_refresh_interval()
 
             for table_name in configs:
                 # No need to do anything with tables in terminal state
@@ -471,6 +477,12 @@ class MultiTable:
                     continue
 
                 model = self._transforms_train.models[table_name]
+                if model.model_id is None:
+                    self._start_model_if_possible(
+                        model, table_name, "transforms model training"
+                    )
+                    continue
+
                 status = cautiously_refresh_status(model, table_name, refresh_attempts)
 
                 # If we consistently failed to refresh the job status, fail the table
@@ -478,15 +490,18 @@ class MultiTable:
                     self._log_lost_contact(table_name)
                     self._transforms_train.lost_contact.append(table_name)
                     failed.append(table_name)
+                    delete_data_source(self._project, model)
                     continue
 
                 if status == Status.COMPLETED:
                     self._log_success(table_name, "model training")
                     completed.append(table_name)
+                    delete_data_source(self._project, model)
                 elif status in END_STATES:
                     # already checked explicitly for completed; all other end states are effectively failures
                     self._log_failed(table_name, "model training")
                     failed.append(table_name)
+                    delete_data_source(self._project, model)
                 else:
                     self._log_in_progress(table_name, status, "model training")
                     continue
@@ -536,12 +551,10 @@ class MultiTable:
         transforms_record_handlers: Dict[str, RecordHandler] = {}
 
         for table_name, transforms_run_path in transforms_run_paths.items():
-            self._log_start(table_name, "transforms run")
             model = self._transforms_train.models[table_name]
             record_handler = model.create_record_handler_obj(
                 data_source=str(transforms_run_path)
             )
-            record_handler.submit_cloud()
             transforms_record_handlers[table_name] = record_handler
 
         working_tables: Dict[str, Optional[pd.DataFrame]] = {}
@@ -550,11 +563,22 @@ class MultiTable:
         def _more_to_do() -> bool:
             return len(working_tables) != len(transforms_run_paths)
 
+        first_pass = True
         while _more_to_do():
-            self._wait_refresh_interval()
+            # Don't wait needlessly the first time through.
+            if first_pass:
+                first_pass = False
+            else:
+                self._wait_refresh_interval()
 
             for table_name, record_handler in transforms_record_handlers.items():
                 if table_name in working_tables:
+                    continue
+
+                if record_handler.record_id is None:
+                    self._start_record_handler_if_possible(
+                        record_handler, table_name, "transforms run"
+                    )
                     continue
 
                 status = cautiously_refresh_status(
@@ -565,6 +589,7 @@ class MultiTable:
                 if refresh_attempts[table_name] >= MAX_REFRESH_ATTEMPTS:
                     self._log_lost_contact(table_name)
                     working_tables[table_name] = None
+                    delete_data_source(self._project, record_handler)
                     continue
 
                 if status == Status.COMPLETED:
@@ -573,10 +598,12 @@ class MultiTable:
                         record_handler
                     )
                     working_tables[table_name] = record_handler_result
+                    delete_data_source(self._project, record_handler)
                 elif status in END_STATES:
                     # already checked explicitly for completed; all other end states are effectively failures
                     self._log_failed(table_name, "transforms run")
                     working_tables[table_name] = None
+                    delete_data_source(self._project, record_handler)
                 else:
                     self._log_in_progress(table_name, status, "transforms run")
 
@@ -632,12 +659,10 @@ class MultiTable:
 
     def _train_synthetics_models(self, training_data: Dict[str, Path]) -> None:
         for table_name, training_csv in training_data.items():
-            self._log_start(table_name, "model training")
             table_model_config = self._table_model_config(table_name)
             model = self._project.create_model_obj(
                 model_config=table_model_config, data_source=str(training_csv)
             )
-            model.submit_cloud()
             self._synthetics_train.models[table_name] = model
 
         self._backup()
@@ -649,8 +674,13 @@ class MultiTable:
         def _more_to_do() -> bool:
             return len(completed + failed) < len(training_data)
 
+        first_pass = True
         while _more_to_do():
-            self._wait_refresh_interval()
+            # Don't wait needlessly the first time through.
+            if first_pass:
+                first_pass = False
+            else:
+                self._wait_refresh_interval()
 
             for table_name in training_data:
                 # No need to do anything with tables in terminal state
@@ -658,6 +688,12 @@ class MultiTable:
                     continue
 
                 model = self._synthetics_train.models[table_name]
+                if model.model_id is None:
+                    self._start_model_if_possible(
+                        model, table_name, "synthetics model training"
+                    )
+                    continue
+
                 status = cautiously_refresh_status(model, table_name, refresh_attempts)
 
                 # If we consistently failed to refresh the job status, fail the table
@@ -665,20 +701,25 @@ class MultiTable:
                     self._log_lost_contact(table_name)
                     self._synthetics_train.lost_contact.append(table_name)
                     failed.append(table_name)
+                    delete_data_source(self._project, model)
                     continue
 
                 if status == Status.COMPLETED:
-                    self._log_success(table_name, "model training")
+                    self._log_success(table_name, "synthetics model training")
                     completed.append(table_name)
+                    delete_data_source(self._project, model)
                     self._strategy.update_evaluation_from_model(
                         table_name, self.evaluations, model, self._working_dir
                     )
                 elif status in END_STATES:
                     # already checked explicitly for completed; all other end states are effectively failures
-                    self._log_failed(table_name, "model training")
+                    self._log_failed(table_name, "synthetics model training")
                     failed.append(table_name)
+                    delete_data_source(self._project, model)
                 else:
-                    self._log_in_progress(table_name, status, "model training")
+                    self._log_in_progress(
+                        table_name, status, "synthetics model training"
+                    )
                     continue
 
             self._backup()
@@ -815,6 +856,12 @@ class MultiTable:
                 if table_name in working_tables:
                     continue
 
+                if record_handler.record_id is None:
+                    self._start_record_handler_if_possible(
+                        record_handler, table_name, "synthetic data generation"
+                    )
+                    continue
+
                 status = cautiously_refresh_status(
                     record_handler, table_name, refresh_attempts
                 )
@@ -831,6 +878,7 @@ class MultiTable:
                             f"Skipping synthetic data generation for `{other_table}` because it depends on `{table_name}`"
                         )
                         working_tables[other_table] = None
+                    delete_data_source(self._project, record_handler)
                     self._backup()
                     continue
 
@@ -844,6 +892,7 @@ class MultiTable:
                     ] = self._strategy.post_process_individual_synthetic_result(
                         table_name, self.relational_data, record_handler_result
                     )
+                    delete_data_source(self._project, record_handler)
                 elif status in END_STATES:
                     # already checked explicitly for completed; all other end states are effectively failures
                     self._log_failed(table_name, "synthetic data generation")
@@ -855,6 +904,7 @@ class MultiTable:
                             f"Skipping synthetic data generation for `{other_table}` because it depends on `{table_name}`"
                         )
                         working_tables[other_table] = None
+                    delete_data_source(self._project, record_handler)
                 else:
                     self._log_in_progress(
                         table_name, status, "synthetic data generation"
@@ -887,11 +937,14 @@ class MultiTable:
                     run_dir,
                     self._synthetics_train.training_columns[table_name],
                 )
-                self._log_start(table_name, "synthetic data generation")
                 model = self._synthetics_train.models[table_name]
                 record_handler = model.create_record_handler_obj(**table_job)
-                record_handler.submit_cloud()
                 self._synthetics_run.record_handlers[table_name] = record_handler
+                # Attempt starting the record handler right away. If it can't start right at this moment,
+                # the check towards the top of the `while` loop will handle starting it when possible.
+                self._start_record_handler_if_possible(
+                    record_handler, table_name, "synthetic data generation"
+                )
 
             self._backup()
 
@@ -1007,6 +1060,11 @@ class MultiTable:
     def _log_failed(self, table_name: str, action: str) -> None:
         logger.info(f"{action.capitalize()} failed for `{table_name}`.")
 
+    def _log_waiting(self, table_name: str, action: str) -> None:
+        logger.info(
+            f"Maximum concurrent relational jobs reached. Deferring start of `{table_name}` {action}."
+        )
+
     def _log_success(self, table_name: str, action: str) -> None:
         logger.info(f"{action.capitalize()} successfully completed for `{table_name}`.")
 
@@ -1028,6 +1086,24 @@ class MultiTable:
         }
 
         return (gretel_model, _BLUEPRINTS[gretel_model])
+
+    def _start_model_if_possible(
+        self, model: Model, table_name: str, action: str
+    ) -> None:
+        if room_in_project(self._project):
+            self._log_start(table_name, action)
+            model.submit_cloud()
+        else:
+            self._log_waiting(table_name, action)
+
+    def _start_record_handler_if_possible(
+        self, record_handler: RecordHandler, table_name: str, action: str
+    ) -> None:
+        if record_handler.data_source is None or room_in_project(self._project):
+            self._log_start(table_name, action)
+            record_handler.submit_cloud()
+        else:
+            self._log_waiting(table_name, action)
 
 
 def _get_data_from_record_handler(record_handler: RecordHandler) -> pd.DataFrame:
