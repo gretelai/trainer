@@ -13,7 +13,7 @@ from gretel_trainer.relational.connectors import (
     snowflake_conn,
     sqlite_conn,
 )
-from gretel_trainer.relational.core import MultiTableException, RelationalData
+from gretel_trainer.relational.core import RelationalData
 from gretel_trainer.relational.multi_table import MultiTable
 
 # Optimize logging for multitable output
@@ -46,20 +46,3 @@ for name, level in log_levels.items():
     logger.handlers.clear()
     logger.addHandler(handler)
     logger.setLevel(level)
-
-
-def create_report(multitable: MultiTable) -> None:
-    logger = logging.getLogger("gretel_trainer.relational.multi_table")
-    logger.info(
-        "The `create_report` function is deprecated and will be removed in a future release. Instead call the `MultiTable#create_relational_report` instance method."
-    )
-    try:
-        run_id = multitable._synthetics_run.identifier  # type:ignore
-        target_dir = multitable._working_dir / run_id
-        multitable.create_relational_report(
-            run_identifier=run_id, target_dir=target_dir
-        )
-    except Exception as e:
-        raise MultiTableException(
-            "Could not create relational report via deprecated `create_report` function."
-        ) from e
