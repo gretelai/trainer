@@ -117,7 +117,6 @@ class GretelLSTM(_BaseConfig):
         config (str/dict, optional): Either a string representing the path to the config on the local filesystem, a string representing a path to the default Gretel configurations, or a dictionary containing the configurations. Default: "synthetics/tabular-lstm", a default Gretel configuration
         max_rows (int, optional): The number of rows of synthetic data to generate. Defaults to 50000
         max_header_clusters (int, optional): Default: 20
-        enable_privacy_filters (bool, optional): This parameter is deprecated and will be removed in future versions.
     """
 
     _max_header_clusters_limit: int = 30
@@ -129,9 +128,7 @@ class GretelLSTM(_BaseConfig):
         config="synthetics/tabular-lstm",
         max_rows=50_000,
         max_header_clusters=20,
-        enable_privacy_filters=None,
     ):
-        _enable_privacy_filters_deprecation_warning(enable_privacy_filters)
         super().__init__(
             config=config,
             max_rows=max_rows,
@@ -149,7 +146,6 @@ class GretelACTGAN(_BaseConfig):
         config (str/dict, optional): Either a string representing the path to the config on the local filesystem, a string representing a path to the default Gretel configurations, or a dictionary containing the configurations. Default: "synthetics/tabular-actgan", a default Gretel configuration
         max_rows (int, optional): The number of rows of synthetic data to generate. Defaults to 50000
         max_header_clusters (int, optional): Default: 500
-        enable_privacy_filters (bool, optional): This parameter is deprecated and will be removed in future versions.
     """
 
     _max_header_clusters_limit: int = 5_000
@@ -161,22 +157,11 @@ class GretelACTGAN(_BaseConfig):
         config="synthetics/tabular-actgan",
         max_rows=1_000_000,
         max_header_clusters=1_000,
-        enable_privacy_filters=None,
     ):
-        _enable_privacy_filters_deprecation_warning(enable_privacy_filters)
         super().__init__(
             config=config,
             max_rows=max_rows,
             max_header_clusters=max_header_clusters,
-        )
-
-
-def _enable_privacy_filters_deprecation_warning(value: Optional[bool]) -> None:
-    if value is not None:
-        logger.warning(
-            "Privacy filters are now configured as `auto` and `enable_privacy_filters` "
-            "parameter is deprecated and will be removed in future versions. "
-            "See https://docs.gretel.ai/gretel.ai/synthetics/synthetics-faqs/privacy-protection#primary-protection-filters for more information"
         )
 
 
