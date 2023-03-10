@@ -524,10 +524,6 @@ class MultiTable:
         If `data` is supplied, runs only the supplied data through the corresponding transforms models.
         Otherwise runs source data through all existing transforms models.
         """
-        identifier = identifier or f"transforms_{_timestamp()}"
-        logger.info(f"Starting transforms run `{identifier}`")
-        run_dir = _mkdir(str(self._working_dir / identifier))
-        transforms_run_paths = {}
         if data is not None:
             unrunnable_tables = [
                 table
@@ -539,14 +535,21 @@ class MultiTable:
                     f"Cannot run transforms on provided data without successfully trained models for {unrunnable_tables}"
                 )
 
-            for table, df in data.items():
-                transforms_run_path = run_dir / f"transforms_run_{table}.csv"
-                df.to_csv(transforms_run_path, index=False)
-                transforms_run_paths[table] = transforms_run_path
-        else:
-            for table, model in self._transforms_train.models.items():
-                if _table_trained_successfully(self._transforms_train, table):
-                    transforms_run_paths[table] = model.data_source
+        identifier = identifier or f"transforms_{_timestamp()}"
+        logger.info(f"Starting transforms run `{identifier}`")
+        run_dir = _mkdir(str(self._working_dir / identifier))
+        transforms_run_paths = {}
+
+        data = data or {
+            table: self.relational_data.get_table_data(table)
+            for table in self._transforms_train.models
+            if _table_trained_successfully(self._transforms_train, table)
+        }
+
+        for table, df in data.items():
+            transforms_run_path = run_dir / f"transforms_input_{table}.csv"
+            df.to_csv(transforms_run_path, index=False)
+            transforms_run_paths[table] = transforms_run_path
 
         transforms_record_handlers: Dict[str, RecordHandler] = {}
 
