@@ -316,13 +316,18 @@ class MultiTable:
             for table, rh in record_handlers.items():
                 data_source = rh.data_source
                 if data_source is not None:
-                    download_file_artifact(
-                        self._project,
-                        data_source,
-                        self._working_dir
-                        / backup_generate.identifier
-                        / f"synthetics_seed_{table}.csv",
-                    )
+                    try:
+                        download_file_artifact(
+                            self._project,
+                            data_source,
+                            self._working_dir
+                            / backup_generate.identifier
+                            / f"synthetics_seed_{table}.csv",
+                        )
+                    except:
+                        logger.warning(
+                            f"Could not download seed CSV data source for `{table}`. It may have already been deleted."
+                        )
             logger.info(
                 f"At time of last backup, generation run `{latest_run_id}` was still in progress. From here, you can attempt to resume that generate job via `generate(resume=True)`, or restart generation from scratch via a regular call to `generate`."
             )
