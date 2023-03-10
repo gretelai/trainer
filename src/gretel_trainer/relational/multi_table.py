@@ -229,11 +229,6 @@ class MultiTable:
         ]
         for table in training_succeeded:
             model = self._synthetics_train.models[table]
-            download_file_artifact(
-                self._project,
-                model.data_source,
-                self._working_dir / f"synthetics_train_{table}.csv",
-            )
             self._strategy.update_evaluation_from_model(
                 table, self.evaluations, model, self._working_dir
             )
