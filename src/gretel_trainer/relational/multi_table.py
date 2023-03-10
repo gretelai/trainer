@@ -244,6 +244,21 @@ class MultiTable:
             )
             return None
 
+        synthetics_training_archive_id = (
+            self._artifact_collection.synthetics_training_archive
+        )
+        if synthetics_training_archive_id is not None:
+            synthetics_training_archive_path = (
+                self._working_dir / "synthetics_training.tar.gz"
+            )
+            download_tar_artifact(
+                self._project,
+                synthetics_training_archive_id,
+                synthetics_training_archive_path,
+            )
+            with tarfile.open(synthetics_training_archive_path, "r:gz") as tar:
+                tar.extractall(path=self._working_dir)
+
         # Synthetics Generate
         ## First, download the outputs archive if present and extract the data.
         synthetics_outputs_archive_id = (
@@ -726,6 +741,13 @@ class MultiTable:
                     continue
 
             self._backup()
+
+        archive_path = self._working_dir / "synthetics_training.tar.gz"
+        for table_name, csv_path in training_data.items():
+            add_to_tar(archive_path, csv_path, csv_path.name)
+        self._artifact_collection.upload_synthetics_training_archive(
+            self._project, str(archive_path)
+        )
 
     def train(self) -> None:
         """Train synthetic data models on each table in the relational dataset"""
