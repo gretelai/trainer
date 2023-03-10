@@ -1161,7 +1161,7 @@ def _table_trained_successfully(
 def _table_is_in_progress(run: SyntheticsRun, table: str) -> bool:
     in_progress = False
     record_handler = run.record_handlers.get(table)
-    if record_handler is not None:
+    if record_handler is not None and record_handler.record_id is not None:
         in_progress = record_handler.status in ACTIVE_STATES
     return in_progress
 
