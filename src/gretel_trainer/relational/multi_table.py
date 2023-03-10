@@ -200,6 +200,21 @@ class MultiTable:
 
         logger.info("Restoring synthetics models")
 
+        synthetics_training_archive_id = (
+            self._artifact_collection.synthetics_training_archive
+        )
+        if synthetics_training_archive_id is not None:
+            synthetics_training_archive_path = (
+                self._working_dir / "synthetics_training.tar.gz"
+            )
+            download_tar_artifact(
+                self._project,
+                synthetics_training_archive_id,
+                synthetics_training_archive_path,
+            )
+            with tarfile.open(synthetics_training_archive_path, "r:gz") as tar:
+                tar.extractall(path=self._working_dir)
+
         self._synthetics_train.training_columns = (
             backup_synthetics_train.training_columns
         )
@@ -243,21 +258,6 @@ class MultiTable:
                 f"Training failed for tables: {training_failed}. From here, your next step is to try retraining them with modified data by calling `retrain_tables`."
             )
             return None
-
-        synthetics_training_archive_id = (
-            self._artifact_collection.synthetics_training_archive
-        )
-        if synthetics_training_archive_id is not None:
-            synthetics_training_archive_path = (
-                self._working_dir / "synthetics_training.tar.gz"
-            )
-            download_tar_artifact(
-                self._project,
-                synthetics_training_archive_id,
-                synthetics_training_archive_path,
-            )
-            with tarfile.open(synthetics_training_archive_path, "r:gz") as tar:
-                tar.extractall(path=self._working_dir)
 
         # Synthetics Generate
         ## First, download the outputs archive if present and extract the data.
