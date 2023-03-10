@@ -949,6 +949,11 @@ class MultiTable:
             )
 
             for table_name in ready_tables:
+                # Any record handlers we create but defer submitting will continue to register as "ready" until they are submitted and become "in progress".
+                # This check prevents repeatedly incurring the cost of getting the generation job details while the job is deferred.
+                if self._synthetics_run.record_handlers.get(table_name) is not None:
+                    continue
+
                 present_working_tables = {
                     table: data
                     for table, data in working_tables.items()
