@@ -30,10 +30,11 @@ class ReportPresenter:
     now: datetime.datetime
     run_identifier: str
     evaluations: Dict[str, TableEvaluation]
-    
+
     @property
     def generated_at(self) -> str:
         return self.now.strftime("%Y-%m-%d")
+
     @property
     def copyright_year(self) -> str:
         return self.now.strftime("%Y")
