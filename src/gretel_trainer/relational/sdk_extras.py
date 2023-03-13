@@ -11,7 +11,7 @@ from gretel_client.projects.projects import Project
 
 logger = logging.getLogger(__name__)
 
-MAX_PROJECT_ARTIFACTS = 6
+MAX_PROJECT_ARTIFACTS = 50
 
 
 def room_in_project(project: Project) -> bool:
