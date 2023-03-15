@@ -113,7 +113,7 @@ class MultiTable:
         self._artifact_collection = ArtifactCollection()
         self._latest_backup: Optional[Backup] = None
         self._transforms_train = TransformsTrain()
-        self.transforms_output_tables: Dict[str, pd.DataFrame] = {}
+        self.transform_output_tables: Dict[str, pd.DataFrame] = {}
         self._synthetics_train = SyntheticsTrain()
         self._synthetics_run: Optional[SyntheticsRun] = None
         self.synthetic_output_tables: Dict[str, pd.DataFrame] = {}
