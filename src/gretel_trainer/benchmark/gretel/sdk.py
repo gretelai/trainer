@@ -77,5 +77,5 @@ ActualGretelSDK = GretelSDK(
     create_project=_create_project,
     search_projects=_search_projects,
     evaluate=_evaluate,
-    poll=gretel_client.helpers.poll,
+    poll=gretel_client.helpers.poll,  # type:ignore
 )
