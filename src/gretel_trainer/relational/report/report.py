@@ -9,19 +9,28 @@ from typing import Dict, List, Optional
 import pandas as pd
 from jinja2 import Environment, FileSystemLoader
 
-from gretel_trainer.relational.core import RelationalData, TableEvaluation
+from gretel_trainer.relational.core import ForeignKey, RelationalData, TableEvaluation
 
 _TEMPLATE_DIR = str(Path(__file__).parent)
+# _TEMPLATE_FILE = "report_template.html"
+_TEMPLATE_FILE = "report_template_two.html"
 
 
 class ReportRenderer:
     def __init__(self):
         file_loader = FileSystemLoader(_TEMPLATE_DIR)
         env = Environment(loader=file_loader)
-        self.template = env.get_template("report_template.html")
+        self.template = env.get_template(_TEMPLATE_FILE)
 
     def render(self, presenter: ReportPresenter) -> str:
         return self.template.render(presenter=presenter)
+
+
+@dataclass
+class ReportTableData:
+    table: str
+    pk: Optional[str]
+    fks: List[ForeignKey]
 
 
 @dataclass
@@ -42,6 +51,18 @@ class ReportPresenter:
     @property
     def relationships(self) -> Relationships:
         return _table_relationships(self.rel_data)
+
+    @property
+    def composite_sqs(self):
+        pass
+
+    @property
+    def composite_ppl(self):
+        pass
+
+    @property
+    def report_table_data(self) -> List[ReportTableData]:
+        return _get_table_data(self.rel_data)
 
 
 @dataclass
@@ -73,6 +94,19 @@ class Cell:
 class Relationships:
     columns: List[str]
     data: List[Cell]
+
+
+def _get_table_data(rel_data: RelationalData) -> List[ReportTableData]:
+    table_data = []
+
+    for table in rel_data.list_all_tables():
+        pk = rel_data.get_primary_key(table)
+        fks = rel_data.get_foreign_keys(table)
+        table_data.append(ReportTableData(table=table, pk=pk, fks=fks))
+
+    # Sort tables alphabetically because that's nice.
+    table_data = sorted(table_data, key=lambda x: x.table)
+    return table_data
 
 
 def _table_relationships(rel_data: RelationalData) -> Relationships:

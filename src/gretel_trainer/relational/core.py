@@ -31,6 +31,64 @@ class TableEvaluation:
             and self.individual_sqs is not None
         )
 
+    # This gets set, punt for now
+    # @property
+    # def cross_table_sqs(self) -> Optional[int]:
+    #     if self.cross_table_report_json is None:
+    #         return None
+    #     else:
+    #         return self.cross_table_report_json["synthetic_data_quality_score"]["score"]
+
+    @property
+    def cross_table_sqs_grade(self) -> Optional[str]:
+        if self.cross_table_report_json is None:
+            return None
+        else:
+            return self.cross_table_report_json["synthetic_data_quality_score"]["grade"]
+
+    @property
+    def cross_table_ppl(self) -> Optional[int]:
+        if self.cross_table_report_json is None:
+            return None
+        else:
+            return self.cross_table_report_json["privacy_protection_level"]["score"]
+
+    @property
+    def cross_table_ppl_grade(self) -> Optional[str]:
+        if self.cross_table_report_json is None:
+            return None
+        else:
+            return self.cross_table_report_json["privacy_protection_level"]["grade"]
+
+    # This gets set, punt for now
+    # @property
+    # def individual_sqs(self) -> Optional[int]:
+    #     if self.individual_report_json is None:
+    #         return None
+    #     else:
+    #         return self.individual_report_json["synthetic_data_quality_score"]["score"]
+
+    @property
+    def individual_sqs_grade(self) -> Optional[str]:
+        if self.individual_report_json is None:
+            return None
+        else:
+            return self.individual_report_json["synthetic_data_quality_score"]["grade"]
+
+    @property
+    def individual_ppl(self) -> Optional[int]:
+        if self.individual_report_json is None:
+            return None
+        else:
+            return self.individual_report_json["privacy_protection_level"]["score"]
+
+    @property
+    def individual_ppl_grade(self) -> Optional[str]:
+        if self.individual_report_json is None:
+            return None
+        else:
+            return self.individual_report_json["privacy_protection_level"]["grade"]
+
 
 @dataclass
 class ForeignKey:

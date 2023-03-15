@@ -9,6 +9,8 @@ type:
 .PHONY: multi
 multi:
 	-python -m pyright src/gretel_trainer/relational tests/relational/
+	# vvv Do we need this...?
+	# pip install -e .
 	python -m pytest tests/relational/
 
 .PHONY: multilint
