@@ -11,6 +11,17 @@ from gretel_client.projects.projects import Project
 
 logger = logging.getLogger(__name__)
 
+MAX_PROJECT_ARTIFACTS = 50
+
+
+def room_in_project(project: Project) -> bool:
+    return len(project.artifacts) < MAX_PROJECT_ARTIFACTS
+
+
+def delete_data_source(project: Project, job: Job) -> None:
+    if job.data_source is not None:
+        project.delete_artifact(job.data_source)
+
 
 def cautiously_refresh_status(
     job: Job, key: str, refresh_attempts: Dict[str, int]

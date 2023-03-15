@@ -33,6 +33,10 @@ ARTIFACTS = {
         "artifact_id": "gretel_abc_train_pets.csv",
         "local_name": "synthetics_train_pets.csv",
     },
+    "synthetics_training_archive": {
+        "artifact_id": "gretel_abc_synthetics_training.tar.gz",
+        "local_name": "synthetics_training.tar.gz",
+    },
     "synthetics_outputs_archive": {
         "artifact_id": "gretel_abc_synthetics_outputs.tar.gz",
         "local_name": "synthetics_outputs.tar.gz",
@@ -99,6 +103,7 @@ def create_backup(
     working_dir: Path,
     synthetics_models: Dict[str, Mock] = {},
     synthetics_record_handlers: Dict[str, Mock] = {},
+    training_archive_present: bool = False,
     output_archive_present: bool = False,
     transforms_models: Dict[str, Mock] = {},
 ) -> str:
@@ -106,6 +111,10 @@ def create_backup(
         gretel_debug_summary=ARTIFACTS["debug_summary"]["artifact_id"],
         source_archive=ARTIFACTS["source_archive"]["artifact_id"],
     )
+    if training_archive_present:
+        artifact_collection.synthetics_training_archive = ARTIFACTS[
+            "synthetics_training_archive"
+        ]["artifact_id"]
     if output_archive_present:
         artifact_collection.synthetics_outputs_archive = ARTIFACTS[
             "synthetics_outputs_archive"
@@ -198,10 +207,14 @@ def create_standin_project_artifacts(
             rel_data.get_table_data(table).to_csv(table_path, index=False)
             tar.add(table_path, arcname=f"source_{table}.csv")
 
-    # Training CSVs
-    for table in rel_data.list_all_tables():
-        table_path = setup_path / f"train_{table}.csv"
-        rel_data.get_table_data(table).to_csv(table_path, index=False)
+    # Synthetics training archive
+    with tarfile.open(
+        local_file(setup_path, "synthetics_training_archive"), "w:gz"
+    ) as tar:
+        for table in rel_data.list_all_tables():
+            table_path = setup_path / f"synthetics_train_{table}.csv"
+            rel_data.get_table_data(table).to_csv(table_path, index=False)
+            tar.add(table_path, arcname=f"synthetics_train_{table}.csv")
 
     # Synthetics output archive
     with tarfile.open(
@@ -364,16 +377,20 @@ def test_restore_training_complete(project, pets):
             synthetics_models,
         )
         backup_file = create_backup(
-            pets, working_dir, synthetics_models=synthetics_models
+            pets,
+            working_dir,
+            synthetics_models=synthetics_models,
+            training_archive_present=True,
         )
 
         mt = MultiTable.restore(backup_file)
 
         # Backup + Debug summary + Source archive + (2) Source CSVs
-        # + (2) Train CSVs + (4) Reports
-        assert len(os.listdir(working_dir)) == 11
+        # + Training archive + (2) Train CSVs + (4) Reports
+        assert len(os.listdir(working_dir)) == 12
 
         # Training state is restored
+        assert os.path.exists(local_file(working_dir, "synthetics_training_archive"))
         assert os.path.exists(local_file(working_dir, "train_humans"))
         assert os.path.exists(
             working_dir / "synthetics_individual_evaluation_humans.json"
@@ -416,17 +433,23 @@ def test_restore_training_one_failed(project, pets):
             synthetics_models,
         )
         backup_file = create_backup(
-            pets, working_dir, synthetics_models=synthetics_models
+            pets,
+            working_dir,
+            synthetics_models=synthetics_models,
+            training_archive_present=True,
         )
 
         mt = MultiTable.restore(backup_file)
 
         # Backup + Debug summary + Source archive + (2) Source CSVs
-        # + (1) Train CSVs + (2) Reports
-        assert len(os.listdir(working_dir)) == 8
+        # Training archive + (2) Train CSVs + (2) Reports
+        assert len(os.listdir(working_dir)) == 10
 
         # Training state is restored
-        assert not os.path.exists(local_file(working_dir, "train_humans"))
+        assert os.path.exists(local_file(working_dir, "synthetics_training_archive"))
+        ## We do expect the training CSV to be present, extracted from the training archive...
+        assert os.path.exists(local_file(working_dir, "train_humans"))
+        ## ...but we should not see evaluation reports because the table failed to train.
         assert not os.path.exists(
             working_dir / "synthetics_individual_evaluation_humans.json"
         )
@@ -485,14 +508,16 @@ def test_restore_generate_completed(project, pets):
             working_dir,
             synthetics_models=synthetics_models,
             synthetics_record_handlers=synthetics_record_handlers,
+            training_archive_present=True,
             output_archive_present=True,
         )
 
         mt = MultiTable.restore(backup_file)
 
         # Backup + Debug summary + Source archive + (2) Source CSVs
-        # + (2) Train CSVs + (4) Reports + Outputs archive + Previous run subdirectory
-        assert len(os.listdir(working_dir)) == 13
+        # + Training archive + (2) Train CSVs + (4) Reports
+        # + Outputs archive + Previous run subdirectory
+        assert len(os.listdir(working_dir)) == 14
 
         # Generate state is restored
         assert os.path.exists(working_dir / "run-id" / "synth_humans.csv")
@@ -555,14 +580,15 @@ def test_restore_generate_in_progress(project, pets):
             working_dir,
             synthetics_models=synthetics_models,
             synthetics_record_handlers=synthetics_record_handlers,
+            training_archive_present=True,
             output_archive_present=False,
         )
 
         mt = MultiTable.restore(backup_file)
 
         # Backup + Debug summary + Source archive + (2) Source CSVs
-        # + (2) Train CSVs + (4) Reports
-        assert len(os.listdir(working_dir)) == 11
+        # + Training archive + (2) Train CSVs + (4) Reports
+        assert len(os.listdir(working_dir)) == 12
 
         # Generate state is partially restored
         assert mt._synthetics_run == SyntheticsRun(
