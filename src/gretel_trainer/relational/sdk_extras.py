@@ -26,8 +26,8 @@ def get_job_id(job: Job) -> Optional[str]:
         raise MultiTableException("Unexpected job object")
 
 
-def room_in_project(project: Project) -> bool:
-    return len(project.artifacts) < MAX_PROJECT_ARTIFACTS
+def room_in_project(project: Project, count: int = 1) -> bool:
+    return len(project.artifacts) + count <= MAX_PROJECT_ARTIFACTS
 
 
 def delete_data_source(project: Project, job: Job) -> None:

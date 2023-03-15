@@ -859,25 +859,99 @@ class MultiTable:
         for table, data in output_tables.items():
             data.to_csv(run_dir / f"synth_{table}.csv", index=False)
 
-        for table, data in output_tables.items():
-            # Get "opposite" evaluation metrics
-            self._strategy.update_evaluation_via_evaluate(
-                evaluation=self.evaluations[table],
-                table=table,
-                rel_data=self.relational_data,
-                synthetic_tables=output_tables,
-                target_dir=run_dir,
+        evaluate_project = create_project(display_name=f"evaluate-{self._project.display_name}")
+        evaluate_models = {}
+        for table, synth_df in output_tables.items():
+            # TODO: skip if table is preserved or failed
+            model_config = {} # get from new method on strategies
+            source_csv = "..."
+            evaluate_model = evaluate_project.create_model_obj(
+                model_config=model_config, data_source=synth_csv, ref_data=source_csv
             )
+            evaluate_models[table] = evaluate_model
 
-            # Copy all evaluation data (model-based and evaluate-based) to run_dir
-            for eval_type in ["individual", "cross_table"]:
-                for ext in ["html", "json"]:
-                    filename = f"synthetics_{eval_type}_evaluation_{table}.{ext}"
-                    with suppress(FileNotFoundError):
-                        shutil.copyfile(
-                            src=self._working_dir / filename,
-                            dst=run_dir / filename,
-                        )
+        refresh_attempts: Dict[str, int] = defaultdict(int)
+        finished_evaluation = []
+
+        def _more_evaluation_to_do() -> bool:
+            return len(finished_evaluation) != len(evaluate_models)
+
+        first_pass = True
+        while _more_evaluation_to_do():
+            # Don't wait needlessly the first time through.
+            if first_pass:
+                first_pass = False
+            else:
+                self._wait_refresh_interval(20)
+
+            for table_name, model in evaluate_models.items():
+                if table in finished_evaluation:
+                    continue
+
+                if model.model_id is None:
+                    self._start_model_if_possible(
+                        model=model,
+                        table_name=table_name,
+                        action="evaluation",
+                        number_of_artifacts=2,
+                        project=evaluate_project,
+                    )
+                    continue
+
+                status = cautiously_refresh_status(model, table_name, refresh_attempts)
+
+                # If we consistently failed to refresh the job status, fail the table
+                if refresh_attempts[table_name] >= MAX_REFRESH_ATTEMPTS:
+                    self._log_lost_contact(table_name)
+                    finished_evaluation.append(table_name)
+                    # delete_data_source(evaluate_project, model)
+                    continue
+
+                if status == Status.COMPLETED:
+                    self._log_success(table_name, "evaluation")
+                    finished_evaluation.append(table_name)
+                    # delete_data_source(evaluate_project, model)
+                    # TODO: something like this, ish
+                    # self._strategy.update_evaluation_from_model(
+                    #     table_name, self.evaluations, model, self._working_dir
+                    # )
+                elif status in END_STATES:
+                    # already checked explicitly for completed; all other end states are effectively failures
+                    self._log_failed(table_name, "evaluation")
+                    finished_evaluation.append(table_name)
+                    # delete_data_source(self._project, model)
+                else:
+                    self._log_in_progress(
+                        table_name, status, "evaluation"
+                    )
+                    continue
+
+            # TODO: decide if we want this call or not.
+            # It's nice to have for consistency (possible refactor in the future?),
+            # and is effectively a no-op since we don't alter any state in this loop,
+            # but it might seem like noise?
+            self._backup()
+
+        # # TODO: delete top part of this, but keep the "copy all evaluation data" part!
+        # for table, data in output_tables.items():
+        #     # Get "opposite" evaluation metrics
+        #     self._strategy.update_evaluation_via_evaluate(
+        #         evaluation=self.evaluations[table],
+        #         table=table,
+        #         rel_data=self.relational_data,
+        #         synthetic_tables=output_tables,
+        #         target_dir=run_dir,
+        #     )
+        #
+        #     # Copy all evaluation data (model-based and evaluate-based) to run_dir
+        #     for eval_type in ["individual", "cross_table"]:
+        #         for ext in ["html", "json"]:
+        #             filename = f"synthetics_{eval_type}_evaluation_{table}.{ext}"
+        #             with suppress(FileNotFoundError):
+        #                 shutil.copyfile(
+        #                     src=self._working_dir / filename,
+        #                     dst=run_dir / filename,
+        #                 )
 
         logger.info("Creating relational report")
         self.create_relational_report(
@@ -939,9 +1013,10 @@ class MultiTable:
         self.evaluations[table].individual_report_json = individual_report_json
         self.evaluations[table].cross_table_report_json = cross_table_report_json
 
-    def _wait_refresh_interval(self) -> None:
-        logger.info(f"Next status check in {self._refresh_interval} seconds.")
-        time.sleep(self._refresh_interval)
+    def _wait_refresh_interval(self, seconds: Optional[int] = None) -> None:
+        seconds = seconds or self._refresh_interval
+        logger.info(f"Next status check in {seconds} seconds.")
+        time.sleep(seconds)
 
     def _log_start(self, table_name: str, action: str) -> None:
         logger.info(f"Starting {action} for `{table_name}`.")
@@ -982,9 +1057,15 @@ class MultiTable:
         return (gretel_model, _BLUEPRINTS[gretel_model])
 
     def _start_model_if_possible(
-        self, model: Model, table_name: str, action: str
+        self,
+        model: Model,
+        table_name: str,
+        action: str,
+        number_of_artifacts: int = 1,
+        project: Optional[Project] = None,
     ) -> None:
-        if room_in_project(self._project):
+        project = project or self._project
+        if room_in_project(project, number_of_artifacts):
             self._log_start(table_name, action)
             model.submit_cloud()
         else:
