@@ -60,27 +60,23 @@
       </p>
 
       <table>
-          <thead>
-            <tr>
-                <th>Table name</th>
-                <th>Private key</th>
-                <th>Foreign keys</th>
-            </tr>
-          </thead>
-          <tbody>
-            {% for table_data in presenter.report_table_data %}
-            <tr>
-              <td><b>{{ table_data.table }}</b></td>
-              <td><span>{{ table_data.pk }}</span></td>
-              <td>
-                {% for fk in table_data.fks %}
-                <span>{{ fk.column_name }}</span>&nbsp;
-                {% endfor %}
-              </td>
-            </tr>
+        <tr>
+            <th>Table name</th>
+            <th>Private key</th>
+            <th>Foreign keys</th>
+        </tr>
+        {% for table_data in presenter.report_table_data %}
+        <tr>
+          <td><b>{{ table_data.table }}</b></td>
+          <td><span class="label">{{ table_data.pk }}</span></td>
+          <td>
+            {% for fk in table_data.fks %}
+            <span class="label">{{ fk.column_name }}</span>&nbsp;
             {% endfor %}
-          </tbody>
-        </table>
+          </td>
+        </tr>
+        {% endfor %}
+      </table>
     </section>
 
     <section class="break">
@@ -106,37 +102,33 @@
         <p>For each table, individual and cross-table synthetic data quality scores (SQS) are computed and displayed below.</p>
 
         <table>
-          <thead>
-            <tr>
-              <th scope="row">Table Name</th>
-              <th scope="col">Individual Score</th>
-              <th scope="col">Cross-table Score</th>
-            </tr>
-          </thead>
+          <tr>
+            <th scope="row">Table Name</th>
+            <th scope="col">Individual Score</th>
+            <th scope="col">Cross-table Score</th>
+          </tr>
           {% for table, evaluation in presenter.evaluations.items() %}
-          <tbody>
-            <tr>
-              <th scope="row">{{table}}</th>
-              <td>
-                {{ evaluation.individual_sqs }}
-                <span class="label label__{{ presenter.sqs_score_to_grade(evaluation.individual_sqs).lower().replace(' ', '-') }}">
-                  {{ presenter.sqs_score_to_grade(evaluation.individual_sqs) }}
-                </span>
-                <span>
-                  <a href="synthetics_individual_evaluation_{{ table }}.html">Report</a>
-                </span>
-              </td>
-              <td>
-                {{ evaluation.cross_table_sqs }}
-                <span class="label label__{{ presenter.sqs_score_to_grade(evaluation.cross_table_sqs).lower().replace(' ', '-') }}">
-                  {{ presenter.sqs_score_to_grade(evaluation.cross_table_sqs) }}
-                </span>
-                <span>
-                  <a href="synthetics_cross_table_evaluation_{{ table }}.html">Report</a>
-                </span>
-              </td>
-            </tr>
-          </tbody>
+          <tr>
+            <th scope="row">{{table}}</th>
+            <td>
+              {{ evaluation.individual_sqs }}
+              <span class="label label__{{ presenter.sqs_score_to_grade(evaluation.individual_sqs).lower().replace(' ', '-') }}">
+                {{ presenter.sqs_score_to_grade(evaluation.individual_sqs) }}
+              </span>
+              <span>
+                <a href="synthetics_individual_evaluation_{{ table }}.html">Report</a>
+              </span>
+            </td>
+            <td>
+              {{ evaluation.cross_table_sqs }}
+              <span class="label label__{{ presenter.sqs_score_to_grade(evaluation.cross_table_sqs).lower().replace(' ', '-') }}">
+                {{ presenter.sqs_score_to_grade(evaluation.cross_table_sqs) }}
+              </span>
+              <span>
+                <a href="synthetics_cross_table_evaluation_{{ table }}.html">Report</a>
+              </span>
+            </td>
+          </tr>
           {% endfor %}
         </table>
 
