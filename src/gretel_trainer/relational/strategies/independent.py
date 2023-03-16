@@ -156,7 +156,6 @@ class IndependentStrategy:
         common.download_artifacts(model, out_filepath, table_name)
 
         evaluation = evaluations[table_name]
-        evaluation.individual_sqs = common.get_sqs_score(model)
         evaluation.individual_report_json = common.read_report_json_data(
             model, out_filepath
         )
@@ -192,7 +191,6 @@ class IndependentStrategy:
         out_filepath = target_dir / f"synthetics_cross_table_evaluation_{table}"
         common.write_report(report, out_filepath)
 
-        evaluation.cross_table_sqs = report.peek().get("score")
         evaluation.cross_table_report_json = report.as_dict
 
 

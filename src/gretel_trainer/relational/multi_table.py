@@ -1067,13 +1067,7 @@ class MultiTable:
         cross_table_report_json = json.loads(smart_open.open(cross_table_path).read())
 
         self.evaluations[table].individual_report_json = individual_report_json
-        self.evaluations[table].individual_sqs = sqs_score_from_full_report(
-            individual_report_json
-        )
         self.evaluations[table].cross_table_report_json = cross_table_report_json
-        self.evaluations[table].cross_table_sqs = sqs_score_from_full_report(
-            cross_table_report_json
-        )
 
     def _wait_refresh_interval(self) -> None:
         logger.info(f"Next status check in {self._refresh_interval} seconds.")

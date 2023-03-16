@@ -182,7 +182,7 @@ def test_post_processing_foreign_keys_with_skewed_frequencies_and_different_size
     assert fk_value_counts == [5, 5, 15, 30, 35, 60]
 
 
-def test_uses_trained_model_to_update_individual_scores():
+def test_uses_trained_model_to_update_individual_scores(report_json_dict):
     strategy = IndependentStrategy()
     evaluations = {
         "table_1": TableEvaluation(),
@@ -192,15 +192,12 @@ def test_uses_trained_model_to_update_individual_scores():
 
     with tempfile.TemporaryDirectory() as working_dir, patch(
         "gretel_trainer.relational.strategies.independent.common.download_artifacts"
-    ) as download_artifacts, patch(
-        "gretel_trainer.relational.strategies.independent.common.get_sqs_score"
-    ) as get_sqs:
-        get_sqs.return_value = 80
+    ) as download_artifacts:
         working_dir = Path(working_dir)
         with open(
             working_dir / "synthetics_individual_evaluation_table_1.json", "w"
         ) as f:
-            f.write(json.dumps({"report": "json"}))
+            f.write(json.dumps(report_json_dict))
 
         strategy.update_evaluation_from_model(
             "table_1", evaluations, model, working_dir
@@ -208,14 +205,14 @@ def test_uses_trained_model_to_update_individual_scores():
 
     evaluation = evaluations["table_1"]
 
-    assert evaluation.individual_sqs == 80
-    assert evaluation.individual_report_json == {"report": "json"}
+    assert evaluation.individual_sqs == 95
+    assert evaluation.individual_report_json == report_json_dict
 
     assert evaluation.cross_table_sqs is None
     assert evaluation.cross_table_report_json is None
 
 
-def test_falls_back_to_fetching_report_json_when_download_artifacts_fails():
+def test_falls_back_to_fetching_report_json_when_download_artifacts_fails(report_json_dict):
     strategy = IndependentStrategy()
     evaluations = {
         "table_1": TableEvaluation(),
@@ -226,14 +223,11 @@ def test_falls_back_to_fetching_report_json_when_download_artifacts_fails():
     with tempfile.TemporaryDirectory() as working_dir, patch(
         "gretel_trainer.relational.strategies.independent.common.download_artifacts"
     ) as download_artifacts, patch(
-        "gretel_trainer.relational.strategies.independent.common.get_sqs_score"
-    ) as get_sqs, patch(
         "gretel_trainer.relational.strategies.independent.common._get_report_json"
     ) as get_json:
-        get_sqs.return_value = 80
         working_dir = Path(working_dir)
         download_artifacts.return_value = None
-        get_json.return_value = {"report": "json"}
+        get_json.return_value = report_json_dict
 
         strategy.update_evaluation_from_model(
             "table_1", evaluations, model, working_dir
@@ -241,14 +235,14 @@ def test_falls_back_to_fetching_report_json_when_download_artifacts_fails():
 
     evaluation = evaluations["table_1"]
 
-    assert evaluation.individual_sqs == 80
-    assert evaluation.individual_report_json == {"report": "json"}
+    assert evaluation.individual_sqs == 95
+    assert evaluation.individual_report_json == report_json_dict
 
     assert evaluation.cross_table_sqs is None
     assert evaluation.cross_table_report_json is None
 
 
-def test_updates_cross_table_scores_using_evaluate(source_nba, synthetic_nba):
+def test_updates_cross_table_scores_using_evaluate(source_nba, synthetic_nba, report_json_dict):
     rel_data, _, _, _ = source_nba
     synth_rel_data, synth_states, synth_cities, synth_teams = synthetic_nba
     synthetic_tables = {
@@ -261,9 +255,8 @@ def test_updates_cross_table_scores_using_evaluate(source_nba, synthetic_nba):
     evaluation = TableEvaluation()
 
     mock_report = Mock()
-    mock_report.peek = lambda: {"score": 85}
     mock_report.as_html = "HTML"
-    mock_report.as_dict = {"REPORT": "JSON"}
+    mock_report.as_dict = report_json_dict
 
     with tempfile.TemporaryDirectory() as working_dir, patch(
         "gretel_trainer.relational.strategies.independent.common.get_quality_report"
@@ -284,7 +277,7 @@ def test_updates_cross_table_scores_using_evaluate(source_nba, synthetic_nba):
             smart_open.open(
                 working_dir / "synthetics_cross_table_evaluation_cities.json"
             ).read()
-        ) == {"REPORT": "JSON"}
+        ) == report_json_dict
 
     get_report.assert_called_once()
 
@@ -299,8 +292,8 @@ def test_updates_cross_table_scores_using_evaluate(source_nba, synthetic_nba):
     pdtest.assert_frame_equal(ancestral_source_data, call_args_kwargs["source_data"])
     pdtest.assert_frame_equal(ancestral_synth_data, call_args_kwargs["synth_data"])
 
-    assert evaluation.cross_table_sqs == 85
-    assert evaluation.cross_table_report_json == {"REPORT": "JSON"}
+    assert evaluation.cross_table_sqs == 95
+    assert evaluation.cross_table_report_json == report_json_dict
 
     assert evaluation.individual_sqs is None
     assert evaluation.individual_report_json is None

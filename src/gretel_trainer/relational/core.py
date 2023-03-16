@@ -11,6 +11,11 @@ from networkx.algorithms.dag import dag_longest_path_length
 
 logger = logging.getLogger(__name__)
 
+_SQS = "synthetic_data_quality_score"
+_PPL = "privacy_protection_level"
+_SCORE = "score"
+_GRADE = "grade"
+
 
 class MultiTableException(Exception):
     pass
@@ -19,9 +24,7 @@ class MultiTableException(Exception):
 @dataclass
 class TableEvaluation:
     cross_table_report_json: Optional[Dict] = field(default=None, repr=False)
-    cross_table_sqs: Optional[int] = None
     individual_report_json: Optional[Dict] = field(default=None, repr=False)
-    individual_sqs: Optional[int] = None
 
     def is_complete(self) -> bool:
         return (
@@ -31,63 +34,51 @@ class TableEvaluation:
             and self.individual_sqs is not None
         )
 
-    # This gets set, punt for now
-    # @property
-    # def cross_table_sqs(self) -> Optional[int]:
-    #     if self.cross_table_report_json is None:
-    #         return None
-    #     else:
-    #         return self.cross_table_report_json["synthetic_data_quality_score"]["score"]
+    # When these were a single helper method that returned Optional[Union[int, str]]
+    # pyright got mad because we tighten the typing in all the properties below.
+    def _score_from_json(self, report_json: Optional[dict], entry: str) -> Optional[int]:
+        if report_json is None:
+            return None
+        else:
+            return report_json.get(entry, {}).get(_SCORE)
+
+    def _grade_from_json(self, report_json: Optional[dict], entry: str) -> Optional[str]:
+        if report_json is None:
+            return None
+        else:
+            return report_json.get(entry, {}).get(_GRADE)
+
+    @property
+    def cross_table_sqs(self) -> Optional[int]:
+        return self._score_from_json(self.cross_table_report_json, _SQS)
 
     @property
     def cross_table_sqs_grade(self) -> Optional[str]:
-        if self.cross_table_report_json is None:
-            return None
-        else:
-            return self.cross_table_report_json["synthetic_data_quality_score"]["grade"]
+        return self._grade_from_json(self.cross_table_report_json, _SQS)
 
     @property
     def cross_table_ppl(self) -> Optional[int]:
-        if self.cross_table_report_json is None:
-            return None
-        else:
-            return self.cross_table_report_json["privacy_protection_level"]["score"]
+        return self._score_from_json(self.cross_table_report_json, _PPL)
 
     @property
     def cross_table_ppl_grade(self) -> Optional[str]:
-        if self.cross_table_report_json is None:
-            return None
-        else:
-            return self.cross_table_report_json["privacy_protection_level"]["grade"]
+        return self._grade_from_json(self.cross_table_report_json, _PPL)
 
-    # This gets set, punt for now
-    # @property
-    # def individual_sqs(self) -> Optional[int]:
-    #     if self.individual_report_json is None:
-    #         return None
-    #     else:
-    #         return self.individual_report_json["synthetic_data_quality_score"]["score"]
+    @property
+    def individual_sqs(self) -> Optional[int]:
+        return self._score_from_json(self.individual_report_json, _SQS)
 
     @property
     def individual_sqs_grade(self) -> Optional[str]:
-        if self.individual_report_json is None:
-            return None
-        else:
-            return self.individual_report_json["synthetic_data_quality_score"]["grade"]
+        return self._grade_from_json(self.individual_report_json, _SQS)
 
     @property
     def individual_ppl(self) -> Optional[int]:
-        if self.individual_report_json is None:
-            return None
-        else:
-            return self.individual_report_json["privacy_protection_level"]["score"]
+        return self._score_from_json(self.individual_report_json, _PPL)
 
     @property
     def individual_ppl_grade(self) -> Optional[str]:
-        if self.individual_report_json is None:
-            return None
-        else:
-            return self.individual_report_json["privacy_protection_level"]["grade"]
+        return self._grade_from_json(self.individual_report_json, _PPL)
 
 
 @dataclass
