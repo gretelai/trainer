@@ -212,7 +212,9 @@ def test_uses_trained_model_to_update_individual_scores(report_json_dict):
     assert evaluation.cross_table_report_json is None
 
 
-def test_falls_back_to_fetching_report_json_when_download_artifacts_fails(report_json_dict):
+def test_falls_back_to_fetching_report_json_when_download_artifacts_fails(
+    report_json_dict,
+):
     strategy = IndependentStrategy()
     evaluations = {
         "table_1": TableEvaluation(),
@@ -242,7 +244,9 @@ def test_falls_back_to_fetching_report_json_when_download_artifacts_fails(report
     assert evaluation.cross_table_report_json is None
 
 
-def test_updates_cross_table_scores_using_evaluate(source_nba, synthetic_nba, report_json_dict):
+def test_updates_cross_table_scores_using_evaluate(
+    source_nba, synthetic_nba, report_json_dict
+):
     rel_data, _, _, _ = source_nba
     synth_rel_data, synth_states, synth_cities, synth_teams = synthetic_nba
     synthetic_tables = {
@@ -273,11 +277,14 @@ def test_updates_cross_table_scores_using_evaluate(source_nba, synthetic_nba, re
             ).read()
             == "HTML"
         )
-        assert json.loads(
-            smart_open.open(
-                working_dir / "synthetics_cross_table_evaluation_cities.json"
-            ).read()
-        ) == report_json_dict
+        assert (
+            json.loads(
+                smart_open.open(
+                    working_dir / "synthetics_cross_table_evaluation_cities.json"
+                ).read()
+            )
+            == report_json_dict
+        )
 
     get_report.assert_called_once()
 

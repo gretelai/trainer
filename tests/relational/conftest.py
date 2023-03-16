@@ -124,44 +124,45 @@ def _setup_nba(
 
     return rel_data, states, cities, teams
 
+
 @pytest.fixture()
 def report_json_dict() -> dict:
     return {
         "synthetic_data_quality_score": {
-            "raw_score": 95.86666666666667, 
-            "grade": "Excellent", 
-            "score": 95
-        }, 
+            "raw_score": 95.86666666666667,
+            "grade": "Excellent",
+            "score": 95,
+        },
         "field_correlation_stability": {
-            "raw_score": 0.017275336944403048, 
-            "grade": "Excellent", 
-            "score": 94
-        }, 
+            "raw_score": 0.017275336944403048,
+            "grade": "Excellent",
+            "score": 94,
+        },
         "principal_component_stability": {
-            "raw_score": 0.07294532166881013, 
-            "grade": "Excellent", 
-            "score": 100
-        }, 
+            "raw_score": 0.07294532166881013,
+            "grade": "Excellent",
+            "score": 100,
+        },
         "field_distribution_stability": {
-            "raw_score": 0.05111941886313614, 
-            "grade": "Excellent", 
-            "score": 94
-        }, 
+            "raw_score": 0.05111941886313614,
+            "grade": "Excellent",
+            "score": 94,
+        },
         "privacy_protection_level": {
-            "grade": "Good", 
-            "raw_score": 2, 
-            "score": 2, 
-            "outlier_filter": "Medium", 
-            "similarity_filter": "Disabled", 
-            "overfitting_protection": "Enabled", 
-            "differential_privacy": "Disabled"
-        }, 
-        "fatal_error": False, 
+            "grade": "Good",
+            "raw_score": 2,
+            "score": 2,
+            "outlier_filter": "Medium",
+            "similarity_filter": "Disabled",
+            "overfitting_protection": "Enabled",
+            "differential_privacy": "Disabled",
+        },
+        "fatal_error": False,
         "summary": [
-            {"field": "synthetic_data_quality_score", "value": 95}, 
-            {"field": "field_correlation_stability", "value": 94}, 
-            {"field": "principal_component_stability", "value": 100}, 
-            {"field": "field_distribution_stability", "value": 94}, 
-            {"field": "privacy_protection_level", "value": 2}
-        ]
+            {"field": "synthetic_data_quality_score", "value": 95},
+            {"field": "field_correlation_stability", "value": 94},
+            {"field": "principal_component_stability", "value": 100},
+            {"field": "field_distribution_stability", "value": 94},
+            {"field": "privacy_protection_level", "value": 2},
+        ],
     }

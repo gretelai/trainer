@@ -36,13 +36,17 @@ class TableEvaluation:
 
     # When these were a single helper method that returned Optional[Union[int, str]]
     # pyright got mad because we tighten the typing in all the properties below.
-    def _score_from_json(self, report_json: Optional[dict], entry: str) -> Optional[int]:
+    def _score_from_json(
+        self, report_json: Optional[dict], entry: str
+    ) -> Optional[int]:
         if report_json is None:
             return None
         else:
             return report_json.get(entry, {}).get(_SCORE)
 
-    def _grade_from_json(self, report_json: Optional[dict], entry: str) -> Optional[str]:
+    def _grade_from_json(
+        self, report_json: Optional[dict], entry: str
+    ) -> Optional[str]:
         if report_json is None:
             return None
         else:
