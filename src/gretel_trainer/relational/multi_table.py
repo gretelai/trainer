@@ -488,7 +488,6 @@ class MultiTable:
             more_to_do=lambda: len(completed + failed) < len(configs),
             is_finished=lambda t: t in (completed + failed),
             get_job=lambda t: self._transforms_train.models[t],
-            start=self._start_model_if_possible,
             handle_lost_contact=_handle_lost_contact,
             handle_completed=lambda t, j: completed.append(t),
             handle_failed=lambda t: failed.append(t),
@@ -558,7 +557,6 @@ class MultiTable:
             more_to_do=lambda: len(working_tables) < len(transforms_run_paths),
             is_finished=lambda t: t in working_tables,
             get_job=lambda t: transforms_record_handlers[t],
-            start=self._start_record_handler_if_possible,
             handle_lost_contact=lambda t: working_tables.update({t: None}),
             handle_completed=_handle_completed,
             handle_failed=lambda t: working_tables.update({t: None}),
@@ -638,7 +636,6 @@ class MultiTable:
             more_to_do=lambda: len(completed + failed) < len(training_data),
             is_finished=lambda t: t in (completed + failed),
             get_job=lambda t: self._synthetics_train.models[t],
-            start=self._start_model_if_possible,
             handle_lost_contact=_handle_lost_contact,
             handle_completed=_handle_completed,
             handle_failed=lambda t: failed.append(t),
@@ -832,12 +829,12 @@ class MultiTable:
                 record_handlers[table_name] = record_handler
                 # Attempt starting the record handler right away. If it can't start right at this moment,
                 # the check towards the top of the `while` loop will handle starting it when possible.
-                self._start_record_handler_if_possible(
-                    record_handler,
-                    table_name,
-                    "synthetic data generation",
-                    self._project,
-                    1,
+                self._start_job_if_possible(
+                    job=record_handler,
+                    table_name=table_name,
+                    action="synthetic data generation",
+                    project=self._project,
+                    number_of_artifacts=1,
                 )
 
         self._loopexec(
@@ -846,7 +843,6 @@ class MultiTable:
             more_to_do=lambda: len(working_tables) != len(all_tables),
             is_finished=lambda t: t in working_tables,
             get_job=lambda t: self._synthetics_run.record_handlers[t],  # type: ignore
-            start=self._start_record_handler_if_possible,
             handle_lost_contact=_handle_lost_contact,
             handle_completed=_handle_completed,
             handle_failed=_handle_failed,
@@ -911,7 +907,6 @@ class MultiTable:
             more_to_do=lambda: len(finished_evaluation) != len(evaluate_models),
             is_finished=lambda t: t in finished_evaluation,
             get_job=lambda t: evaluate_models[t],
-            start=self._start_model_if_possible,
             handle_lost_contact=lambda t: finished_evaluation.append(t),
             handle_completed=_handle_eval_completed,
             handle_failed=lambda t: finished_evaluation.append(t),
@@ -1022,31 +1017,17 @@ class MultiTable:
 
         return (gretel_model, _BLUEPRINTS[gretel_model])
 
-    def _start_model_if_possible(
+    def _start_job_if_possible(
         self,
-        model: Model,
-        table_name: str,
-        action: str,
-        project: Project,
-        number_of_artifacts: int,
-    ) -> None:
-        if room_in_project(project, number_of_artifacts):
-            self._log_start(table_name, action)
-            model.submit_cloud()
-        else:
-            self._log_waiting(table_name, action)
-
-    def _start_record_handler_if_possible(
-        self,
-        record_handler: RecordHandler,
+        job: Job,
         table_name: str,
         action: str,
         project: Project,
         number_of_artifacts: int = 1,
     ) -> None:
-        if record_handler.data_source is None or room_in_project(project):
+        if job.data_source is None or room_in_project(project, number_of_artifacts):
             self._log_start(table_name, action)
-            record_handler.submit_cloud()
+            job.submit_cloud()
         else:
             self._log_waiting(table_name, action)
 
@@ -1057,7 +1038,6 @@ class MultiTable:
         more_to_do: Callable[[], bool],
         is_finished: Callable[[str], bool],
         get_job: Callable[[str], Job],
-        start: Callable[[Job, str, str, Project, int], None],
         handle_lost_contact: Callable[[str], None],
         handle_completed: Callable[[str, Job], None],
         handle_failed: Callable[[str], None],
@@ -1083,7 +1063,13 @@ class MultiTable:
 
                 job = get_job(table_name)
                 if get_job_id(job) is None:
-                    start(job, table_name, action, project, artifacts_per_job)
+                    self._start_job_if_possible(
+                        job=job,
+                        table_name=table_name,
+                        action=action,
+                        project=project,
+                        number_of_artifacts=artifacts_per_job
+                    )
                     continue
 
                 status = cautiously_refresh_status(job, table_name, refresh_attempts)
