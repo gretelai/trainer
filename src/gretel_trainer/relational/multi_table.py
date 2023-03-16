@@ -13,7 +13,7 @@ from dataclasses import dataclass, field, replace
 from datetime import datetime
 from enum import Enum
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple, Union
+from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 
 import pandas as pd
 import requests
@@ -49,6 +49,7 @@ from gretel_trainer.relational.sdk_extras import (
     delete_data_source,
     download_file_artifact,
     download_tar_artifact,
+    get_job_id,
     room_in_project,
     sqs_score_from_full_report,
 )
@@ -474,57 +475,24 @@ class MultiTable:
 
         self._backup()
 
-        refresh_attempts: Dict[str, int] = defaultdict(int)
         completed = []
         failed = []
 
-        def _more_to_do() -> bool:
-            return len(completed + failed) < len(configs)
+        def _handle_lost_contact(table_name: str) -> None:
+            self._transforms_train.lost_contact.append(table_name)
+            failed.append(table_name)
 
-        first_pass = True
-        while _more_to_do():
-            # Don't wait needlessly the first time through.
-            if first_pass:
-                first_pass = False
-            else:
-                self._wait_refresh_interval()
-
-            for table_name in configs:
-                # No need to do anything with tables in terminal state
-                if table_name in (completed + failed):
-                    continue
-
-                model = self._transforms_train.models[table_name]
-                if model.model_id is None:
-                    self._start_model_if_possible(
-                        model, table_name, "transforms model training"
-                    )
-                    continue
-
-                status = cautiously_refresh_status(model, table_name, refresh_attempts)
-
-                # If we consistently failed to refresh the job status, fail the table
-                if refresh_attempts[table_name] >= MAX_REFRESH_ATTEMPTS:
-                    self._log_lost_contact(table_name)
-                    self._transforms_train.lost_contact.append(table_name)
-                    failed.append(table_name)
-                    delete_data_source(self._project, model)
-                    continue
-
-                if status == Status.COMPLETED:
-                    self._log_success(table_name, "model training")
-                    completed.append(table_name)
-                    delete_data_source(self._project, model)
-                elif status in END_STATES:
-                    # already checked explicitly for completed; all other end states are effectively failures
-                    self._log_failed(table_name, "model training")
-                    failed.append(table_name)
-                    delete_data_source(self._project, model)
-                else:
-                    self._log_in_progress(table_name, status, "model training")
-                    continue
-
-            self._backup()
+        self._loopexec(
+            action="transforms model training",
+            table_collection=list(configs.keys()),
+            more_to_do=lambda: len(completed + failed) < len(configs),
+            is_finished=lambda t: t in (completed + failed),
+            get_job=lambda t: self._transforms_train.models[t],
+            start=self._start_model_if_possible,
+            handle_lost_contact=_handle_lost_contact,
+            handle_completed=lambda t, j: completed.append(t),
+            handle_failed=lambda t: failed.append(t),
+        )
 
     def run_transforms(
         self,
@@ -579,54 +547,22 @@ class MultiTable:
             transforms_record_handlers[table_name] = record_handler
 
         working_tables: Dict[str, Optional[pd.DataFrame]] = {}
-        refresh_attempts: Dict[str, int] = defaultdict(int)
 
-        def _more_to_do() -> bool:
-            return len(working_tables) != len(transforms_run_paths)
+        def _handle_completed(table_name: str, record_handler: RecordHandler) -> None:
+            record_handler_result = _get_data_from_record_handler(record_handler)
+            working_tables[table_name] = record_handler_result
 
-        first_pass = True
-        while _more_to_do():
-            # Don't wait needlessly the first time through.
-            if first_pass:
-                first_pass = False
-            else:
-                self._wait_refresh_interval()
-
-            for table_name, record_handler in transforms_record_handlers.items():
-                if table_name in working_tables:
-                    continue
-
-                if record_handler.record_id is None:
-                    self._start_record_handler_if_possible(
-                        record_handler, table_name, "transforms run"
-                    )
-                    continue
-
-                status = cautiously_refresh_status(
-                    record_handler, table_name, refresh_attempts
-                )
-
-                # If we consistently failed to refresh the job via API, fail the table
-                if refresh_attempts[table_name] >= MAX_REFRESH_ATTEMPTS:
-                    self._log_lost_contact(table_name)
-                    working_tables[table_name] = None
-                    delete_data_source(self._project, record_handler)
-                    continue
-
-                if status == Status.COMPLETED:
-                    self._log_success(table_name, "transforms run")
-                    record_handler_result = _get_data_from_record_handler(
-                        record_handler
-                    )
-                    working_tables[table_name] = record_handler_result
-                    delete_data_source(self._project, record_handler)
-                elif status in END_STATES:
-                    # already checked explicitly for completed; all other end states are effectively failures
-                    self._log_failed(table_name, "transforms run")
-                    working_tables[table_name] = None
-                    delete_data_source(self._project, record_handler)
-                else:
-                    self._log_in_progress(table_name, status, "transforms run")
+        self._loopexec(
+            action="transforms run",
+            table_collection=list(transforms_record_handlers.keys()),
+            more_to_do=lambda: len(working_tables) < len(transforms_run_paths),
+            is_finished=lambda t: t in working_tables,
+            get_job=lambda t: transforms_record_handlers[t],
+            start=self._start_record_handler_if_possible,
+            handle_lost_contact=lambda t: working_tables.update({t: None}),
+            handle_completed=_handle_completed,
+            handle_failed=lambda t: working_tables.update({t: None}),
+        )
 
         output_tables: Dict[str, pd.DataFrame] = {
             table: data for table, data in working_tables.items() if data is not None
@@ -683,62 +619,30 @@ class MultiTable:
 
         self._backup()
 
-        refresh_attempts: Dict[str, int] = defaultdict(int)
         completed = []
         failed = []
 
-        def _more_to_do() -> bool:
-            return len(completed + failed) < len(training_data)
+        def _handle_lost_contact(table_name: str) -> None:
+            self._synthetics_train.lost_contact.append(table_name)
+            failed.append(table_name)
 
-        first_pass = True
-        while _more_to_do():
-            # Don't wait needlessly the first time through.
-            if first_pass:
-                first_pass = False
-            else:
-                self._wait_refresh_interval()
+        def _handle_completed(table_name: str, job: Job) -> None:
+            completed.append(table_name)
+            self._strategy.update_evaluation_from_model(
+                table_name, self.evaluations, job, self._working_dir
+            )
 
-            for table_name in training_data:
-                # No need to do anything with tables in terminal state
-                if table_name in (completed + failed):
-                    continue
-
-                model = self._synthetics_train.models[table_name]
-                if model.model_id is None:
-                    self._start_model_if_possible(
-                        model, table_name, "synthetics model training"
-                    )
-                    continue
-
-                status = cautiously_refresh_status(model, table_name, refresh_attempts)
-
-                # If we consistently failed to refresh the job status, fail the table
-                if refresh_attempts[table_name] >= MAX_REFRESH_ATTEMPTS:
-                    self._log_lost_contact(table_name)
-                    self._synthetics_train.lost_contact.append(table_name)
-                    failed.append(table_name)
-                    delete_data_source(self._project, model)
-                    continue
-
-                if status == Status.COMPLETED:
-                    self._log_success(table_name, "synthetics model training")
-                    completed.append(table_name)
-                    delete_data_source(self._project, model)
-                    self._strategy.update_evaluation_from_model(
-                        table_name, self.evaluations, model, self._working_dir
-                    )
-                elif status in END_STATES:
-                    # already checked explicitly for completed; all other end states are effectively failures
-                    self._log_failed(table_name, "synthetics model training")
-                    failed.append(table_name)
-                    delete_data_source(self._project, model)
-                else:
-                    self._log_in_progress(
-                        table_name, status, "synthetics model training"
-                    )
-                    continue
-
-            self._backup()
+        self._loopexec(
+            action="synthetics model training",
+            table_collection=list(training_data.keys()),
+            more_to_do=lambda: len(completed + failed) < len(training_data),
+            is_finished=lambda t: t in (completed + failed),
+            get_job=lambda t: self._synthetics_train.models[t],
+            start=self._start_model_if_possible,
+            handle_lost_contact=_handle_lost_contact,
+            handle_completed=_handle_completed,
+            handle_failed=lambda t: failed.append(t),
+        )
 
         archive_path = self._working_dir / "synthetics_training.tar.gz"
         for table_name, csv_path in training_data.items():
@@ -859,86 +763,43 @@ class MultiTable:
                 table, self.relational_data
             )
         all_tables = self.relational_data.list_all_tables()
-        refresh_attempts: Dict[str, int] = defaultdict(int)
 
-        def _more_to_do() -> bool:
-            return len(working_tables) != len(all_tables)
-
-        first_pass = True
-        while _more_to_do():
-            # Don't wait needlessly the first time through.
-            if first_pass:
-                first_pass = False
-            else:
-                self._wait_refresh_interval()
-
-            for (
-                table_name,
-                record_handler,
-            ) in self._synthetics_run.record_handlers.items():
-                if table_name in working_tables:
-                    continue
-
-                if record_handler.record_id is None:
-                    self._start_record_handler_if_possible(
-                        record_handler, table_name, "synthetic data generation"
-                    )
-                    continue
-
-                status = cautiously_refresh_status(
-                    record_handler, table_name, refresh_attempts
+        def _handle_lost_contact(table_name: str) -> None:
+            self._synthetics_run.lost_contact.append(table_name)  # type:ignore
+            working_tables[table_name] = None
+            for other_table in self._strategy.tables_to_skip_when_failed(
+                table_name, self.relational_data
+            ):
+                logger.info(
+                    f"Skipping synthetic data generation for `{other_table}` because it depends on `{table_name}`"
                 )
+                working_tables[other_table] = None
+            self._backup()
 
-                # If we consistently failed to refresh the job via API, fail the table
-                if refresh_attempts[table_name] >= MAX_REFRESH_ATTEMPTS:
-                    self._log_lost_contact(table_name)
-                    self._synthetics_run.lost_contact.append(table_name)
-                    working_tables[table_name] = None
-                    for other_table in self._strategy.tables_to_skip_when_failed(
-                        table_name, self.relational_data
-                    ):
-                        logger.info(
-                            f"Skipping synthetic data generation for `{other_table}` because it depends on `{table_name}`"
-                        )
-                        working_tables[other_table] = None
-                    delete_data_source(self._project, record_handler)
-                    self._backup()
-                    continue
+        def _handle_completed(table_name: str, job: Job) -> None:
+            record_handler_result = _get_data_from_record_handler(job)
+            working_tables[
+                table_name
+            ] = self._strategy.post_process_individual_synthetic_result(
+                table_name, self.relational_data, record_handler_result
+            )
 
-                if status == Status.COMPLETED:
-                    self._log_success(table_name, "synthetic data generation")
-                    record_handler_result = _get_data_from_record_handler(
-                        record_handler
-                    )
-                    working_tables[
-                        table_name
-                    ] = self._strategy.post_process_individual_synthetic_result(
-                        table_name, self.relational_data, record_handler_result
-                    )
-                    delete_data_source(self._project, record_handler)
-                elif status in END_STATES:
-                    # already checked explicitly for completed; all other end states are effectively failures
-                    self._log_failed(table_name, "synthetic data generation")
-                    working_tables[table_name] = None
-                    for other_table in self._strategy.tables_to_skip_when_failed(
-                        table_name, self.relational_data
-                    ):
-                        logger.info(
-                            f"Skipping synthetic data generation for `{other_table}` because it depends on `{table_name}`"
-                        )
-                        working_tables[other_table] = None
-                    delete_data_source(self._project, record_handler)
-                else:
-                    self._log_in_progress(
-                        table_name, status, "synthetic data generation"
-                    )
-                    continue
+        def _handle_failed(table_name: str) -> None:
+            working_tables[table_name] = None
+            for other_table in self._strategy.tables_to_skip_when_failed(
+                table_name, self.relational_data
+            ):
+                logger.info(
+                    f"Skipping synthetic data generation for `{other_table}` because it depends on `{table_name}`"
+                )
+                working_tables[other_table] = None
 
+        def _each_iteration() -> None:
             # Determine if we can start any more jobs
             in_progress_tables = [
                 table
                 for table in all_tables
-                if _table_is_in_progress(self._synthetics_run, table)
+                if _table_is_in_progress(self._synthetics_run, table)  # type: ignore
             ]
             finished_tables = [table for table in working_tables]
 
@@ -949,7 +810,7 @@ class MultiTable:
             for table_name in ready_tables:
                 # Any record handlers we create but defer submitting will continue to register as "ready" until they are submitted and become "in progress".
                 # This check prevents repeatedly incurring the cost of getting the generation job details while the job is deferred.
-                if self._synthetics_run.record_handlers.get(table_name) is not None:
+                if self._synthetics_run.record_handlers.get(table_name) is not None:  # type:ignore
                     continue
 
                 present_working_tables = {
@@ -960,21 +821,32 @@ class MultiTable:
                 table_job = self._strategy.get_generation_job(
                     table_name,
                     self.relational_data,
-                    self._synthetics_run.record_size_ratio,
+                    self._synthetics_run.record_size_ratio,  # type:ignore
                     present_working_tables,
                     run_dir,
                     self._synthetics_train.training_columns[table_name],
                 )
                 model = self._synthetics_train.models[table_name]
                 record_handler = model.create_record_handler_obj(**table_job)
-                self._synthetics_run.record_handlers[table_name] = record_handler
+                self._synthetics_run.record_handlers[table_name] = record_handler  # type:ignore
                 # Attempt starting the record handler right away. If it can't start right at this moment,
                 # the check towards the top of the `while` loop will handle starting it when possible.
                 self._start_record_handler_if_possible(
                     record_handler, table_name, "synthetic data generation"
                 )
 
-            self._backup()
+        self._loopexec(
+            action="synthetic data generation",
+            table_collection=list(self._synthetics_run.record_handlers.keys()),
+            more_to_do=lambda: len(working_tables) != len(all_tables),
+            is_finished=lambda t: t in working_tables,
+            get_job=lambda t: self._synthetics_run.record_handlers[t],  # type: ignore
+            start=self._start_record_handler_if_possible,
+            handle_lost_contact=_handle_lost_contact,
+            handle_completed=_handle_completed,
+            handle_failed=_handle_failed,
+            each_iteration=_each_iteration,
+        )
 
         output_tables: Dict[str, pd.DataFrame] = {
             table: data for table, data in working_tables.items() if data is not None
@@ -1126,6 +998,59 @@ class MultiTable:
             record_handler.submit_cloud()
         else:
             self._log_waiting(table_name, action)
+
+    def _loopexec(
+        self,
+        action: str,
+        table_collection: List[str],
+        more_to_do: Callable[[], bool],
+        is_finished: Callable[[str], bool],
+        get_job: Callable[[str], Job],
+        start: Callable[[Job, str, str], None],
+        handle_lost_contact: Callable[[str], None],
+        handle_completed: Callable[[str, Job], None],
+        handle_failed: Callable[[str], None],
+        each_iteration: Callable[[], None] = lambda: None,
+    ) -> None:
+        refresh_attempts: Dict[str, int] = defaultdict(int)
+        first_pass = True
+
+        while more_to_do():
+            if first_pass:
+                first_pass = False
+            else:
+                self._wait_refresh_interval()
+
+            for table_name in table_collection:
+                if is_finished(table_name):
+                    continue
+
+                job = get_job(table_name)
+                if get_job_id(job) is None:
+                    start(job, table_name, action)
+                    continue
+
+                status = cautiously_refresh_status(job, table_name, refresh_attempts)
+
+                if refresh_attempts[table_name] >= MAX_REFRESH_ATTEMPTS:
+                    self._log_lost_contact(table_name)
+                    handle_lost_contact(table_name)
+                    delete_data_source(self._project, job)
+                    continue
+
+                if status == Status.COMPLETED:
+                    self._log_success(table_name, action)
+                    handle_completed(table_name, job)
+                    delete_data_source(self._project, job)
+                elif status in END_STATES:
+                    self._log_failed(table_name, action)
+                    handle_failed(table_name)
+                    delete_data_source(self._project, job)
+                else:
+                    self._log_in_progress(table_name, status, action)
+
+            each_iteration()
+            self._backup()
 
 
 def _get_data_from_record_handler(record_handler: RecordHandler) -> pd.DataFrame:
