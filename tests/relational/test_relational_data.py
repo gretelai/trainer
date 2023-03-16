@@ -37,6 +37,9 @@ def test_mutagenesis_relational_data(mutagenesis):
     assert mutagenesis.get_primary_key("bond") is None
     assert mutagenesis.get_primary_key("atom") == "atom_id"
 
+    assert set(mutagenesis.get_all_key_columns("bond")) == {"atom1_id", "atom2_id"}
+    assert set(mutagenesis.get_all_key_columns("atom")) == {"atom_id", "molecule_id"}
+
 
 def test_add_foreign_key_checks_if_tables_exist():
     rel_data = RelationalData()
