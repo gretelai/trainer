@@ -808,9 +808,10 @@ class MultiTable:
             )
 
             for table_name in ready_tables:
+                record_handlers = self._synthetics_run.record_handlers  # type:ignore
                 # Any record handlers we create but defer submitting will continue to register as "ready" until they are submitted and become "in progress".
                 # This check prevents repeatedly incurring the cost of getting the generation job details while the job is deferred.
-                if self._synthetics_run.record_handlers.get(table_name) is not None:  # type:ignore
+                if record_handlers.get(table_name) is not None:
                     continue
 
                 present_working_tables = {
@@ -828,11 +829,15 @@ class MultiTable:
                 )
                 model = self._synthetics_train.models[table_name]
                 record_handler = model.create_record_handler_obj(**table_job)
-                self._synthetics_run.record_handlers[table_name] = record_handler  # type:ignore
+                record_handlers[table_name] = record_handler
                 # Attempt starting the record handler right away. If it can't start right at this moment,
                 # the check towards the top of the `while` loop will handle starting it when possible.
                 self._start_record_handler_if_possible(
-                    record_handler, table_name, "synthetic data generation"
+                    record_handler,
+                    table_name,
+                    "synthetic data generation",
+                    self._project,
+                    1,
                 )
 
         self._loopexec(
@@ -856,102 +861,64 @@ class MultiTable:
             output_tables, self._synthetics_run.preserved, self.relational_data
         )
 
-        for table, data in output_tables.items():
-            data.to_csv(run_dir / f"synth_{table}.csv", index=False)
-
-        evaluate_project = create_project(display_name=f"evaluate-{self._project.display_name}")
+        evaluate_project = create_project(
+            display_name=f"evaluate-{self._project.display_name}"
+        )
         evaluate_models = {}
         for table, synth_df in output_tables.items():
-            # TODO: skip if table is preserved or failed
-            model_config = {} # get from new method on strategies
-            source_csv = "..."
+            synth_csv_path = run_dir / f"synth_{table}.csv"
+            synth_df.to_csv(synth_csv_path, index=False)
+
+            if table in self._synthetics_run.preserved:
+                continue
+
+            source_csv_path = self._working_dir / f"source_{table}.csv"
+
+            model_config = {}  # get from new method on strategies
+
             evaluate_model = evaluate_project.create_model_obj(
-                model_config=model_config, data_source=synth_csv, ref_data=source_csv
+                model_config=model_config,
+                data_source=synth_csv_path,
+                ref_data=source_csv_path,
             )
             evaluate_models[table] = evaluate_model
 
-        refresh_attempts: Dict[str, int] = defaultdict(int)
         finished_evaluation = []
 
-        def _more_evaluation_to_do() -> bool:
-            return len(finished_evaluation) != len(evaluate_models)
+        def _handle_eval_completed(
+            table_name: str, record_handler: RecordHandler
+        ) -> None:
+            finished_evaluation.append(table_name)
+            # update table evaluation
+            # requires using the strategy
+            # can now be done from model like earlier... but can't reuse fn as-is because assumes score type
+            # I think we'll be able to delete update_evaluation_via_evaluate
+            # includes exporting reports as CSVs
 
-        first_pass = True
-        while _more_evaluation_to_do():
-            # Don't wait needlessly the first time through.
-            if first_pass:
-                first_pass = False
-            else:
-                self._wait_refresh_interval(20)
+            # copy all evaluation data (both types, both formats) to synthetics run dir
+            for eval_type in ["individual", "cross_table"]:
+                for ext in ["html", "json"]:
+                    filename = f"synthetics_{eval_type}_evaluation_{table_name}.{ext}"
+                    with suppress(FileNotFoundError):
+                        shutil.copyfile(
+                            src=self._working_dir / filename,
+                            dst=run_dir / filename,
+                        )
 
-            for table_name, model in evaluate_models.items():
-                if table in finished_evaluation:
-                    continue
-
-                if model.model_id is None:
-                    self._start_model_if_possible(
-                        model=model,
-                        table_name=table_name,
-                        action="evaluation",
-                        number_of_artifacts=2,
-                        project=evaluate_project,
-                    )
-                    continue
-
-                status = cautiously_refresh_status(model, table_name, refresh_attempts)
-
-                # If we consistently failed to refresh the job status, fail the table
-                if refresh_attempts[table_name] >= MAX_REFRESH_ATTEMPTS:
-                    self._log_lost_contact(table_name)
-                    finished_evaluation.append(table_name)
-                    # delete_data_source(evaluate_project, model)
-                    continue
-
-                if status == Status.COMPLETED:
-                    self._log_success(table_name, "evaluation")
-                    finished_evaluation.append(table_name)
-                    # delete_data_source(evaluate_project, model)
-                    # TODO: something like this, ish
-                    # self._strategy.update_evaluation_from_model(
-                    #     table_name, self.evaluations, model, self._working_dir
-                    # )
-                elif status in END_STATES:
-                    # already checked explicitly for completed; all other end states are effectively failures
-                    self._log_failed(table_name, "evaluation")
-                    finished_evaluation.append(table_name)
-                    # delete_data_source(self._project, model)
-                else:
-                    self._log_in_progress(
-                        table_name, status, "evaluation"
-                    )
-                    continue
-
-            # TODO: decide if we want this call or not.
-            # It's nice to have for consistency (possible refactor in the future?),
-            # and is effectively a no-op since we don't alter any state in this loop,
-            # but it might seem like noise?
-            self._backup()
-
-        # # TODO: delete top part of this, but keep the "copy all evaluation data" part!
-        # for table, data in output_tables.items():
-        #     # Get "opposite" evaluation metrics
-        #     self._strategy.update_evaluation_via_evaluate(
-        #         evaluation=self.evaluations[table],
-        #         table=table,
-        #         rel_data=self.relational_data,
-        #         synthetic_tables=output_tables,
-        #         target_dir=run_dir,
-        #     )
-        #
-        #     # Copy all evaluation data (model-based and evaluate-based) to run_dir
-        #     for eval_type in ["individual", "cross_table"]:
-        #         for ext in ["html", "json"]:
-        #             filename = f"synthetics_{eval_type}_evaluation_{table}.{ext}"
-        #             with suppress(FileNotFoundError):
-        #                 shutil.copyfile(
-        #                     src=self._working_dir / filename,
-        #                     dst=run_dir / filename,
-        #                 )
+        self._loopexec(
+            action="evaluation",
+            table_collection=list(evaluate_models.keys()),
+            more_to_do=lambda: len(finished_evaluation) != len(evaluate_models),
+            is_finished=lambda t: t in finished_evaluation,
+            get_job=lambda t: evaluate_models[t],
+            start=self._start_model_if_possible,
+            handle_lost_contact=lambda t: finished_evaluation.append(t),
+            handle_completed=_handle_eval_completed,
+            handle_failed=lambda t: finished_evaluation.append(t),
+            artifacts_per_job=2,
+            project=evaluate_project,
+            refresh_interval=20,
+        )
 
         logger.info("Creating relational report")
         self.create_relational_report(
@@ -1013,8 +980,7 @@ class MultiTable:
         self.evaluations[table].individual_report_json = individual_report_json
         self.evaluations[table].cross_table_report_json = cross_table_report_json
 
-    def _wait_refresh_interval(self, seconds: Optional[int] = None) -> None:
-        seconds = seconds or self._refresh_interval
+    def _wait_refresh_interval(self, seconds: int) -> None:
         logger.info(f"Next status check in {seconds} seconds.")
         time.sleep(seconds)
 
@@ -1061,10 +1027,9 @@ class MultiTable:
         model: Model,
         table_name: str,
         action: str,
-        number_of_artifacts: int = 1,
-        project: Optional[Project] = None,
+        project: Project,
+        number_of_artifacts: int,
     ) -> None:
-        project = project or self._project
         if room_in_project(project, number_of_artifacts):
             self._log_start(table_name, action)
             model.submit_cloud()
@@ -1072,9 +1037,14 @@ class MultiTable:
             self._log_waiting(table_name, action)
 
     def _start_record_handler_if_possible(
-        self, record_handler: RecordHandler, table_name: str, action: str
+        self,
+        record_handler: RecordHandler,
+        table_name: str,
+        action: str,
+        project: Project,
+        number_of_artifacts: int = 1,
     ) -> None:
-        if record_handler.data_source is None or room_in_project(self._project):
+        if record_handler.data_source is None or room_in_project(project):
             self._log_start(table_name, action)
             record_handler.submit_cloud()
         else:
@@ -1087,12 +1057,17 @@ class MultiTable:
         more_to_do: Callable[[], bool],
         is_finished: Callable[[str], bool],
         get_job: Callable[[str], Job],
-        start: Callable[[Job, str, str], None],
+        start: Callable[[Job, str, str, Project, int], None],
         handle_lost_contact: Callable[[str], None],
         handle_completed: Callable[[str, Job], None],
         handle_failed: Callable[[str], None],
         each_iteration: Callable[[], None] = lambda: None,
+        artifacts_per_job: int = 1,
+        project: Optional[Project] = None,
+        refresh_interval: Optional[int] = None,
     ) -> None:
+        project = project or self._project
+        refresh_interval = refresh_interval or self._refresh_interval
         refresh_attempts: Dict[str, int] = defaultdict(int)
         first_pass = True
 
@@ -1100,7 +1075,7 @@ class MultiTable:
             if first_pass:
                 first_pass = False
             else:
-                self._wait_refresh_interval()
+                self._wait_refresh_interval(refresh_interval)
 
             for table_name in table_collection:
                 if is_finished(table_name):
@@ -1108,7 +1083,7 @@ class MultiTable:
 
                 job = get_job(table_name)
                 if get_job_id(job) is None:
-                    start(job, table_name, action)
+                    start(job, table_name, action, project, artifacts_per_job)
                     continue
 
                 status = cautiously_refresh_status(job, table_name, refresh_attempts)
@@ -1116,17 +1091,17 @@ class MultiTable:
                 if refresh_attempts[table_name] >= MAX_REFRESH_ATTEMPTS:
                     self._log_lost_contact(table_name)
                     handle_lost_contact(table_name)
-                    delete_data_source(self._project, job)
+                    delete_data_source(project, job)
                     continue
 
                 if status == Status.COMPLETED:
                     self._log_success(table_name, action)
                     handle_completed(table_name, job)
-                    delete_data_source(self._project, job)
+                    delete_data_source(project, job)
                 elif status in END_STATES:
                     self._log_failed(table_name, action)
                     handle_failed(table_name)
-                    delete_data_source(self._project, job)
+                    delete_data_source(project, job)
                 else:
                     self._log_in_progress(table_name, status, action)
 
