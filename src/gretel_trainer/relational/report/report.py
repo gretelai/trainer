@@ -112,8 +112,9 @@ class ReportPresenter:
     @property
     def composite_ppl_figure(self) -> go.Figure:
         score, grade = self.composite_ppl_score_and_grade
+        ppl_score_map = {0: 30, 1: 46, 2: 54, 3: 66, 4: 74, 5: 86, 6: 94}
         return gauge_and_needle_chart(
-            score,
+            ppl_score_map.get(score, 30),
             display_score=False,
             marker_colors=[s["color"] for s in PRIVACY_LEVEL_VALUES],
         )
