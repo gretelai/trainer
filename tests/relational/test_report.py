@@ -8,10 +8,7 @@ from gretel_trainer.relational.core import (
     RelationalData,
     TableEvaluation,
 )
-from gretel_trainer.relational.report.report import (
-    ReportPresenter,
-    ReportRenderer,
-)
+from gretel_trainer.relational.report.report import ReportPresenter, ReportRenderer
 
 
 def _evals_from_rel_data(rel_data):
@@ -47,5 +44,5 @@ def test_ecommerce_relational_data_report(ecom):
                 + '//div[contains(@class, "score-container")]'
             )
         )
-        == 0
+        == 2
     )
