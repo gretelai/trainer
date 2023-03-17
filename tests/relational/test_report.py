@@ -35,8 +35,14 @@ def test_ecommerce_relational_data_report(ecom):
     )
 
     html_content = ReportRenderer().render(presenter)
+
+    # DEV ONLY if you want to save a local copy to look at
+    # with open("report.html", 'w') as f:
+    #     f.write(html_content)
+
     tree = html.fromstring(html_content)
 
+    # Top level scores
     assert (
         len(
             tree.xpath(
@@ -45,6 +51,117 @@ def test_ecommerce_relational_data_report(ecom):
             )
         )
         == 2
+    )
+    # SQS score label and bottom text
+    assert (
+        tree.xpath(
+            '//div[contains(@class, "test-report-main-score")]'
+            + '//div[contains(@class, "score-container")]'
+            + '//span[contains(@class, "label")]'
+        )[0].text.strip()
+        == "Excellent"
+    )
+    elts = tree.xpath(
+        '//div[contains(@class, "test-report-main-score")]'
+        + '//div[contains(@class, "score-container")]'
+        + '//span[contains(@class, "score-container-text")]'
+    )
+    assert (
+        tree.xpath(
+            '//div[contains(@class, "test-report-main-score")]'
+            + '//div[contains(@class, "score-container")]'
+            + '//span[contains(@class, "score-container-text")]'
+        )[0].text
+        == "Composite"  # <br /> cuts off the rest
+    )
+    # PPL score label and bottom text
+    assert (
+        tree.xpath(
+            '//div[contains(@class, "test-report-main-score")]'
+            + '//div[contains(@class, "score-container")]'
+            + '//span[contains(@class, "label")]'
+        )[1].text.strip()
+        == "Good"
+    )
+    assert (
+        tree.xpath(
+            '//div[contains(@class, "test-report-main-score")]'
+            + '//div[contains(@class, "score-container")]'
+            + '//span[contains(@class, "score-container-text")]'
+        )[0].text.strip()
+        == "Composite"  # <br /> cuts off the rest
+    )
+
+    # Table relationships
+    assert (
+        len(
+            tree.xpath(
+                '//section[contains(@class, "test-table-relationships")]' + "//tr"
+            )
+        )
+        == 7  # Header plus six tables
+    )
+    relations_data_rows = tree.xpath(
+        '//section[contains(@class, "test-table-relationships")]' + "//tr"
+    )[1:]
+    # First row, Table name td, bold tag wrapping table name
+    assert (
+        relations_data_rows[0].getchildren()[0].getchildren()[0].text
+        == "distribution_center"
+    )
+    # pk column/td, each is a span, unpack then text
+    pks = [row.getchildren()[1].getchildren()[0].text for row in relations_data_rows]
+    for pk in pks:
+        assert pk == "id"
+    # First row has no fk's
+    assert len(relations_data_rows[0].getchildren()[2].getchildren()) == 0
+    # Third row has two fk's
+    assert len(relations_data_rows[2].getchildren()[2].getchildren()) == 2
+
+    # SQS score table
+    assert (
+        len(tree.xpath('//section[contains(@class, "test-sqs-results")]' + "//tr"))
+        == 7  # Header plus six tables again
+    )
+    assert (
+        len(
+            tree.xpath(
+                '//section[contains(@class, "test-sqs-results")]'
+                + "//tr"
+                + '//span[contains(@class, "sqs-table-score")]'
+            )
+        )
+        == 12  # Six tables, each has two numeric scores
+    )
+    assert (
+        len(
+            tree.xpath(
+                '//section[contains(@class, "test-sqs-results")]'
+                + "//tr"
+                + '//span[contains(@class, "label")]'
+            )
+        )
+        == 12  # Six tables, each has two grade labels
+    )
+    assert (
+        len(
+            tree.xpath(
+                '//section[contains(@class, "test-sqs-results")]'
+                + "//tr"
+                + '//span[contains(@class, "sqs-table-link")]'
+            )
+        )
+        == 12  # Six tables, each has two linked reports
+    )
+    # Check the first report link
+    assert (
+        tree.xpath(
+            '//section[contains(@class, "test-sqs-results")]'
+            + "//tr"
+            + '//span[contains(@class, "sqs-table-link")]'
+            + "/a/@href"
+        )[0]
+        == "synthetics_individual_evaluation_distribution_center.html"
     )
 
 
@@ -60,8 +177,14 @@ def test_mutagenesis_relational_data_report(mutagenesis):
     )
 
     html_content = ReportRenderer().render(presenter)
+
+    # DEV ONLY if you want to save a local copy to look at
+    # with open("report.html", 'w') as f:
+    #     f.write(html_content)
+
     tree = html.fromstring(html_content)
 
+    # Two scores at top
     assert (
         len(
             tree.xpath(
@@ -70,4 +193,60 @@ def test_mutagenesis_relational_data_report(mutagenesis):
             )
         )
         == 2
+    )
+
+    # Table relationships
+    assert (
+        len(
+            tree.xpath(
+                '//section[contains(@class, "test-table-relationships")]' + "//tr"
+            )
+        )
+        == 4  # Header plus three tables
+    )
+
+    # SQS score table
+    assert (
+        len(tree.xpath('//section[contains(@class, "test-sqs-results")]' + "//tr"))
+        == 4  # Header plus three tables again
+    )
+    assert (
+        len(
+            tree.xpath(
+                '//section[contains(@class, "test-sqs-results")]'
+                + "//tr"
+                + '//span[contains(@class, "sqs-table-score")]'
+            )
+        )
+        == 6  # Three tables, each has two numeric scores
+    )
+    assert (
+        len(
+            tree.xpath(
+                '//section[contains(@class, "test-sqs-results")]'
+                + "//tr"
+                + '//span[contains(@class, "label")]'
+            )
+        )
+        == 6  # Three tables, each has two grade labels
+    )
+    assert (
+        len(
+            tree.xpath(
+                '//section[contains(@class, "test-sqs-results")]'
+                + "//tr"
+                + '//span[contains(@class, "sqs-table-link")]'
+            )
+        )
+        == 6  # Three tables, each has two linked reports
+    )
+    # Check the first report link
+    assert (
+        tree.xpath(
+            '//section[contains(@class, "test-sqs-results")]'
+            + "//tr"
+            + '//span[contains(@class, "sqs-table-link")]'
+            + "/a/@href"
+        )[0]
+        == "synthetics_individual_evaluation_atom.html"
     )

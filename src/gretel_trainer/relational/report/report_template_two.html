@@ -29,7 +29,8 @@
 
         <div class="score-container mb-1">
             <span class="label label__{{ presenter.composite_sqs_score_and_grade[1].lower().replace(' ', '-') }} mb-0.5">
-            {{ presenter.composite_sqs_score_and_grade[1] }}</span>
+              {{ presenter.composite_sqs_score_and_grade[1] }}
+            </span>
             <div id="chart" class="score mb-0.5">
                 <figure>{{ presenter.composite_sqs_figure.to_html(config={'displayModeBar': False}, full_html=False, include_plotlyjs=False) }}</figure>
             </div>
@@ -40,7 +41,8 @@
 
         <div class="score-container mb-1">
             <span class="label label__privacy__{{ presenter.composite_ppl_score_and_grade[1].lower().replace(' ', '-') }} mb-0.5">
-            {{ presenter.composite_ppl_score_and_grade[1] }}</span>
+              {{ presenter.composite_ppl_score_and_grade[1] }}
+            </span>
             <div id="chart" class="score mb-0.5">
                 <figure>{{ presenter.composite_ppl_figure.to_html(config={'displayModeBar': False}, full_html=False, include_plotlyjs=False) }}</figure>
             </div>
@@ -52,7 +54,7 @@
         </div>
     </div>
 
-    <section class="scroll">
+    <section class="scroll test-table-relationships">
       <h2>Table Relationships</h2>
 
       <p>
@@ -80,7 +82,7 @@
       </table>
     </section>
 
-    <section class="break">
+    <section class="break test-sqs-results">
       <h2>Synthetic Data Quality Results</h2>
 
       <p>For each table, individual and cross-table Gretel Synthetic Reports are generated, which 
