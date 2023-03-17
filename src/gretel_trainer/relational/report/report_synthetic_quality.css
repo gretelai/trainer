@@ -46,6 +46,7 @@ body::before {
 .score-container-text {
 	font-size: 1.3125rem;
 	text-align: center;
+	float: right;
 }
 .score {
 	width: 180px;

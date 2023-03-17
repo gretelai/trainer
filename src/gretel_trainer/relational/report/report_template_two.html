@@ -121,7 +121,7 @@
               </span>
             </td>
             <td>
-              {{ evaluation.cross_table_sqs }}
+              <span class="sqs-table-score">{{ evaluation.cross_table_sqs }}</span>
               <span class="label label__{{ presenter.sqs_score_to_grade(evaluation.cross_table_sqs).lower().replace(' ', '-') }}">
                 {{ presenter.sqs_score_to_grade(evaluation.cross_table_sqs) }}
               </span>
