@@ -1068,7 +1068,7 @@ class MultiTable:
                         table_name=table_name,
                         action=action,
                         project=project,
-                        number_of_artifacts=artifacts_per_job
+                        number_of_artifacts=artifacts_per_job,
                     )
                     continue
 
