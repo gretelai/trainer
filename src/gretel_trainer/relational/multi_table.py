@@ -63,8 +63,6 @@ from gretel_trainer.relational.tasks.synthetics_train import SyntheticsTrainTask
 from gretel_trainer.relational.tasks.transforms_run import TransformsRunTask
 from gretel_trainer.relational.tasks.transforms_train import TransformsTrainTask
 
-MAX_REFRESH_ATTEMPTS = 3
-
 logger = logging.getLogger(__name__)
 
 
@@ -870,32 +868,6 @@ class MultiTable:
         self.evaluations[table].individual_report_json = individual_report_json
         self.evaluations[table].cross_table_report_json = cross_table_report_json
 
-    def _wait_refresh_interval(self, seconds: int) -> None:
-        logger.info(f"Next status check in {seconds} seconds.")
-        time.sleep(seconds)
-
-    def _log_start(self, table_name: str, action: str) -> None:
-        logger.info(f"Starting {action} for `{table_name}`.")
-
-    def _log_in_progress(self, table_name: str, status: Status, action: str) -> None:
-        logger.info(
-            f"{action.capitalize()} job for `{table_name}` still in progress (status: {status})."
-        )
-
-    def _log_failed(self, table_name: str, action: str) -> None:
-        logger.info(f"{action.capitalize()} failed for `{table_name}`.")
-
-    def _log_waiting(self, table_name: str, action: str) -> None:
-        logger.info(
-            f"Maximum concurrent relational jobs reached. Deferring start of `{table_name}` {action}."
-        )
-
-    def _log_success(self, table_name: str, action: str) -> None:
-        logger.info(f"{action.capitalize()} successfully completed for `{table_name}`.")
-
-    def _log_lost_contact(self, table_name: str) -> None:
-        logger.warning(f"Lost contact with job for `{table_name}`.")
-
     def _validate_gretel_model(self, gretel_model: Optional[str]) -> Tuple[str, str]:
         gretel_model = (gretel_model or self._strategy.default_model).lower()
         supported_models = self._strategy.supported_models
@@ -911,87 +883,6 @@ class MultiTable:
         }
 
         return (gretel_model, _BLUEPRINTS[gretel_model])
-
-    def _start_job_if_possible(
-        self,
-        job: Job,
-        table_name: str,
-        action: str,
-        project: Project,
-        number_of_artifacts: int = 1,
-    ) -> None:
-        if job.data_source is None or room_in_project(project, number_of_artifacts):
-            self._log_start(table_name, action)
-            job.submit_cloud()
-        else:
-            self._log_waiting(table_name, action)
-
-    def _loopexec(
-        self,
-        action: str,
-        table_collection: List[str],
-        more_to_do: Callable[[], bool],
-        is_finished: Callable[[str], bool],
-        get_job: Callable[[str], Job],
-        handle_lost_contact: Callable[[str], None],
-        handle_completed: Callable[[str, Job], None],
-        handle_failed: Callable[[str], None],
-        each_iteration: Callable[[], None] = lambda: None,
-        artifacts_per_job: int = 1,
-        project: Optional[Project] = None,
-        refresh_interval: Optional[int] = None,
-    ) -> None:
-        project = project or self._project
-        refresh_interval = refresh_interval or self._refresh_interval
-        refresh_attempts: Dict[str, int] = defaultdict(int)
-        first_pass = True
-
-        while more_to_do():
-            if first_pass:
-                first_pass = False
-            else:
-                self._wait_refresh_interval(refresh_interval)
-
-            for table_name in table_collection:
-                if is_finished(table_name):
-                    continue
-
-                job = get_job(table_name)
-                if get_job_id(job) is None:
-                    self._start_job_if_possible(
-                        job=job,
-                        table_name=table_name,
-                        action=action,
-                        project=project,
-                        number_of_artifacts=artifacts_per_job,
-                    )
-                    continue
-
-                status = cautiously_refresh_status(job, table_name, refresh_attempts)
-
-                if refresh_attempts[table_name] >= MAX_REFRESH_ATTEMPTS:
-                    self._log_lost_contact(table_name)
-                    handle_lost_contact(table_name)
-                    delete_data_source(project, job)
-                    continue
-
-                if status == Status.COMPLETED:
-                    self._log_success(table_name, action)
-                    handle_completed(table_name, job)
-                    delete_data_source(project, job)
-                elif status in END_STATES:
-                    self._log_failed(table_name, action)
-                    handle_failed(table_name)
-                    delete_data_source(project, job)
-                else:
-                    self._log_in_progress(table_name, status, action)
-
-            each_iteration()
-            self._backup()
-
-
-def _get_data_from_record_handler(record_handler: RecordHandler) -> pd.DataFrame:
-    return pd.read_csv(record_handler.get_artifact_link("data"), compression="gzip")
 
 
 def _validate_strategy(strategy: str) -> Union[IndependentStrategy, AncestralStrategy]:
