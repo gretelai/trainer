@@ -1,9 +1,15 @@
 from gretel_client.projects.models import read_model_config
 
 from gretel_trainer.relational.model_config import (
+    make_evaluate_config,
     make_synthetics_config,
     make_transform_config,
 )
+
+
+def test_evaluate_config_prepends_workflow():
+    config = make_evaluate_config("users")
+    assert config["name"] == "evaluate-users"
 
 
 def test_synthetics_config_prepends_workflow():

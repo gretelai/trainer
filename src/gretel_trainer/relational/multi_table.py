@@ -40,6 +40,7 @@ from gretel_trainer.relational.core import (
     TableEvaluation,
 )
 from gretel_trainer.relational.model_config import (
+    make_evaluate_config,
     make_synthetics_config,
     make_transform_config,
 )
@@ -56,6 +57,7 @@ from gretel_trainer.relational.sdk_extras import (
 from gretel_trainer.relational.strategies.ancestral import AncestralStrategy
 from gretel_trainer.relational.strategies.independent import IndependentStrategy
 from gretel_trainer.relational.task_runner import run_task
+from gretel_trainer.relational.tasks.synthetics_evaluate import SyntheticsEvaluateTask
 from gretel_trainer.relational.tasks.synthetics_run import SyntheticsRunTask
 from gretel_trainer.relational.tasks.synthetics_train import SyntheticsTrainTask
 from gretel_trainer.relational.tasks.transforms_run import TransformsRunTask
@@ -755,41 +757,50 @@ class MultiTable:
             output_tables, self._synthetics_run.preserved, self.relational_data
         )
 
+        for table, synth_df in output_tables.items():
+            synth_csv_path = run_dir / f"synth_{table}.csv"
+            synth_df.to_csv(synth_csv_path, index=False)
+
         evaluate_project = create_project(
             display_name=f"evaluate-{self._project.display_name}"
         )
         evaluate_models = {}
         for table, synth_df in output_tables.items():
-            synth_csv_path = run_dir / f"synth_{table}.csv"
-            synth_df.to_csv(synth_csv_path, index=False)
-
             if table in self._synthetics_run.preserved:
                 continue
 
-            source_csv_path = self._working_dir / f"source_{table}.csv"
-
-            model_config = {}  # get from new method on strategies
-
-            evaluate_model = evaluate_project.create_model_obj(
-                model_config=model_config,
-                data_source=synth_csv_path,
-                ref_data=source_csv_path,
+            evaluate_data = self._strategy.get_evaluate_model_data(
+                rel_data=self.relational_data,
+                table_name=table,
+                synthetic_tables=output_tables,
             )
-            evaluate_models[table] = evaluate_model
+            if evaluate_data is None:
+                continue
 
-        finished_evaluation = []
+            evaluate_models[table] = evaluate_project.create_model_obj(
+                model_config=make_evaluate_config(table),
+                data_source=evaluate_data["synthetic"],
+                ref_data=evaluate_data["source"],
+            )
 
-        def _handle_eval_completed(
-            table_name: str, record_handler: RecordHandler
-        ) -> None:
-            finished_evaluation.append(table_name)
-            # update table evaluation
-            # requires using the strategy
-            # can now be done from model like earlier... but can't reuse fn as-is because assumes score type
-            # I think we'll be able to delete update_evaluation_via_evaluate
-            # includes exporting reports as CSVs
+        synthetics_evaluate_task = SyntheticsEvaluateTask(
+            evaluate_models=evaluate_models,
+            project=evaluate_project,
+            multitable=self,
+        )
+        run_task(synthetics_evaluate_task)
 
-            # copy all evaluation data (both types, both formats) to synthetics run dir
+        for table in synthetics_evaluate_task.completed:
+            self._strategy.update_evaluation_from_evaluate(
+                table_name=table,
+                evaluate_model=evaluate_models[table],
+                evaluations=self.evaluations,
+                working_dir=self._working_dir,
+            )
+
+        evaluate_project.delete()
+
+        for table_name in output_tables:
             for eval_type in ["individual", "cross_table"]:
                 for ext in ["html", "json"]:
                     filename = f"synthetics_{eval_type}_evaluation_{table_name}.{ext}"
@@ -798,20 +809,6 @@ class MultiTable:
                             src=self._working_dir / filename,
                             dst=run_dir / filename,
                         )
-
-        self._loopexec(
-            action="evaluation",
-            table_collection=list(evaluate_models.keys()),
-            more_to_do=lambda: len(finished_evaluation) != len(evaluate_models),
-            is_finished=lambda t: t in finished_evaluation,
-            get_job=lambda t: evaluate_models[t],
-            handle_lost_contact=lambda t: finished_evaluation.append(t),
-            handle_completed=_handle_eval_completed,
-            handle_failed=lambda t: finished_evaluation.append(t),
-            artifacts_per_job=2,
-            project=evaluate_project,
-            refresh_interval=20,
-        )
 
         logger.info("Creating relational report")
         self.create_relational_report(

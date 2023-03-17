@@ -287,6 +287,34 @@ class AncestralStrategy:
             model, out_filepath
         )
 
+    def get_evaluate_model_data(
+        self,
+        table_name: str,
+        rel_data: RelationalData,
+        synthetic_tables: Dict[str, pd.DataFrame],
+    ) -> Optional[Dict[str, pd.DataFrame]]:
+        return {
+            "source": rel_data.get_table_data(table_name),
+            "synthetic": synthetic_tables[table_name],
+        }
+
+    def update_evaluation_from_evaluate(
+        self,
+        table_name: str,
+        evaluations: Dict[str, TableEvaluation],
+        evaluate_model: Model,
+        working_dir: Path,
+    ) -> None:
+        logger.info(f"Downloading individual evaluation reports for `{table_name}`.")
+        out_filepath = working_dir / f"synthetics_individual_evaluation_{table_name}"
+        common.download_artifacts(evaluate_model, out_filepath, table_name)
+
+        evaluation = evaluations[table_name]
+        evaluation.individual_sqs = common.get_sqs_score(evaluate_model)
+        evaluation.individual_report_json = common.read_report_json_data(
+            evaluate_model, out_filepath
+        )
+
     def update_evaluation_via_evaluate(
         self,
         evaluation: TableEvaluation,

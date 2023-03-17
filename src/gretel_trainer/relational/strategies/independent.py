@@ -160,6 +160,49 @@ class IndependentStrategy:
             model, out_filepath
         )
 
+    def get_evaluate_model_data(
+        self,
+        table_name: str,
+        rel_data: RelationalData,
+        synthetic_tables: Dict[str, pd.DataFrame],
+    ) -> Optional[Dict[str, pd.DataFrame]]:
+        missing_ancestors = [
+            ancestor
+            for ancestor in rel_data.get_ancestors(table_name)
+            if ancestor not in synthetic_tables
+        ]
+        if len(missing_ancestors) > 0:
+            logger.info(
+                f"Cannot run cross_table evaluations for `{table_name}` because no synthetic data exists for ancestor tables {missing_ancestors}."
+            )
+            return None
+
+        source_data = ancestry.get_table_data_with_ancestors(rel_data, table_name)
+        synthetic_data = ancestry.get_table_data_with_ancestors(
+            rel_data, table_name, synthetic_tables
+        )
+        return {
+            "source": source_data,
+            "synthetic": synthetic_data,
+        }
+
+    def update_evaluation_from_evaluate(
+        self,
+        table_name: str,
+        evaluations: Dict[str, TableEvaluation],
+        evaluate_model: Model,
+        working_dir: Path,
+    ) -> None:
+        logger.info(f"Downloading cross table evaluation reports for `{table_name}`.")
+        out_filepath = working_dir / f"synthetics_cross_table_evaluation_{table_name}"
+        common.download_artifacts(evaluate_model, out_filepath, table_name)
+
+        evaluation = evaluations[table_name]
+        evaluation.cross_table_sqs = common.get_sqs_score(evaluate_model)
+        evaluation.cross_table_report_json = common.read_report_json_data(
+            evaluate_model, out_filepath
+        )
+
     def update_evaluation_via_evaluate(
         self,
         evaluation: TableEvaluation,
