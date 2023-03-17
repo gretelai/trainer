@@ -55,6 +55,8 @@ from gretel_trainer.relational.sdk_extras import (
 )
 from gretel_trainer.relational.strategies.ancestral import AncestralStrategy
 from gretel_trainer.relational.strategies.independent import IndependentStrategy
+from gretel_trainer.relational.task_runner import run_task
+from gretel_trainer.relational.tasks.transforms_train import TransformsTrainTask
 
 MAX_REFRESH_ATTEMPTS = 3
 
@@ -475,23 +477,13 @@ class MultiTable:
 
         self._backup()
 
-        completed = []
-        failed = []
-
-        def _handle_lost_contact(table_name: str) -> None:
-            self._transforms_train.lost_contact.append(table_name)
-            failed.append(table_name)
-
-        self._loopexec(
-            action="transforms model training",
-            table_collection=list(configs.keys()),
-            more_to_do=lambda: len(completed + failed) < len(configs),
-            is_finished=lambda t: t in (completed + failed),
-            get_job=lambda t: self._transforms_train.models[t],
-            handle_lost_contact=_handle_lost_contact,
-            handle_completed=lambda t, j: completed.append(t),
-            handle_failed=lambda t: failed.append(t),
+        task = TransformsTrainTask(
+            project=self._project,
+            models=self._transforms_train.models,
+            lost_contact=self._transforms_train.lost_contact,
+            multitable=self,
         )
+        run_task(task)
 
     def run_transforms(
         self,
