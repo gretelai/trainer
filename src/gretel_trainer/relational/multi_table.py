@@ -479,7 +479,6 @@ class MultiTable:
         self._backup()
 
         task = TransformsTrainTask(
-            project=self._project,
             models=self._transforms_train.models,
             lost_contact=self._transforms_train.lost_contact,
             multitable=self,

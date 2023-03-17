@@ -10,12 +10,10 @@ from gretel_trainer.relational.tasks.common import _MultiTable
 class TransformsTrainTask:
     def __init__(
         self,
-        project: Project,
         models: Dict[str, Model],
         lost_contact: List[str],
         multitable: _MultiTable,
     ):
-        self.project = project
         self.models = models
         self.lost_contact = lost_contact
         self.multitable = multitable
@@ -29,6 +27,10 @@ class TransformsTrainTask:
     @property
     def refresh_interval(self) -> int:
         return self.multitable._refresh_interval
+
+    @property
+    def project(self) -> Project:
+        return self.multitable._project
 
     @property
     def table_collection(self) -> List[str]:
