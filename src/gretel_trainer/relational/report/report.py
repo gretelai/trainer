@@ -18,8 +18,7 @@ from gretel_trainer.relational.report.figures import (
 )
 
 _TEMPLATE_DIR = str(Path(__file__).parent)
-# _TEMPLATE_FILE = "report_template.html"
-_TEMPLATE_FILE = "report_template_two.html"
+_TEMPLATE_FILE = "report_template.html"
 
 
 class ReportRenderer:

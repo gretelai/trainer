@@ -64,20 +64,6 @@ def _get_report_json(model: Model) -> Optional[Dict]:
         return None
 
 
-def get_sqs_score(model: Model) -> Optional[int]:
-    summary = model.get_report_summary()
-    if summary is None or summary.get("summary") is None:
-        logger.warning("Failed to fetch model evaluation report summary.")
-        return None
-
-    sqs_score = None
-    for stat in summary["summary"]:
-        if stat["field"] == "synthetic_data_quality_score":
-            sqs_score = stat["value"]
-
-    return sqs_score
-
-
 def label_encode_keys(
     rel_data: RelationalData, tables: Dict[str, pd.DataFrame]
 ) -> Dict[str, pd.DataFrame]:

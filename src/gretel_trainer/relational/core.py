@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import json
 import logging
-from dataclasses import dataclass, field
+from dataclasses import asdict, dataclass, field
 from typing import Any, Dict, List, Optional
 
 import networkx
@@ -83,6 +83,12 @@ class TableEvaluation:
     @property
     def individual_ppl_grade(self) -> Optional[str]:
         return self._grade_from_json(self.individual_report_json, _PPL)
+    
+    def __repr__(self) -> str:
+        d = asdict(self)
+        del d[cross_table_report_json]
+        del d[individual_report_json]
+        return json.dumps(d)
 
 
 @dataclass
