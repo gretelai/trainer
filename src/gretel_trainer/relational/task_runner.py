@@ -12,6 +12,7 @@ from gretel_trainer.relational.sdk_extras import (
     delete_data_source,
     get_job_id,
     room_in_project,
+    start_job_if_possible,
 )
 
 MAX_REFRESH_ATTEMPTS = 3
@@ -78,7 +79,7 @@ def run_task(task: Task) -> None:
 
             job = task.get_job(table_name)
             if get_job_id(job) is None:
-                _start_job_if_possible(
+                start_job_if_possible(
                     job=job,
                     table_name=table_name,
                     action=task.action,
@@ -109,33 +110,9 @@ def run_task(task: Task) -> None:
         task.each_iteration()
 
 
-def _start_job_if_possible(
-    job: Job,
-    table_name: str,
-    action: str,
-    project: Project,
-    number_of_artifacts: int,
-) -> None:
-    if job.data_source is None or room_in_project(project, number_of_artifacts):
-        _log_start(table_name, action)
-        job.submit_cloud()
-    else:
-        _log_waiting(table_name, action)
-
-
 def _wait(seconds: int) -> None:
     logger.info(f"Next status check in {seconds} seconds.")
     time.sleep(seconds)
-
-
-def _log_start(table_name: str, action: str) -> None:
-    logger.info(f"Starting {action} for `{table_name}`.")
-
-
-def _log_waiting(table_name: str, action: str) -> None:
-    logger.info(
-        f"Maximum concurrent relational jobs reached. Deferring start of `{table_name}` {action}."
-    )
 
 
 def _log_lost_contact(table_name: str) -> None:

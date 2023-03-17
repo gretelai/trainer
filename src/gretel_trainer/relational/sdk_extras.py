@@ -81,3 +81,27 @@ def sqs_score_from_full_report(report: Dict[str, Any]) -> Optional[int]:
 
 def get_record_handler_data(record_handler: RecordHandler) -> pd.DataFrame:
     return pd.read_csv(record_handler.get_artifact_link("data"), compression="gzip")
+
+
+def start_job_if_possible(
+    job: Job,
+    table_name: str,
+    action: str,
+    project: Project,
+    number_of_artifacts: int,
+) -> None:
+    if job.data_source is None or room_in_project(project, number_of_artifacts):
+        _log_start(table_name, action)
+        job.submit_cloud()
+    else:
+        _log_waiting(table_name, action)
+
+
+def _log_start(table_name: str, action: str) -> None:
+    logger.info(f"Starting {action} for `{table_name}`.")
+
+
+def _log_waiting(table_name: str, action: str) -> None:
+    logger.info(
+        f"Maximum concurrent relational jobs reached. Deferring start of `{table_name}` {action}."
+    )

@@ -56,6 +56,7 @@ from gretel_trainer.relational.sdk_extras import (
 from gretel_trainer.relational.strategies.ancestral import AncestralStrategy
 from gretel_trainer.relational.strategies.independent import IndependentStrategy
 from gretel_trainer.relational.task_runner import run_task
+from gretel_trainer.relational.tasks.synthetics_run import SyntheticsRunTask
 from gretel_trainer.relational.tasks.synthetics_train import SyntheticsTrainTask
 from gretel_trainer.relational.tasks.transforms_run import TransformsRunTask
 from gretel_trainer.relational.tasks.transforms_train import TransformsTrainTask
@@ -733,95 +734,18 @@ class MultiTable:
             working_tables[table] = self._strategy.get_preserved_data(
                 table, self.relational_data
             )
-        all_tables = self.relational_data.list_all_tables()
 
-        def _handle_lost_contact(table_name: str) -> None:
-            self._synthetics_run.lost_contact.append(table_name)  # type:ignore
-            working_tables[table_name] = None
-            for other_table in self._strategy.tables_to_skip_when_failed(
-                table_name, self.relational_data
-            ):
-                logger.info(
-                    f"Skipping synthetic data generation for `{other_table}` because it depends on `{table_name}`"
-                )
-                working_tables[other_table] = None
-            self._backup()
-
-        def _handle_completed(table_name: str, job: Job) -> None:
-            record_handler_result = _get_data_from_record_handler(job)
-            working_tables[
-                table_name
-            ] = self._strategy.post_process_individual_synthetic_result(
-                table_name, self.relational_data, record_handler_result
-            )
-
-        def _handle_failed(table_name: str) -> None:
-            working_tables[table_name] = None
-            for other_table in self._strategy.tables_to_skip_when_failed(
-                table_name, self.relational_data
-            ):
-                logger.info(
-                    f"Skipping synthetic data generation for `{other_table}` because it depends on `{table_name}`"
-                )
-                working_tables[other_table] = None
-
-        def _each_iteration() -> None:
-            # Determine if we can start any more jobs
-            in_progress_tables = [
-                table
-                for table in all_tables
-                if _table_is_in_progress(self._synthetics_run, table)  # type: ignore
-            ]
-            finished_tables = [table for table in working_tables]
-
-            ready_tables = self._strategy.ready_to_generate(
-                self.relational_data, in_progress_tables, finished_tables
-            )
-
-            for table_name in ready_tables:
-                record_handlers = self._synthetics_run.record_handlers  # type:ignore
-                # Any record handlers we create but defer submitting will continue to register as "ready" until they are submitted and become "in progress".
-                # This check prevents repeatedly incurring the cost of getting the generation job details while the job is deferred.
-                if record_handlers.get(table_name) is not None:
-                    continue
-
-                present_working_tables = {
-                    table: data
-                    for table, data in working_tables.items()
-                    if data is not None
-                }
-                table_job = self._strategy.get_generation_job(
-                    table_name,
-                    self.relational_data,
-                    self._synthetics_run.record_size_ratio,  # type:ignore
-                    present_working_tables,
-                    run_dir,
-                    self._synthetics_train.training_columns[table_name],
-                )
-                model = self._synthetics_train.models[table_name]
-                record_handler = model.create_record_handler_obj(**table_job)
-                record_handlers[table_name] = record_handler
-                # Attempt starting the record handler right away. If it can't start right at this moment,
-                # the check towards the top of the `while` loop will handle starting it when possible.
-                self._start_job_if_possible(
-                    job=record_handler,
-                    table_name=table_name,
-                    action="synthetic data generation",
-                    project=self._project,
-                    number_of_artifacts=1,
-                )
-
-        self._loopexec(
-            action="synthetic data generation",
-            table_collection=list(self._synthetics_run.record_handlers.keys()),
-            more_to_do=lambda: len(working_tables) != len(all_tables),
-            is_finished=lambda t: t in working_tables,
-            get_job=lambda t: self._synthetics_run.record_handlers[t],  # type: ignore
-            handle_lost_contact=_handle_lost_contact,
-            handle_completed=_handle_completed,
-            handle_failed=_handle_failed,
-            each_iteration=_each_iteration,
+        task = SyntheticsRunTask(
+            record_handlers=self._synthetics_run.record_handlers,
+            lost_contact=self._synthetics_run.lost_contact,
+            record_size_ratio=self._synthetics_run.record_size_ratio,
+            training_columns=self._synthetics_train.training_columns,
+            models=self._synthetics_train.models,
+            run_dir=run_dir,
+            working_tables=working_tables,
+            multitable=self,
         )
+        run_task(task)
 
         output_tables: Dict[str, pd.DataFrame] = {
             table: data for table, data in working_tables.items() if data is not None
@@ -1094,14 +1018,6 @@ def _table_trained_successfully(
         return False
     else:
         return model.status == Status.COMPLETED
-
-
-def _table_is_in_progress(run: SyntheticsRun, table: str) -> bool:
-    in_progress = False
-    record_handler = run.record_handlers.get(table)
-    if record_handler is not None and record_handler.record_id is not None:
-        in_progress = record_handler.status in ACTIVE_STATES
-    return in_progress
 
 
 def _mkdir(name: str) -> Path:
