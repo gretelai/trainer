@@ -56,6 +56,7 @@ from gretel_trainer.relational.sdk_extras import (
 from gretel_trainer.relational.strategies.ancestral import AncestralStrategy
 from gretel_trainer.relational.strategies.independent import IndependentStrategy
 from gretel_trainer.relational.task_runner import run_task
+from gretel_trainer.relational.tasks.transforms_run import TransformsRunTask
 from gretel_trainer.relational.tasks.transforms_train import TransformsTrainTask
 
 MAX_REFRESH_ATTEMPTS = 3
@@ -537,25 +538,16 @@ class MultiTable:
             )
             transforms_record_handlers[table_name] = record_handler
 
-        working_tables: Dict[str, Optional[pd.DataFrame]] = {}
-
-        def _handle_completed(table_name: str, record_handler: RecordHandler) -> None:
-            record_handler_result = _get_data_from_record_handler(record_handler)
-            working_tables[table_name] = record_handler_result
-
-        self._loopexec(
-            action="transforms run",
-            table_collection=list(transforms_record_handlers.keys()),
-            more_to_do=lambda: len(working_tables) < len(transforms_run_paths),
-            is_finished=lambda t: t in working_tables,
-            get_job=lambda t: transforms_record_handlers[t],
-            handle_lost_contact=lambda t: working_tables.update({t: None}),
-            handle_completed=_handle_completed,
-            handle_failed=lambda t: working_tables.update({t: None}),
+        task = TransformsRunTask(
+            record_handlers=transforms_record_handlers,
+            multitable=self,
         )
+        run_task(task)
 
         output_tables: Dict[str, pd.DataFrame] = {
-            table: data for table, data in working_tables.items() if data is not None
+            table: data
+            for table, data in task.working_tables.items()
+            if data is not None
         }
 
         output_tables = self._strategy.label_encode_keys(

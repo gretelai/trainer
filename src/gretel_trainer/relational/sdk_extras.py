@@ -3,6 +3,7 @@ from contextlib import suppress
 from pathlib import Path
 from typing import Any, Dict, Optional, Union
 
+import pandas as pd
 import requests
 import smart_open
 from gretel_client.projects.jobs import Job, Status
@@ -76,3 +77,7 @@ def sqs_score_from_full_report(report: Dict[str, Any]) -> Optional[int]:
         for field_dict in report["summary"]:
             if field_dict["field"] == "synthetic_data_quality_score":
                 return field_dict["value"]
+
+
+def get_record_handler_data(record_handler: RecordHandler) -> pd.DataFrame:
+    return pd.read_csv(record_handler.get_artifact_link("data"), compression="gzip")
