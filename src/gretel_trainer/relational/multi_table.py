@@ -56,6 +56,7 @@ from gretel_trainer.relational.sdk_extras import (
 from gretel_trainer.relational.strategies.ancestral import AncestralStrategy
 from gretel_trainer.relational.strategies.independent import IndependentStrategy
 from gretel_trainer.relational.task_runner import run_task
+from gretel_trainer.relational.tasks.synthetics_train import SyntheticsTrainTask
 from gretel_trainer.relational.tasks.transforms_run import TransformsRunTask
 from gretel_trainer.relational.tasks.transforms_train import TransformsTrainTask
 
@@ -600,30 +601,20 @@ class MultiTable:
 
         self._backup()
 
-        completed = []
-        failed = []
+        task = SyntheticsTrainTask(
+            models=self._synthetics_train.models,
+            lost_contact=self._synthetics_train.lost_contact,
+            multitable=self,
+        )
+        run_task(task)
 
-        def _handle_lost_contact(table_name: str) -> None:
-            self._synthetics_train.lost_contact.append(table_name)
-            failed.append(table_name)
-
-        def _handle_completed(table_name: str, job: Job) -> None:
-            completed.append(table_name)
+        for table in task.completed:
+            model = self._synthetics_train.models[table]
             self._strategy.update_evaluation_from_model(
-                table_name, self.evaluations, job, self._working_dir
+                table, self.evaluations, model, self._working_dir
             )
 
-        self._loopexec(
-            action="synthetics model training",
-            table_collection=list(training_data.keys()),
-            more_to_do=lambda: len(completed + failed) < len(training_data),
-            is_finished=lambda t: t in (completed + failed),
-            get_job=lambda t: self._synthetics_train.models[t],
-            handle_lost_contact=_handle_lost_contact,
-            handle_completed=_handle_completed,
-            handle_failed=lambda t: failed.append(t),
-        )
-
+        # TODO: consider moving this to before running the task
         archive_path = self._working_dir / "synthetics_training.tar.gz"
         for table_name, csv_path in training_data.items():
             add_to_tar(archive_path, csv_path, csv_path.name)
