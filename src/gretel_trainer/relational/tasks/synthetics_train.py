@@ -51,8 +51,6 @@ class SyntheticsTrainTask:
 
     def handle_completed(self, table: str, job: Job) -> None:
         self.completed.append(table)
-        # TODO strategy update evaluation from model???
-        # Maybe for simplicity do this outside the task loop
 
     def handle_failed(self, table: str) -> None:
         self.failed.append(table)
