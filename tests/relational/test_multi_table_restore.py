@@ -177,9 +177,6 @@ def make_mock_model(
     model.model_id = name
     model.data_source = ARTIFACTS[f"train_{name}"]["artifact_id"]
     model.get_report_summary.return_value = report_json
-    # {
-    #     "summary": [{"field": "synthetic_data_quality_score", "value": 94}]
-    # }
     model.get_record_handler.return_value = record_handler
     return model
 

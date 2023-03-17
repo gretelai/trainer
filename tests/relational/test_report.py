@@ -46,3 +46,28 @@ def test_ecommerce_relational_data_report(ecom):
         )
         == 2
     )
+
+
+def test_mutagenesis_relational_data_report(mutagenesis):
+    # Fake these
+    evaluations = _evals_from_rel_data(mutagenesis)
+
+    presenter = ReportPresenter(
+        rel_data=mutagenesis,
+        evaluations=evaluations,
+        now=datetime.utcnow(),
+        run_identifier="run_identifier",
+    )
+
+    html_content = ReportRenderer().render(presenter)
+    tree = html.fromstring(html_content)
+
+    assert (
+        len(
+            tree.xpath(
+                '//div[contains(@class, "test-report-main-score")]'
+                + '//div[contains(@class, "score-container")]'
+            )
+        )
+        == 2
+    )

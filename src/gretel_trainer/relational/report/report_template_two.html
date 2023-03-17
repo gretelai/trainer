@@ -34,7 +34,7 @@
                 <figure>{{ presenter.composite_sqs_figure.to_html(config={'displayModeBar': False}, full_html=False, include_plotlyjs=False) }}</figure>
             </div>
             <div>
-                <span class="score-container-text">Composite<br />Synthetic Quality Score</span>
+                <span class="score-container-text">Composite<br />Synthetic Data Quality Score</span>
             </div>
         </div>
 
@@ -62,9 +62,9 @@
 
       <table>
         <tr>
-            <th>Table name</th>
-            <th>Primary key</th>
-            <th>Foreign keys</th>
+            <th>Table Name</th>
+            <th>Primary Key</th>
+            <th>Foreign Keys</th>
         </tr>
         {% for table_data in presenter.report_table_data %}
         <tr>
@@ -110,7 +110,7 @@
           </tr>
           {% for table, evaluation in presenter.evaluations.items() %}
           <tr>
-            <th scope="row">{{table}}</th>
+            <td><b>{{ table }}</b></td>
             <td>
               <span class="sqs-table-score">{{ evaluation.individual_sqs }}</span>
               <span class="label label__{{ presenter.sqs_score_to_grade(evaluation.individual_sqs).lower().replace(' ', '-') }}">
