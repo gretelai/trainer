@@ -205,11 +205,12 @@ a.score-error-support-link:hover, a.score-error-support-link:active {
     color: rgba(33, 20, 148, 1);
 }
 .sqs-table-score {
-	padding-right: 0.5rem;
+	padding-left: 1rem;
+	padding-right: 1rem;
 }
 .sqs-table-link {
 	float: right;
-	padding-right: 0.5rem;
+	padding-right: 1rem;
 }
 
 /* Utils */
