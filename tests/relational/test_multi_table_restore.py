@@ -167,15 +167,19 @@ def make_mock_get_model(models: Dict[str, Mock]):
 
 
 def make_mock_model(
-    name: str, status: str, record_handler: Optional[Mock] = None
+    name: str,
+    status: str,
+    record_handler: Optional[Mock] = None,
+    report_json: Optional[dict] = None,
 ) -> Mock:
     model = Mock()
     model.status = status
     model.model_id = name
     model.data_source = ARTIFACTS[f"train_{name}"]["artifact_id"]
-    model.get_report_summary.return_value = {
-        "summary": [{"field": "synthetic_data_quality_score", "value": 94}]
-    }
+    model.get_report_summary.return_value = report_json
+    # {
+    #     "summary": [{"field": "synthetic_data_quality_score", "value": 94}]
+    # }
     model.get_record_handler.return_value = record_handler
     return model
 
@@ -356,7 +360,7 @@ def test_restore_synthetics_training_still_in_progress(project, pets):
             mt = MultiTable.restore(backup_file)
 
 
-def test_restore_training_complete(project, pets):
+def test_restore_training_complete(project, pets, report_json_dict):
     with tempfile.TemporaryDirectory() as working_dir, tempfile.TemporaryDirectory() as testsetup_dir, patch(
         "gretel_trainer.relational.multi_table.download_tar_artifact"
     ) as download_tar_artifact:
@@ -364,8 +368,12 @@ def test_restore_training_complete(project, pets):
         testsetup_dir = Path(testsetup_dir)
 
         synthetics_models = {
-            "humans": make_mock_model(name="humans", status="completed"),
-            "pets": make_mock_model(name="pets", status="completed"),
+            "humans": make_mock_model(
+                name="humans", status="completed", report_json=report_json_dict
+            ),
+            "pets": make_mock_model(
+                name="pets", status="completed", report_json=report_json_dict
+            ),
         }
 
         create_standin_project_artifacts(pets, testsetup_dir)
@@ -406,13 +414,13 @@ def test_restore_training_complete(project, pets):
             working_dir / "synthetics_individual_evaluation_pets.html"
         )
         assert len(mt._synthetics_train.models) == 2
-        assert mt.evaluations["humans"].individual_sqs == 94
+        assert mt.evaluations["humans"].individual_sqs == 95
         assert mt.evaluations["humans"].cross_table_sqs is None
-        assert mt.evaluations["pets"].individual_sqs == 94
+        assert mt.evaluations["pets"].individual_sqs == 95
         assert mt.evaluations["pets"].cross_table_sqs is None
 
 
-def test_restore_training_one_failed(project, pets):
+def test_restore_training_one_failed(project, pets, report_json_dict):
     with tempfile.TemporaryDirectory() as working_dir, tempfile.TemporaryDirectory() as testsetup_dir, patch(
         "gretel_trainer.relational.multi_table.download_tar_artifact"
     ) as download_tar_artifact:
@@ -421,7 +429,9 @@ def test_restore_training_one_failed(project, pets):
 
         synthetics_models = {
             "humans": make_mock_model(name="humans", status="error"),
-            "pets": make_mock_model(name="pets", status="completed"),
+            "pets": make_mock_model(
+                name="pets", status="completed", report_json=report_json_dict
+            ),
         }
 
         create_standin_project_artifacts(pets, testsetup_dir)
@@ -466,11 +476,11 @@ def test_restore_training_one_failed(project, pets):
         assert len(mt._synthetics_train.models) == 2
         assert mt.evaluations["humans"].individual_sqs is None
         assert mt.evaluations["humans"].cross_table_sqs is None
-        assert mt.evaluations["pets"].individual_sqs == 94
+        assert mt.evaluations["pets"].individual_sqs == 95
         assert mt.evaluations["pets"].cross_table_sqs is None
 
 
-def test_restore_generate_completed(project, pets):
+def test_restore_generate_completed(project, pets, report_json_dict):
     with tempfile.TemporaryDirectory() as working_dir, tempfile.TemporaryDirectory() as testsetup_dir, patch(
         "gretel_trainer.relational.multi_table.download_tar_artifact"
     ) as download_tar_artifact:
@@ -487,11 +497,13 @@ def test_restore_generate_completed(project, pets):
                 name="humans",
                 status="completed",
                 record_handler=synthetics_record_handlers["humans"],
+                report_json=report_json_dict,
             ),
             "pets": make_mock_model(
                 name="pets",
                 status="completed",
                 record_handler=synthetics_record_handlers["pets"],
+                report_json=report_json_dict,
             ),
         }
 
@@ -536,13 +548,13 @@ def test_restore_generate_completed(project, pets):
         )
         assert mt._synthetics_run is not None
         assert len(mt.synthetic_output_tables) == 2
-        assert mt.evaluations["humans"].individual_sqs == 90
+        assert mt.evaluations["humans"].individual_sqs == 95
         assert mt.evaluations["humans"].cross_table_sqs is 91
-        assert mt.evaluations["pets"].individual_sqs == 90
+        assert mt.evaluations["pets"].individual_sqs == 95
         assert mt.evaluations["pets"].cross_table_sqs == 91
 
 
-def test_restore_generate_in_progress(project, pets):
+def test_restore_generate_in_progress(project, pets, report_json_dict):
     with tempfile.TemporaryDirectory() as working_dir, tempfile.TemporaryDirectory() as testsetup_dir, patch(
         "gretel_trainer.relational.multi_table.download_tar_artifact"
     ) as download_tar_artifact:
@@ -559,11 +571,13 @@ def test_restore_generate_in_progress(project, pets):
                 name="humans",
                 status="completed",
                 record_handler=synthetics_record_handlers["humans"],
+                report_json=report_json_dict,
             ),
             "pets": make_mock_model(
                 name="pets",
                 status="completed",
                 record_handler=synthetics_record_handlers["pets"],
+                report_json=report_json_dict,
             ),
         }
 
@@ -600,7 +614,7 @@ def test_restore_generate_in_progress(project, pets):
             record_handlers=synthetics_record_handlers,
         )
         assert len(mt.synthetic_output_tables) == 0
-        assert mt.evaluations["humans"].individual_sqs == 94
+        assert mt.evaluations["humans"].individual_sqs == 95
         assert mt.evaluations["humans"].cross_table_sqs is None
-        assert mt.evaluations["pets"].individual_sqs == 94
+        assert mt.evaluations["pets"].individual_sqs == 95
         assert mt.evaluations["pets"].cross_table_sqs is None

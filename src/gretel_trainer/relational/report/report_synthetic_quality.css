@@ -43,6 +43,10 @@ body::before {
 	align-items: center;
 	flex-direction: column;
 }
+.score-container-text {
+	font-size: 1.3125rem;
+	text-align: center;
+}
 .score {
 	width: 180px;
 	height: 180px;
@@ -198,6 +202,13 @@ a.score-error-support-link:link {
 }
 a.score-error-support-link:hover, a.score-error-support-link:active {
     color: rgba(33, 20, 148, 1);
+}
+.sqs-table-score {
+	padding-right: 0.5rem;
+}
+.sqs-table-link {
+	float: right;
+	padding-right: 0.5rem;
 }
 
 /* Utils */

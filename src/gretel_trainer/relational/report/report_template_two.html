@@ -21,9 +21,9 @@
         <div class="header">
           <h1>Gretel Relational<br />Synthetic Report</h1>
           <span>
-            <b>Generation ID</b> {{ presenter.run_identifier }}
-            <br/>
             <b>Generated</b> {{presenter.generated_at}}
+            <br/>
+            <b>Generation ID</b> {{ presenter.run_identifier }}
           </span>
         </div>
 
@@ -34,7 +34,7 @@
                 <figure>{{ presenter.composite_sqs_figure.to_html(config={'displayModeBar': False}, full_html=False, include_plotlyjs=False) }}</figure>
             </div>
             <div>
-                <span class="h3">Composite Synthetic Quality Score</span>
+                <span class="score-container-text">Composite<br />Synthetic Quality Score</span>
             </div>
         </div>
 
@@ -45,7 +45,7 @@
                 <figure>{{ presenter.composite_ppl_figure.to_html(config={'displayModeBar': False}, full_html=False, include_plotlyjs=False) }}</figure>
             </div>
             <div>
-                <span class="h3">Composite Privacy Protection Level</span>
+                <span class="score-container-text">Composite<br />Privacy Protection Level</span>
             </div>
         </div>
 
@@ -56,7 +56,8 @@
       <h2>Table Relationships</h2>
 
       <p>
-        The fields of each table in the synthesized database and their relationships are displayed below.
+        The primary and foreign keys for each table in the synthesized database and their 
+        relationships are displayed below.
       </p>
 
       <table>
@@ -111,11 +112,11 @@
           <tr>
             <th scope="row">{{table}}</th>
             <td>
-              {{ evaluation.individual_sqs }}
+              <span class="sqs-table-score">{{ evaluation.individual_sqs }}</span>
               <span class="label label__{{ presenter.sqs_score_to_grade(evaluation.individual_sqs).lower().replace(' ', '-') }}">
                 {{ presenter.sqs_score_to_grade(evaluation.individual_sqs) }}
               </span>
-              <span style="float: right;">
+              <span class="sqs-table-link">
                 <a href="synthetics_individual_evaluation_{{ table }}.html">Report</a>
               </span>
             </td>
