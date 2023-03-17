@@ -1,0 +1,5 @@
+from gretel_trainer.relational.tasks.synthetics_evaluate import SyntheticsEvaluateTask
+from gretel_trainer.relational.tasks.synthetics_run import SyntheticsRunTask
+from gretel_trainer.relational.tasks.synthetics_train import SyntheticsTrainTask
+from gretel_trainer.relational.tasks.transforms_run import TransformsRunTask
+from gretel_trainer.relational.tasks.transforms_train import TransformsTrainTask

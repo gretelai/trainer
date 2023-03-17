@@ -57,11 +57,13 @@ from gretel_trainer.relational.sdk_extras import (
 from gretel_trainer.relational.strategies.ancestral import AncestralStrategy
 from gretel_trainer.relational.strategies.independent import IndependentStrategy
 from gretel_trainer.relational.task_runner import run_task
-from gretel_trainer.relational.tasks.synthetics_evaluate import SyntheticsEvaluateTask
-from gretel_trainer.relational.tasks.synthetics_run import SyntheticsRunTask
-from gretel_trainer.relational.tasks.synthetics_train import SyntheticsTrainTask
-from gretel_trainer.relational.tasks.transforms_run import TransformsRunTask
-from gretel_trainer.relational.tasks.transforms_train import TransformsTrainTask
+from gretel_trainer.relational.tasks import (
+    SyntheticsEvaluateTask,
+    SyntheticsRunTask,
+    SyntheticsTrainTask,
+    TransformsRunTask,
+    TransformsTrainTask,
+)
 
 logger = logging.getLogger(__name__)
 
