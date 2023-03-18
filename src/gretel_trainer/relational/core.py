@@ -83,11 +83,31 @@ class TableEvaluation:
     @property
     def individual_ppl_grade(self) -> Optional[str]:
         return self._grade_from_json(self.individual_report_json, _PPL)
-    
+
     def __repr__(self) -> str:
-        d = asdict(self)
-        del d[cross_table_report_json]
-        del d[individual_report_json]
+        d = {}
+        if self.cross_table_report_json is not None:
+            d["cross_table"] = {
+                "sqs": {
+                    "score": self.cross_table_sqs,
+                    "grade": self.cross_table_sqs_grade,
+                },
+                "ppl": {
+                    "score": self.cross_table_ppl,
+                    "grade": self.cross_table_ppl_grade,
+                },
+            }
+        if self.individual_report_json is not None:
+            d["individual"] = {
+                "sqs": {
+                    "score": self.individual_sqs,
+                    "grade": self.individual_sqs_grade,
+                },
+                "ppl": {
+                    "score": self.individual_ppl,
+                    "grade": self.individual_ppl_grade,
+                },
+            }
         return json.dumps(d)
 
 
