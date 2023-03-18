@@ -41,6 +41,22 @@ ARTIFACTS = {
         "artifact_id": "gretel_abc_synthetics_outputs.tar.gz",
         "local_name": "synthetics_outputs.tar.gz",
     },
+    "report_humans": {
+        "artifact_id": "report",
+        "local_name": "synthetics_individual_evaluation_humans.html",
+    },
+    "report_json_humans": {
+        "artifact_id": "report_json",
+        "local_name": "synthetics_individual_evaluation_humans.json",
+    },
+    "report_pets": {
+        "artifact_id": "report",
+        "local_name": "synthetics_individual_evaluation_pets.html",
+    },
+    "report_json_pets": {
+        "artifact_id": "report_json",
+        "local_name": "synthetics_individual_evaluation_pets.json",
+    },
 }
 
 
@@ -169,6 +185,7 @@ def make_mock_get_model(models: Dict[str, Mock]):
 def make_mock_model(
     name: str,
     status: str,
+    setup_path: Path,
     record_handler: Optional[Mock] = None,
     report_json: Optional[dict] = None,
 ) -> Mock:
@@ -176,7 +193,7 @@ def make_mock_model(
     model.status = status
     model.model_id = name
     model.data_source = ARTIFACTS[f"train_{name}"]["artifact_id"]
-    model.get_report_summary.return_value = report_json
+    model.get_artifact_link = make_mock_get_artifact_link(setup_path)
     model.get_record_handler.return_value = record_handler
     return model
 
@@ -260,17 +277,6 @@ def create_standin_project_artifacts(
             table_path = setup_path / f"synthetics_train_{table}.csv"
             rel_data.get_table_data(table).to_csv(table_path, index=False)
             tar.add(table_path, arcname=f"synthetics_train_{table}.csv")
-            for kind, score in [("individual", 90), ("cross_table", 91)]:
-                html_filename = f"synthetics_{kind}_evaluation_{table}.html"
-                html_path = setup_path / html_filename
-                with open(html_path, "w") as f:
-                    f.write("<html></html>")
-                tar.add(html_path, arcname=f"{html_filename}")
-                json_filename = f"synthetics_{kind}_evaluation_{table}.json"
-                json_path = setup_path / json_filename
-                with open(json_path, "w") as f:
-                    json.dump(_report_json_dict, f)
-                tar.add(json_path, arcname=f"{json_filename}")
 
     # Synthetics output archive
     with tarfile.open(
@@ -280,7 +286,7 @@ def create_standin_project_artifacts(
             table_path = setup_path / f"synth_{table}.csv"
             rel_data.get_table_data(table).to_csv(table_path, index=False)
             tar.add(table_path, arcname=f"run-id/synth_{table}.csv")
-            for kind, score in [("individual", 90), ("cross_table", 91)]:
+            for kind in ["individual", "cross_table"]:
                 html_filename = f"synthetics_{kind}_evaluation_{table}.html"
                 html_path = setup_path / html_filename
                 with open(html_path, "w") as f:
@@ -348,8 +354,16 @@ def test_restore_transforms(project, pets):
         testsetup_dir = Path(testsetup_dir)
 
         transforms_models = {
-            "humans": make_mock_model(name="humans", status="completed"),
-            "pets": make_mock_model(name="pets", status="completed"),
+            "humans": make_mock_model(
+                name="humans",
+                status="completed",
+                setup_path=testsetup_dir,
+            ),
+            "pets": make_mock_model(
+                name="pets",
+                status="completed",
+                setup_path=testsetup_dir,
+            ),
         }
 
         create_standin_project_artifacts(pets, testsetup_dir)
@@ -382,8 +396,16 @@ def test_restore_synthetics_training_still_in_progress(project, pets):
         testsetup_dir = Path(testsetup_dir)
 
         synthetics_models = {
-            "humans": make_mock_model(name="humans", status="active"),
-            "pets": make_mock_model(name="pets", status="pending"),
+            "humans": make_mock_model(
+                name="humans",
+                status="active",
+                setup_path=testsetup_dir,
+            ),
+            "pets": make_mock_model(
+                name="pets",
+                status="pending",
+                setup_path=testsetup_dir,
+            ),
         }
 
         create_standin_project_artifacts(pets, testsetup_dir)
@@ -411,10 +433,16 @@ def test_restore_training_complete(project, pets, report_json_dict):
 
         synthetics_models = {
             "humans": make_mock_model(
-                name="humans", status="completed", report_json=report_json_dict
+                name="humans",
+                status="completed",
+                setup_path=testsetup_dir,
+                report_json=report_json_dict,
             ),
             "pets": make_mock_model(
-                name="pets", status="completed", report_json=report_json_dict
+                name="pets",
+                status="completed",
+                setup_path=testsetup_dir,
+                report_json=report_json_dict,
             ),
         }
 
@@ -436,9 +464,8 @@ def test_restore_training_complete(project, pets, report_json_dict):
         mt = MultiTable.restore(backup_file)
 
         # Backup + Debug summary + Source archive + (2) Source CSVs
-        # + Training archive + (2) Train CSVs + (4) Train reports + (4) Reports
-        # FIXME verify summary above is correct
-        assert len(os.listdir(working_dir)) == 16
+        # + Training archive + (2) Train CSVs + (4) Reports from models
+        assert len(os.listdir(working_dir)) == 12
 
         # Training state is restored
         assert os.path.exists(local_file(working_dir, "synthetics_training_archive"))
@@ -473,9 +500,16 @@ def test_restore_training_one_failed(project, pets, report_json_dict):
         testsetup_dir = Path(testsetup_dir)
 
         synthetics_models = {
-            "humans": make_mock_model(name="humans", status="error"),
+            "humans": make_mock_model(
+                name="humans",
+                status="error",
+                setup_path=testsetup_dir,
+            ),
             "pets": make_mock_model(
-                name="pets", status="completed", report_json=report_json_dict
+                name="pets",
+                status="completed",
+                setup_path=testsetup_dir,
+                report_json=report_json_dict,
             ),
         }
 
@@ -497,9 +531,8 @@ def test_restore_training_one_failed(project, pets, report_json_dict):
         mt = MultiTable.restore(backup_file)
 
         # Backup + Debug summary + Source archive + (2) Source CSVs
-        # Training archive + (2) Train CSVs + (2) Reports
-        # FIXME this was 10, not sure how we got 16 if something "failed" because we might want like 14 then? 12?
-        assert len(os.listdir(working_dir)) == 16
+        # Training archive + (2) Train CSVs + (2) Reports from model
+        assert len(os.listdir(working_dir)) == 10
 
         # Training state is restored
         assert os.path.exists(local_file(working_dir, "synthetics_training_archive"))
@@ -507,13 +540,12 @@ def test_restore_training_one_failed(project, pets, report_json_dict):
         assert os.path.exists(local_file(working_dir, "train_humans"))
         ## ...but we should not see evaluation reports because the table failed to train.
 
-        # FIXME this fails due to overly aggressive mocking??? See also inflated listdir count above???
-        # assert not os.path.exists(
-        #     working_dir / "synthetics_individual_evaluation_humans.json"
-        # )
-        # assert not os.path.exists(
-        #     working_dir / "synthetics_individual_evaluation_humans.html"
-        # )
+        assert not os.path.exists(
+            working_dir / "synthetics_individual_evaluation_humans.json"
+        )
+        assert not os.path.exists(
+            working_dir / "synthetics_individual_evaluation_humans.html"
+        )
 
         assert os.path.exists(local_file(working_dir, "train_pets"))
         assert os.path.exists(
@@ -524,15 +556,10 @@ def test_restore_training_one_failed(project, pets, report_json_dict):
         )
         assert len(mt._synthetics_train.models) == 2
 
-        # FIXME we mock aggressively
-        # assert mt.evaluations["humans"].individual_sqs is None
-        # assert mt.evaluations["humans"].cross_table_sqs is None
-        # assert mt.evaluations["pets"].individual_sqs == 95
-        # assert mt.evaluations["pets"].cross_table_sqs is None
-        assert mt.evaluations["humans"].individual_sqs == 95
-        assert mt.evaluations["humans"].cross_table_sqs == 95
+        assert mt.evaluations["humans"].individual_sqs is None
+        assert mt.evaluations["humans"].cross_table_sqs is None
         assert mt.evaluations["pets"].individual_sqs == 95
-        assert mt.evaluations["pets"].cross_table_sqs == 95
+        assert mt.evaluations["pets"].cross_table_sqs is None
 
 
 def test_restore_generate_completed(project, pets, report_json_dict):
@@ -551,12 +578,14 @@ def test_restore_generate_completed(project, pets, report_json_dict):
             "humans": make_mock_model(
                 name="humans",
                 status="completed",
+                setup_path=testsetup_dir,
                 record_handler=synthetics_record_handlers["humans"],
                 report_json=report_json_dict,
             ),
             "pets": make_mock_model(
                 name="pets",
                 status="completed",
+                setup_path=testsetup_dir,
                 record_handler=synthetics_record_handlers["pets"],
                 report_json=report_json_dict,
             ),
@@ -582,10 +611,9 @@ def test_restore_generate_completed(project, pets, report_json_dict):
         mt = MultiTable.restore(backup_file)
 
         # Backup + Debug summary + Source archive + (2) Source CSVs
-        # + Training archive + (2) Train CSVs + (4) Train reports (?) + (4) Reports
+        # + Training archive + (2) Train CSVs + (4) Reports from models
         # + Outputs archive + Previous run subdirectory
-        # FIXME verify summary above is correct
-        assert len(os.listdir(working_dir)) == 18
+        assert len(os.listdir(working_dir)) == 14
 
         # Generate state is restored
         assert os.path.exists(working_dir / "run-id" / "synth_humans.csv")
@@ -626,12 +654,14 @@ def test_restore_generate_in_progress(project, pets, report_json_dict):
             "humans": make_mock_model(
                 name="humans",
                 status="completed",
+                setup_path=testsetup_dir,
                 record_handler=synthetics_record_handlers["humans"],
                 report_json=report_json_dict,
             ),
             "pets": make_mock_model(
                 name="pets",
                 status="completed",
+                setup_path=testsetup_dir,
                 record_handler=synthetics_record_handlers["pets"],
                 report_json=report_json_dict,
             ),
@@ -657,9 +687,8 @@ def test_restore_generate_in_progress(project, pets, report_json_dict):
         mt = MultiTable.restore(backup_file)
 
         # Backup + Debug summary + Source archive + (2) Source CSVs
-        # + Training archive + (2) Train CSVs + (4) Train reports + (4) Run Reports
-        # FIXME verify summary above is correct
-        assert len(os.listdir(working_dir)) == 16
+        # + Training archive + (2) Train CSVs + (4) Reports from models
+        assert len(os.listdir(working_dir)) == 12
 
         # Generate state is partially restored
         assert mt._synthetics_run == SyntheticsRun(
