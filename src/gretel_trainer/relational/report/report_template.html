@@ -111,12 +111,14 @@
             <th scope="col">Cross-table SQS</th>
           </tr>
           {% for table, evaluation in presenter.evaluations.items() %}
+          {% set individual_grade = presenter.sqs_score_to_grade(evaluation.individual_sqs) %}
+          {% set cross_table_grade = presenter.sqs_score_to_grade(evaluation.cross_table_sqs) %}
           <tr>
             <td><b>{{ table }}</b></td>
             <td>
               <span class="sqs-table-score">{{ evaluation.individual_sqs }}</span>
-              <span class="label label__{{ presenter.css_label_format(presenter.sqs_score_to_grade(evaluation.individual_sqs)) }}">
-                {{ presenter.sqs_score_to_grade(evaluation.individual_sqs) }}
+              <span class="label label__{{ presenter.css_label_format(individual_grade) }}">
+                {{ individual_grade }}
               </span>
               <span class="sqs-table-link">
                 <a href="synthetics_individual_evaluation_{{ table }}.html">Report</a>
@@ -124,8 +126,8 @@
             </td>
             <td>
               <span class="sqs-table-score">{{ evaluation.cross_table_sqs }}</span>
-              <span class="label label__{{ presenter.css_label_format(presenter.sqs_score_to_grade(evaluation.cross_table_sqs)) }}">
-                {{ presenter.sqs_score_to_grade(evaluation.cross_table_sqs) }}
+              <span class="label label__{{ presenter.css_label_format(cross_table_grade) }}">
+                {{ cross_table_grade }}
               </span>
               <span class="sqs-table-link">
                 <a href="synthetics_cross_table_evaluation_{{ table }}.html">Report</a>
