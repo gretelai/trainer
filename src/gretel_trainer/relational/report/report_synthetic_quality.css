@@ -5,6 +5,8 @@
 	--color-moderate: #F5DAA3;
 	--color-good: #E9F1C0;
 	--color-excellent: #C8F1C0;
+	--color-highlighted: #FDE68A;
+	--color-highlighted-row: #FFF9E0;
 	--color-figure-v-poor: #E53C1A;
 	--color-figure-poor: #E5801A;
 	--color-figure-moderate: #E5A11A;
@@ -106,6 +108,14 @@ body::before {
 .label__excellent {
 	background-color: var(--color-excellent);
 }
+
+.label__highlighted {
+	background-color: var(--color-highlighted);
+}
+.row__highlighted {
+	background-color: var(--color-highlighted-row);
+}
+
 .figure__very-poor {
 	background-color: var(--color-figure-v-poor);
 }
