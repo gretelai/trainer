@@ -81,7 +81,7 @@ class ReportPresenter:
         _formatted_grade = (
             self.composite_sqs_score_and_grade[1].lower().replace(" ", "-")
         )
-        return f"label_{_formatted_grade}"
+        return f"label__{_formatted_grade}"
 
     @property
     def composite_sqs_figure(self) -> go.Figure:
