@@ -78,9 +78,7 @@ class ReportPresenter:
 
     @property
     def composite_sqs_label(self) -> str:
-        _formatted_grade = (
-            self.composite_sqs_score_and_grade[1].lower().replace(" ", "-")
-        )
+        _formatted_grade = self.css_label_format(self.composite_sqs_score_and_grade[1])
         return f"label__{_formatted_grade}"
 
     @property
@@ -119,9 +117,7 @@ class ReportPresenter:
 
     @property
     def composite_ppl_label(self) -> str:
-        _formatted_grade = (
-            self.composite_ppl_score_and_grade[1].lower().replace(" ", "-")
-        )
+        _formatted_grade = self.css_label_format(self.composite_ppl_score_and_grade[1])
         return f"label__privacy__{_formatted_grade}"
 
     @property
@@ -160,3 +156,6 @@ class ReportPresenter:
         # Constrain to [0,4]
         idx = max(0, min(4, idx))
         return GRADES[idx]
+
+    def css_label_format(self, grade: str) -> str:
+        return grade.lower().replace(" ", "-")
