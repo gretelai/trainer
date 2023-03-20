@@ -77,6 +77,13 @@ class ReportPresenter:
         return (score, self.sqs_score_to_grade(score))
 
     @property
+    def composite_sqs_label(self) -> str:
+        _formatted_grade = (
+            self.composite_sqs_score_and_grade[1].lower().replace(" ", "-")
+        )
+        return f"label_{_formatted_grade}"
+
+    @property
     def composite_sqs_figure(self) -> go.Figure:
         score, grade = self.composite_sqs_score_and_grade
         return gauge_and_needle_chart(score)
@@ -109,6 +116,13 @@ class ReportPresenter:
         else:
             GRADE_UNAVAILABLE = "Unavailable"
             return (None, GRADE_UNAVAILABLE)
+
+    @property
+    def composite_ppl_label(self) -> str:
+        _formatted_grade = (
+            self.composite_ppl_score_and_grade[1].lower().replace(" ", "-")
+        )
+        return f"label__privacy__{_formatted_grade}"
 
     @property
     def composite_ppl_figure(self) -> go.Figure:

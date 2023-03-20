@@ -28,7 +28,7 @@
         </div>
 
         <div class="score-container mb-1">
-            <span class="label label__{{ presenter.composite_sqs_score_and_grade[1].lower().replace(' ', '-') }} mb-0.5">
+            <span class="label {{ composite_sqs_label }} mb-0.5">
               {{ presenter.composite_sqs_score_and_grade[1] }}
             </span>
             <div id="chart" class="score mb-0.5">
@@ -40,7 +40,7 @@
         </div>
 
         <div class="score-container mb-1">
-            <span class="label label__privacy__{{ presenter.composite_ppl_score_and_grade[1].lower().replace(' ', '-') }} mb-0.5">
+            <span class="label {{ composite_ppl_label }} mb-0.5">
               {{ presenter.composite_ppl_score_and_grade[1] }}
             </span>
             <div id="chart" class="score mb-0.5">
