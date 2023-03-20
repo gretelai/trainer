@@ -1,11 +1,12 @@
 function mouseOverPk(event) {
     event.preventDefault();
-    let target = event;
+    let { currentTarget } = event;
+    let target = currentTarget;
 
     target.classList.add("label__highlighted");
     target.parentNode.parentNode.classList.add("row__highlighted");
 
-    document.querySelector(`[data-fk-from=${target.id}]`).forEach(
+    document.querySelectorAll(`[data-fk-from=${target.id}]`).forEach(
         fk => {
             fk.classList.add("label__highlighted");
             fk.parentNode.parentNode.classList.add("row__highlighted");
@@ -15,12 +16,13 @@ function mouseOverPk(event) {
 
 function mouseOutPk(event) {
     event.preventDefault();
-    let target = event;
+    let { currentTarget } = event;
+    let target = currentTarget;
 
     target.classList.remove("label__highlighted");
     target.parentNode.parentNode.classList.remove("row__highlighted");
 
-    document.querySelector(`[data-fk-from=${target.id}]`).forEach(
+    document.querySelectorAll(`[data-fk-from=${target.id}]`).forEach(
         fk => {
             fk.classList.remove("label__highlighted");
             fk.parentNode.parentNode.classList.remove("row__highlighted");
@@ -30,7 +32,8 @@ function mouseOutPk(event) {
 
 function mouseOverFk(event) {
     event.preventDefault();
-    let target = event;
+    let { currentTarget } = event;
+    let target = currentTarget;
 
     target.classList.add("label__highlighted");
     target.parentNode.parentNode.classList.add("row__highlighted");
@@ -42,7 +45,8 @@ function mouseOverFk(event) {
 
 function mouseOutFk(event) {
     event.preventDefault();
-    let target = event;
+    let { currentTarget } = event;
+    let target = currentTarget;
 
     target.classList.remove("label__highlighted");
     target.parentNode.parentNode.classList.remove("row__highlighted");
