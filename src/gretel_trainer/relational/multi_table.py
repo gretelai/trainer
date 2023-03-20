@@ -34,9 +34,14 @@ from gretel_trainer.relational.backup import (
     BackupTransformsTrain,
 )
 from gretel_trainer.relational.core import (
+    GretelModelConfig,
     MultiTableException,
     RelationalData,
     TableEvaluation,
+)
+from gretel_trainer.relational.model_config import (
+    make_synthetics_config,
+    make_transform_config,
 )
 from gretel_trainer.relational.report.report import ReportPresenter, ReportRenderer
 from gretel_trainer.relational.sdk_extras import (
@@ -49,8 +54,6 @@ from gretel_trainer.relational.sdk_extras import (
 )
 from gretel_trainer.relational.strategies.ancestral import AncestralStrategy
 from gretel_trainer.relational.strategies.independent import IndependentStrategy
-
-GretelModelConfig = Union[str, Path, Dict]
 
 MAX_REFRESH_ATTEMPTS = 3
 
@@ -454,9 +457,9 @@ class MultiTable:
 
     def train_transform_models(self, configs: Dict[str, GretelModelConfig]) -> None:
         for table, config in configs.items():
-            # Ensure consistent, friendly model name in Console
-            named_config = read_model_config(config)
-            named_config["name"] = _model_name("transforms", table)
+            transform_config = make_transform_config(
+                self.relational_data, table, config
+            )
 
             # Ensure consistent, friendly data source names in Console
             table_data = self.relational_data.get_table_data(table)
@@ -465,7 +468,7 @@ class MultiTable:
 
             # Create model
             model = self._project.create_model_obj(
-                model_config=named_config, data_source=str(transforms_train_path)
+                model_config=transform_config, data_source=str(transforms_train_path)
             )
             self._transforms_train.models[table] = model
 
@@ -670,16 +673,11 @@ class MultiTable:
 
         return training_paths
 
-    def _table_model_config(self, table_name: str) -> Dict:
-        config_dict = read_model_config(self._model_config)
-        config_dict["name"] = _model_name("synthetics", table_name)
-        return config_dict
-
     def _train_synthetics_models(self, training_data: Dict[str, Path]) -> None:
         for table_name, training_csv in training_data.items():
-            table_model_config = self._table_model_config(table_name)
+            synthetics_config = make_synthetics_config(table_name, self._model_config)
             model = self._project.create_model_obj(
-                model_config=table_model_config, data_source=str(training_csv)
+                model_config=synthetics_config, data_source=str(training_csv)
             )
             self._synthetics_train.models[table_name] = model
 
@@ -1177,11 +1175,6 @@ def _upload_gretel_backup(project: Project, path: str) -> None:
         key = artifact["key"]
         if key != latest and key.endswith("__gretel_backup.json"):
             project.delete_artifact(key)
-
-
-def _model_name(workflow: str, table: str) -> str:
-    ok_table_name = table.replace("--", "__")
-    return f"{workflow}-{ok_table_name}"
 
 
 def _timestamp() -> str:

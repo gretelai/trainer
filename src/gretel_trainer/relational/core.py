@@ -2,7 +2,8 @@ from __future__ import annotations
 
 import json
 import logging
-from dataclasses import asdict, dataclass, field
+from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Any, Dict, List, Optional, Union, overload
 
 import networkx
@@ -20,6 +21,9 @@ _GRADE = "grade"
 
 class MultiTableException(Exception):
     pass
+
+
+GretelModelConfig = Union[str, Path, Dict]
 
 
 @dataclass
@@ -254,6 +258,13 @@ class RelationalData:
             fks = self.graph.edges[table, parent]["via"]
             foreign_keys.extend(fks)
         return foreign_keys
+
+    def get_all_key_columns(self, table: str) -> List[str]:
+        key_columns = [fk.column_name for fk in self.get_foreign_keys(table)]
+        pk = self.get_primary_key(table)
+        if pk is not None:
+            key_columns.append(pk)
+        return key_columns
 
     def debug_summary(self) -> Dict[str, Any]:
         max_depth = dag_longest_path_length(self.graph)
