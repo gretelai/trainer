@@ -22,11 +22,12 @@ class SyntheticsRunTask:
         self,
         record_handlers: Dict[str, RecordHandler],
         lost_contact: List[str],
+        preserved: List[str],
+        missing_model: List[str],
         record_size_ratio: float,
         training_columns: Dict[str, List[str]],
         models: Dict[str, Model],
         run_dir: Path,
-        working_tables: Dict[str, Optional[pd.DataFrame]],
         multitable: _MultiTable,
     ):
         self.record_handlers = record_handlers
@@ -35,8 +36,31 @@ class SyntheticsRunTask:
         self.training_columns = training_columns
         self.models = models
         self.run_dir = run_dir
-        self.working_tables = working_tables
         self.multitable = multitable
+        self.working_tables = self._setup_working_tables(preserved, missing_model)
+
+    def _setup_working_tables(
+        self, preserved: List[str], missing_model: List[str]
+    ) -> Dict[str, Optional[pd.DataFrame]]:
+        working_tables = {}
+
+        for table in missing_model:
+            working_tables[table] = None
+
+        for table in preserved:
+            working_tables[table] = self.multitable._strategy.get_preserved_data(
+                table, self.multitable.relational_data
+            )
+
+        return working_tables
+
+    @property
+    def output_tables(self) -> Dict[str, pd.DataFrame]:
+        return {
+            table: data
+            for table, data in self.working_tables.items()
+            if data is not None
+        }
 
     @property
     def action(self) -> str:

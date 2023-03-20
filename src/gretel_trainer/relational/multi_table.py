@@ -691,8 +691,6 @@ class MultiTable:
         Returns:
             dict[str, pd.DataFrame]: Return a dictionary of table names and output data.
         """
-        working_tables: Dict[str, Optional[pd.DataFrame]] = {}
-
         if resume:
             if identifier is not None:
                 logger.warning(
@@ -732,29 +730,21 @@ class MultiTable:
 
         run_dir = _mkdir(str(self._working_dir / self._synthetics_run.identifier))
 
-        for table in self._synthetics_run.preserved:
-            working_tables[table] = self._strategy.get_preserved_data(
-                table, self.relational_data
-            )
-
         task = SyntheticsRunTask(
             record_handlers=self._synthetics_run.record_handlers,
             lost_contact=self._synthetics_run.lost_contact,
+            preserved=self._synthetics_run.preserved,
+            missing_model=self._synthetics_run.missing_model,
             record_size_ratio=self._synthetics_run.record_size_ratio,
             training_columns=self._synthetics_train.training_columns,
             models=self._synthetics_train.models,
             run_dir=run_dir,
-            working_tables=working_tables,
             multitable=self,
         )
         run_task(task)
 
-        output_tables: Dict[str, pd.DataFrame] = {
-            table: data for table, data in working_tables.items() if data is not None
-        }
-
         output_tables = self._strategy.post_process_synthetic_results(
-            output_tables, self._synthetics_run.preserved, self.relational_data
+            task.output_tables, self._synthetics_run.preserved, self.relational_data
         )
 
         for table, synth_df in output_tables.items():
