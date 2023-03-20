@@ -6,8 +6,7 @@ import os
 
 from contextlib import contextmanager
 from dataclasses import dataclass
-from typing import Dict, List, Optional, Tuple, Union
-from typing_extensions import Protocol
+from typing import Dict, List, Optional, Protocol, Tuple, Union
 
 import boto3
 

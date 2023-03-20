@@ -1,6 +1,5 @@
 from dataclasses import dataclass
-from typing import Callable, Dict, List
-from typing_extensions import Protocol
+from typing import Callable, Dict, List, Protocol
 
 import pandas as pd
 
