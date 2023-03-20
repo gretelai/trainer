@@ -38,16 +38,3 @@
 .privacy-level {
     color: var(--color-privacy-text);
 }
-
-.privacy_level_info {
-}
-
-.icon-wrapper {
-    position: relative;
-    display: inline-block;
-}
-.icon-status {
-    position: absolute;
-    bottom: -5px;
-    right: -18px;
-}

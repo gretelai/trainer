@@ -4,9 +4,6 @@ from typing import List, Optional
 import plotly.graph_objects as go
 
 _GRETEL_PALETTE = ["#A051FA", "#18E7AA"]
-_GRAPH_OPACITY = 0.75
-_GRAPH_BARGAP = 0.2  # gap between bars of adjacent location coordinates
-_GRAPH_BARGROUPGAP = 0.1  # gap between bars of the same location coordinates
 
 SCORE_VALUES = [
     {"label": "Very poor", "color": "rgb(229, 60, 26)"},

@@ -88,22 +88,6 @@
         font-feature-settings: "tnum";
         text-align: right;
       }
-      dl {
-        display: grid;
-        grid-template-columns: 3fr 1fr;
-        grid-template-rows: auto;
-        font-size: 1.25rem;
-        margin: 0;
-      }
-      dt,
-      dd {
-        margin: 0 0 0.75rem 0;
-        padding: 0 0 0.25rem 0;
-        border-bottom: 2px solid #e5e5e6;
-      }
-      dd {
-        font-family: monospace;
-      }
       .highlight {
         background-color: #fafafa;
         font-family: monospace;

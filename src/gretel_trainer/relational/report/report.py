@@ -3,6 +3,8 @@ from __future__ import annotations
 import datetime
 import itertools
 from dataclasses import dataclass
+from functools import cached_property
+from math import ceil
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 
@@ -68,7 +70,7 @@ class ReportPresenter:
 
         # Take the average.
         if _num_scores > 0:
-            score = int(_total_score / _num_scores)
+            score = ceil(_total_score / _num_scores)
         # Or tell the user the bad news.
         else:
             score = None
