@@ -283,7 +283,6 @@ class AncestralStrategy:
         common.download_artifacts(model, out_filepath, table_name)
 
         evaluation = evaluations[table_name]
-        evaluation.cross_table_sqs = common.get_sqs_score(model)
         evaluation.cross_table_report_json = common.read_report_json_data(
             model, out_filepath
         )
@@ -306,7 +305,6 @@ class AncestralStrategy:
         out_filepath = target_dir / f"synthetics_individual_evaluation_{table}"
         common.write_report(report, out_filepath)
 
-        evaluation.individual_sqs = report.peek().get("score")
         evaluation.individual_report_json = report.as_dict
 
 

@@ -1,0 +1,40 @@
+:root {
+	--color-privacy-poor: #CBD2FC;
+	--color-privacy-normal: #A0ABF5;
+	--color-privacy-good: #7C87E9;
+	--color-privacy-very-good: #5351DE;
+	--color-privacy-excellent: #3B2ED0;
+	--color-white: #FFFFFF;
+	--color-privacy-text: #144BB8;
+	--color-privacy-text-not-excellent: #0C052E;
+}
+
+.grid-pps {
+	display: grid;
+	grid-template-columns: repeat(4, 1fr);
+}
+
+.label__privacy__poor {
+	background-color: var(--color-privacy-poor);
+	color: var(--color-privacy-text-not-excellent);
+}
+.label__privacy__normal {
+	background-color: var(--color-privacy-normal);
+	color: var(--color-privacy-text-not-excellent);
+}
+.label__privacy__good {
+	background-color: var(--color-privacy-good);
+	color: var(--color-privacy-text-not-excellent);
+}
+.label__privacy__very-good {
+	background-color: var(--color-privacy-good);
+	color: var(--color-privacy-text-not-excellent);
+}
+.label__privacy__excellent {
+	background-color: var(--color-privacy-excellent);
+	color: var(--color-white);
+}
+
+.privacy-level {
+    color: var(--color-privacy-text);
+}
