@@ -64,31 +64,13 @@ from gretel_trainer.relational.tasks import (
     TransformsRunTask,
     TransformsTrainTask,
 )
+from gretel_trainer.relational.workflow_state import (
+    SyntheticsRun,
+    SyntheticsTrain,
+    TransformsTrain,
+)
 
 logger = logging.getLogger(__name__)
-
-
-@dataclass
-class TransformsTrain:
-    models: Dict[str, Model] = field(default_factory=dict)
-    lost_contact: List[str] = field(default_factory=list)
-
-
-@dataclass
-class SyntheticsTrain:
-    models: Dict[str, Model] = field(default_factory=dict)
-    lost_contact: List[str] = field(default_factory=list)
-    training_columns: Dict[str, List[str]] = field(default_factory=dict)
-
-
-@dataclass
-class SyntheticsRun:
-    identifier: str
-    record_size_ratio: float
-    preserved: List[str]
-    record_handlers: Dict[str, RecordHandler]
-    lost_contact: List[str]
-    missing_model: List[str]
 
 
 class MultiTable:
