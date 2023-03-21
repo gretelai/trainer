@@ -13,6 +13,7 @@ from gretel_trainer.relational.sdk_extras import (
     start_job_if_possible,
 )
 from gretel_trainer.relational.tasks.common import _MultiTable
+from gretel_trainer.relational.workflow_state import SyntheticsRun, SyntheticsTrain
 
 logger = logging.getLogger(__name__)
 
@@ -20,34 +21,24 @@ logger = logging.getLogger(__name__)
 class SyntheticsRunTask:
     def __init__(
         self,
-        record_handlers: Dict[str, RecordHandler],
-        lost_contact: List[str],
-        preserved: List[str],
-        missing_model: List[str],
-        record_size_ratio: float,
-        training_columns: Dict[str, List[str]],
-        models: Dict[str, Model],
+        synthetics_run: SyntheticsRun,
+        synthetics_train: SyntheticsTrain,
         run_dir: Path,
         multitable: _MultiTable,
     ):
-        self.record_handlers = record_handlers
-        self.lost_contact = lost_contact
-        self.record_size_ratio = record_size_ratio
-        self.training_columns = training_columns
-        self.models = models
+        self.synthetics_run = synthetics_run
+        self.synthetics_train = synthetics_train
         self.run_dir = run_dir
         self.multitable = multitable
-        self.working_tables = self._setup_working_tables(preserved, missing_model)
+        self.working_tables = self._setup_working_tables()
 
-    def _setup_working_tables(
-        self, preserved: List[str], missing_model: List[str]
-    ) -> Dict[str, Optional[pd.DataFrame]]:
+    def _setup_working_tables(self) -> Dict[str, Optional[pd.DataFrame]]:
         working_tables = {}
 
-        for table in missing_model:
+        for table in self.synthetics_run.missing_model:
             working_tables[table] = None
 
-        for table in preserved:
+        for table in self.synthetics_run.preserved:
             working_tables[table] = self.multitable._strategy.get_preserved_data(
                 table, self.multitable.relational_data
             )
@@ -76,7 +67,7 @@ class SyntheticsRunTask:
 
     @property
     def table_collection(self) -> List[str]:
-        return list(self.record_handlers.keys())
+        return list(self.synthetics_run.record_handlers.keys())
 
     @property
     def artifacts_per_job(self) -> int:
@@ -89,7 +80,7 @@ class SyntheticsRunTask:
         return table in self.working_tables
 
     def get_job(self, table: str) -> Job:
-        return self.record_handlers[table]
+        return self.synthetics_run.record_handlers[table]
 
     def handle_completed(self, table: str, job: Job) -> None:
         record_handler_data = get_record_handler_data(job)
@@ -106,7 +97,7 @@ class SyntheticsRunTask:
         self.multitable._backup()
 
     def handle_lost_contact(self, table: str) -> None:
-        self.lost_contact.append(table)
+        self.synthetics_run.lost_contact.append(table)
         self._fail_table(table)
         self.multitable._backup()
 
@@ -115,7 +106,7 @@ class SyntheticsRunTask:
         in_progress_tables = [
             table
             for table in self._all_tables
-            if _table_is_in_progress(self.record_handlers, table)
+            if _table_is_in_progress(self.synthetics_run.record_handlers, table)
         ]
         finished_tables = [table for table in self.working_tables]
 
@@ -126,7 +117,7 @@ class SyntheticsRunTask:
         for table_name in ready_tables:
             # Any record handlers we created but deferred submitting will continue to register as "ready" until they are actually submitted and become "in progress".
             # This check prevents repeatedly incurring the cost of fetching the job details (and logging duplicatively) while the job is deferred.
-            if self.record_handlers.get(table_name) is not None:
+            if self.synthetics_run.record_handlers.get(table_name) is not None:
                 continue
 
             present_working_tables = {
@@ -138,14 +129,14 @@ class SyntheticsRunTask:
             table_job = self.multitable._strategy.get_generation_job(
                 table_name,
                 self.multitable.relational_data,
-                self.record_size_ratio,
+                self.synthetics_run.record_size_ratio,
                 present_working_tables,
                 self.run_dir,
-                self.training_columns[table_name],
+                self.synthetics_train.training_columns[table_name],
             )
-            model = self.models[table_name]
+            model = self.synthetics_train.models[table_name]
             record_handler = model.create_record_handler_obj(**table_job)
-            self.record_handlers[table_name] = record_handler
+            self.synthetics_run.record_handlers[table_name] = record_handler
             # Attempt starting the record handler right away. If it can't start right at this moment,
             # the regular task runner check will handle starting it when possible.
             start_job_if_possible(

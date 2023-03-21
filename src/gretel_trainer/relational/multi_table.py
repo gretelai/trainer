@@ -465,8 +465,7 @@ class MultiTable:
         self._backup()
 
         task = TransformsTrainTask(
-            models=self._transforms_train.models,
-            lost_contact=self._transforms_train.lost_contact,
+            transforms_train=self._transforms_train,
             multitable=self,
         )
         run_task(task)
@@ -587,8 +586,7 @@ class MultiTable:
         self._backup()
 
         task = SyntheticsTrainTask(
-            models=self._synthetics_train.models,
-            lost_contact=self._synthetics_train.lost_contact,
+            synthetics_train=self._synthetics_train,
             multitable=self,
         )
         run_task(task)
@@ -713,13 +711,8 @@ class MultiTable:
         run_dir = _mkdir(str(self._working_dir / self._synthetics_run.identifier))
 
         task = SyntheticsRunTask(
-            record_handlers=self._synthetics_run.record_handlers,
-            lost_contact=self._synthetics_run.lost_contact,
-            preserved=self._synthetics_run.preserved,
-            missing_model=self._synthetics_run.missing_model,
-            record_size_ratio=self._synthetics_run.record_size_ratio,
-            training_columns=self._synthetics_train.training_columns,
-            models=self._synthetics_train.models,
+            synthetics_run=self._synthetics_run,
+            synthetics_train=self._synthetics_train,
             run_dir=run_dir,
             multitable=self,
         )

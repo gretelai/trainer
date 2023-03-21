@@ -5,17 +5,16 @@ from gretel_client.projects.models import Model
 from gretel_client.projects.projects import Project
 
 from gretel_trainer.relational.tasks.common import _MultiTable
+from gretel_trainer.relational.workflow_state import SyntheticsTrain
 
 
 class SyntheticsTrainTask:
     def __init__(
         self,
-        models: Dict[str, Model],
-        lost_contact: List[str],
+        synthetics_train: SyntheticsTrain,
         multitable: _MultiTable,
     ):
-        self.models = models
-        self.lost_contact = lost_contact
+        self.synthetics_train = synthetics_train
         self.multitable = multitable
         self.completed = []
         self.failed = []
@@ -34,20 +33,20 @@ class SyntheticsTrainTask:
 
     @property
     def table_collection(self) -> List[str]:
-        return list(self.models.keys())
+        return list(self.synthetics_train.models.keys())
 
     @property
     def artifacts_per_job(self) -> int:
         return 1
 
     def more_to_do(self) -> bool:
-        return len(self.completed + self.failed) < len(self.models)
+        return len(self.completed + self.failed) < len(self.synthetics_train.models)
 
     def is_finished(self, table: str) -> bool:
         return table in (self.completed + self.failed)
 
     def get_job(self, table: str) -> Job:
-        return self.models[table]
+        return self.synthetics_train.models[table]
 
     def handle_completed(self, table: str, job: Job) -> None:
         self.completed.append(table)
@@ -56,7 +55,7 @@ class SyntheticsTrainTask:
         self.failed.append(table)
 
     def handle_lost_contact(self, table: str) -> None:
-        self.lost_contact.append(table)
+        self.synthetics_train.lost_contact.append(table)
         self.failed.append(table)
 
     def each_iteration(self) -> None:
