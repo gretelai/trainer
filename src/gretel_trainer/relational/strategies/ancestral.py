@@ -244,12 +244,11 @@ class AncestralStrategy:
         Replaces primary key values with a new, contiguous set of values.
         Replaces synthesized foreign keys with seed primary keys.
         """
-        primary_key = ancestry.get_multigenerational_primary_key(rel_data, table_name)
-        if primary_key is None:
-            return synthetic_table
-
         processed = synthetic_table
-        processed[primary_key] = [i for i in range(len(synthetic_table))]
+
+        primary_key = ancestry.get_multigenerational_primary_key(rel_data, table_name)
+        if primary_key is not None:
+            processed[primary_key] = [i for i in range(len(synthetic_table))]
 
         foreign_key_maps = ancestry.get_ancestral_foreign_key_maps(rel_data, table_name)
         for fk, parent_pk in foreign_key_maps:
