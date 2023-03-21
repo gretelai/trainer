@@ -20,6 +20,14 @@ class TransformsRunTask:
         self.working_tables: Dict[str, Optional[pd.DataFrame]] = {}
 
     @property
+    def output_tables(self) -> Dict[str, pd.DataFrame]:
+        return {
+            table: data
+            for table, data in self.working_tables.items()
+            if data is not None
+        }
+
+    @property
     def action(self) -> str:
         return "transforms run"
 

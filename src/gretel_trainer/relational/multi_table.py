@@ -528,14 +528,8 @@ class MultiTable:
         )
         run_task(task)
 
-        output_tables: Dict[str, pd.DataFrame] = {
-            table: data
-            for table, data in task.working_tables.items()
-            if data is not None
-        }
-
         output_tables = self._strategy.label_encode_keys(
-            self.relational_data, output_tables
+            self.relational_data, task.output_tables
         )
 
         if in_place:
