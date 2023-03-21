@@ -198,43 +198,9 @@ class IndependentStrategy:
         common.download_artifacts(evaluate_model, out_filepath, table_name)
 
         evaluation = evaluations[table_name]
-        evaluation.cross_table_sqs = common.get_sqs_score(evaluate_model)
         evaluation.cross_table_report_json = common.read_report_json_data(
             evaluate_model, out_filepath
         )
-
-    def update_evaluation_via_evaluate(
-        self,
-        evaluation: TableEvaluation,
-        table: str,
-        rel_data: RelationalData,
-        synthetic_tables: Dict[str, pd.DataFrame],
-        target_dir: Path,
-    ) -> None:
-        missing_ancestors = [
-            ancestor
-            for ancestor in rel_data.get_ancestors(table)
-            if ancestor not in synthetic_tables
-        ]
-        if len(missing_ancestors) > 0:
-            logger.info(
-                f"Cannot run cross_table evaluations for `{table}` because no synthetic data exists for ancestor tables {missing_ancestors}."
-            )
-            return None
-
-        source_data = ancestry.get_table_data_with_ancestors(rel_data, table)
-        synth_data = ancestry.get_table_data_with_ancestors(
-            rel_data, table, synthetic_tables
-        )
-
-        logger.info(f"Running cross_table evaluations for `{table}`.")
-        report = common.get_quality_report(
-            source_data=source_data, synth_data=synth_data
-        )
-        out_filepath = target_dir / f"synthetics_cross_table_evaluation_{table}"
-        common.write_report(report, out_filepath)
-
-        evaluation.cross_table_report_json = report.as_dict
 
 
 def _synthesize_primary_keys(

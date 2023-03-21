@@ -310,30 +310,9 @@ class AncestralStrategy:
         common.download_artifacts(evaluate_model, out_filepath, table_name)
 
         evaluation = evaluations[table_name]
-        evaluation.individual_sqs = common.get_sqs_score(evaluate_model)
         evaluation.individual_report_json = common.read_report_json_data(
             evaluate_model, out_filepath
         )
-
-    def update_evaluation_via_evaluate(
-        self,
-        evaluation: TableEvaluation,
-        table: str,
-        rel_data: RelationalData,
-        synthetic_tables: Dict[str, pd.DataFrame],
-        target_dir: Path,
-    ) -> None:
-        source_data = rel_data.get_table_data(table)
-        synth_data = synthetic_tables[table]
-
-        logger.info(f"Running individual evaluations for `{table}`.")
-        report = common.get_quality_report(
-            source_data=source_data, synth_data=synth_data
-        )
-        out_filepath = target_dir / f"synthetics_individual_evaluation_{table}"
-        common.write_report(report, out_filepath)
-
-        evaluation.individual_report_json = report.as_dict
 
 
 def _add_artifical_rows_for_seeding(
