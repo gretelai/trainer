@@ -24,6 +24,7 @@ class InProgress:
     stage: str
     train_secs: Optional[float] = None
     generate_secs: Optional[float] = None
+    synthetic_data: Optional[Path] = None
 
     @property
     def display(self) -> str:
