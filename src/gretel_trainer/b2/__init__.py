@@ -12,28 +12,19 @@ from gretel_trainer.b2.gretel.models import (
     GretelModel,
 )
 
-log_levels = {
-    "gretel_trainer.b2.comparison": "INFO",
-    "gretel_trainer.b2.custom.executor": "INFO",
-    "gretel_trainer.b2.gretel.executor": "INFO",
-}
-
 log_format = "%(levelname)s - %(asctime)s - %(message)s"
 time_format = "%Y-%m-%d %H:%M:%S"
+formatter = logging.Formatter(log_format, time_format)
+handler = logging.StreamHandler()
+handler.setFormatter(formatter)
 
 # Clear out any existing root handlers
 # (This prevents duplicate log output in Colab)
 for root_handler in logging.root.handlers:
     logging.root.removeHandler(root_handler)
 
-# Configure our loggers
-for name, level in log_levels.items():
-    logger = logging.getLogger(name)
-
-    formatter = logging.Formatter(log_format, time_format)
-    handler = logging.StreamHandler()
-    handler.setFormatter(formatter)
-
-    logger.handlers.clear()
-    logger.addHandler(handler)
-    logger.setLevel(level)
+# Configure benchmark loggers
+logger = logging.getLogger("gretel_trainer.b2")
+logger.handlers.clear()
+logger.addHandler(handler)
+logger.setLevel("INFO")
