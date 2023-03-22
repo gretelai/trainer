@@ -13,7 +13,6 @@ from gretel_trainer.b2.core import (
     BenchmarkException,
     Dataset,
     RunIdentifier,
-    Timer,
     run_out_path,
 )
 from gretel_trainer.b2.gretel.models import GretelModel, GretelModelConfig
@@ -58,11 +57,9 @@ class GretelSDKStrategy:
         self.model = self.project.create_model_obj(
             model_config=model_config, data_source=self.dataset.data_source
         )
-        train_time = Timer()
-        with train_time:
-            self.model.submit_cloud()
-            job_status = _await_job(self.model, self.refresh_interval)
-        self.train_time = train_time.duration()
+        self.model.submit_cloud()
+        job_status = _await_job(self.model, self.refresh_interval)
+        self.train_time = _get_duration(self.model)
         if job_status in END_STATES and job_status != Status.COMPLETED:
             raise BenchmarkException("Training failed")
 
@@ -73,11 +70,9 @@ class GretelSDKStrategy:
         self.record_handler = self.model.create_record_handler_obj(
             params={"num_records": self.dataset.row_count}
         )
-        generate_time = Timer()
-        with generate_time:
-            self.record_handler.submit_cloud()
-            job_status = _await_job(self.record_handler, self.refresh_interval)
-        self.generate_time = generate_time.duration()
+        self.record_handler.submit_cloud()
+        job_status = _await_job(self.record_handler, self.refresh_interval)
+        self.generate_time = _get_duration(self.record_handler)
         if job_status == Status.COMPLETED:
             synthetic_data = pd.read_csv(
                 self.record_handler.get_artifact_link("data"), compression="gzip"
@@ -120,6 +115,10 @@ def _await_job(job: Job, refresh_interval: int) -> Status:
             job, failed_refresh_attempts
         )
     return status
+
+
+def _get_duration(job: Job) -> float:
+    return job.billing_details["total_time_seconds"]
 
 
 def _finished(status: Status) -> bool:
