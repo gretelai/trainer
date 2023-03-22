@@ -44,13 +44,20 @@ class GretelSDKStrategy:
 
         self.model: Optional[Model] = None
         self.record_handler: Optional[RecordHandler] = None
-        self.train_time: Optional[float] = None
-        self.generate_time: Optional[float] = None
 
     def _format_model_config(self) -> GretelModelConfig:
         config = read_model_config(self.benchmark_model.config)
         config["name"] = str(self.run_identifier)
         return config
+
+    def runnable(self, dataset: Dataset) -> bool:
+        return self.benchmark_model.runnable(dataset)
+
+    def get_train_time(self) -> Optional[float]:
+        return _get_duration(self.model)
+
+    def get_generate_time(self) -> Optional[float]:
+        return _get_duration(self.record_handler)
 
     def train(self) -> None:
         model_config = self._format_model_config()
@@ -59,12 +66,11 @@ class GretelSDKStrategy:
         )
         self.model.submit_cloud()
         job_status = _await_job(self.model, self.refresh_interval)
-        self.train_time = _get_duration(self.model)
         if job_status in END_STATES and job_status != Status.COMPLETED:
             raise BenchmarkException("Training failed")
 
-    def generate(self) -> Path:
-        if self.model is None or self.train_time is None:
+    def generate(self) -> None:
+        if self.model is None:
             raise BenchmarkException("Cannot generate before training")
 
         self.record_handler = self.model.create_record_handler_obj(
@@ -72,14 +78,12 @@ class GretelSDKStrategy:
         )
         self.record_handler.submit_cloud()
         job_status = _await_job(self.record_handler, self.refresh_interval)
-        self.generate_time = _get_duration(self.record_handler)
         if job_status == Status.COMPLETED:
             synthetic_data = pd.read_csv(
                 self.record_handler.get_artifact_link("data"), compression="gzip"
             )
             out_path = run_out_path(self.working_dir, self.run_identifier)
             synthetic_data.to_csv(out_path, index=False)
-            return out_path
         else:
             raise BenchmarkException("Generate failed")
 

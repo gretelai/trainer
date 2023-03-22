@@ -38,8 +38,17 @@ class GretelTrainerStrategy:
         self.working_dir = working_dir
 
         self.trainer: Optional[Trainer] = None
-        self.train_time: Optional[float] = None
-        self.generate_time: Optional[float] = None
+        self.train_timer: Optional[Timer] = None
+        self.generate_timer: Optional[Timer] = None
+
+    def runnable(self, dataset: Dataset) -> bool:
+        return self.benchmark_model.runnable(dataset)
+
+    def get_train_time(self) -> Optional[float]:
+        return _get_duration(self.train_timer)
+
+    def get_generate_time(self) -> Optional[float]:
+        return _get_duration(self.generate_timer)
 
     def train(self) -> None:
         self.trainer = Trainer(
@@ -47,34 +56,29 @@ class GretelTrainerStrategy:
             model_type=self.benchmark_model.trainer_model_type,
             cache_file=self.working_dir / f"{self.run_identifier}.json",
         )
-        train_time = Timer()
-        try:
-            with train_time:
-                data_source = self.dataset.data_source
-                self.trainer.train(self.dataset.data_source)
-            self.train_time = train_time.duration()
-        except Exception as e:
-            raise BenchmarkException("Training failed") from e
+        self.train_timer = Timer()
+        with self.train_timer:
+            self.trainer.train(self.dataset.data_source)
 
-    def generate(self) -> Path:
-        if self.trainer is None or self.train_time is None:
+    def generate(self) -> None:
+        if self.trainer is None:
             raise BenchmarkException("Cannot generate before training")
 
-        generate_time = Timer()
-        try:
-            with generate_time:
-                synthetic_data = self.trainer.generate(
-                    num_records=self.dataset.row_count
-                )
-            self.generate_time = generate_time.duration()
-            out_path = run_out_path(self.working_dir, self.run_identifier)
-            synthetic_data.to_csv(out_path, index=False)
-            return out_path
-        except Exception as e:
-            raise BenchmarkException("Generate failed") from e
+        self.generate_timer = Timer()
+        with self.generate_timer:
+            synthetic_data = self.trainer.generate(num_records=self.dataset.row_count)
+        out_path = run_out_path(self.working_dir, self.run_identifier)
+        synthetic_data.to_csv(out_path, index=False)
 
     def get_sqs_score(self) -> int:
         if self.trainer is None:
             raise BenchmarkException("Cannot get SQS score before training")
 
         return self.trainer.get_sqs_score()
+
+
+def _get_duration(timer: Optional[Timer]) -> Optional[float]:
+    if timer is None:
+        return None
+    else:
+        return timer.duration()

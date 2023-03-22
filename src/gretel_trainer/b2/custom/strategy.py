@@ -1,6 +1,12 @@
 from typing import Optional
 
-from gretel_trainer.b2.core import BenchmarkConfig, Dataset, run_out_path, RunIdentifier, Timer
+from gretel_trainer.b2.core import (
+    BenchmarkConfig,
+    Dataset,
+    RunIdentifier,
+    Timer,
+    run_out_path,
+)
 from gretel_trainer.b2.custom.models import CustomModel
 
 

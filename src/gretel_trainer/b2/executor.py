@@ -3,12 +3,7 @@ from multiprocessing.managers import DictProxy
 from pathlib import Path
 from typing import Optional, Protocol
 
-from gretel_trainer.b2.core import (
-    BenchmarkConfig,
-    Dataset,
-    RunIdentifier,
-    run_out_path,
-)
+from gretel_trainer.b2.core import BenchmarkConfig, Dataset, RunIdentifier, run_out_path
 from gretel_trainer.b2.status import (
     Completed,
     Failed,
@@ -45,12 +40,14 @@ class Executor:
     def __init__(
         self,
         strategy: Strategy,
+        model_name: str,
         dataset: Dataset,
         run_identifier: RunIdentifier,
         statuses: DictProxy,
         config: BenchmarkConfig,
     ):
         self.strategy = strategy
+        self.model_name = model_name
         self.dataset = dataset
         self.run_identifier = run_identifier
         self.statuses = statuses
@@ -119,9 +116,7 @@ class Executor:
         if isinstance(self.status, (Skipped, Failed)):
             return None
 
-        logger.info(
-            f"Starting evaluation for run `{self.run_identifier}`"
-        )
+        logger.info(f"Starting evaluation for run `{self.run_identifier}`")
         self.set_status(
             InProgress(
                 stage="evaluate",
@@ -142,9 +137,7 @@ class Executor:
                 )
             )
         except Exception as e:
-            logger.info(
-                f"Evaluation failed for run `{self.run_identifier}`"
-            )
+            logger.info(f"Evaluation failed for run `{self.run_identifier}`")
             self.set_status(
                 Failed(
                     during="evaluate",

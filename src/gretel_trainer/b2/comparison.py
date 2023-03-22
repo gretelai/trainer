@@ -11,7 +11,7 @@ from typing import Any, Dict, List, Optional, Tuple, Type, Union
 import pandas as pd
 from gretel_client import configure_session
 from gretel_client.helpers import poll
-from gretel_client.projects import create_project, search_projects
+from gretel_client.projects import Project, create_project, search_projects
 from gretel_client.projects.jobs import Job
 
 from gretel_trainer.b2.core import (
@@ -21,11 +21,12 @@ from gretel_trainer.b2.core import (
     RunIdentifier,
 )
 from gretel_trainer.b2.custom.datasets import CustomDataset
-from gretel_trainer.b2.custom.executor import CustomExecutor
 from gretel_trainer.b2.custom.models import CustomModel
+from gretel_trainer.b2.custom.strategy import CustomStrategy
+from gretel_trainer.b2.executor import Executor
 from gretel_trainer.b2.gretel.datasets import GretelDataset
-from gretel_trainer.b2.gretel.executor import GretelExecutor
 from gretel_trainer.b2.gretel.models import GretelAuto, GretelModel
+from gretel_trainer.b2.gretel.strategy_sdk import GretelSDKStrategy
 from gretel_trainer.b2.gretel.strategy_trainer import GretelTrainerStrategy
 from gretel_trainer.b2.status import Completed, Failed, InProgress
 
@@ -34,7 +35,6 @@ logger = logging.getLogger(__name__)
 
 DatasetTypes = Union[CustomDataset, GretelDataset]
 ModelTypes = Union[Type[CustomModel], Type[GretelModel]]
-Executor = Union[CustomExecutor, GretelExecutor]
 
 
 def compare(
@@ -93,7 +93,7 @@ class Comparison:
             )
 
     def execute(self) -> Comparison:
-        custom_executors: List[CustomExecutor] = []
+        custom_executors: List[Executor] = []
         for dataset in self.datasets:
             for model in self.gretel_models:
                 self._setup_gretel_run(dataset, model)
@@ -122,12 +122,9 @@ class Comparison:
     def _get_gretel_job(self, model: str, dataset: str, action: str) -> Job:
         run_id = RunIdentifier((model, dataset))
         executor = self.executors[run_id]
-        if not isinstance(executor, GretelExecutor):
-            raise BenchmarkException("Cannot get Gretel job for non-Gretel model runs")
-
-        strategy = executor._strategy
-        if isinstance(strategy, GretelTrainerStrategy):
-            raise BenchmarkException("Cannot get Gretel job when using Trainer")
+        strategy = executor.strategy
+        if not isinstance(strategy, GretelSDKStrategy):
+            raise BenchmarkException("Cannot get Gretel job for non-GretelSDK runs")
 
         if action == "train":
             job = strategy.model
@@ -187,13 +184,20 @@ class Comparison:
     def _setup_gretel_run(self, dataset: Dataset, model: GretelModel) -> None:
         run_identifier = RunIdentifier((model.name, dataset.name))
         logger.info(f"Queueing run `{run_identifier}`")
-        executor = GretelExecutor(
+        strategy = _set_gretel_strategy(
             benchmark_model=model,
+            dataset=dataset,
+            run_identifier=run_identifier,
+            config=self.config,
+            project=self._project,
+        )
+        executor = Executor(
+            strategy=strategy,
+            model_name=model.name,
             dataset=dataset,
             run_identifier=run_identifier,
             statuses=self.run_statuses,
             config=self.config,
-            project=self._project,
         )
         self.executors[run_identifier] = executor
         self.futures.append(self.thread_pool.submit(_run_gretel, executor))
@@ -202,29 +206,35 @@ class Comparison:
         self,
         dataset: Dataset,
         model_type: Type[CustomModel],
-        collection: List[CustomExecutor],
+        collection: List[Executor],
     ) -> None:
         model_name = model_type.__name__
         run_identifier = RunIdentifier((model_name, dataset.name))
         logger.info(f"Queueing run `{run_identifier}`")
-        executor = CustomExecutor(
+        strategy = CustomStrategy(
             model=model_type(),
+            dataset=dataset,
+            run_identifier=run_identifier,
+            config=self.config,
+        )
+        executor = Executor(
+            strategy=strategy,
             model_name=model_name,
             dataset=dataset,
             run_identifier=run_identifier,
-            working_dir=self.config.working_dir,
             statuses=self.run_statuses,
+            config=self.config,
         )
         self.executors[run_identifier] = executor
         collection.append(executor)
 
 
-def _run_gretel(executor: GretelExecutor) -> None:
+def _run_gretel(executor: Executor) -> None:
     executor.train()
     executor.generate()
 
 
-def _run_custom(executors: List[CustomExecutor]) -> None:
+def _run_custom(executors: List[Executor]) -> None:
     for executor in executors:
         executor.train()
         executor.generate()
@@ -277,3 +287,29 @@ def _validate_sdk_setup(gretel_models: List[GretelModel]) -> None:
             "Either remove it from this comparison, or configure this comparison to use Trainer (trainer=True)"
         )
         raise BenchmarkException("Invalid configuration")
+
+
+def _set_gretel_strategy(
+    benchmark_model: GretelModel,
+    dataset: Dataset,
+    run_identifier: RunIdentifier,
+    config: BenchmarkConfig,
+    project: Optional[Project],
+) -> Union[GretelSDKStrategy, GretelTrainerStrategy]:
+    if config.trainer:
+        return GretelTrainerStrategy(
+            benchmark_model=benchmark_model,
+            dataset=dataset,
+            run_identifier=run_identifier,
+            project_prefix=config.trainer_project_prefix,
+            working_dir=config.working_dir,
+        )
+    else:
+        return GretelSDKStrategy(
+            benchmark_model=benchmark_model,
+            dataset=dataset,
+            run_identifier=run_identifier,
+            project=project,
+            refresh_interval=config.refresh_interval,
+            working_dir=config.working_dir,
+        )
