@@ -244,12 +244,11 @@ class AncestralStrategy:
         Replaces primary key values with a new, contiguous set of values.
         Replaces synthesized foreign keys with seed primary keys.
         """
-        primary_key = ancestry.get_multigenerational_primary_key(rel_data, table_name)
-        if primary_key is None:
-            return synthetic_table
-
         processed = synthetic_table
-        processed[primary_key] = [i for i in range(len(synthetic_table))]
+
+        primary_key = ancestry.get_multigenerational_primary_key(rel_data, table_name)
+        if primary_key is not None:
+            processed[primary_key] = [i for i in range(len(synthetic_table))]
 
         foreign_key_maps = ancestry.get_ancestral_foreign_key_maps(rel_data, table_name)
         for fk, parent_pk in foreign_key_maps:
@@ -287,25 +286,32 @@ class AncestralStrategy:
             model, out_filepath
         )
 
-    def update_evaluation_via_evaluate(
+    def get_evaluate_model_data(
         self,
-        evaluation: TableEvaluation,
-        table: str,
+        table_name: str,
         rel_data: RelationalData,
         synthetic_tables: Dict[str, pd.DataFrame],
-        target_dir: Path,
+    ) -> Optional[Dict[str, pd.DataFrame]]:
+        return {
+            "source": rel_data.get_table_data(table_name),
+            "synthetic": synthetic_tables[table_name],
+        }
+
+    def update_evaluation_from_evaluate(
+        self,
+        table_name: str,
+        evaluations: Dict[str, TableEvaluation],
+        evaluate_model: Model,
+        working_dir: Path,
     ) -> None:
-        source_data = rel_data.get_table_data(table)
-        synth_data = synthetic_tables[table]
+        logger.info(f"Downloading individual evaluation reports for `{table_name}`.")
+        out_filepath = working_dir / f"synthetics_individual_evaluation_{table_name}"
+        common.download_artifacts(evaluate_model, out_filepath, table_name)
 
-        logger.info(f"Running individual evaluations for `{table}`.")
-        report = common.get_quality_report(
-            source_data=source_data, synth_data=synth_data
+        evaluation = evaluations[table_name]
+        evaluation.individual_report_json = common.read_report_json_data(
+            evaluate_model, out_filepath
         )
-        out_filepath = target_dir / f"synthetics_individual_evaluation_{table}"
-        common.write_report(report, out_filepath)
-
-        evaluation.individual_report_json = report.as_dict
 
 
 def _add_artifical_rows_for_seeding(

@@ -1,7 +1,6 @@
 import sqlite3
-import tempfile
 from pathlib import Path
-from typing import List, Tuple
+from typing import Tuple
 from unittest.mock import Mock, patch
 
 import pandas as pd

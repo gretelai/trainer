@@ -4,9 +4,7 @@ from pathlib import Path
 from typing import Dict, Optional, Set, Tuple
 
 import pandas as pd
-import requests
 import smart_open
-from gretel_client.evaluation.quality_report import QualityReport
 from gretel_client.projects.models import Model
 from sklearn import preprocessing
 
@@ -14,24 +12,6 @@ from gretel_trainer.relational.core import RelationalData
 from gretel_trainer.relational.sdk_extras import download_file_artifact
 
 logger = logging.getLogger(__name__)
-
-
-def get_quality_report(
-    source_data: pd.DataFrame, synth_data: pd.DataFrame
-) -> QualityReport:
-    report = QualityReport(data_source=synth_data, ref_data=source_data)
-    report.run()
-    return report
-
-
-def write_report(report: QualityReport, out_filepath: Path) -> None:
-    html_path = f"{out_filepath}.html"
-    json_path = f"{out_filepath}.json"
-
-    with open(html_path, "w") as f:
-        f.write(report.as_html)
-    with open(json_path, "w") as f:
-        f.write(json.dumps(report.as_dict))
 
 
 def download_artifacts(model: Model, out_filepath: Path, table_name: str) -> None:

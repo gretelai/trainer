@@ -160,38 +160,47 @@ class IndependentStrategy:
             model, out_filepath
         )
 
-    def update_evaluation_via_evaluate(
+    def get_evaluate_model_data(
         self,
-        evaluation: TableEvaluation,
-        table: str,
+        table_name: str,
         rel_data: RelationalData,
         synthetic_tables: Dict[str, pd.DataFrame],
-        target_dir: Path,
-    ) -> None:
+    ) -> Optional[Dict[str, pd.DataFrame]]:
         missing_ancestors = [
             ancestor
-            for ancestor in rel_data.get_ancestors(table)
+            for ancestor in rel_data.get_ancestors(table_name)
             if ancestor not in synthetic_tables
         ]
         if len(missing_ancestors) > 0:
             logger.info(
-                f"Cannot run cross_table evaluations for `{table}` because no synthetic data exists for ancestor tables {missing_ancestors}."
+                f"Cannot run cross_table evaluations for `{table_name}` because no synthetic data exists for ancestor tables {missing_ancestors}."
             )
             return None
 
-        source_data = ancestry.get_table_data_with_ancestors(rel_data, table)
-        synth_data = ancestry.get_table_data_with_ancestors(
-            rel_data, table, synthetic_tables
+        source_data = ancestry.get_table_data_with_ancestors(rel_data, table_name)
+        synthetic_data = ancestry.get_table_data_with_ancestors(
+            rel_data, table_name, synthetic_tables
         )
+        return {
+            "source": source_data,
+            "synthetic": synthetic_data,
+        }
 
-        logger.info(f"Running cross_table evaluations for `{table}`.")
-        report = common.get_quality_report(
-            source_data=source_data, synth_data=synth_data
+    def update_evaluation_from_evaluate(
+        self,
+        table_name: str,
+        evaluations: Dict[str, TableEvaluation],
+        evaluate_model: Model,
+        working_dir: Path,
+    ) -> None:
+        logger.info(f"Downloading cross table evaluation reports for `{table_name}`.")
+        out_filepath = working_dir / f"synthetics_cross_table_evaluation_{table_name}"
+        common.download_artifacts(evaluate_model, out_filepath, table_name)
+
+        evaluation = evaluations[table_name]
+        evaluation.cross_table_report_json = common.read_report_json_data(
+            evaluate_model, out_filepath
         )
-        out_filepath = target_dir / f"synthetics_cross_table_evaluation_{table}"
-        common.write_report(report, out_filepath)
-
-        evaluation.cross_table_report_json = report.as_dict
 
 
 def _synthesize_primary_keys(

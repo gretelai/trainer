@@ -14,6 +14,12 @@ def _model_name(workflow: str, table: str) -> str:
     return f"{workflow}-{ok_table_name}"
 
 
+def make_evaluate_config(table: str) -> Dict[str, Any]:
+    tailored_config = read_model_config("evaluate/default")
+    tailored_config["name"] = _model_name("evaluate", table)
+    return tailored_config
+
+
 def make_synthetics_config(table: str, config: GretelModelConfig) -> Dict[str, Any]:
     tailored_config = read_model_config(config)
     tailored_config["name"] = _model_name("synthetics", table)
