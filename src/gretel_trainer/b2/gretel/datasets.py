@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import json
 from dataclasses import dataclass, field
-from functools import wraps
+from functools import cached_property, wraps
 from typing import Dict, List, Optional, Tuple, Union
 
 import boto3
@@ -18,27 +18,23 @@ class GretelDataset:
         self.name = name
         self.datatype = datatype
         self.tags = tags
-        self._row_count: Optional[int] = None
-        self._column_count: Optional[int] = None
 
-    @property
+    @cached_property
     def data_source(self) -> str:
         return f"https://gretel-datasets.s3.amazonaws.com/{self.name}/data.csv"
 
-    @property
+    @cached_property
     def row_count(self) -> int:
-        return self._shape()[0]
+        return self._shape[0]
 
-    @property
+    @cached_property
     def column_count(self) -> int:
-        return self._shape()[1]
+        return self._shape[1]
 
+    @cached_property
     def _shape(self) -> Tuple[int, int]:
-        if self._row_count is None or self._column_count is None:
-            df = pd.read_csv(self.data_source)
-            self._row_count = df.shape[0]
-            self._column_count = df.shape[1]
-        return self._row_count, self._column_count
+        df = pd.read_csv(self.data_source)
+        return df.shape
 
     def __repr__(self) -> str:
         return f"GretelDataset(name={self.name}, datatype={self.datatype})"
