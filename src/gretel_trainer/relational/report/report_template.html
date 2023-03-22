@@ -58,7 +58,7 @@
       <h2>Table Relationships</h2>
 
       <p>
-        The primary and foreign keys for each table in the synthesized database and their 
+        The primary and foreign keys for each table in the synthesized database and their
         relationships are displayed below.
       </p>
 
@@ -85,18 +85,18 @@
     <section class="break test-sqs-results">
       <h2>Synthetic Data Quality Results</h2>
 
-      <p>For each table, individual and cross-table Gretel Synthetic Reports are generated, which 
+      <p>For each table, individual and cross-table Gretel Synthetic Reports are generated, which
         include the Synthetic Data
-      Quality Score (SQS). The individual Synthetic Report evaluates the statistical accuracy of the 
+      Quality Score (SQS). The individual Synthetic Report evaluates the statistical accuracy of the
       individual synthetic table compared to the real world data that it is
       based on. This provides insight into the accuracy of the synthetic output of the stand-alone
-      table. The individual SQS does not take into account statistical correlations of data across 
+      table. The individual SQS does not take into account statistical correlations of data across
       related tables. The
-      cross-table Synthetic Report evaluates the statistical accuracy of the synthetic data of a 
+      cross-table Synthetic Report evaluates the statistical accuracy of the synthetic data of a
       table with consideration to the
-      correlations between data across related tables. The cross-table SQS provides insight into 
+      correlations between data across related tables. The cross-table SQS provides insight into
       the accuracy of the
-      table in the context of the database as a whole. More information about the Gretel Synthetic 
+      table in the context of the database as a whole. More information about the Gretel Synthetic
       Report and Synthetic Data Quality Score is
       available <a href="https://docs.gretel.ai/reference/synthetics/gretel-synthetic-report">here</a>.</p>
 
@@ -111,12 +111,14 @@
             <th scope="col">Cross-table SQS</th>
           </tr>
           {% for table, evaluation in presenter.evaluations.items() %}
+          {% set individual_grade = presenter.sqs_score_to_grade(evaluation.individual_sqs) %}
+          {% set cross_table_grade = presenter.sqs_score_to_grade(evaluation.cross_table_sqs) %}
           <tr>
             <td><b>{{ table }}</b></td>
             <td>
               <span class="sqs-table-score">{{ evaluation.individual_sqs }}</span>
-              <span class="label label__{{ presenter.sqs_score_to_grade(evaluation.individual_sqs).lower().replace(' ', '-') }}">
-                {{ presenter.sqs_score_to_grade(evaluation.individual_sqs) }}
+              <span class="label label__{{ presenter.css_label_format(individual_grade) }}">
+                {{ individual_grade }}
               </span>
               <span class="sqs-table-link">
                 <a href="synthetics_individual_evaluation_{{ table }}.html">Report</a>
@@ -124,8 +126,8 @@
             </td>
             <td>
               <span class="sqs-table-score">{{ evaluation.cross_table_sqs }}</span>
-              <span class="label label__{{ presenter.sqs_score_to_grade(evaluation.cross_table_sqs).lower().replace(' ', '-') }}">
-                {{ presenter.sqs_score_to_grade(evaluation.cross_table_sqs) }}
+              <span class="label label__{{ presenter.css_label_format(cross_table_grade) }}">
+                {{ cross_table_grade }}
               </span>
               <span class="sqs-table-link">
                 <a href="synthetics_cross_table_evaluation_{{ table }}.html">Report</a>
@@ -135,15 +137,15 @@
           {% endfor %}
         </table>
 
-        <p> The Synthetic Data Quality Score is an estimate of how well the generated synthetic 
-            data maintains the same statistical properties as the original dataset. In this 
-            sense, the Synthetic Data Quality Score can be viewed as a utility score or a 
-            confidence score as to whether scientific conclusions drawn from the synthetic 
-            dataset would be the same if one were to have used the original dataset instead. 
-            If you do not require statistical symmetry, as might be the case in a testing or 
+        <p> The Synthetic Data Quality Score is an estimate of how well the generated synthetic
+            data maintains the same statistical properties as the original dataset. In this
+            sense, the Synthetic Data Quality Score can be viewed as a utility score or a
+            confidence score as to whether scientific conclusions drawn from the synthetic
+            dataset would be the same if one were to have used the original dataset instead.
+            If you do not require statistical symmetry, as might be the case in a testing or
             demo environment, a lower score may be just as acceptable.</p>
-        <p> If your Synthetic Data Quality Score isn't as high as you'd like it to be, 
-            read <a href="https://docs.gretel.ai/reference/synthetics/tips-improve-synthetic-data-accuracy">here</a> 
+        <p> If your Synthetic Data Quality Score isn't as high as you'd like it to be,
+            read <a href="https://docs.gretel.ai/reference/synthetics/tips-improve-synthetic-data-accuracy">here</a>
             for a multitude of ideas for improving your model.</p>
 
     </section>
