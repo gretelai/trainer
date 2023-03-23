@@ -135,7 +135,6 @@ class Executor:
                 stage="evaluating",
                 train_secs=self.strategy.get_train_time(),
                 generate_secs=self.strategy.get_generate_time(),
-                synthetic_data=self._synthetic_data_path,
             )
         )
 
@@ -149,7 +148,6 @@ class Executor:
                     sqs=sqs,
                     train_secs=self.strategy.get_train_time(),
                     generate_secs=self.strategy.get_generate_time(),
-                    synthetic_data=self._synthetic_data_path,
                 )
             )
         except Exception as e:
@@ -160,10 +158,5 @@ class Executor:
                     error=e,
                     train_secs=self.strategy.get_train_time(),
                     generate_secs=self.strategy.get_generate_time(),
-                    synthetic_data=self._synthetic_data_path,
                 )
             )
-
-    @property
-    def _synthetic_data_path(self) -> Path:
-        return run_out_path(self.config.working_dir, self.run_identifier)
