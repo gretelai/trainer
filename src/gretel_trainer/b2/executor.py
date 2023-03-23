@@ -65,11 +65,17 @@ class Executor:
             return None
 
         logger.info(f"Starting model training for run `{self.run_identifier}`")
-        self.set_status(InProgress(stage="train"))
+        self.set_status(InProgress(stage="training"))
         try:
             self.strategy.train()
             logger.info(
                 f"Training completed successfully for run `{self.run_identifier}`"
+            )
+            self.set_status(
+                InProgress(
+                    stage="trained",
+                    train_secs=self.strategy.get_train_time(),
+                )
             )
         except Exception as e:
             logger.info(f"Training failed for run `{self.run_identifier}`")
@@ -90,7 +96,7 @@ class Executor:
         )
         self.set_status(
             InProgress(
-                stage="generate",
+                stage="generating",
                 train_secs=self.strategy.get_train_time(),
             )
         )
@@ -98,6 +104,13 @@ class Executor:
             self.strategy.generate()
             logger.info(
                 f"Synthetic data generation completed successfully for run `{self.run_identifier}`"
+            )
+            self.set_status(
+                InProgress(
+                    stage="generated",
+                    train_secs=self.strategy.get_train_time(),
+                    generate_secs=self.strategy.get_generate_time(),
+                )
             )
         except Exception as e:
             logger.info(
@@ -119,7 +132,7 @@ class Executor:
         logger.info(f"Starting evaluation for run `{self.run_identifier}`")
         self.set_status(
             InProgress(
-                stage="evaluate",
+                stage="evaluating",
                 train_secs=self.strategy.get_train_time(),
                 generate_secs=self.strategy.get_generate_time(),
                 synthetic_data=self._synthetic_data_path,
@@ -128,6 +141,9 @@ class Executor:
 
         try:
             sqs = self.strategy.get_sqs_score()
+            logger.info(
+                f"Evaluation completed successfully for run `{self.run_identifier}`"
+            )
             self.set_status(
                 Completed(
                     sqs=sqs,
