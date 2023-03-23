@@ -65,27 +65,16 @@ class Executor:
             return None
 
         logger.info(f"Starting model training for run `{self.run_identifier}`")
-        self.set_status(InProgress(stage="training"))
+        self._in_progress("training")
         try:
             self.strategy.train()
             logger.info(
                 f"Training completed successfully for run `{self.run_identifier}`"
             )
-            self.set_status(
-                InProgress(
-                    stage="trained",
-                    train_secs=self.strategy.get_train_time(),
-                )
-            )
+            self._in_progress("trained")
         except Exception as e:
             logger.info(f"Training failed for run `{self.run_identifier}`")
-            self.set_status(
-                Failed(
-                    during="train",
-                    error=e,
-                    train_secs=self.strategy.get_train_time(),
-                )
-            )
+            self._failed("train", e)
 
     def generate(self) -> None:
         if isinstance(self.status, (Skipped, Failed)):
@@ -94,49 +83,25 @@ class Executor:
         logger.info(
             f"Starting synthetic data generation for run `{self.run_identifier}`"
         )
-        self.set_status(
-            InProgress(
-                stage="generating",
-                train_secs=self.strategy.get_train_time(),
-            )
-        )
+        self._in_progress("generating")
         try:
             self.strategy.generate()
             logger.info(
                 f"Synthetic data generation completed successfully for run `{self.run_identifier}`"
             )
-            self.set_status(
-                InProgress(
-                    stage="generated",
-                    train_secs=self.strategy.get_train_time(),
-                    generate_secs=self.strategy.get_generate_time(),
-                )
-            )
+            self._in_progress("generated")
         except Exception as e:
             logger.info(
                 f"Synthetic data generation failed for run `{self.run_identifier}`"
             )
-            self.set_status(
-                Failed(
-                    during="generate",
-                    error=e,
-                    train_secs=self.strategy.get_train_time(),
-                    generate_secs=self.strategy.get_generate_time(),
-                )
-            )
+            self._failed("generate", e)
 
     def evaluate(self) -> None:
         if isinstance(self.status, (Skipped, Failed)):
             return None
 
         logger.info(f"Starting evaluation for run `{self.run_identifier}`")
-        self.set_status(
-            InProgress(
-                stage="evaluating",
-                train_secs=self.strategy.get_train_time(),
-                generate_secs=self.strategy.get_generate_time(),
-            )
-        )
+        self._in_progress("evaluating")
 
         try:
             sqs = self.strategy.get_sqs_score()
@@ -152,11 +117,23 @@ class Executor:
             )
         except Exception as e:
             logger.info(f"Evaluation failed for run `{self.run_identifier}`")
-            self.set_status(
-                Failed(
-                    during="evaluate",
-                    error=e,
-                    train_secs=self.strategy.get_train_time(),
-                    generate_secs=self.strategy.get_generate_time(),
-                )
+            self._failed("evaluate", e)
+
+    def _in_progress(self, stage: str) -> None:
+        self.set_status(
+            InProgress(
+                stage=stage,
+                train_secs=self.strategy.get_train_time(),
+                generate_secs=self.strategy.get_generate_time(),
             )
+        )
+
+    def _failed(self, during: str, error: Exception) -> None:
+        self.set_status(
+            Failed(
+                during=during,
+                error=error,
+                train_secs=self.strategy.get_train_time(),
+                generate_secs=self.strategy.get_generate_time(),
+            )
+        )
