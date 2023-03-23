@@ -2,11 +2,11 @@ from __future__ import annotations
 
 import logging
 import multiprocessing as mp
-from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import Future, ThreadPoolExecutor
 from datetime import datetime
 from multiprocessing.managers import DictProxy
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple, Type, Union
+from typing import Any, Dict, List, Literal, Optional, Type, Union
 
 import pandas as pd
 from gretel_client import configure_session
@@ -79,7 +79,7 @@ class Comparison:
         ]
         self.executors: Dict[RunIdentifier, Executor] = {}
         self.thread_pool = ThreadPoolExecutor(5)
-        self.futures = []
+        self.futures: Dict[Union[RunIdentifier, Literal["custom"]], Future] = {}
         self._manager = mp.Manager()
         # Cannot type-hint more specifically than DictProxy,
         # but this functions as a Dict[RunIdentifier, RunStatus]
@@ -99,7 +99,7 @@ class Comparison:
                 self._setup_gretel_run(dataset, model)
             for model_type in self.custom_models:
                 self._setup_custom_run(dataset, model_type, custom_executors)
-        self.futures.append(self.thread_pool.submit(_run_custom, custom_executors))
+        self.futures["custom"] = self.thread_pool.submit(_run_custom, custom_executors)
         return self
 
     @property
@@ -108,8 +108,13 @@ class Comparison:
         return pd.DataFrame.from_records(result_records)
 
     def wait(self) -> Comparison:
-        [future.result() for future in self.futures]
+        [future.result() for future in self.futures.values()]
         return self
+
+    def whats_happening(self) -> Dict[str, str]:
+        return {
+            str(key): self._basic_status(future) for key, future in self.futures.items()
+        }
 
     def poll_job(self, model: str, dataset: str, action: str):
         job = self._get_gretel_job(model, dataset, action)
@@ -200,7 +205,7 @@ class Comparison:
             config=self.config,
         )
         self.executors[run_identifier] = executor
-        self.futures.append(self.thread_pool.submit(_run_gretel, executor))
+        self.futures[run_identifier] = self.thread_pool.submit(_run_gretel, executor)
 
     def _setup_custom_run(
         self,
@@ -227,6 +232,14 @@ class Comparison:
         )
         self.executors[run_identifier] = executor
         collection.append(executor)
+
+    def _basic_status(self, future: Future) -> str:
+        if future.done():
+            return "Finished"
+        elif future.cancelled():
+            return "Cancelled"
+        else:
+            return "Running"
 
 
 def _run_gretel(executor: Executor) -> None:

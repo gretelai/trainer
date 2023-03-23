@@ -30,7 +30,6 @@ A v2 rewrite of Benchmark.
 
 ## TODOs
 
-- Method to ask "is anything still happening?" (and ideally "if so, what exactly?") (because the logging has become so sparse now, and unlike relational we don't get "check-in" updates)
 - Nicole: downstream evaluations
 - Sami: resume functionality
 - Sami: skip SQS and data preview when training, and instead always run Evaluate afterwards (improves training time + is more accurate for Trainer models than average SQS from N models)
