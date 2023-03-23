@@ -121,8 +121,11 @@ def _await_job(job: Job, refresh_interval: int) -> Status:
     return status
 
 
-def _get_duration(job: Job) -> float:
-    return job.billing_details["total_time_seconds"]
+def _get_duration(job: Optional[Job]) -> Optional[float]:
+    if job is None:
+        return None
+    else:
+        return job.billing_details["total_time_seconds"]
 
 
 def _finished(status: Status) -> bool:
