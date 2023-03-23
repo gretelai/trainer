@@ -232,12 +232,14 @@ class Comparison:
 def _run_gretel(executor: Executor) -> None:
     executor.train()
     executor.generate()
+    executor.evaluate()
 
 
 def _run_custom(executors: List[Executor]) -> None:
     for executor in executors:
         executor.train()
         executor.generate()
+        executor.evaluate()
 
 
 def _make_dataset(dataset: DatasetTypes, working_dir: Path) -> Dataset:
