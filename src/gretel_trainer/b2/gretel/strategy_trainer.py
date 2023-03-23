@@ -1,4 +1,3 @@
-from multiprocessing.managers import DictProxy
 from pathlib import Path
 from typing import Optional
 
@@ -13,13 +12,6 @@ from gretel_trainer.b2.core import (
     run_out_path,
 )
 from gretel_trainer.b2.gretel.models import GretelModel
-from gretel_trainer.b2.status import (
-    Completed,
-    Failed,
-    InProgress,
-    NotStarted,
-    RunStatus,
-)
 
 
 class GretelTrainerStrategy:

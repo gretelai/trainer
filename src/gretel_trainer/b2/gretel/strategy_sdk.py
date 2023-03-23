@@ -1,7 +1,6 @@
 import time
-from multiprocessing.managers import DictProxy
 from pathlib import Path
-from typing import Callable, Optional, Tuple
+from typing import Optional, Tuple
 
 import pandas as pd
 from gretel_client.projects.jobs import END_STATES, Job, Status
@@ -16,13 +15,6 @@ from gretel_trainer.b2.core import (
     run_out_path,
 )
 from gretel_trainer.b2.gretel.models import GretelModel, GretelModelConfig
-from gretel_trainer.b2.status import (
-    Completed,
-    Failed,
-    InProgress,
-    NotStarted,
-    RunStatus,
-)
 
 
 class GretelSDKStrategy:
