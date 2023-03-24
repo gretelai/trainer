@@ -1,10 +1,8 @@
-import json
 import logging
 from pathlib import Path
 from typing import Any, Dict, Optional, Tuple
 
 import pandas as pd
-import smart_open
 from gretel_client.projects.jobs import ACTIVE_STATES, END_STATES, Job, Status
 from gretel_client.projects.models import Model, read_model_config
 from gretel_client.projects.projects import Project
@@ -18,7 +16,7 @@ from gretel_trainer.b2.core import (
     run_out_path,
 )
 from gretel_trainer.b2.gretel.models import GretelModel, GretelModelConfig
-from gretel_trainer.b2.gretel.sdk_extras import await_job
+from gretel_trainer.b2.gretel.sdk_extras import await_job, run_evaluate
 
 
 class GretelSDKStrategy:
@@ -84,17 +82,12 @@ class GretelSDKStrategy:
             raise BenchmarkException("Generate failed")
 
     def evaluate(self) -> None:
-        evaluate_model = self.project.create_model_obj(
-            model_config="evaluate/default",
+        self.evaluate_report_json = run_evaluate(
+            project=self.project,
             data_source=str(self._synthetic_data_path),
             ref_data=self.dataset.data_source,
-        )
-        evaluate_model.submit_cloud()
-        job_status = self._await_job(evaluate_model, "evaluation")
-        if job_status in END_STATES and job_status != Status.COMPLETED:
-            raise BenchmarkException("Evaluate failed")
-        self.evaluate_report_json = json.loads(
-            smart_open.open(evaluate_model.get_artifact_link("report_json")).read()
+            run_identifier=self.run_identifier,
+            wait=self.refresh_interval,
         )
 
     def get_sqs_score(self) -> Optional[int]:

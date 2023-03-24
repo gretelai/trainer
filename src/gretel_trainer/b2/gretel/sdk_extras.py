@@ -1,9 +1,30 @@
+import json
 import time
-from typing import Tuple
+from typing import Any, Dict, Tuple
+
+import smart_open
 
 from gretel_client.projects.jobs import ACTIVE_STATES, END_STATES, Job, Status
+from gretel_client.projects.projects import Project
 
-from gretel_trainer.b2.core import RunIdentifier, log
+from gretel_trainer.b2.core import BenchmarkException, RunIdentifier, log
+
+
+def run_evaluate(
+    project: Project, data_source: str, ref_data: str, run_identifier: RunIdentifier, wait: int
+) -> Dict[str, Any]:
+    evaluate_model = project.create_model_obj(
+        model_config="evaluate/default",
+        data_source=data_source,
+        ref_data=ref_data,
+    )
+    evaluate_model.submit_cloud()
+    job_status = await_job(run_identifier, evaluate_model, "evaluation", wait)
+    if job_status in END_STATES and job_status != Status.COMPLETED:
+        raise BenchmarkException("Evaluate failed")
+    return json.loads(
+        smart_open.open(evaluate_model.get_artifact_link("report_json")).read()
+    )
 
 
 def await_job(
