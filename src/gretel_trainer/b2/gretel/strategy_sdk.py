@@ -6,7 +6,7 @@ from typing import Any, Dict, Optional, Tuple
 
 import pandas as pd
 import smart_open
-from gretel_client.projects.jobs import END_STATES, Job, Status
+from gretel_client.projects.jobs import ACTIVE_STATES, END_STATES, Job, Status
 from gretel_client.projects.models import Model, read_model_config
 from gretel_client.projects.projects import Project
 from gretel_client.projects.records import RecordHandler
@@ -63,7 +63,7 @@ class GretelSDKStrategy:
             model_config=model_config, data_source=self.dataset.data_source
         )
         self.model.submit_cloud()
-        job_status = _await_job(self.model, self.refresh_interval)
+        job_status = self._await_job(self.model, "training")
         if job_status in END_STATES and job_status != Status.COMPLETED:
             raise BenchmarkException("Training failed")
 
@@ -75,7 +75,7 @@ class GretelSDKStrategy:
             params={"num_records": self.dataset.row_count}
         )
         self.record_handler.submit_cloud()
-        job_status = _await_job(self.record_handler, self.refresh_interval)
+        job_status = self._await_job(self.record_handler, "generation")
         if job_status == Status.COMPLETED:
             synthetic_data = pd.read_csv(
                 self.record_handler.get_artifact_link("data"), compression="gzip"
@@ -91,7 +91,7 @@ class GretelSDKStrategy:
             ref_data=self.dataset.data_source,
         )
         evaluate_model.submit_cloud()
-        job_status = _await_job(evaluate_model, self.refresh_interval)
+        job_status = self._await_job(evaluate_model, "evaluation")
         if job_status in END_STATES and job_status != Status.COMPLETED:
             raise BenchmarkException("Evaluate failed")
         self.evaluate_report_json = json.loads(
@@ -108,18 +108,26 @@ class GretelSDKStrategy:
     def _synthetic_data_path(self) -> Path:
         return run_out_path(self.working_dir, self.run_identifier)
 
+    def _await_job(self, job: Job, task: str) -> Status:
+        failed_refresh_attempts = 0
+        status = job.status
+        while not _finished(status):
+            if failed_refresh_attempts >= 5:
+                return Status.LOST
 
-def _await_job(job: Job, refresh_interval: int) -> Status:
-    failed_refresh_attempts = 0
-    status = job.status
-    while not _finished(status):
-        if failed_refresh_attempts >= 5:
-            return Status.LOST
-        time.sleep(refresh_interval)
-        status, failed_refresh_attempts = _cautiously_refresh_status(
-            job, failed_refresh_attempts
-        )
-    return status
+            time.sleep(self.refresh_interval)
+
+            status, failed_refresh_attempts = _cautiously_refresh_status(
+                job, failed_refresh_attempts
+            )
+            self._log_in_progress(status, task)
+        return status
+
+    def _log_in_progress(self, status: Status, task: str) -> None:
+        if status in ACTIVE_STATES:
+            logger.info(
+                f"`{self.run_identifier}` - {task} job still in progress (status: {status})"
+            )
 
 
 def _get_duration(job: Optional[Job]) -> Optional[float]:
