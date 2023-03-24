@@ -91,14 +91,6 @@ class GretelSDKStrategy:
 
         return sqs_score
 
-    def get_synthetic_data(self) -> pd.DataFrame:
-        if self.record_handler is None:
-            raise BenchmarkException("Cannot get synthetic data before generating")
-
-        return pd.read_csv(
-            self.record_handler.get_artifact_link("data"), compression="gzip"
-        )
-
 
 def _await_job(job: Job, refresh_interval: int) -> Status:
     failed_refresh_attempts = 0
