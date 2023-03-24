@@ -74,6 +74,8 @@ class Comparison:
         self.custom_models = [m() for m in models if not issubclass(m, GretelModel)]
         self.config = config
         _validate_setup(self.config, self.gretel_models)
+        configure_session(api_key="prompt", cache="yes", validate=True)
+
         self.config.working_dir.mkdir(exist_ok=True)
         self.datasets = [
             _make_dataset(dataset, self.config.working_dir) for dataset in datasets
@@ -86,7 +88,6 @@ class Comparison:
         # but this functions as a Dict[RunIdentifier, RunStatus]
         self.run_statuses: DictProxy = self._manager.dict()
 
-        configure_session(api_key="prompt", cache="yes", validate=True)
         self._project = None
         if not self.config.trainer and len(self.gretel_models) > 0:
             self._project = create_project(
