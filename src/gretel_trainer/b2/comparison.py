@@ -177,9 +177,9 @@ class Comparison:
         return {
             "Input data": run_identifier.dataset_name,
             "Model": run_identifier.model_name,
-            "DataType": executor.dataset.datatype,
-            "Rows": executor.dataset.row_count,
-            "Columns": executor.dataset.column_count,
+            "DataType": executor.strategy.dataset.datatype,
+            "Rows": executor.strategy.dataset.row_count,
+            "Columns": executor.strategy.dataset.column_count,
             "Status": status.display,
             "SQS": sqs,
             "Train time (sec)": train_time,
@@ -198,10 +198,8 @@ class Comparison:
         )
         executor = Executor(
             strategy=strategy,
-            dataset=dataset,
             run_identifier=run_identifier,
             statuses=self.run_statuses,
-            config=self.config,
         )
         self.executors[run_identifier] = executor
         self.futures[run_identifier] = self.thread_pool.submit(_run_gretel, executor)
@@ -221,10 +219,8 @@ class Comparison:
         )
         executor = Executor(
             strategy=strategy,
-            dataset=dataset,
             run_identifier=run_identifier,
             statuses=self.run_statuses,
-            config=self.config,
         )
         self.executors[run_identifier] = executor
         collection.append(executor)

@@ -20,7 +20,11 @@ from gretel_trainer.b2.status import (
 
 
 class Strategy(Protocol):
-    def runnable(self, dataset: Dataset) -> bool:
+    @property
+    def dataset(self) -> Dataset:
+        ...
+
+    def runnable(self) -> bool:
         ...
 
     def train(self) -> None:
@@ -46,16 +50,12 @@ class Executor:
     def __init__(
         self,
         strategy: Strategy,
-        dataset: Dataset,
         run_identifier: RunIdentifier,
         statuses: DictProxy,
-        config: BenchmarkConfig,
     ):
         self.strategy = strategy
-        self.dataset = dataset
         self.run_identifier = run_identifier
         self.statuses = statuses
-        self.config = config
         self.set_status(NotStarted())
 
     def set_status(self, status: RunStatus) -> None:
@@ -63,7 +63,7 @@ class Executor:
         self.statuses[self.run_identifier] = status
 
     def train(self) -> None:
-        if not self.strategy.runnable(self.dataset):
+        if not self.strategy.runnable():
             self._log("skipping")
             self.set_status(Skipped())
             return None

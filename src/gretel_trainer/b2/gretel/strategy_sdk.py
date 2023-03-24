@@ -47,8 +47,8 @@ class GretelSDKStrategy:
         config["name"] = str(self.run_identifier)
         return config
 
-    def runnable(self, dataset: Dataset) -> bool:
-        return self.benchmark_model.runnable(dataset)
+    def runnable(self) -> bool:
+        return self.benchmark_model.runnable(self.dataset)
 
     def get_train_time(self) -> Optional[float]:
         return _get_duration(self.model)

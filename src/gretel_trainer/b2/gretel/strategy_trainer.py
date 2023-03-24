@@ -33,8 +33,8 @@ class GretelTrainerStrategy:
         self.train_timer: Optional[Timer] = None
         self.generate_timer: Optional[Timer] = None
 
-    def runnable(self, dataset: Dataset) -> bool:
-        return self.benchmark_model.runnable(dataset)
+    def runnable(self) -> bool:
+        return self.benchmark_model.runnable(self.dataset)
 
     def get_train_time(self) -> Optional[float]:
         return _get_duration(self.train_timer)

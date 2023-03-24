@@ -45,7 +45,7 @@ class CustomStrategy:
     def get_sqs_score(self) -> Optional[int]:
         return None
 
-    def runnable(self, dataset: Dataset) -> bool:
+    def runnable(self) -> bool:
         return True
 
     def get_train_time(self) -> Optional[float]:
