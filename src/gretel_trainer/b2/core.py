@@ -56,7 +56,7 @@ class Timer:
         self.total_time = time.time() - self.t
 
     def duration(self) -> float:
-        return round(self.total_time, 2)
+        return round(self.total_time, 3)
 
 
 def run_out_path(working_dir: Path, run_identifier: RunIdentifier) -> Path:
