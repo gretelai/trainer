@@ -151,12 +151,11 @@ class Comparison:
         return job
 
     def cleanup(self) -> None:
+        self._project.delete()
+
         if self.config.trainer:
-            for project in search_projects(self.config.trainer_project_prefix):
+            for project in search_projects(query=self.config.trainer_project_prefix):
                 project.delete()
-        else:
-            if self._project is not None:
-                self._project.delete()
 
     def _result_dict(self, run_identifier: RunIdentifier) -> Dict[str, Any]:
         executor = self.executors[run_identifier]
