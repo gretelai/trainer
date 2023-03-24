@@ -126,6 +126,30 @@ def test_run_happy_path_gretel_sdk(
     pdtest.assert_frame_equal(df, mock_synth_data)
 
 
+def test_sdk_model_failure(working_dir, iris, project):
+    model = Mock(
+        status=Status.ERROR,
+        billing_details={"total_time_seconds": 30},
+    )
+
+    project.create_model_obj.side_effect = [model]
+
+    comparison = compare(
+        datasets=[iris],
+        models=[GretelLSTM],
+        working_dir=working_dir,
+    ).wait()
+
+    assert len(comparison.results) == 1
+    result = comparison.results.iloc[0]
+    assert result["Model"] == "GretelLSTM"
+    assert result["Status"] == "Failed (train)"
+    assert result["SQS"] is None
+    assert result["Train time (sec)"] == 30
+    assert result["Generate time (sec)"] is None
+    assert result["Total time (sec)"] == 30
+
+
 def test_run_with_failures(working_dir, iris):
     comparison = compare(
         datasets=[iris],
