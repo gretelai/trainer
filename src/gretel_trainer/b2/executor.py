@@ -43,14 +43,12 @@ class Executor:
     def __init__(
         self,
         strategy: Strategy,
-        model_name: str,
         dataset: Dataset,
         run_identifier: RunIdentifier,
         statuses: DictProxy,
         config: BenchmarkConfig,
     ):
         self.strategy = strategy
-        self.model_name = model_name
         self.dataset = dataset
         self.run_identifier = run_identifier
         self.statuses = statuses
@@ -71,9 +69,7 @@ class Executor:
         self._in_progress("training")
         try:
             self.strategy.train()
-            logger.info(
-                f"{self.run_identifier} - training completed successfully"
-            )
+            logger.info(f"{self.run_identifier} - training completed successfully")
             self._in_progress("trained")
         except Exception as e:
             logger.info(f"{self.run_identifier} - training failed")
@@ -83,9 +79,7 @@ class Executor:
         if isinstance(self.status, (Skipped, Failed)):
             return None
 
-        logger.info(
-            f"{self.run_identifier} - starting synthetic data generation"
-        )
+        logger.info(f"{self.run_identifier} - starting synthetic data generation")
         self._in_progress("generating")
         try:
             self.strategy.generate()
@@ -94,9 +88,7 @@ class Executor:
             )
             self._in_progress("generated")
         except Exception as e:
-            logger.info(
-                f"{self.run_identifier} - synthetic data generation failed"
-            )
+            logger.info(f"{self.run_identifier} - synthetic data generation failed")
             self._failed("generate", e)
 
     def evaluate(self) -> None:
@@ -109,9 +101,7 @@ class Executor:
         try:
             self.strategy.evaluate()
             sqs = self.strategy.get_sqs_score()
-            logger.info(
-                f"{self.run_identifier} - evaluation completed successfully"
-            )
+            logger.info(f"{self.run_identifier} - evaluation completed successfully")
             self.set_status(
                 Completed(
                     sqs=sqs,

@@ -19,6 +19,7 @@ from gretel_trainer.b2.core import (
     BenchmarkException,
     Dataset,
     RunIdentifier,
+    log,
 )
 from gretel_trainer.b2.custom.datasets import CustomDataset
 from gretel_trainer.b2.custom.models import CustomModel
@@ -174,8 +175,8 @@ class Comparison:
             total_time = train_time + generate_time
 
         return {
-            "Input data": executor.dataset.name,
-            "Model": executor.model_name,
+            "Input data": run_identifier.dataset_name,
+            "Model": run_identifier.model_name,
             "DataType": executor.dataset.datatype,
             "Rows": executor.dataset.row_count,
             "Columns": executor.dataset.column_count,
@@ -187,8 +188,7 @@ class Comparison:
         }
 
     def _setup_gretel_run(self, dataset: Dataset, model: GretelModel) -> None:
-        run_identifier = RunIdentifier((model.name, dataset.name))
-        _log_queueing(run_identifier)
+        run_identifier = _make_run_identifier(model, dataset)
         strategy = _set_gretel_strategy(
             benchmark_model=model,
             dataset=dataset,
@@ -198,7 +198,6 @@ class Comparison:
         )
         executor = Executor(
             strategy=strategy,
-            model_name=model.name,
             dataset=dataset,
             run_identifier=run_identifier,
             statuses=self.run_statuses,
@@ -213,9 +212,7 @@ class Comparison:
         model: CustomModel,
         collection: List[Executor],
     ) -> None:
-        model_name = type(model).__name__
-        run_identifier = RunIdentifier((model_name, dataset.name))
-        _log_queueing(run_identifier)
+        run_identifier = _make_run_identifier(model, dataset)
         strategy = CustomStrategy(
             model=model,
             dataset=dataset,
@@ -224,7 +221,6 @@ class Comparison:
         )
         executor = Executor(
             strategy=strategy,
-            model_name=model_name,
             dataset=dataset,
             run_identifier=run_identifier,
             statuses=self.run_statuses,
@@ -275,6 +271,19 @@ def _current_timestamp() -> str:
     return datetime.now().strftime("%Y%m%d%H%M%S")
 
 
+def _make_run_identifier(
+    model: Union[GretelModel, CustomModel], dataset: Dataset
+) -> RunIdentifier:
+    if isinstance(model, GretelModel):
+        model_name = model.name
+    else:
+        model_name = type(model).__name__
+
+    ri = RunIdentifier((model_name, dataset.name))
+    log(ri, "preparing run")
+    return ri
+
+
 def _validate_setup(config: BenchmarkConfig, gretel_models: List[GretelModel]) -> None:
     if config.trainer:
         _validate_trainer_setup(gretel_models)
@@ -302,10 +311,6 @@ def _validate_sdk_setup(gretel_models: List[GretelModel]) -> None:
             "Either remove it from this comparison, or configure this comparison to use Trainer (trainer=True)"
         )
         raise BenchmarkException("Invalid configuration")
-
-
-def _log_queueing(run_identifier: RunIdentifier) -> None:
-    logger.info(f"{run_identifier} - queueing")
 
 
 def _set_gretel_strategy(

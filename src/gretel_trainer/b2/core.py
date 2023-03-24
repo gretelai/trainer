@@ -1,3 +1,4 @@
+import logging
 import time
 from dataclasses import dataclass
 from enum import Enum
@@ -7,6 +8,8 @@ from typing import Tuple, Type, Union
 import pandas as pd
 from typing_extensions import Protocol
 
+logger = logging.getLogger(__name__)
+
 
 class BenchmarkException(Exception):
     pass
@@ -15,6 +18,14 @@ class BenchmarkException(Exception):
 class RunIdentifier(Tuple[str, str]):
     def __repr__(self) -> str:
         return f"{self[0]}-{self[1]}"
+
+    @property
+    def model_name(self) -> str:
+        return self[0]
+
+    @property
+    def dataset_name(self) -> str:
+        return self[1]
 
 
 class Datatype(str, Enum):
@@ -61,3 +72,7 @@ class Timer:
 
 def run_out_path(working_dir: Path, run_identifier: RunIdentifier) -> Path:
     return working_dir / f"synth_{run_identifier}.csv"
+
+
+def log(run_identifier: RunIdentifier, msg: str) -> None:
+    logger.info(f"{run_identifier} - {msg}")
