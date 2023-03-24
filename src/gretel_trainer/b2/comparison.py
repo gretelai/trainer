@@ -327,6 +327,7 @@ def _set_gretel_strategy(
             run_identifier=run_identifier,
             evaluate_project=project,
             project_prefix=config.trainer_project_prefix,
+            refresh_interval=config.refresh_interval,
             working_dir=config.working_dir,
         )
     else:

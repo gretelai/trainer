@@ -3,7 +3,6 @@ import time
 from typing import Any, Dict, Tuple
 
 import smart_open
-
 from gretel_client.projects.jobs import ACTIVE_STATES, END_STATES, Job, Status
 from gretel_client.projects.projects import Project
 
@@ -11,7 +10,11 @@ from gretel_trainer.b2.core import BenchmarkException, RunIdentifier, log
 
 
 def run_evaluate(
-    project: Project, data_source: str, ref_data: str, run_identifier: RunIdentifier, wait: int
+    project: Project,
+    data_source: str,
+    ref_data: str,
+    run_identifier: RunIdentifier,
+    wait: int,
 ) -> Dict[str, Any]:
     evaluate_model = project.create_model_obj(
         model_config="evaluate/default",
@@ -27,9 +30,7 @@ def run_evaluate(
     )
 
 
-def await_job(
-    run_identifier: RunIdentifier, job: Job, task: str, wait: int
-) -> Status:
+def await_job(run_identifier: RunIdentifier, job: Job, task: str, wait: int) -> Status:
     failed_refresh_attempts = 0
     status = job.status
     while not _finished(status):

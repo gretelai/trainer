@@ -1,5 +1,5 @@
 from pathlib import Path
-from typing import Optional
+from typing import Any, Dict, Optional
 
 import pandas as pd
 from gretel_client.projects.projects import Project
@@ -13,6 +13,7 @@ from gretel_trainer.b2.core import (
     run_out_path,
 )
 from gretel_trainer.b2.gretel.models import GretelModel
+from gretel_trainer.b2.gretel.sdk_extras import run_evaluate
 
 
 class GretelTrainerStrategy:
@@ -23,6 +24,7 @@ class GretelTrainerStrategy:
         run_identifier: RunIdentifier,
         evaluate_project: Project,
         project_prefix: str,
+        refresh_interval: int,
         working_dir: Path,
     ):
         self.benchmark_model = benchmark_model
@@ -30,11 +32,13 @@ class GretelTrainerStrategy:
         self.run_identifier = run_identifier
         self.evaluate_project = evaluate_project
         self.project_prefix = project_prefix
+        self.refresh_interval = refresh_interval
         self.working_dir = working_dir
 
         self.trainer: Optional[Trainer] = None
         self.train_timer: Optional[Timer] = None
         self.generate_timer: Optional[Timer] = None
+        self.evaluate_report_json: Optional[Dict[str, Any]] = None
 
     def runnable(self) -> bool:
         return self.benchmark_model.runnable(self.dataset)
@@ -65,10 +69,19 @@ class GretelTrainerStrategy:
         synthetic_data.to_csv(self._synthetic_data_path, index=False)
 
     def evaluate(self) -> None:
-        pass
+        self.evaluate_report_json = run_evaluate(
+            project=self.evaluate_project,
+            data_source=str(self._synthetic_data_path),
+            ref_data=self.dataset.data_source,
+            run_identifier=self.run_identifier,
+            wait=self.refresh_interval,
+        )
 
     def get_sqs_score(self) -> Optional[int]:
-        return None
+        if self.evaluate_report_json is None:
+            return None
+        else:
+            return self.evaluate_report_json["synthetic_data_quality_score"]["score"]
 
     @property
     def _synthetic_data_path(self) -> Path:
