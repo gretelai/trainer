@@ -212,7 +212,7 @@ class Comparison:
     ) -> None:
         run_identifier = _make_run_identifier(model, dataset)
         strategy = CustomStrategy(
-            model=model,
+            benchmark_model=model,
             dataset=dataset,
             run_identifier=run_identifier,
             config=self.config,

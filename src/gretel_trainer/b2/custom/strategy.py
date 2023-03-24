@@ -13,12 +13,12 @@ from gretel_trainer.b2.custom.models import CustomModel
 class CustomStrategy:
     def __init__(
         self,
-        model: CustomModel,
+        benchmark_model: CustomModel,
         dataset: Dataset,
         run_identifier: RunIdentifier,
         config: BenchmarkConfig,
     ):
-        self.model = model
+        self.benchmark_model = benchmark_model
         self.dataset = dataset
         self.run_identifier = run_identifier
         self.working_dir = config.working_dir
@@ -28,13 +28,13 @@ class CustomStrategy:
     def train(self) -> None:
         self.train_timer = Timer()
         with self.train_timer:
-            self.model.train(self.dataset)
+            self.benchmark_model.train(self.dataset)
 
     def generate(self) -> None:
         synthetic_data_path = run_out_path(self.working_dir, self.run_identifier)
         self.generate_timer = Timer()
         with self.generate_timer:
-            synthetic_df = self.model.generate(
+            synthetic_df = self.benchmark_model.generate(
                 num_records=self.dataset.row_count,
             )
             synthetic_df.to_csv(synthetic_data_path, index=False)
