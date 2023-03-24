@@ -11,7 +11,13 @@ from gretel_trainer.b2 import Datatype, GretelGPTX, GretelLSTM, compare, make_da
 from tests.b2.mocks import DoNothingModel, FailsToGenerate, FailsToTrain, TailoredActgan
 
 
-def test_run_with_gretel_dataset(working_dir, project, iris):
+def test_run_with_gretel_dataset(working_dir, project, evaluate_report_path, iris):
+    evaluate_model = Mock(
+        status=Status.COMPLETED,
+    )
+    evaluate_model.get_artifact_link.return_value = evaluate_report_path
+    project.create_model_obj.side_effect = [evaluate_model]
+
     comparison = compare(
         datasets=[iris],
         models=[DoNothingModel],
@@ -26,9 +32,16 @@ def test_run_with_gretel_dataset(working_dir, project, iris):
     assert result["Rows"] == _iris_shape[0]
     assert result["Columns"] == _iris_shape[1]
     assert result["Status"] == "Completed"
+    assert result["SQS"] == 95
 
 
-def test_run_with_custom_csv_dataset(working_dir, project, df):
+def test_run_with_custom_csv_dataset(working_dir, project, evaluate_report_path, df):
+    evaluate_model = Mock(
+        status=Status.COMPLETED,
+    )
+    evaluate_model.get_artifact_link.return_value = evaluate_report_path
+    project.create_model_obj.side_effect = [evaluate_model]
+
     with tempfile.NamedTemporaryFile() as f:
         df.to_csv(f.name, index=False)
 
@@ -47,9 +60,16 @@ def test_run_with_custom_csv_dataset(working_dir, project, df):
     assert result["Rows"] == 3
     assert result["Columns"] == 2
     assert result["Status"] == "Completed"
+    assert result["SQS"] == 95
 
 
-def test_run_with_custom_dataframe_dataset(working_dir, project, df):
+def test_run_with_custom_dataframe_dataset(working_dir, project, evaluate_report_path, df):
+    evaluate_model = Mock(
+        status=Status.COMPLETED,
+    )
+    evaluate_model.get_artifact_link.return_value = evaluate_report_path
+    project.create_model_obj.side_effect = [evaluate_model]
+
     dataset = make_dataset(df, datatype="tabular", name="pets")
 
     comparison = compare(
@@ -65,6 +85,7 @@ def test_run_with_custom_dataframe_dataset(working_dir, project, df):
     assert result["Rows"] == 3
     assert result["Columns"] == 2
     assert result["Status"] == "Completed"
+    assert result["SQS"] == 95
 
     working_dir_contents = os.listdir(working_dir)
 

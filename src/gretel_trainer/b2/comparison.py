@@ -219,6 +219,7 @@ class Comparison:
             benchmark_model=model,
             dataset=dataset,
             run_identifier=run_identifier,
+            evaluate_project=self._project,
             config=self.config,
         )
         executor = Executor(
