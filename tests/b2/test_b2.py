@@ -63,7 +63,9 @@ def test_run_with_custom_csv_dataset(working_dir, project, evaluate_report_path,
     assert result["SQS"] == 95
 
 
-def test_run_with_custom_dataframe_dataset(working_dir, project, evaluate_report_path, df):
+def test_run_with_custom_dataframe_dataset(
+    working_dir, project, evaluate_report_path, df
+):
     evaluate_model = Mock(
         status=Status.COMPLETED,
     )
