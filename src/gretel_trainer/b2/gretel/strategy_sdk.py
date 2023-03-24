@@ -15,11 +15,10 @@ from gretel_trainer.b2.core import (
     BenchmarkException,
     Dataset,
     RunIdentifier,
+    log,
     run_out_path,
 )
 from gretel_trainer.b2.gretel.models import GretelModel, GretelModelConfig
-
-logger = logging.getLogger(__name__)
 
 
 class GretelSDKStrategy:
@@ -125,9 +124,7 @@ class GretelSDKStrategy:
 
     def _log_in_progress(self, status: Status, task: str) -> None:
         if status in ACTIVE_STATES:
-            logger.info(
-                f"{self.run_identifier} - {task} job still in progress (status: {status})"
-            )
+            log(self.run_identifier, f"{task} job still in progress (status: {status})")
 
 
 def _get_duration(job: Optional[Job]) -> Optional[float]:
