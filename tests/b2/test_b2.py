@@ -11,7 +11,7 @@ from gretel_trainer.b2 import Datatype, GretelGPTX, GretelLSTM, compare, make_da
 from tests.b2.mocks import DoNothingModel, FailsToGenerate, FailsToTrain, TailoredActgan
 
 
-def test_run_with_gretel_dataset(working_dir, iris):
+def test_run_with_gretel_dataset(working_dir, project, iris):
     comparison = compare(
         datasets=[iris],
         models=[DoNothingModel],
@@ -28,7 +28,7 @@ def test_run_with_gretel_dataset(working_dir, iris):
     assert result["Status"] == "Completed"
 
 
-def test_run_with_custom_csv_dataset(working_dir, df):
+def test_run_with_custom_csv_dataset(working_dir, project, df):
     with tempfile.NamedTemporaryFile() as f:
         df.to_csv(f.name, index=False)
 
@@ -49,7 +49,7 @@ def test_run_with_custom_csv_dataset(working_dir, df):
     assert result["Status"] == "Completed"
 
 
-def test_run_with_custom_dataframe_dataset(working_dir, df):
+def test_run_with_custom_dataframe_dataset(working_dir, project, df):
     dataset = make_dataset(df, datatype="tabular", name="pets")
 
     comparison = compare(
@@ -150,7 +150,7 @@ def test_sdk_model_failure(working_dir, iris, project):
     assert result["Total time (sec)"] == 30
 
 
-def test_run_with_failures(working_dir, iris):
+def test_run_with_failures(working_dir, project, iris):
     comparison = compare(
         datasets=[iris],
         models=[FailsToTrain, FailsToGenerate],

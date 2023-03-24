@@ -74,7 +74,9 @@ class Comparison:
         self.custom_models = [m() for m in models if not issubclass(m, GretelModel)]
         self.config = config
         _validate_setup(self.config, self.gretel_models)
+
         configure_session(api_key="prompt", cache="yes", validate=True)
+        self._project = self._make_project()
 
         self.config.working_dir.mkdir(exist_ok=True)
         self.datasets = [
@@ -88,11 +90,12 @@ class Comparison:
         # but this functions as a Dict[RunIdentifier, RunStatus]
         self.run_statuses: DictProxy = self._manager.dict()
 
-        self._project = None
-        if not self.config.trainer and len(self.gretel_models) > 0:
-            self._project = create_project(
-                display_name=self.config.project_display_name
-            )
+    def _make_project(self) -> Project:
+        display_name = self.config.project_display_name
+        if self.config.trainer:
+            display_name = f"{display_name}-evaluate"
+
+        return create_project(display_name=display_name)
 
     def execute(self) -> Comparison:
         custom_executors: List[Executor] = []
