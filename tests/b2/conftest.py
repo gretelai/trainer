@@ -24,6 +24,11 @@ def sleepless():
 
 
 @pytest.fixture()
+def repo():
+    return REPO
+
+
+@pytest.fixture()
 def iris():
     return IRIS
 
