@@ -19,6 +19,7 @@ from gretel_trainer.b2.core import (
     run_out_path,
 )
 from gretel_trainer.b2.gretel.models import GretelModel, GretelModelConfig
+from gretel_trainer.b2.gretel.sdk_extras import await_job
 
 
 class GretelSDKStrategy:
@@ -108,23 +109,7 @@ class GretelSDKStrategy:
         return run_out_path(self.working_dir, self.run_identifier)
 
     def _await_job(self, job: Job, task: str) -> Status:
-        failed_refresh_attempts = 0
-        status = job.status
-        while not _finished(status):
-            if failed_refresh_attempts >= 5:
-                return Status.LOST
-
-            time.sleep(self.refresh_interval)
-
-            status, failed_refresh_attempts = _cautiously_refresh_status(
-                job, failed_refresh_attempts
-            )
-            self._log_in_progress(status, task)
-        return status
-
-    def _log_in_progress(self, status: Status, task: str) -> None:
-        if status in ACTIVE_STATES:
-            log(self.run_identifier, f"{task} job still in progress (status: {status})")
+        return await_job(self.run_identifier, job, task, self.refresh_interval)
 
 
 def _get_duration(job: Optional[Job]) -> Optional[float]:
@@ -132,17 +117,3 @@ def _get_duration(job: Optional[Job]) -> Optional[float]:
         return None
     else:
         return job.billing_details["total_time_seconds"]
-
-
-def _finished(status: Status) -> bool:
-    return status in END_STATES
-
-
-def _cautiously_refresh_status(job: Job, attempts: int) -> Tuple[Status, int]:
-    try:
-        job.refresh()
-        attempts = 0
-    except:
-        attempts = attempts + 1
-
-    return (job.status, attempts)
