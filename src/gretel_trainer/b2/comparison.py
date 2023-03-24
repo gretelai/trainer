@@ -318,13 +318,14 @@ def _set_gretel_strategy(
     dataset: Dataset,
     run_identifier: RunIdentifier,
     config: BenchmarkConfig,
-    project: Optional[Project],
+    project: Project,
 ) -> Union[GretelSDKStrategy, GretelTrainerStrategy]:
     if config.trainer:
         return GretelTrainerStrategy(
             benchmark_model=benchmark_model,
             dataset=dataset,
             run_identifier=run_identifier,
+            evaluate_project=project,
             project_prefix=config.trainer_project_prefix,
             working_dir=config.working_dir,
         )

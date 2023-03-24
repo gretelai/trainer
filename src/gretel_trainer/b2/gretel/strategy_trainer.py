@@ -2,6 +2,7 @@ from pathlib import Path
 from typing import Optional
 
 import pandas as pd
+from gretel_client.projects.projects import Project
 
 from gretel_trainer import Trainer
 from gretel_trainer.b2.core import (
@@ -20,12 +21,14 @@ class GretelTrainerStrategy:
         benchmark_model: GretelModel,
         dataset: Dataset,
         run_identifier: RunIdentifier,
+        evaluate_project: Project,
         project_prefix: str,
         working_dir: Path,
     ):
         self.benchmark_model = benchmark_model
         self.dataset = dataset
         self.run_identifier = run_identifier
+        self.evaluate_project = evaluate_project
         self.project_prefix = project_prefix
         self.working_dir = working_dir
 
