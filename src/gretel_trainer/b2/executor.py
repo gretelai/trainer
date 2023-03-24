@@ -63,20 +63,20 @@ class Executor:
 
     def train(self) -> None:
         if not self.strategy.runnable(self.dataset):
-            logger.info(f"Skipping model training for run `{self.run_identifier}`")
+            logger.info(f"{self.run_identifier} - skipping")
             self.set_status(Skipped())
             return None
 
-        logger.info(f"Starting model training for run `{self.run_identifier}`")
+        logger.info(f"{self.run_identifier} - starting model training")
         self._in_progress("training")
         try:
             self.strategy.train()
             logger.info(
-                f"Training completed successfully for run `{self.run_identifier}`"
+                f"{self.run_identifier} - training completed successfully"
             )
             self._in_progress("trained")
         except Exception as e:
-            logger.info(f"Training failed for run `{self.run_identifier}`")
+            logger.info(f"{self.run_identifier} - training failed")
             self._failed("train", e)
 
     def generate(self) -> None:
@@ -84,18 +84,18 @@ class Executor:
             return None
 
         logger.info(
-            f"Starting synthetic data generation for run `{self.run_identifier}`"
+            f"{self.run_identifier} - starting synthetic data generation"
         )
         self._in_progress("generating")
         try:
             self.strategy.generate()
             logger.info(
-                f"Synthetic data generation completed successfully for run `{self.run_identifier}`"
+                f"{self.run_identifier} - synthetic data generation completed successfully"
             )
             self._in_progress("generated")
         except Exception as e:
             logger.info(
-                f"Synthetic data generation failed for run `{self.run_identifier}`"
+                f"{self.run_identifier} - synthetic data generation failed"
             )
             self._failed("generate", e)
 
@@ -103,14 +103,14 @@ class Executor:
         if isinstance(self.status, (Skipped, Failed)):
             return None
 
-        logger.info(f"Starting evaluation for run `{self.run_identifier}`")
+        logger.info(f"{self.run_identifier} - starting evaluation")
         self._in_progress("evaluating")
 
         try:
             self.strategy.evaluate()
             sqs = self.strategy.get_sqs_score()
             logger.info(
-                f"Evaluation completed successfully for run `{self.run_identifier}`"
+                f"{self.run_identifier} - evaluation completed successfully"
             )
             self.set_status(
                 Completed(
@@ -120,7 +120,7 @@ class Executor:
                 )
             )
         except Exception as e:
-            logger.info(f"Evaluation failed for run `{self.run_identifier}`")
+            logger.info(f"{self.run_identifier} - evaluation failed")
             self._failed("evaluate", e)
 
     def _in_progress(self, stage: str) -> None:

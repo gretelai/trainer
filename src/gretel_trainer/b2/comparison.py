@@ -188,7 +188,7 @@ class Comparison:
 
     def _setup_gretel_run(self, dataset: Dataset, model: GretelModel) -> None:
         run_identifier = RunIdentifier((model.name, dataset.name))
-        logger.info(f"Queueing run `{run_identifier}`")
+        _log_queueing(run_identifier)
         strategy = _set_gretel_strategy(
             benchmark_model=model,
             dataset=dataset,
@@ -215,7 +215,7 @@ class Comparison:
     ) -> None:
         model_name = type(model).__name__
         run_identifier = RunIdentifier((model_name, dataset.name))
-        logger.info(f"Queueing run `{run_identifier}`")
+        _log_queueing(run_identifier)
         strategy = CustomStrategy(
             model=model,
             dataset=dataset,
@@ -302,6 +302,10 @@ def _validate_sdk_setup(gretel_models: List[GretelModel]) -> None:
             "Either remove it from this comparison, or configure this comparison to use Trainer (trainer=True)"
         )
         raise BenchmarkException("Invalid configuration")
+
+
+def _log_queueing(run_identifier: RunIdentifier) -> None:
+    logger.info(f"{run_identifier} - queueing")
 
 
 def _set_gretel_strategy(

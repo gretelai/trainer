@@ -126,7 +126,7 @@ class GretelSDKStrategy:
     def _log_in_progress(self, status: Status, task: str) -> None:
         if status in ACTIVE_STATES:
             logger.info(
-                f"`{self.run_identifier}` - {task} job still in progress (status: {status})"
+                f"{self.run_identifier} - {task} job still in progress (status: {status})"
             )
 
 
