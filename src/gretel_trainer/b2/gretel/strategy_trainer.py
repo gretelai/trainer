@@ -59,14 +59,17 @@ class GretelTrainerStrategy:
         self.generate_timer = Timer()
         with self.generate_timer:
             synthetic_data = self.trainer.generate(num_records=self.dataset.row_count)
-        out_path = run_out_path(self.working_dir, self.run_identifier)
-        synthetic_data.to_csv(out_path, index=False)
+        synthetic_data.to_csv(self._synthetic_data_path, index=False)
 
-    def get_sqs_score(self) -> int:
-        if self.trainer is None:
-            raise BenchmarkException("Cannot get SQS score before training")
+    def evaluate(self) -> None:
+        pass
 
-        return self.trainer.get_sqs_score()
+    def get_sqs_score(self) -> Optional[int]:
+        return None
+
+    @property
+    def _synthetic_data_path(self) -> Path:
+        return run_out_path(self.working_dir, self.run_identifier)
 
 
 def _get_duration(timer: Optional[Timer]) -> Optional[float]:

@@ -1,8 +1,11 @@
+import json
+import logging
 import time
 from pathlib import Path
-from typing import Optional, Tuple
+from typing import Any, Dict, Optional, Tuple
 
 import pandas as pd
+import smart_open
 from gretel_client.projects.jobs import END_STATES, Job, Status
 from gretel_client.projects.models import Model, read_model_config
 from gretel_client.projects.projects import Project
@@ -15,6 +18,8 @@ from gretel_trainer.b2.core import (
     run_out_path,
 )
 from gretel_trainer.b2.gretel.models import GretelModel, GretelModelConfig
+
+logger = logging.getLogger(__name__)
 
 
 class GretelSDKStrategy:
@@ -36,6 +41,7 @@ class GretelSDKStrategy:
 
         self.model: Optional[Model] = None
         self.record_handler: Optional[RecordHandler] = None
+        self.evaluate_report_json: Optional[Dict[str, Any]] = None
 
     def _format_model_config(self) -> GretelModelConfig:
         config = read_model_config(self.benchmark_model.config)
@@ -74,22 +80,33 @@ class GretelSDKStrategy:
             synthetic_data = pd.read_csv(
                 self.record_handler.get_artifact_link("data"), compression="gzip"
             )
-            out_path = run_out_path(self.working_dir, self.run_identifier)
-            synthetic_data.to_csv(out_path, index=False)
+            synthetic_data.to_csv(self._synthetic_data_path, index=False)
         else:
             raise BenchmarkException("Generate failed")
 
-    def get_sqs_score(self) -> int:
-        if self.model is None:
-            raise BenchmarkException("Cannot get SQS score before training")
+    def evaluate(self) -> None:
+        evaluate_model = self.project.create_model_obj(
+            model_config="evaluate/default",
+            data_source=str(self._synthetic_data_path),
+            ref_data=self.dataset.data_source,
+        )
+        evaluate_model.submit_cloud()
+        job_status = _await_job(evaluate_model, self.refresh_interval)
+        if job_status in END_STATES and job_status != Status.COMPLETED:
+            raise BenchmarkException("Evaluate failed")
+        self.evaluate_report_json = json.loads(
+            smart_open.open(evaluate_model.get_artifact_link("report_json")).read()
+        )
 
-        sqs_score = 0
-        summary = self.model.get_report_summary()
-        for stat in summary["summary"]:
-            if stat["field"] == "synthetic_data_quality_score":
-                sqs_score = stat["value"]
+    def get_sqs_score(self) -> Optional[int]:
+        if self.evaluate_report_json is None:
+            return None
+        else:
+            return self.evaluate_report_json["synthetic_data_quality_score"]["score"]
 
-        return sqs_score
+    @property
+    def _synthetic_data_path(self) -> Path:
+        return run_out_path(self.working_dir, self.run_identifier)
 
 
 def _await_job(job: Job, refresh_interval: int) -> Status:

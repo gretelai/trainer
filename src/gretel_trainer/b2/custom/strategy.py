@@ -39,9 +39,11 @@ class CustomStrategy:
             )
             synthetic_df.to_csv(synthetic_data_path, index=False)
 
-    def get_sqs_score(self) -> int:
-        # TODO
-        return 0
+    def evaluate(self) -> None:
+        pass
+
+    def get_sqs_score(self) -> Optional[int]:
+        return None
 
     def runnable(self, dataset: Dataset) -> bool:
         return True

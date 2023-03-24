@@ -26,7 +26,10 @@ class Strategy(Protocol):
     def generate(self) -> None:
         ...
 
-    def get_sqs_score(self) -> int:
+    def evaluate(self) -> None:
+        ...
+
+    def get_sqs_score(self) -> Optional[int]:
         ...
 
     def get_train_time(self) -> Optional[float]:
@@ -104,6 +107,7 @@ class Executor:
         self._in_progress("evaluating")
 
         try:
+            self.strategy.evaluate()
             sqs = self.strategy.get_sqs_score()
             logger.info(
                 f"Evaluation completed successfully for run `{self.run_identifier}`"

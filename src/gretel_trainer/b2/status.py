@@ -31,7 +31,7 @@ class InProgress:
 
 @dataclass
 class Completed:
-    sqs: int
+    sqs: Optional[int]
     train_secs: Optional[float]
     generate_secs: Optional[float]
 
