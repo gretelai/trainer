@@ -326,9 +326,7 @@ def _set_gretel_strategy(
             dataset=dataset,
             run_identifier=run_identifier,
             evaluate_project=project,
-            project_prefix=config.trainer_project_prefix,
-            refresh_interval=config.refresh_interval,
-            working_dir=config.working_dir,
+            config=config,
         )
     else:
         return GretelSDKStrategy(
@@ -336,6 +334,5 @@ def _set_gretel_strategy(
             dataset=dataset,
             run_identifier=run_identifier,
             project=project,
-            refresh_interval=config.refresh_interval,
-            working_dir=config.working_dir,
+            config=config,
         )

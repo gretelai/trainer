@@ -9,6 +9,7 @@ from gretel_client.projects.projects import Project
 from gretel_client.projects.records import RecordHandler
 
 from gretel_trainer.b2.core import (
+    BenchmarkConfig,
     BenchmarkException,
     Dataset,
     RunIdentifier,
@@ -26,15 +27,13 @@ class GretelSDKStrategy:
         dataset: Dataset,
         run_identifier: RunIdentifier,
         project: Project,
-        refresh_interval: int,
-        working_dir: Path,
+        config: BenchmarkConfig,
     ):
         self.benchmark_model = benchmark_model
         self.dataset = dataset
         self.run_identifier = run_identifier
         self.project = project
-        self.refresh_interval = refresh_interval
-        self.working_dir = working_dir
+        self.config = config
 
         self.model: Optional[Model] = None
         self.record_handler: Optional[RecordHandler] = None
@@ -87,7 +86,7 @@ class GretelSDKStrategy:
             data_source=str(self._synthetic_data_path),
             ref_data=self.dataset.data_source,
             run_identifier=self.run_identifier,
-            wait=self.refresh_interval,
+            wait=self.config.refresh_interval,
         )
 
     def get_sqs_score(self) -> Optional[int]:
@@ -98,10 +97,10 @@ class GretelSDKStrategy:
 
     @property
     def _synthetic_data_path(self) -> Path:
-        return run_out_path(self.working_dir, self.run_identifier)
+        return run_out_path(self.config.working_dir, self.run_identifier)
 
     def _await_job(self, job: Job, task: str) -> Status:
-        return await_job(self.run_identifier, job, task, self.refresh_interval)
+        return await_job(self.run_identifier, job, task, self.config.refresh_interval)
 
 
 def _get_duration(job: Optional[Job]) -> Optional[float]:

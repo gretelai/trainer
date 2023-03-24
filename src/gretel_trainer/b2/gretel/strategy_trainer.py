@@ -6,6 +6,7 @@ from gretel_client.projects.projects import Project
 
 from gretel_trainer import Trainer
 from gretel_trainer.b2.core import (
+    BenchmarkConfig,
     BenchmarkException,
     Dataset,
     RunIdentifier,
@@ -23,17 +24,13 @@ class GretelTrainerStrategy:
         dataset: Dataset,
         run_identifier: RunIdentifier,
         evaluate_project: Project,
-        project_prefix: str,
-        refresh_interval: int,
-        working_dir: Path,
+        config: BenchmarkConfig,
     ):
         self.benchmark_model = benchmark_model
         self.dataset = dataset
         self.run_identifier = run_identifier
         self.evaluate_project = evaluate_project
-        self.project_prefix = project_prefix
-        self.refresh_interval = refresh_interval
-        self.working_dir = working_dir
+        self.config = config
 
         self.trainer: Optional[Trainer] = None
         self.train_timer: Optional[Timer] = None
@@ -51,9 +48,9 @@ class GretelTrainerStrategy:
 
     def train(self) -> None:
         self.trainer = Trainer(
-            project_name=f"{self.project_prefix}-{self.run_identifier}",
+            project_name=f"{self.config.trainer_project_prefix}-{self.run_identifier}",
             model_type=self.benchmark_model.trainer_model_type,
-            cache_file=self.working_dir / f"{self.run_identifier}.json",
+            cache_file=self.config.working_dir / f"{self.run_identifier}.json",
         )
         self.train_timer = Timer()
         with self.train_timer:
@@ -74,7 +71,7 @@ class GretelTrainerStrategy:
             data_source=str(self._synthetic_data_path),
             ref_data=self.dataset.data_source,
             run_identifier=self.run_identifier,
-            wait=self.refresh_interval,
+            wait=self.config.refresh_interval,
         )
 
     def get_sqs_score(self) -> Optional[int]:
@@ -85,7 +82,7 @@ class GretelTrainerStrategy:
 
     @property
     def _synthetic_data_path(self) -> Path:
-        return run_out_path(self.working_dir, self.run_identifier)
+        return run_out_path(self.config.working_dir, self.run_identifier)
 
 
 def _get_duration(timer: Optional[Timer]) -> Optional[float]:
