@@ -1,9 +1,14 @@
-import logging
 from multiprocessing.managers import DictProxy
 from pathlib import Path
 from typing import Optional, Protocol
 
-from gretel_trainer.b2.core import BenchmarkConfig, Dataset, RunIdentifier, run_out_path
+from gretel_trainer.b2.core import (
+    BenchmarkConfig,
+    Dataset,
+    RunIdentifier,
+    log,
+    run_out_path,
+)
 from gretel_trainer.b2.status import (
     Completed,
     Failed,
@@ -12,8 +17,6 @@ from gretel_trainer.b2.status import (
     RunStatus,
     Skipped,
 )
-
-logger = logging.getLogger(__name__)
 
 
 class Strategy(Protocol):
@@ -61,47 +64,45 @@ class Executor:
 
     def train(self) -> None:
         if not self.strategy.runnable(self.dataset):
-            logger.info(f"{self.run_identifier} - skipping")
+            self._log("skipping")
             self.set_status(Skipped())
             return None
 
-        logger.info(f"{self.run_identifier} - starting model training")
+        self._log("starting model training")
         self._in_progress("training")
         try:
             self.strategy.train()
-            logger.info(f"{self.run_identifier} - training completed successfully")
+            self._log("training completed successfully")
             self._in_progress("trained")
         except Exception as e:
-            logger.info(f"{self.run_identifier} - training failed")
+            self._log("training failed")
             self._failed("train", e)
 
     def generate(self) -> None:
         if isinstance(self.status, (Skipped, Failed)):
             return None
 
-        logger.info(f"{self.run_identifier} - starting synthetic data generation")
+        self._log("starting synthetic data generation")
         self._in_progress("generating")
         try:
             self.strategy.generate()
-            logger.info(
-                f"{self.run_identifier} - synthetic data generation completed successfully"
-            )
+            self._log("synthetic data generation completed successfully")
             self._in_progress("generated")
         except Exception as e:
-            logger.info(f"{self.run_identifier} - synthetic data generation failed")
+            self._log("synthetic data generation failed")
             self._failed("generate", e)
 
     def evaluate(self) -> None:
         if isinstance(self.status, (Skipped, Failed)):
             return None
 
-        logger.info(f"{self.run_identifier} - starting evaluation")
+        self._log("starting evaluation")
         self._in_progress("evaluating")
 
         try:
             self.strategy.evaluate()
             sqs = self.strategy.get_sqs_score()
-            logger.info(f"{self.run_identifier} - evaluation completed successfully")
+            self._log("evaluation completed successfully")
             self.set_status(
                 Completed(
                     sqs=sqs,
@@ -110,7 +111,7 @@ class Executor:
                 )
             )
         except Exception as e:
-            logger.info(f"{self.run_identifier} - evaluation failed")
+            self._log("evaluation failed")
             self._failed("evaluate", e)
 
     def _in_progress(self, stage: str) -> None:
@@ -131,3 +132,6 @@ class Executor:
                 generate_secs=self.strategy.get_generate_time(),
             )
         )
+
+    def _log(self, msg: str) -> None:
+        log(self.run_identifier, msg)
