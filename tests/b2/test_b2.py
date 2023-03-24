@@ -137,7 +137,7 @@ def test_run_with_failures(working_dir, iris):
     assert set(comparison.results["Status"]) == {"Failed (train)", "Failed (generate)"}
 
 
-def test_gptx_skips_too_many_columns(working_dir):
+def test_gptx_skips_too_many_columns(working_dir, project):
     two_columns = pd.DataFrame(
         data={"english": ["hello", "world"], "spanish": ["hola", "mundo"]}
     )
@@ -155,7 +155,7 @@ def test_gptx_skips_too_many_columns(working_dir):
     assert_is_skipped(comparison.results.iloc[0])
 
 
-def test_gptx_skips_non_natural_language_datatype(working_dir):
+def test_gptx_skips_non_natural_language_datatype(working_dir, project):
     tabular = pd.DataFrame(data={"foo": [1, 2, 3]})
     dataset = make_dataset(tabular, datatype=Datatype.tabular, name="skippy")
 
@@ -169,7 +169,7 @@ def test_gptx_skips_non_natural_language_datatype(working_dir):
     assert_is_skipped(comparison.results.iloc[0])
 
 
-def test_lstm_skips_datasets_with_over_150_columns(working_dir):
+def test_lstm_skips_datasets_with_over_150_columns(working_dir, project):
     jumbo = pd.DataFrame(columns=list(range(151)))
     dataset = make_dataset(jumbo, datatype=Datatype.tabular, name="skippy")
 
