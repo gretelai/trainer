@@ -30,6 +30,8 @@ A v2 rewrite of Benchmark.
 
 ## TODOs
 
+- It appears SDK jobs get a billing-details attr right away, but the times stay stuck at 0.000 until the job is complete. Ends up being a little confusing seeing "Status: Generating" + "Generate time: 0.000"
+- Is there any way to force-kill a run/job that seems to be stuck and we don't care to wait around for? e.g. a job stuck in pending for too long.
 - Errors should be more detailed. Might help to do `raise BenchmarkException(...) from e` in certain places. Also some of those exceptions can get more detailed messages (e.g. exact job status)
 - Is it simple enough to get to an error? `comparison.executors[run_id].exception`. Maybe some kind of `all_errors` helper function? With advice on what to do next (e.g. check logs)?
 - Project name(s). Consider creating projects with both a display name (provided by user) **and** an actual unique name (something like `benchmark-{timestamp}`).
