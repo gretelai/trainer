@@ -7,6 +7,8 @@ from gretel_trainer.b2.gretel.datasets import GretelDatasetRepo
 from gretel_trainer.b2.gretel.models import (
     GretelACTGAN,
     GretelAmplify,
+    GretelAuto,
+    GretelDGAN,
     GretelGPTX,
     GretelLSTM,
     GretelModel,

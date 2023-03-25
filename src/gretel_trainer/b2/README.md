@@ -30,6 +30,10 @@ A v2 rewrite of Benchmark.
 
 ## TODOs
 
+- All three strategies' `evaluate` methods are identical; maybe we should lift that up to the `Executor`?
+- Errors should be more detailed. Might help to do `raise BenchmarkException(...) from e` in certain places. Also some of those exceptions can get more detailed messages (e.g. exact job status)
+- Is it simple enough to get to an error? `comparison.executors[run_id].exception`. Maybe some kind of `all_errors` helper function? With advice on what to do next (e.g. check logs)?
+- Project name(s). Consider creating projects with both a display name (provided by user) **and** an actual unique name (something like `benchmark-{timestamp}`).
 - Nicole: downstream evaluations
 - Sami: resume functionality
 - Sami: skip SQS and data preview when training, and instead always run Evaluate afterwards (improves training time + is more accurate for Trainer models than average SQS from N models)
