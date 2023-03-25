@@ -73,7 +73,7 @@ class Comparison:
         self.gretel_models = [m() for m in models if issubclass(m, GretelModel)]
         self.custom_models = [m() for m in models if not issubclass(m, GretelModel)]
         self.config = config
-        _validate_setup(self.config, self.gretel_models)
+        _validate_setup(self.config, self.gretel_models, self.custom_models, datasets)
 
         configure_session(api_key="prompt", cache="yes", validate=True)
         self._project = self._make_project()
@@ -274,21 +274,31 @@ def _current_timestamp() -> str:
 def _make_run_identifier(
     model: Union[GretelModel, CustomModel], dataset: Dataset
 ) -> RunIdentifier:
-    if isinstance(model, GretelModel):
-        model_name = model.name
-    else:
-        model_name = type(model).__name__
-
-    ri = RunIdentifier((model_name, dataset.name))
+    ri = RunIdentifier((_model_name(model), dataset.name))
     log(ri, "preparing run")
     return ri
 
 
-def _validate_setup(config: BenchmarkConfig, gretel_models: List[GretelModel]) -> None:
+def _validate_setup(
+    config: BenchmarkConfig,
+    gretel_models: List[GretelModel],
+    custom_models: List[CustomModel],
+    all_datasets: List[DatasetTypes],
+) -> None:
+    dataset_names = [d.name for d in all_datasets]
+    model_names = [_model_name(m) for m in (gretel_models + custom_models)]
+    _ensure_unique(dataset_names, "datasets")
+    _ensure_unique(model_names, "models")
+
     if config.trainer:
         _validate_trainer_setup(gretel_models)
     else:
         _validate_sdk_setup(gretel_models)
+
+
+def _ensure_unique(col: List[str], kind: str) -> None:
+    if len(set(col)) < len(col):
+        raise BenchmarkException(f"{kind} must have unique names")
 
 
 def _validate_trainer_setup(gretel_models: List[GretelModel]) -> None:
@@ -336,3 +346,10 @@ def _set_gretel_strategy(
             project=project,
             config=config,
         )
+
+
+def _model_name(model: Union[GretelModel, CustomModel]) -> str:
+    if isinstance(model, GretelModel):
+        return model.name
+    else:
+        return type(model).__name__

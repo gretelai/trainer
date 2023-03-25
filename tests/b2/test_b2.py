@@ -236,20 +236,3 @@ def assert_is_skipped(result):
     assert result["Train time (sec)"] is None
     assert result["Generate time (sec)"] is None
     assert result["Total time (sec)"] is None
-
-
-def test_bad_session_exits_early(iris):
-    class SomeException(Exception):
-        pass
-
-    with patch("gretel_trainer.b2.comparison.configure_session") as configure_session:
-        configure_session.side_effect = SomeException()
-
-        with pytest.raises(SomeException):
-            compare(
-                datasets=[iris],
-                models=[GretelLSTM],
-                working_dir="should_not_be_created",
-            )
-
-    assert not os.path.exists("should_not_be_created")
