@@ -14,13 +14,7 @@ from gretel_client.helpers import poll
 from gretel_client.projects import Project, create_project, search_projects
 from gretel_client.projects.jobs import Job
 
-from gretel_trainer.b2.core import (
-    BenchmarkConfig,
-    BenchmarkException,
-    Dataset,
-    RunIdentifier,
-    log,
-)
+from gretel_trainer.b2.core import BenchmarkConfig, BenchmarkException, Dataset, log
 from gretel_trainer.b2.custom.datasets import CustomDataset
 from gretel_trainer.b2.custom.models import CustomModel
 from gretel_trainer.b2.custom.strategy import CustomStrategy
@@ -81,9 +75,9 @@ class Comparison:
         self.datasets = [
             _make_dataset(dataset, self.config.working_dir) for dataset in datasets
         ]
-        self.executors: Dict[RunIdentifier, Executor] = {}
+        self.executors: Dict[str, Executor] = {}
         self.thread_pool = ThreadPoolExecutor(5)
-        self.futures: Dict[Union[RunIdentifier, Literal["custom"]], Future] = {}
+        self.futures: Dict[str, Future] = {}
 
     def _make_project(self) -> Project:
         display_name = self.config.project_display_name
@@ -125,7 +119,7 @@ class Comparison:
         return job.logs
 
     def _get_gretel_job(self, model: str, dataset: str, action: str) -> Job:
-        run_id = RunIdentifier((model, dataset))
+        run_id = f"{model}-{dataset}"
         executor = self.executors[run_id]
         strategy = executor.strategy
         if not isinstance(strategy, GretelSDKStrategy):
@@ -145,11 +139,6 @@ class Comparison:
 
         return job
 
-    def get_executor(self, run_id: str) -> Executor:
-        model, dataset = run_id.split("-")
-        run_identifier = RunIdentifier((model, dataset))
-        return self.executors[run_identifier]
-
     def cleanup(self) -> None:
         self._project.delete()
 
@@ -157,8 +146,9 @@ class Comparison:
             for project in search_projects(query=self.config.trainer_project_prefix):
                 project.delete()
 
-    def _result_dict(self, run_identifier: RunIdentifier) -> Dict[str, Any]:
+    def _result_dict(self, run_identifier: str) -> Dict[str, Any]:
         executor = self.executors[run_identifier]
+        model_name, dataset_name = run_identifier.split("-")
 
         train_time = executor.strategy.get_train_time()
         generate_time = executor.strategy.get_generate_time()
@@ -168,8 +158,8 @@ class Comparison:
             total_time = train_time + generate_time
 
         return {
-            "Input data": run_identifier.dataset_name,
-            "Model": run_identifier.model_name,
+            "Input data": dataset_name,
+            "Model": model_name,
             "DataType": executor.strategy.dataset.datatype,
             "Rows": executor.strategy.dataset.row_count,
             "Columns": executor.strategy.dataset.column_count,
@@ -261,10 +251,10 @@ def _current_timestamp() -> str:
 
 def _make_run_identifier(
     model: Union[GretelModel, CustomModel], dataset: Dataset
-) -> RunIdentifier:
-    ri = RunIdentifier((_model_name(model), dataset.name))
-    log(ri, "preparing run")
-    return ri
+) -> str:
+    run_identifier = f"{_model_name(model)}-{dataset.name}"
+    log(run_identifier, "preparing run")
+    return run_identifier
 
 
 def _validate_setup(
@@ -314,7 +304,7 @@ def _validate_sdk_setup(gretel_models: List[GretelModel]) -> None:
 def _set_gretel_strategy(
     benchmark_model: GretelModel,
     dataset: Dataset,
-    run_identifier: RunIdentifier,
+    run_identifier: str,
     config: BenchmarkConfig,
     project: Project,
 ) -> Union[GretelSDKStrategy, GretelTrainerStrategy]:

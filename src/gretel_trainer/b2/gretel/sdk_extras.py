@@ -6,14 +6,14 @@ import smart_open
 from gretel_client.projects.jobs import ACTIVE_STATES, END_STATES, Job, Status
 from gretel_client.projects.projects import Project
 
-from gretel_trainer.b2.core import BenchmarkException, RunIdentifier, log
+from gretel_trainer.b2.core import BenchmarkException, log
 
 
 def run_evaluate(
     project: Project,
     data_source: str,
     ref_data: str,
-    run_identifier: RunIdentifier,
+    run_identifier: str,
     wait: int,
 ) -> Dict[str, Any]:
     evaluate_model = project.create_model_obj(
@@ -30,7 +30,7 @@ def run_evaluate(
     )
 
 
-def await_job(run_identifier: RunIdentifier, job: Job, task: str, wait: int) -> Status:
+def await_job(run_identifier: str, job: Job, task: str, wait: int) -> Status:
     failed_refresh_attempts = 0
     status = job.status
     while not _finished(status):
@@ -60,6 +60,6 @@ def _cautiously_refresh_status(job: Job, attempts: int) -> Tuple[Status, int]:
     return (job.status, attempts)
 
 
-def _log_in_progress(run_identifier: RunIdentifier, status: Status, task: str) -> None:
+def _log_in_progress(run_identifier: str, status: Status, task: str) -> None:
     if status in ACTIVE_STATES:
         log(run_identifier, f"{task} job still in progress (status: {status})")

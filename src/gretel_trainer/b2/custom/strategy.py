@@ -3,13 +3,7 @@ from typing import Any, Dict, Optional
 
 from gretel_client.projects.projects import Project
 
-from gretel_trainer.b2.core import (
-    BenchmarkConfig,
-    Dataset,
-    RunIdentifier,
-    Timer,
-    run_out_path,
-)
+from gretel_trainer.b2.core import BenchmarkConfig, Dataset, Timer, run_out_path
 from gretel_trainer.b2.custom.models import CustomModel
 from gretel_trainer.b2.gretel.sdk_extras import run_evaluate
 
@@ -19,7 +13,7 @@ class CustomStrategy:
         self,
         benchmark_model: CustomModel,
         dataset: Dataset,
-        run_identifier: RunIdentifier,
+        run_identifier: str,
         evaluate_project: Project,
         config: BenchmarkConfig,
     ):

@@ -3,13 +3,7 @@ from multiprocessing.managers import DictProxy
 from pathlib import Path
 from typing import Optional, Protocol
 
-from gretel_trainer.b2.core import (
-    BenchmarkConfig,
-    Dataset,
-    RunIdentifier,
-    log,
-    run_out_path,
-)
+from gretel_trainer.b2.core import BenchmarkConfig, Dataset, log, run_out_path
 
 
 class Status(str, Enum):
@@ -64,7 +58,7 @@ class Executor:
     def __init__(
         self,
         strategy: Strategy,
-        run_identifier: RunIdentifier,
+        run_identifier: str,
     ):
         self.strategy = strategy
         self.run_identifier = run_identifier

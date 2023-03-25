@@ -15,19 +15,6 @@ class BenchmarkException(Exception):
     pass
 
 
-class RunIdentifier(Tuple[str, str]):
-    def __repr__(self) -> str:
-        return f"{self[0]}-{self[1]}"
-
-    @property
-    def model_name(self) -> str:
-        return self[0]
-
-    @property
-    def dataset_name(self) -> str:
-        return self[1]
-
-
 class Datatype(str, Enum):
     tabular = "tabular"
     time_series = "time_series"
@@ -70,9 +57,9 @@ class Timer:
         return round(self.total_time, 3)
 
 
-def run_out_path(working_dir: Path, run_identifier: RunIdentifier) -> Path:
+def run_out_path(working_dir: Path, run_identifier: str) -> Path:
     return working_dir / f"synth_{run_identifier}.csv"
 
 
-def log(run_identifier: RunIdentifier, msg: str) -> None:
+def log(run_identifier: str, msg: str) -> None:
     logger.info(f"{run_identifier} - {msg}")

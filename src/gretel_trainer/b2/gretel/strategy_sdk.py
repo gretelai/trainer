@@ -12,7 +12,6 @@ from gretel_trainer.b2.core import (
     BenchmarkConfig,
     BenchmarkException,
     Dataset,
-    RunIdentifier,
     log,
     run_out_path,
 )
@@ -25,7 +24,7 @@ class GretelSDKStrategy:
         self,
         benchmark_model: GretelModel,
         dataset: Dataset,
-        run_identifier: RunIdentifier,
+        run_identifier: str,
         project: Project,
         config: BenchmarkConfig,
     ):
