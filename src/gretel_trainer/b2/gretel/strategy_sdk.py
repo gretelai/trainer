@@ -16,7 +16,7 @@ from gretel_trainer.b2.core import (
     run_out_path,
 )
 from gretel_trainer.b2.gretel.models import GretelModel, GretelModelConfig
-from gretel_trainer.b2.gretel.sdk_extras import await_job, run_evaluate
+from gretel_trainer.b2.gretel.sdk_extras import await_job
 
 
 class GretelSDKStrategy:
@@ -36,7 +36,6 @@ class GretelSDKStrategy:
 
         self.model: Optional[Model] = None
         self.record_handler: Optional[RecordHandler] = None
-        self.evaluate_report_json: Optional[Dict[str, Any]] = None
 
     def _format_model_config(self) -> GretelModelConfig:
         config = read_model_config(self.benchmark_model.config)
@@ -78,21 +77,6 @@ class GretelSDKStrategy:
             synthetic_data.to_csv(self._synthetic_data_path, index=False)
         else:
             raise BenchmarkException("Generate failed")
-
-    def evaluate(self) -> None:
-        self.evaluate_report_json = run_evaluate(
-            project=self.project,
-            data_source=str(self._synthetic_data_path),
-            ref_data=self.dataset.data_source,
-            run_identifier=self.run_identifier,
-            wait=self.config.refresh_interval,
-        )
-
-    def get_sqs_score(self) -> Optional[int]:
-        if self.evaluate_report_json is None:
-            return None
-        else:
-            return self.evaluate_report_json["synthetic_data_quality_score"]["score"]
 
     @property
     def _synthetic_data_path(self) -> Path:

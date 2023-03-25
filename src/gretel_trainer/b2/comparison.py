@@ -164,7 +164,7 @@ class Comparison:
             "Rows": executor.strategy.dataset.row_count,
             "Columns": executor.strategy.dataset.column_count,
             "Status": executor.status.value,
-            "SQS": executor.strategy.get_sqs_score(),
+            "SQS": executor.get_sqs_score(),
             "Train time (sec)": train_time,
             "Generate time (sec)": generate_time,
             "Total time (sec)": total_time,
@@ -182,6 +182,8 @@ class Comparison:
         executor = Executor(
             strategy=strategy,
             run_identifier=run_identifier,
+            evaluate_project=self._project,
+            config=self.config,
         )
         self.executors[run_identifier] = executor
         self.futures[run_identifier] = self.thread_pool.submit(_run_gretel, executor)
@@ -197,12 +199,13 @@ class Comparison:
             benchmark_model=model,
             dataset=dataset,
             run_identifier=run_identifier,
-            evaluate_project=self._project,
             config=self.config,
         )
         executor = Executor(
             strategy=strategy,
             run_identifier=run_identifier,
+            evaluate_project=self._project,
+            config=self.config,
         )
         self.executors[run_identifier] = executor
         collection.append(executor)
@@ -309,7 +312,6 @@ def _set_gretel_strategy(
             benchmark_model=benchmark_model,
             dataset=dataset,
             run_identifier=run_identifier,
-            evaluate_project=project,
             config=config,
         )
     else:

@@ -3,7 +3,10 @@ from multiprocessing.managers import DictProxy
 from pathlib import Path
 from typing import Optional, Protocol
 
+from gretel_client.projects.projects import Project
+
 from gretel_trainer.b2.core import BenchmarkConfig, Dataset, log, run_out_path
+from gretel_trainer.b2.gretel.sdk_extras import run_evaluate
 
 
 class Status(str, Enum):
@@ -45,12 +48,6 @@ class Strategy(Protocol):
     def generate(self) -> None:
         ...
 
-    def evaluate(self) -> None:
-        ...
-
-    def get_sqs_score(self) -> Optional[int]:
-        ...
-
     def get_train_time(self) -> Optional[float]:
         ...
 
@@ -63,11 +60,17 @@ class Executor:
         self,
         strategy: Strategy,
         run_identifier: str,
+        evaluate_project: Project,
+        config: BenchmarkConfig,
     ):
         self.strategy = strategy
         self.run_identifier = run_identifier
+        self.evaluate_project = evaluate_project
+        self.config = config
+
         self.status = Status.NotStarted
         self.exception: Optional[Exception] = None
+        self.evaluate_report_json: Optional[dict] = None
 
     def run(self) -> None:
         self._maybe_skip()
@@ -77,6 +80,12 @@ class Executor:
             self._generate()
         if self.status.can_proceed:
             self._evaluate()
+
+    def get_sqs_score(self) -> Optional[int]:
+        if self.evaluate_report_json is None:
+            return None
+        else:
+            return self.evaluate_report_json["synthetic_data_quality_score"]["score"]
 
     def _maybe_skip(self) -> None:
         if not self.strategy.runnable():
@@ -110,8 +119,15 @@ class Executor:
         self.status = Status.Evaluating
 
         try:
-            self.strategy.evaluate()
-            sqs = self.strategy.get_sqs_score()
+            self.evaluate_report_json = run_evaluate(
+                project=self.evaluate_project,
+                data_source=str(
+                    run_out_path(self.config.working_dir, self.run_identifier)
+                ),
+                ref_data=self.strategy.dataset.data_source,
+                run_identifier=self.run_identifier,
+                wait=self.config.refresh_interval,
+            )
             self._log("evaluation completed successfully")
             self.status = Status.Complete
         except Exception as e:
