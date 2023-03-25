@@ -18,6 +18,10 @@ class Status(str, Enum):
     FailedEvaluate = "Failed (evaluate)"
 
     @property
+    def can_proceed(self) -> bool:
+        return not self.cannot_proceed
+
+    @property
     def cannot_proceed(self) -> bool:
         return self in [
             Status.Skipped,
@@ -65,12 +69,21 @@ class Executor:
         self.status = Status.NotStarted
         self.exception: Optional[Exception] = None
 
-    def train(self) -> None:
+    def run(self) -> None:
+        self._maybe_skip()
+        if self.status.can_proceed:
+            self._train()
+        if self.status.can_proceed:
+            self._generate()
+        if self.status.can_proceed:
+            self._evaluate()
+
+    def _maybe_skip(self) -> None:
         if not self.strategy.runnable():
             self._log("skipping")
             self.status = Status.Skipped
-            return None
 
+    def _train(self) -> None:
         self._log("starting model training")
         self.status = Status.Training
         try:
@@ -81,10 +94,7 @@ class Executor:
             self.status = Status.FailedTrain
             self.exception = e
 
-    def generate(self) -> None:
-        if self.status.cannot_proceed:
-            return None
-
+    def _generate(self) -> None:
         self._log("starting synthetic data generation")
         self.status = Status.Generating
         try:
@@ -95,10 +105,7 @@ class Executor:
             self.status = Status.FailedGenerate
             self.exception = e
 
-    def evaluate(self) -> None:
-        if self.status.cannot_proceed:
-            return None
-
+    def _evaluate(self) -> None:
         self._log("starting evaluation")
         self.status = Status.Evaluating
 
