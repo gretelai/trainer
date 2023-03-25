@@ -145,6 +145,11 @@ class Comparison:
 
         return job
 
+    def get_executor(self, run_id: str) -> Executor:
+        model, dataset = run_id.split("-")
+        run_identifier = RunIdentifier((model, dataset))
+        return self.executors[run_identifier]
+
     def cleanup(self) -> None:
         self._project.delete()
 
@@ -168,7 +173,7 @@ class Comparison:
             "DataType": executor.strategy.dataset.datatype,
             "Rows": executor.strategy.dataset.row_count,
             "Columns": executor.strategy.dataset.column_count,
-            "Status": executor.status,
+            "Status": executor.status.value,
             "SQS": executor.strategy.get_sqs_score(),
             "Train time (sec)": train_time,
             "Generate time (sec)": generate_time,
