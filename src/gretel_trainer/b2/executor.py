@@ -1,3 +1,4 @@
+from enum import Enum
 from multiprocessing.managers import DictProxy
 from pathlib import Path
 from typing import Optional, Protocol
@@ -9,14 +10,27 @@ from gretel_trainer.b2.core import (
     log,
     run_out_path,
 )
-from gretel_trainer.b2.status import (
-    Completed,
-    Failed,
-    InProgress,
-    NotStarted,
-    RunStatus,
-    Skipped,
-)
+
+
+class Status(str, Enum):
+    NotStarted = "Not started"
+    Skipped = "Skipped"
+    Training = "Training"
+    Generating = "Generating"
+    Evaluating = "Evaluating"
+    Complete = "Complete"
+    FailedTrain = "Failed (train)"
+    FailedGenerate = "Failed (generate)"
+    FailedEvaluate = "Failed (evaluate)"
+
+    @property
+    def cannot_proceed(self) -> bool:
+        return self in [
+            Status.Skipped,
+            Status.FailedTrain,
+            Status.FailedGenerate,
+            Status.FailedEvaluate,
+        ]
 
 
 class Strategy(Protocol):
@@ -51,87 +65,58 @@ class Executor:
         self,
         strategy: Strategy,
         run_identifier: RunIdentifier,
-        statuses: DictProxy,
     ):
         self.strategy = strategy
         self.run_identifier = run_identifier
-        self.statuses = statuses
-        self.set_status(NotStarted())
-
-    def set_status(self, status: RunStatus) -> None:
-        self.status = status
-        self.statuses[self.run_identifier] = status
+        self.status = Status.NotStarted
+        self.exception: Optional[Exception] = None
 
     def train(self) -> None:
         if not self.strategy.runnable():
             self._log("skipping")
-            self.set_status(Skipped())
+            self.status = Status.Skipped
             return None
 
         self._log("starting model training")
-        self._in_progress("training")
+        self.status = Status.Training
         try:
             self.strategy.train()
             self._log("training completed successfully")
-            self._in_progress("trained")
         except Exception as e:
             self._log("training failed")
-            self._failed("train", e)
+            self.status = Status.FailedTrain
+            self.exception = e
 
     def generate(self) -> None:
-        if isinstance(self.status, (Skipped, Failed)):
+        if self.status.cannot_proceed:
             return None
 
         self._log("starting synthetic data generation")
-        self._in_progress("generating")
+        self.status = Status.Generating
         try:
             self.strategy.generate()
             self._log("synthetic data generation completed successfully")
-            self._in_progress("generated")
         except Exception as e:
             self._log("synthetic data generation failed")
-            self._failed("generate", e)
+            self.status = Status.FailedGenerate
+            self.exception = e
 
     def evaluate(self) -> None:
-        if isinstance(self.status, (Skipped, Failed)):
+        if self.status.cannot_proceed:
             return None
 
         self._log("starting evaluation")
-        self._in_progress("evaluating")
+        self.status = Status.Evaluating
 
         try:
             self.strategy.evaluate()
             sqs = self.strategy.get_sqs_score()
             self._log("evaluation completed successfully")
-            self.set_status(
-                Completed(
-                    sqs=sqs,
-                    train_secs=self.strategy.get_train_time(),
-                    generate_secs=self.strategy.get_generate_time(),
-                )
-            )
+            self.status = Status.Complete
         except Exception as e:
             self._log("evaluation failed")
-            self._failed("evaluate", e)
-
-    def _in_progress(self, stage: str) -> None:
-        self.set_status(
-            InProgress(
-                stage=stage,
-                train_secs=self.strategy.get_train_time(),
-                generate_secs=self.strategy.get_generate_time(),
-            )
-        )
-
-    def _failed(self, during: str, error: Exception) -> None:
-        self.set_status(
-            Failed(
-                during=during,
-                error=error,
-                train_secs=self.strategy.get_train_time(),
-                generate_secs=self.strategy.get_generate_time(),
-            )
-        )
+            self.status = Status.FailedEvaluate
+            self.exception = e
 
     def _log(self, msg: str) -> None:
         log(self.run_identifier, msg)

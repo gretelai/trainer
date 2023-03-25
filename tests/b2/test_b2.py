@@ -31,7 +31,7 @@ def test_run_with_gretel_dataset(working_dir, project, evaluate_report_path, iri
     assert result["Model"] == "DoNothingModel"
     assert result["Rows"] == _iris_shape[0]
     assert result["Columns"] == _iris_shape[1]
-    assert result["Status"] == "Completed"
+    assert result["Status"] == "Complete"
     assert result["SQS"] == 95
 
 
@@ -59,7 +59,7 @@ def test_run_with_custom_csv_dataset(working_dir, project, evaluate_report_path,
     assert result["Model"] == "DoNothingModel"
     assert result["Rows"] == 3
     assert result["Columns"] == 2
-    assert result["Status"] == "Completed"
+    assert result["Status"] == "Complete"
     assert result["SQS"] == 95
 
 
@@ -86,7 +86,7 @@ def test_run_with_custom_dataframe_dataset(
     assert result["Model"] == "DoNothingModel"
     assert result["Rows"] == 3
     assert result["Columns"] == 2
-    assert result["Status"] == "Completed"
+    assert result["Status"] == "Complete"
     assert result["SQS"] == 95
 
     working_dir_contents = os.listdir(working_dir)
@@ -134,7 +134,7 @@ def test_run_happy_path_gretel_sdk(
     result = comparison.results.iloc[0]
     model_name = benchmark_model.__name__
     assert result["Model"] == model_name
-    assert result["Status"] == "Completed"
+    assert result["Status"] == "Complete"
     assert result["SQS"] == 95
     assert result["Train time (sec)"] == 30
     assert result["Generate time (sec)"] == 15

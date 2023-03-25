@@ -29,7 +29,6 @@ from gretel_trainer.b2.gretel.datasets import GretelDataset
 from gretel_trainer.b2.gretel.models import GretelAuto, GretelModel
 from gretel_trainer.b2.gretel.strategy_sdk import GretelSDKStrategy
 from gretel_trainer.b2.gretel.strategy_trainer import GretelTrainerStrategy
-from gretel_trainer.b2.status import Completed, Failed, InProgress
 
 logger = logging.getLogger(__name__)
 
@@ -85,10 +84,6 @@ class Comparison:
         self.executors: Dict[RunIdentifier, Executor] = {}
         self.thread_pool = ThreadPoolExecutor(5)
         self.futures: Dict[Union[RunIdentifier, Literal["custom"]], Future] = {}
-        self._manager = mp.Manager()
-        # Cannot type-hint more specifically than DictProxy,
-        # but this functions as a Dict[RunIdentifier, RunStatus]
-        self.run_statuses: DictProxy = self._manager.dict()
 
     def _make_project(self) -> Project:
         display_name = self.config.project_display_name
@@ -159,19 +154,9 @@ class Comparison:
 
     def _result_dict(self, run_identifier: RunIdentifier) -> Dict[str, Any]:
         executor = self.executors[run_identifier]
-        status = self.run_statuses[run_identifier]
 
-        sqs = None
-        if isinstance(status, Completed):
-            sqs = status.sqs
-
-        train_time = None
-        if isinstance(status, (Completed, Failed, InProgress)):
-            train_time = status.train_secs
-
-        generate_time = None
-        if isinstance(status, (Completed, Failed, InProgress)):
-            generate_time = status.generate_secs
+        train_time = executor.strategy.get_train_time()
+        generate_time = executor.strategy.get_generate_time()
 
         total_time = train_time
         if train_time is not None and generate_time is not None:
@@ -183,8 +168,8 @@ class Comparison:
             "DataType": executor.strategy.dataset.datatype,
             "Rows": executor.strategy.dataset.row_count,
             "Columns": executor.strategy.dataset.column_count,
-            "Status": status.display,
-            "SQS": sqs,
+            "Status": executor.status,
+            "SQS": executor.strategy.get_sqs_score(),
             "Train time (sec)": train_time,
             "Generate time (sec)": generate_time,
             "Total time (sec)": total_time,
@@ -202,7 +187,6 @@ class Comparison:
         executor = Executor(
             strategy=strategy,
             run_identifier=run_identifier,
-            statuses=self.run_statuses,
         )
         self.executors[run_identifier] = executor
         self.futures[run_identifier] = self.thread_pool.submit(_run_gretel, executor)
@@ -224,7 +208,6 @@ class Comparison:
         executor = Executor(
             strategy=strategy,
             run_identifier=run_identifier,
-            statuses=self.run_statuses,
         )
         self.executors[run_identifier] = executor
         collection.append(executor)
