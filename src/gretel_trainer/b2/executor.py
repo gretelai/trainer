@@ -6,7 +6,7 @@ from typing import Optional, Protocol
 from gretel_client.projects.projects import Project
 
 from gretel_trainer.b2.core import BenchmarkConfig, Dataset, log, run_out_path
-from gretel_trainer.b2.gretel.sdk_extras import run_evaluate
+from gretel_trainer.b2.sdk_extras import run_evaluate
 
 
 class Status(str, Enum):

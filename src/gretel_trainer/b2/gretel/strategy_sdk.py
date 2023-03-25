@@ -16,7 +16,7 @@ from gretel_trainer.b2.core import (
     run_out_path,
 )
 from gretel_trainer.b2.gretel.models import GretelModel, GretelModelConfig
-from gretel_trainer.b2.gretel.sdk_extras import await_job
+from gretel_trainer.b2.sdk_extras import await_job
 
 
 class GretelSDKStrategy:
