@@ -4,6 +4,7 @@ from typing import Any, Dict, Tuple
 
 import smart_open
 from gretel_client.projects.jobs import ACTIVE_STATES, END_STATES, Job, Status
+from gretel_client.projects.models import read_model_config
 from gretel_client.projects.projects import Project
 
 from gretel_trainer.b2.core import BenchmarkException, log
@@ -17,7 +18,7 @@ def run_evaluate(
     wait: int,
 ) -> Dict[str, Any]:
     evaluate_model = project.create_model_obj(
-        model_config="evaluate/default",
+        model_config=_make_evaluate_config(run_identifier),
         data_source=data_source,
         ref_data=ref_data,
     )
@@ -28,6 +29,12 @@ def run_evaluate(
     return json.loads(
         smart_open.open(evaluate_model.get_artifact_link("report_json")).read()
     )
+
+
+def _make_evaluate_config(run_identifier: str) -> dict:
+    config_dict = read_model_config("evaluate/default")
+    config_dict["name"] = f"evaluate-{run_identifier}"
+    return config_dict
 
 
 def await_job(run_identifier: str, job: Job, task: str, wait: int) -> Status:
