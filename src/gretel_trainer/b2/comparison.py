@@ -93,7 +93,10 @@ class Comparison:
                 self._setup_gretel_run(dataset, model)
             for model in self.custom_models:
                 self._setup_custom_run(dataset, model, custom_executors)
-        self.futures["custom"] = self.thread_pool.submit(_run_custom, custom_executors)
+        if len(custom_executors) > 0:
+            self.futures["custom"] = self.thread_pool.submit(
+                _run_custom, custom_executors
+            )
         return self
 
     @property
