@@ -43,7 +43,7 @@ class GretelTrainerStrategy:
 
     def train(self) -> None:
         self.trainer = Trainer(
-            project_name=f"{self.config.trainer_project_prefix}-{self.run_identifier}",
+            project_name=self._project_name,
             model_type=self.benchmark_model.trainer_model_type,
             cache_file=self.config.working_dir / f"{self.run_identifier}.json",
         )
@@ -67,6 +67,13 @@ class GretelTrainerStrategy:
     @property
     def _synthetic_data_path(self) -> Path:
         return run_out_path(self.config.working_dir, self.run_identifier)
+
+    @property
+    def _project_name(self) -> str:
+        prefix = self.config.trainer_project_prefix
+        run_id = self.run_identifier
+        name = f"{prefix}-{run_id}"
+        return name.replace("_", "-")
 
 
 def _get_duration(timer: Optional[Timer]) -> Optional[float]:
