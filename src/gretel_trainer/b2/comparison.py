@@ -26,6 +26,8 @@ from gretel_trainer.b2.gretel.strategy_trainer import GretelTrainerStrategy
 
 logger = logging.getLogger(__name__)
 
+RUN_IDENTIFIER_SEPARATOR = "-"
+
 
 DatasetTypes = Union[CustomDataset, GretelDataset]
 ModelTypes = Union[Type[CustomModel], Type[GretelModel]]
@@ -148,7 +150,7 @@ class Comparison:
 
     def _result_dict(self, run_identifier: str) -> Dict[str, Any]:
         executor = self.executors[run_identifier]
-        model_name, dataset_name = run_identifier.split("-")
+        model_name, dataset_name = run_identifier.split(RUN_IDENTIFIER_SEPARATOR, 1)
 
         train_time = executor.strategy.get_train_time()
         generate_time = executor.strategy.get_generate_time()
@@ -251,7 +253,7 @@ def _current_timestamp() -> str:
 def _make_run_identifier(
     model: Union[GretelModel, CustomModel], dataset: Dataset
 ) -> str:
-    run_identifier = f"{_model_name(model)}-{dataset.name}"
+    run_identifier = f"{_model_name(model)}{RUN_IDENTIFIER_SEPARATOR}{dataset.name}"
     log(run_identifier, "preparing run")
     return run_identifier
 
