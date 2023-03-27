@@ -70,7 +70,7 @@ class GretelTrainerStrategy:
 
     @property
     def _project_name(self) -> str:
-        prefix = self.config.trainer_project_prefix
+        prefix = self.config.project_display_name
         run_id = self.run_identifier
         name = f"{prefix}-{run_id}"
         return name.replace("_", "-")

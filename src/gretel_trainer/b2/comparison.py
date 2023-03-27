@@ -3,7 +3,6 @@ from __future__ import annotations
 import logging
 import multiprocessing as mp
 from concurrent.futures import Future, ThreadPoolExecutor
-from datetime import datetime
 from multiprocessing.managers import DictProxy
 from pathlib import Path
 from typing import Any, Dict, List, Literal, Optional, Type, Union
@@ -47,7 +46,6 @@ def compare(
         trainer=trainer,
         refresh_interval=refresh_interval,
         working_dir=Path(working_dir),
-        timestamp=_current_timestamp(),
     )
     comparison = Comparison(
         datasets=datasets,
@@ -145,7 +143,7 @@ class Comparison:
         self._project.delete()
 
         if self.config.trainer:
-            for project in search_projects(query=self.config.trainer_project_prefix):
+            for project in search_projects(query=self.config.project_display_name):
                 project.delete()
 
     def _result_dict(self, run_identifier: str) -> Dict[str, Any]:
@@ -244,10 +242,6 @@ def _make_dataset(dataset: DatasetTypes, working_dir: Path) -> Dataset:
         column_count=dataset.column_count,
         data_source=source,
     )
-
-
-def _current_timestamp() -> str:
-    return datetime.now().strftime("%Y%m%d%H%M%S")
 
 
 def _make_run_identifier(

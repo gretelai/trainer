@@ -36,11 +36,6 @@ class BenchmarkConfig:
     refresh_interval: int
     trainer: bool
     working_dir: Path
-    timestamp: str
-
-    @property
-    def trainer_project_prefix(self) -> str:
-        return f"{self.project_display_name}-{self.timestamp}"
 
 
 class Timer:
