@@ -39,7 +39,7 @@ class GretelSDKStrategy:
 
     def _format_model_config(self) -> GretelModelConfig:
         config = read_model_config(self.benchmark_model.config)
-        config["name"] = str(self.run_identifier)
+        config["name"] = self.run_identifier
         return config
 
     def runnable(self) -> bool:
