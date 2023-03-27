@@ -4,24 +4,30 @@ from typing import Any, Dict, Tuple
 
 import smart_open
 from gretel_client.projects.jobs import ACTIVE_STATES, END_STATES, Job, Status
-from gretel_client.projects.models import read_model_config
+from gretel_client.projects.models import Model, read_model_config
 from gretel_client.projects.projects import Project
 
 from gretel_trainer.b2.core import BenchmarkException, log
 
 
-def run_evaluate(
+def create_evaluate_model(
     project: Project,
     data_source: str,
     ref_data: str,
     run_identifier: str,
-    wait: int,
-) -> Dict[str, Any]:
-    evaluate_model = project.create_model_obj(
+) -> Model:
+    return project.create_model_obj(
         model_config=_make_evaluate_config(run_identifier),
         data_source=data_source,
         ref_data=ref_data,
     )
+
+
+def run_evaluate(
+    evaluate_model: Model,
+    run_identifier: str,
+    wait: int,
+) -> Dict[str, Any]:
     evaluate_model.submit_cloud()
     job_status = await_job(run_identifier, evaluate_model, "evaluation", wait)
     if job_status in END_STATES and job_status != Status.COMPLETED:

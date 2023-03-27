@@ -3,10 +3,11 @@ from multiprocessing.managers import DictProxy
 from pathlib import Path
 from typing import Optional, Protocol
 
+from gretel_client.projects.models import Model
 from gretel_client.projects.projects import Project
 
 from gretel_trainer.b2.core import BenchmarkConfig, Dataset, log, run_out_path
-from gretel_trainer.b2.sdk_extras import run_evaluate
+from gretel_trainer.b2.sdk_extras import create_evaluate_model, run_evaluate
 
 
 class Status(str, Enum):
@@ -70,6 +71,7 @@ class Executor:
 
         self.status = Status.NotStarted
         self.exception: Optional[Exception] = None
+        self.evaluate_model: Optional[Model] = None
         self.evaluate_report_json: Optional[dict] = None
 
     def run(self) -> None:
@@ -118,13 +120,15 @@ class Executor:
         self._log("starting evaluation")
         self.status = Status.Evaluating
 
+        self.evaluate_model = create_evaluate_model(
+            project=self.evaluate_project,
+            data_source=str(run_out_path(self.config.working_dir, self.run_identifier)),
+            ref_data=self.strategy.dataset.data_source,
+            run_identifier=self.run_identifier,
+        )
         try:
             self.evaluate_report_json = run_evaluate(
-                project=self.evaluate_project,
-                data_source=str(
-                    run_out_path(self.config.working_dir, self.run_identifier)
-                ),
-                ref_data=self.strategy.dataset.data_source,
+                evaluate_model=self.evaluate_model,
                 run_identifier=self.run_identifier,
                 wait=self.config.refresh_interval,
             )
