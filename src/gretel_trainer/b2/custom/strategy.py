@@ -37,6 +37,10 @@ class CustomStrategy:
             synthetic_df.to_csv(self._synthetic_data_path, index=False)
 
     @property
+    def evaluate_ref_data(self) -> str:
+        return self.dataset.data_source
+
+    @property
     def _synthetic_data_path(self) -> Path:
         return run_out_path(self.config.working_dir, self.run_identifier)
 

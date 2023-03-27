@@ -30,6 +30,7 @@ A v2 rewrite of Benchmark.
 
 ## TODOs
 
+- Consider being more economical about data sources. Example: SDK comparisons can upload datasets' data sources in advance and pass the artifact keys to the SDKStrategy. We may need an artifact eviction strategy.
 - Errors should be more detailed. Might help to do `raise BenchmarkException(...) from e` in certain places. Also some of those exceptions can get more detailed messages (e.g. exact job status)
 - Is it simple enough to get to an error? `comparison.executors[run_id].exception`. Maybe some kind of `all_errors` helper function? With advice on what to do next (e.g. check logs)?
 - Project name(s). Consider creating projects with both a display name (provided by user) **and** an actual unique name (something like `benchmark-{timestamp}`).

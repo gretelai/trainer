@@ -79,6 +79,13 @@ class GretelSDKStrategy:
             raise BenchmarkException("Generate failed")
 
     @property
+    def evaluate_ref_data(self) -> str:
+        if self.model is None:
+            return self.dataset.data_source
+        else:
+            return self.model.data_source
+
+    @property
     def _synthetic_data_path(self) -> Path:
         return run_out_path(self.config.working_dir, self.run_identifier)
 

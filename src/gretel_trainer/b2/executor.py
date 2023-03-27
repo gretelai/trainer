@@ -40,6 +40,10 @@ class Strategy(Protocol):
     def dataset(self) -> Dataset:
         ...
 
+    @property
+    def evaluate_ref_data(self) -> str:
+        ...
+
     def runnable(self) -> bool:
         ...
 
@@ -123,7 +127,7 @@ class Executor:
         self.evaluate_model = create_evaluate_model(
             project=self.evaluate_project,
             data_source=str(run_out_path(self.config.working_dir, self.run_identifier)),
-            ref_data=self.strategy.dataset.data_source,
+            ref_data=self.strategy.evaluate_ref_data,
             run_identifier=self.run_identifier,
         )
         try:
