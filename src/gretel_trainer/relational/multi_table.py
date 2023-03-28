@@ -47,11 +47,9 @@ from gretel_trainer.relational.model_config import (
 from gretel_trainer.relational.report.report import ReportPresenter, ReportRenderer
 from gretel_trainer.relational.sdk_extras import (
     cautiously_refresh_status,
-    delete_data_source,
     download_file_artifact,
     download_tar_artifact,
     get_job_id,
-    room_in_project,
     sqs_score_from_full_report,
 )
 from gretel_trainer.relational.strategies.ancestral import AncestralStrategy

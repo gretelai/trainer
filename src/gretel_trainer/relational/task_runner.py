@@ -11,7 +11,6 @@ from gretel_trainer.relational.sdk_extras import (
     cautiously_refresh_status,
     delete_data_source,
     get_job_id,
-    room_in_project,
     start_job_if_possible,
 )
 
