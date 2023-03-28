@@ -23,6 +23,7 @@ class MockMultiTable:
     _refresh_interval: int = 0
     _project: Project = Mock(artifacts=[])
     _strategy: Union[AncestralStrategy, IndependentStrategy] = AncestralStrategy()
+    hybrid: bool = False
 
     def _backup(self) -> None:
         pass
@@ -126,7 +127,7 @@ def test_starts_jobs_for_ready_tables(pets, tmpdir):
     task.synthetics_train.models[
         "humans"
     ].create_record_handler_obj.assert_called_once()
-    task.synthetics_run.record_handlers["humans"].submit_cloud.assert_called_once()
+    task.synthetics_run.record_handlers["humans"].submit.assert_called_once()
 
 
 def test_defers_jobs_if_no_room(pets, tmpdir):
@@ -146,7 +147,7 @@ def test_defers_jobs_if_no_room(pets, tmpdir):
     task.synthetics_train.models[
         "humans"
     ].create_record_handler_obj.assert_called_once()
-    task.synthetics_run.record_handlers["humans"].submit_cloud.assert_not_called()
+    task.synthetics_run.record_handlers["humans"].submit.assert_not_called()
 
 
 def test_does_not_restart_existing_deferred_jobs(pets, tmpdir):
@@ -163,7 +164,7 @@ def test_does_not_restart_existing_deferred_jobs(pets, tmpdir):
     task.synthetics_train.models[
         "humans"
     ].create_record_handler_obj.assert_called_once()
-    task.synthetics_run.record_handlers["humans"].submit_cloud.assert_not_called()
+    task.synthetics_run.record_handlers["humans"].submit.assert_not_called()
 
     task.synthetics_train.models["humans"].reset_mock()
 

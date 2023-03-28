@@ -25,5 +25,9 @@ class _MultiTable(Protocol):
     def _strategy(self) -> Union[AncestralStrategy, IndependentStrategy]:
         ...
 
+    @property
+    def hybrid(self) -> bool:
+        ...
+
     def _backup(self) -> None:
         ...

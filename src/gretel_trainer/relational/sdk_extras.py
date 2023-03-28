@@ -27,8 +27,8 @@ def get_job_id(job: Job) -> Optional[str]:
         raise MultiTableException("Unexpected job object")
 
 
-def delete_data_source(project: Project, job: Job) -> None:
-    if job.data_source is not None:
+def delete_data_source(project: Project, job: Job, hybrid: bool) -> None:
+    if not hybrid and job.data_source is not None:
         project.delete_artifact(job.data_source)
 
 
@@ -85,15 +85,20 @@ def start_job_if_possible(
     action: str,
     project: Project,
     number_of_artifacts: int,
+    hybrid: bool,
 ) -> None:
-    if job.data_source is None or _room_in_project(project, number_of_artifacts):
+    if job.data_source is None or _room_in_project(
+        project, number_of_artifacts, hybrid
+    ):
         _log_start(table_name, action)
-        job.submit_cloud()
+        job.submit()
     else:
         _log_waiting(table_name, action)
 
 
-def _room_in_project(project: Project, count: int = 1) -> bool:
+def _room_in_project(project: Project, count: int, hybrid: bool) -> bool:
+    if hybrid:
+        return True
     return len(project.artifacts) + count <= MAX_PROJECT_ARTIFACTS
 
 

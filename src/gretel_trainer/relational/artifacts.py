@@ -11,6 +11,7 @@ from gretel_client.projects import Project
 
 @dataclass
 class ArtifactCollection:
+    hybrid: bool
     gretel_debug_summary: Optional[str] = None
     source_archive: Optional[str] = None
     synthetics_training_archive: Optional[str] = None
@@ -37,7 +38,10 @@ class ArtifactCollection:
         existing = self.transforms_outputs_archive
         self.transforms_outputs_archive = self._upload_file(project, path, existing)
 
-    def _upload_file(self, project: Project, path: str, existing: Optional[str]) -> str:
+    def _upload_file(self, project: Project, path: str, existing: Optional[str]) -> Optional[str]:
+        if self.hybrid:
+            return None
+
         latest = project.upload_artifact(path)
         if existing is not None:
             project.delete_artifact(existing)

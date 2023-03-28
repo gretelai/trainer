@@ -101,7 +101,7 @@ class MultiTable:
         self._set_refresh_interval(refresh_interval)
 
         self.relational_data = relational_data
-        self._artifact_collection = ArtifactCollection()
+        self._artifact_collection = ArtifactCollection(hybrid=True)
         self._latest_backup: Optional[Backup] = None
         self._transforms_train = TransformsTrain()
         self.transform_output_tables: Dict[str, pd.DataFrame] = {}
@@ -109,6 +109,8 @@ class MultiTable:
         self._synthetics_run: Optional[SyntheticsRun] = None
         self.synthetic_output_tables: Dict[str, pd.DataFrame] = {}
         self.evaluations = defaultdict(lambda: TableEvaluation())
+
+        self.hybrid = True
 
         configure_session(api_key="prompt", cache="yes", validate=True)
 
@@ -364,7 +366,7 @@ class MultiTable:
         with open(backup_path, "w") as bak:
             json.dump(backup.as_dict, bak)
 
-        _upload_gretel_backup(self._project, str(backup_path))
+        _upload_gretel_backup(self._project, str(backup_path), self.hybrid)
 
         self._latest_backup = backup
 
@@ -466,7 +468,7 @@ class MultiTable:
             transforms_train=self._transforms_train,
             multitable=self,
         )
-        run_task(task)
+        run_task(task, self.hybrid)
 
     def run_transforms(
         self,
@@ -524,7 +526,7 @@ class MultiTable:
             record_handlers=transforms_record_handlers,
             multitable=self,
         )
-        run_task(task)
+        run_task(task, self.hybrid)
 
         output_tables = self._strategy.label_encode_keys(
             self.relational_data, task.output_tables
@@ -581,7 +583,7 @@ class MultiTable:
             synthetics_train=self._synthetics_train,
             multitable=self,
         )
-        run_task(task)
+        run_task(task, self.hybrid)
 
         for table in task.completed:
             model = self._synthetics_train.models[table]
@@ -708,7 +710,7 @@ class MultiTable:
             run_dir=run_dir,
             multitable=self,
         )
-        run_task(task)
+        run_task(task, self.hybrid)
 
         output_tables = self._strategy.post_process_synthetic_results(
             task.output_tables, self._synthetics_run.preserved, self.relational_data
@@ -745,7 +747,7 @@ class MultiTable:
             project=evaluate_project,
             multitable=self,
         )
-        run_task(synthetics_evaluate_task)
+        run_task(synthetics_evaluate_task, self.hybrid)
 
         for table in synthetics_evaluate_task.completed:
             self._strategy.update_evaluation_from_evaluate(
@@ -873,7 +875,9 @@ def _mkdir(name: str) -> Path:
     return d
 
 
-def _upload_gretel_backup(project: Project, path: str) -> None:
+def _upload_gretel_backup(project: Project, path: str, hybrid: bool) -> None:
+    if hybrid:
+        return None
     latest = project.upload_artifact(path)
     for artifact in project.artifacts:
         key = artifact["key"]

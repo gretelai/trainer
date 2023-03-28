@@ -126,6 +126,7 @@ def create_backup(
     artifact_collection = ArtifactCollection(
         gretel_debug_summary=ARTIFACTS["debug_summary"]["artifact_id"],
         source_archive=ARTIFACTS["source_archive"]["artifact_id"],
+        hybrid=False,
     )
     if training_archive_present:
         artifact_collection.synthetics_training_archive = ARTIFACTS[

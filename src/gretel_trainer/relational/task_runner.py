@@ -62,7 +62,7 @@ class Task(Protocol):
         ...
 
 
-def run_task(task: Task) -> None:
+def run_task(task: Task, hybrid: bool) -> None:
     refresh_attempts: Dict[str, int] = defaultdict(int)
     first_pass = True
 
@@ -84,6 +84,7 @@ def run_task(task: Task) -> None:
                     action=task.action,
                     project=task.project,
                     number_of_artifacts=task.artifacts_per_job,
+                    hybrid=hybrid,
                 )
                 continue
 
@@ -92,17 +93,17 @@ def run_task(task: Task) -> None:
             if refresh_attempts[table_name] >= MAX_REFRESH_ATTEMPTS:
                 _log_lost_contact(table_name)
                 task.handle_lost_contact(table_name)
-                delete_data_source(task.project, job)
+                delete_data_source(task.project, job, hybrid)
                 continue
 
             if status == Status.COMPLETED:
                 _log_success(table_name, task.action)
                 task.handle_completed(table_name, job)
-                delete_data_source(task.project, job)
+                delete_data_source(task.project, job, hybrid)
             elif status in END_STATES:
                 _log_failed(table_name, task.action)
                 task.handle_failed(table_name)
-                delete_data_source(task.project, job)
+                delete_data_source(task.project, job, hybrid)
             else:
                 _log_in_progress(table_name, status, task.action)
 

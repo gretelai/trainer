@@ -80,7 +80,7 @@ def test_one_successful_model(get_job_id, delete_data_source):
         project=project,
         models=models,
     )
-    run_task(task)
+    run_task(task, hybrid=False)
 
     assert task.iteration_count == 2
     assert task.completed == ["table"]
@@ -99,7 +99,7 @@ def test_one_failed_model(get_job_id, delete_data_source):
         project=project,
         models=models,
     )
-    run_task(task)
+    run_task(task, hybrid=False)
 
     assert task.iteration_count == 2
     assert task.completed == []
@@ -120,7 +120,7 @@ def test_model_taking_awhile(get_job_id, delete_data_source):
         project=project,
         models=models,
     )
-    run_task(task)
+    run_task(task, hybrid=False)
 
     assert task.iteration_count == 3
     assert task.completed == ["table"]
@@ -140,7 +140,7 @@ def test_lose_contact_with_model(get_job_id, delete_data_source):
         project=project,
         models=models,
     )
-    run_task(task)
+    run_task(task, hybrid=False)
 
     # Bail after refresh fails MAX_REFRESH_ATTEMPTS times
     assert task.iteration_count == 4
@@ -164,7 +164,7 @@ def test_refresh_status_can_tolerate_blips(get_job_id, delete_data_source):
         project=project,
         models=models,
     )
-    run_task(task)
+    run_task(task, hybrid=False)
 
     assert task.iteration_count == 3
     assert task.completed == ["table"]
@@ -194,7 +194,7 @@ def test_defers_submission_if_no_room_in_project(get_job_id, delete_data_source)
         project=project,
         models=models,
     )
-    run_task(task)
+    run_task(task, hybrid=False)
 
     assert task.iteration_count == 4
     assert task.completed == ["table"]
@@ -220,16 +220,16 @@ def test_several_models(delete_data_source):
         project=project,
         models=models,
     )
-    run_task(task)
+    run_task(task, hybrid=False)
 
     assert task.completed == ["completed"]
     assert set(task.failed) == {"error", "cancelled", "lost"}
     delete_data_source.assert_has_calls(
         [
-            call(project, completed_model),
-            call(project, error_model),
-            call(project, cancelled_model),
-            call(project, lost_model),
+            call(project, completed_model, False),
+            call(project, error_model, False),
+            call(project, cancelled_model, False),
+            call(project, lost_model, False),
         ],
         any_order=True,
     )

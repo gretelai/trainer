@@ -145,6 +145,7 @@ class SyntheticsRunTask:
                 action=self.action,
                 project=self.project,
                 number_of_artifacts=self.artifacts_per_job,
+                hybrid=self.multitable.hybrid,
             )
 
         self.multitable._backup()
