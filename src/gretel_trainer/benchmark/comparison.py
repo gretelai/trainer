@@ -104,6 +104,9 @@ class Comparison:
         result_records = [self._result_dict(run_id) for run_id in self.executors]
         return pd.DataFrame.from_records(result_records)
 
+    def export_results(self, destination: str) -> None:
+        self.results.to_csv(destination, index=False)
+
     def wait(self) -> Comparison:
         [future.result() for future in self.futures.values()]
         return self
