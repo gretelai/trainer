@@ -1,3 +1,4 @@
+import gzip
 import os
 import tempfile
 from unittest.mock import Mock, patch
@@ -147,11 +148,10 @@ def test_run_happy_path_gretel_sdk(
 
     project.create_model_obj.side_effect = [model, evaluate_model]
 
-    # Patch the pd.read_csv call that fetches record handler data
-    mock_synth_data = pd.DataFrame(data={"synthetic": [1, 2], "data": [3, 4]})
-
-    with patch("gretel_trainer.b2.gretel.strategy_sdk.pd.read_csv") as read_csv:
-        read_csv.return_value = mock_synth_data
+    with patch(
+        "gretel_trainer.b2.gretel.strategy_sdk.GretelSDKStrategy._get_record_handler_data"
+    ) as get:
+        get.return_value = Mock(content=gzip.compress(b"synthetic,data\n1,3\n2,4"))
         comparison = compare(
             datasets=[iris],
             models=[benchmark_model],
@@ -162,6 +162,7 @@ def test_run_happy_path_gretel_sdk(
     result = comparison.results.iloc[0]
     model_name = benchmark_model.__name__
     assert result["Model"] == model_name
+    print(comparison.executors[f"{model_name}-iris"].exception)
     assert result["Status"] == "Complete"
     assert result["SQS"] == 95
     assert result["Train time (sec)"] == 30
@@ -174,7 +175,9 @@ def test_run_happy_path_gretel_sdk(
     filename = f"synth_{model_name}-iris.csv"
     assert filename in working_dir_contents
     df = pd.read_csv(f"{working_dir}/{filename}")
-    pdtest.assert_frame_equal(df, mock_synth_data)
+    pdtest.assert_frame_equal(
+        df, pd.DataFrame(data={"synthetic": [1, 2], "data": [3, 4]})
+    )
 
 
 def test_sdk_model_failure(working_dir, iris, project):

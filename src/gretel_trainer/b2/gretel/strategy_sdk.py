@@ -1,8 +1,9 @@
+import gzip
 import logging
 from pathlib import Path
 from typing import Any, Dict, Optional, Tuple
 
-import pandas as pd
+import requests
 from gretel_client.projects.jobs import ACTIVE_STATES, END_STATES, Job, Status
 from gretel_client.projects.models import Model, read_model_config
 from gretel_client.projects.projects import Project
@@ -71,12 +72,20 @@ class GretelSDKStrategy:
         self.record_handler.submit_cloud()
         job_status = self._await_job(self.record_handler, "generation")
         if job_status == Status.COMPLETED:
-            synthetic_data = pd.read_csv(
-                self.record_handler.get_artifact_link("data"), compression="gzip"
-            )
-            synthetic_data.to_csv(self._synthetic_data_path, index=False)
+            self._download_synthetic_data(self.record_handler)
         else:
             raise BenchmarkException("Generate failed")
+
+    def _download_synthetic_data(self, record_handler: RecordHandler) -> None:
+        response = self._get_record_handler_data(record_handler)
+        with open(self._synthetic_data_path, "wb") as out:
+            out.write(gzip.decompress(response.content))
+
+    def _get_record_handler_data(
+        self, record_handler: RecordHandler
+    ) -> requests.Response:
+        artifact_link = record_handler.get_artifact_link("data")
+        return requests.get(artifact_link)
 
     @property
     def evaluate_ref_data(self) -> str:
