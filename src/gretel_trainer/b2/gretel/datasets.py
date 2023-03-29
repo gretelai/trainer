@@ -6,11 +6,10 @@ from functools import cached_property, wraps
 from typing import Dict, List, Optional, Tuple, Union
 
 import boto3
-import pandas as pd
 from botocore import UNSIGNED
 from botocore.client import Config
 
-from gretel_trainer.b2.core import BenchmarkException, Datatype
+from gretel_trainer.b2.core import BenchmarkException, Datatype, get_data_shape
 
 
 class GretelDataset:
@@ -33,8 +32,7 @@ class GretelDataset:
 
     @cached_property
     def _shape(self) -> Tuple[int, int]:
-        df = pd.read_csv(self.data_source)
-        return df.shape
+        return get_data_shape(self.data_source)
 
     def __repr__(self) -> str:
         return f"GretelDataset(name={self.name}, datatype={self.datatype})"

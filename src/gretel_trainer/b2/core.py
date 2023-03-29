@@ -1,3 +1,4 @@
+import csv
 import logging
 import time
 from dataclasses import dataclass
@@ -5,7 +6,7 @@ from enum import Enum
 from pathlib import Path
 from typing import Tuple, Type, Union
 
-import pandas as pd
+import smart_open
 from typing_extensions import Protocol
 
 logger = logging.getLogger(__name__)
@@ -58,3 +59,13 @@ def run_out_path(working_dir: Path, run_identifier: str) -> Path:
 
 def log(run_identifier: str, msg: str) -> None:
     logger.info(f"{run_identifier} - {msg}")
+
+
+def get_data_shape(path: str, delimiter: str = ",") -> Tuple[int, int]:
+    with smart_open.open(path) as f:
+        reader = csv.reader(f, delimiter=delimiter)
+        cols = len(next(reader))
+        # We just read the header row to get cols,
+        # so the remaining rows are all data
+        rows = sum(1 for _ in f)
+    return (rows, cols)
