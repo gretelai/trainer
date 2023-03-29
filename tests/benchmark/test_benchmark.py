@@ -8,8 +8,19 @@ import pandas.testing as pdtest
 import pytest
 from gretel_client.projects.jobs import Status
 
-from gretel_trainer.benchmark import Datatype, GretelGPTX, GretelLSTM, compare, make_dataset
-from tests.benchmark.mocks import DoNothingModel, FailsToGenerate, FailsToTrain, TailoredActgan
+from gretel_trainer.benchmark import (
+    Datatype,
+    GretelGPTX,
+    GretelLSTM,
+    compare,
+    make_dataset,
+)
+from tests.benchmark.mocks import (
+    DoNothingModel,
+    FailsToGenerate,
+    FailsToTrain,
+    TailoredActgan,
+)
 
 
 def test_run_with_gretel_dataset(working_dir, project, evaluate_report_path, iris):

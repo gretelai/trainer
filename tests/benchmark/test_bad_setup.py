@@ -11,7 +11,9 @@ def test_bad_session_exits_early(iris):
     class SomeException(Exception):
         pass
 
-    with patch("gretel_trainer.benchmark.comparison.configure_session") as configure_session:
+    with patch(
+        "gretel_trainer.benchmark.comparison.configure_session"
+    ) as configure_session:
         configure_session.side_effect = SomeException()
 
         with pytest.raises(SomeException):
