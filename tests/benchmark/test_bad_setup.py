@@ -3,15 +3,15 @@ from unittest.mock import patch
 
 import pytest
 
-from gretel_trainer.b2 import GretelLSTM, compare
-from gretel_trainer.b2.core import BenchmarkException
+from gretel_trainer.benchmark import GretelLSTM, compare
+from gretel_trainer.benchmark.core import BenchmarkException
 
 
 def test_bad_session_exits_early(iris):
     class SomeException(Exception):
         pass
 
-    with patch("gretel_trainer.b2.comparison.configure_session") as configure_session:
+    with patch("gretel_trainer.benchmark.comparison.configure_session") as configure_session:
         configure_session.side_effect = SomeException()
 
         with pytest.raises(SomeException):

@@ -5,7 +5,7 @@ from typing import Optional, Union
 
 import pandas as pd
 
-from gretel_trainer.b2.core import BenchmarkException, Datatype, get_data_shape
+from gretel_trainer.benchmark.core import BenchmarkException, Datatype, get_data_shape
 
 
 @dataclass

@@ -9,7 +9,7 @@ import boto3
 from botocore import UNSIGNED
 from botocore.client import Config
 
-from gretel_trainer.b2.core import BenchmarkException, Datatype, get_data_shape
+from gretel_trainer.benchmark.core import BenchmarkException, Datatype, get_data_shape
 
 
 class GretelDataset:

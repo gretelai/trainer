@@ -1,7 +1,7 @@
 import pandas as pd
 from typing_extensions import Protocol
 
-from gretel_trainer.b2.core import Dataset
+from gretel_trainer.benchmark.core import Dataset
 
 
 class CustomModel(Protocol):

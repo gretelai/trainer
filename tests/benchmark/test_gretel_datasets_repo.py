@@ -1,4 +1,4 @@
-from gretel_trainer.b2 import Datatype
+from gretel_trainer.benchmark import Datatype
 
 
 def test_repo_list_tags(repo):

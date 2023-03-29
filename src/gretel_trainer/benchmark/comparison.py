@@ -13,15 +13,15 @@ from gretel_client.helpers import poll
 from gretel_client.projects import Project, create_project, search_projects
 from gretel_client.projects.jobs import Job
 
-from gretel_trainer.b2.core import BenchmarkConfig, BenchmarkException, Dataset, log
-from gretel_trainer.b2.custom.datasets import CustomDataset
-from gretel_trainer.b2.custom.models import CustomModel
-from gretel_trainer.b2.custom.strategy import CustomStrategy
-from gretel_trainer.b2.executor import Executor
-from gretel_trainer.b2.gretel.datasets import GretelDataset
-from gretel_trainer.b2.gretel.models import GretelAuto, GretelModel
-from gretel_trainer.b2.gretel.strategy_sdk import GretelSDKStrategy
-from gretel_trainer.b2.gretel.strategy_trainer import GretelTrainerStrategy
+from gretel_trainer.benchmark.core import BenchmarkConfig, BenchmarkException, Dataset, log
+from gretel_trainer.benchmark.custom.datasets import CustomDataset
+from gretel_trainer.benchmark.custom.models import CustomModel
+from gretel_trainer.benchmark.custom.strategy import CustomStrategy
+from gretel_trainer.benchmark.executor import Executor
+from gretel_trainer.benchmark.gretel.datasets import GretelDataset
+from gretel_trainer.benchmark.gretel.models import GretelAuto, GretelModel
+from gretel_trainer.benchmark.gretel.strategy_sdk import GretelSDKStrategy
+from gretel_trainer.benchmark.gretel.strategy_trainer import GretelTrainerStrategy
 
 logger = logging.getLogger(__name__)
 

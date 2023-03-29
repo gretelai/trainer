@@ -1,10 +1,10 @@
 import logging
 
-from gretel_trainer.b2.comparison import compare
-from gretel_trainer.b2.core import Datatype
-from gretel_trainer.b2.custom.datasets import make_dataset
-from gretel_trainer.b2.gretel.datasets import GretelDatasetRepo
-from gretel_trainer.b2.gretel.models import (
+from gretel_trainer.benchmark.comparison import compare
+from gretel_trainer.benchmark.core import Datatype
+from gretel_trainer.benchmark.custom.datasets import make_dataset
+from gretel_trainer.benchmark.gretel.datasets import GretelDatasetRepo
+from gretel_trainer.benchmark.gretel.models import (
     GretelACTGAN,
     GretelAmplify,
     GretelAuto,
@@ -26,7 +26,7 @@ for root_handler in logging.root.handlers:
     logging.root.removeHandler(root_handler)
 
 # Configure benchmark loggers
-logger = logging.getLogger("gretel_trainer.b2")
+logger = logging.getLogger("gretel_trainer.benchmark")
 logger.handlers.clear()
 logger.addHandler(handler)
 logger.setLevel("INFO")

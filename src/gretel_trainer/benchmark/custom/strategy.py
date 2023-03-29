@@ -3,8 +3,8 @@ from typing import Any, Dict, Optional
 
 from gretel_client.projects.projects import Project
 
-from gretel_trainer.b2.core import BenchmarkConfig, Dataset, Timer, run_out_path
-from gretel_trainer.b2.custom.models import CustomModel
+from gretel_trainer.benchmark.core import BenchmarkConfig, Dataset, Timer, run_out_path
+from gretel_trainer.benchmark.custom.models import CustomModel
 
 
 class CustomStrategy:

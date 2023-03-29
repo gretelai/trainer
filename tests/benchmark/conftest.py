@@ -5,7 +5,7 @@ from unittest.mock import Mock, patch
 import pandas as pd
 import pytest
 
-from gretel_trainer.b2 import GretelDatasetRepo
+from gretel_trainer.benchmark import GretelDatasetRepo
 
 REPO = GretelDatasetRepo()
 IRIS = REPO.get_dataset("iris")
@@ -13,7 +13,7 @@ IRIS = REPO.get_dataset("iris")
 
 @pytest.fixture(autouse=True)
 def patch_configure_session():
-    with patch("gretel_trainer.b2.comparison.configure_session"):
+    with patch("gretel_trainer.benchmark.comparison.configure_session"):
         yield
 
 
@@ -40,7 +40,7 @@ def df():
 
 @pytest.fixture()
 def project():
-    with patch("gretel_trainer.b2.comparison.create_project") as create_project:
+    with patch("gretel_trainer.benchmark.comparison.create_project") as create_project:
         project = Mock()
         create_project.return_value = project
         yield project

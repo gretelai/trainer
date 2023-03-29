@@ -7,7 +7,7 @@ from gretel_client.projects.jobs import ACTIVE_STATES, END_STATES, Job, Status
 from gretel_client.projects.models import Model, read_model_config
 from gretel_client.projects.projects import Project
 
-from gretel_trainer.b2.core import BenchmarkException, log
+from gretel_trainer.benchmark.core import BenchmarkException, log
 
 
 def create_evaluate_model(

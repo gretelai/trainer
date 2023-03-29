@@ -4,14 +4,14 @@ from typing import Any, Dict, Optional
 from gretel_client.projects.projects import Project
 
 from gretel_trainer import Trainer
-from gretel_trainer.b2.core import (
+from gretel_trainer.benchmark.core import (
     BenchmarkConfig,
     BenchmarkException,
     Dataset,
     Timer,
     run_out_path,
 )
-from gretel_trainer.b2.gretel.models import GretelModel
+from gretel_trainer.benchmark.gretel.models import GretelModel
 
 
 class GretelTrainerStrategy:

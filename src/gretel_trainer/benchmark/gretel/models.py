@@ -6,7 +6,7 @@ from gretel_client.projects.models import read_model_config
 
 import gretel_trainer
 from gretel_trainer import models
-from gretel_trainer.b2.core import BenchmarkException, Dataset, Datatype
+from gretel_trainer.benchmark.core import BenchmarkException, Dataset, Datatype
 
 GretelModelConfig = Union[str, Path, Dict]
 

@@ -8,8 +8,8 @@ import pandas.testing as pdtest
 import pytest
 from gretel_client.projects.jobs import Status
 
-from gretel_trainer.b2 import Datatype, GretelGPTX, GretelLSTM, compare, make_dataset
-from tests.b2.mocks import DoNothingModel, FailsToGenerate, FailsToTrain, TailoredActgan
+from gretel_trainer.benchmark import Datatype, GretelGPTX, GretelLSTM, compare, make_dataset
+from tests.benchmark.mocks import DoNothingModel, FailsToGenerate, FailsToTrain, TailoredActgan
 
 
 def test_run_with_gretel_dataset(working_dir, project, evaluate_report_path, iris):
@@ -149,7 +149,7 @@ def test_run_happy_path_gretel_sdk(
     project.create_model_obj.side_effect = [model, evaluate_model]
 
     with patch(
-        "gretel_trainer.b2.gretel.strategy_sdk.GretelSDKStrategy._get_record_handler_data"
+        "gretel_trainer.benchmark.gretel.strategy_sdk.GretelSDKStrategy._get_record_handler_data"
     ) as get:
         get.return_value = Mock(content=gzip.compress(b"synthetic,data\n1,3\n2,4"))
         comparison = compare(

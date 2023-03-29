@@ -1,8 +1,8 @@
 import pandas as pd
 from gretel_client.projects.models import read_model_config
 
-from gretel_trainer.b2.core import Dataset
-from gretel_trainer.b2.gretel.models import GretelModel
+from gretel_trainer.benchmark.core import Dataset
+from gretel_trainer.benchmark.gretel.models import GretelModel
 
 
 class DoNothingModel:

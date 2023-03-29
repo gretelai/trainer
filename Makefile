@@ -16,12 +16,12 @@ multilint:
 	python -m isort src/gretel_trainer/relational tests/relational
 	python -m black src/gretel_trainer/relational tests/relational
 
-.PHONY: b2
-b2:
-	python -m pyright src/gretel_trainer/b2 tests/b2
-	python -m pytest tests/b2/
+.PHONY: bench
+bench:
+	python -m pyright src/gretel_trainer/benchmark tests/benchmark
+	python -m pytest tests/benchmark/
 
-.PHONY: b2lint
-b2lint:
-	python -m isort src/gretel_trainer/b2 tests/b2
-	python -m black src/gretel_trainer/b2 tests/b2
+.PHONY: benchlint
+benchlint:
+	python -m isort src/gretel_trainer/benchmark tests/benchmark
+	python -m black src/gretel_trainer/benchmark tests/benchmark

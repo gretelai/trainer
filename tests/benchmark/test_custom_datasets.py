@@ -2,8 +2,8 @@ import tempfile
 
 import pytest
 
-from gretel_trainer.b2 import Datatype, make_dataset
-from gretel_trainer.b2.core import BenchmarkException
+from gretel_trainer.benchmark import Datatype, make_dataset
+from gretel_trainer.benchmark.core import BenchmarkException
 
 
 def test_making_good_datasets(df):

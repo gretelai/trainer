@@ -9,15 +9,15 @@ from gretel_client.projects.models import Model, read_model_config
 from gretel_client.projects.projects import Project
 from gretel_client.projects.records import RecordHandler
 
-from gretel_trainer.b2.core import (
+from gretel_trainer.benchmark.core import (
     BenchmarkConfig,
     BenchmarkException,
     Dataset,
     log,
     run_out_path,
 )
-from gretel_trainer.b2.gretel.models import GretelModel, GretelModelConfig
-from gretel_trainer.b2.sdk_extras import await_job
+from gretel_trainer.benchmark.gretel.models import GretelModel, GretelModelConfig
+from gretel_trainer.benchmark.sdk_extras import await_job
 
 
 class GretelSDKStrategy:
