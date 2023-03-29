@@ -1,7 +1,6 @@
 from pathlib import Path
 from typing import Any, Dict, Optional
 
-import pandas as pd
 from gretel_client.projects.projects import Project
 
 from gretel_trainer import Trainer
