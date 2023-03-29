@@ -63,6 +63,34 @@ def test_run_with_custom_csv_dataset(working_dir, project, evaluate_report_path,
     assert result["SQS"] == 95
 
 
+def test_run_with_custom_psv_dataset(working_dir, project, evaluate_report_path, df):
+    evaluate_model = Mock(
+        status=Status.COMPLETED,
+    )
+    evaluate_model.get_artifact_link.return_value = evaluate_report_path
+    project.create_model_obj.side_effect = [evaluate_model]
+
+    with tempfile.NamedTemporaryFile() as f:
+        df.to_csv(f.name, sep="|", index=False)
+
+        dataset = make_dataset(f.name, datatype="tabular", name="pets", delimiter="|")
+
+        comparison = compare(
+            datasets=[dataset],
+            models=[DoNothingModel],
+            working_dir=working_dir,
+        ).wait()
+
+    assert len(comparison.results) == 1
+    result = comparison.results.iloc[0]
+    assert result["Input data"] == "pets"
+    assert result["Model"] == "DoNothingModel"
+    assert result["Rows"] == 3
+    assert result["Columns"] == 2
+    assert result["Status"] == "Complete"
+    assert result["SQS"] == 95
+
+
 def test_run_with_custom_dataframe_dataset(
     working_dir, project, evaluate_report_path, df
 ):
