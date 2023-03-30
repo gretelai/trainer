@@ -19,6 +19,7 @@ from tests.benchmark.mocks import (
     DoNothingModel,
     FailsToGenerate,
     FailsToTrain,
+    SharedDictLstm,
     TailoredActgan,
 )
 
@@ -224,6 +225,31 @@ def test_run_with_failures(working_dir, project, iris):
 
     assert len(comparison.results) == 2
     assert set(comparison.results["Status"]) == {"Failed (train)", "Failed (generate)"}
+
+
+def test_custom_gretel_model_configs_do_not_overwrite_each_other(
+    working_dir, project, iris, df
+):
+    model = Mock(
+        status=Status.ERROR,
+        billing_details={"total_time_seconds": 30},
+    )
+    project.create_model_obj.return_value = model
+
+    pets = make_dataset(df, datatype="tabular", name="pets")
+
+    comparison = compare(
+        datasets=[iris, pets],
+        models=[SharedDictLstm],
+        working_dir=working_dir,
+    ).wait()
+
+    model_names = [
+        call.kwargs["model_config"]["name"]
+        for call in project.create_model_obj.call_args_list
+    ]
+
+    assert set(model_names) == {"SharedDictLstm-iris", "SharedDictLstm-pets"}
 
 
 def test_gptx_skips_too_many_columns(working_dir, project):

@@ -35,3 +35,29 @@ class TailoredActgan(GretelModel):
         c = read_model_config("synthetics/tabular-actgan")
         c["models"][0]["actgan"]["params"]["epochs"] = 100
         return c
+
+
+class SharedDictLstm(GretelModel):
+    config = {
+        "schema_version": "1.0",
+        "name": "tabular-lstm",
+        "models": [
+            {
+                "synthetics": {
+                    "data_source": "__tmp__",
+                    "params": {
+                        "epochs": "auto",
+                        "vocab_size": "auto",
+                        "learning_rate": "auto",
+                        "batch_size": "auto",
+                        "rnn_units": "auto",
+                    },
+                    "generate": {"num_records": 5000},
+                    "privacy_filters": {
+                        "outliers": "auto",
+                        "similarity": "auto",
+                    },
+                }
+            }
+        ],
+    }

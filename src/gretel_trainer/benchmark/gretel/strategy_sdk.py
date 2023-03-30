@@ -1,3 +1,4 @@
+import copy
 import gzip
 import logging
 from pathlib import Path
@@ -39,7 +40,7 @@ class GretelSDKStrategy:
         self.record_handler: Optional[RecordHandler] = None
 
     def _format_model_config(self) -> GretelModelConfig:
-        config = read_model_config(self.benchmark_model.config)
+        config = copy.deepcopy(read_model_config(self.benchmark_model.config))
         config["name"] = self.run_identifier
         return config
 
