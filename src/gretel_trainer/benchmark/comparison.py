@@ -46,16 +46,13 @@ def compare(
     refresh_interval: int = 15,
     working_dir: str = "benchmark",
 ) -> Comparison:
-    config = BenchmarkConfig(
-        project_display_name=project_display_name,
-        trainer=trainer,
-        refresh_interval=refresh_interval,
-        working_dir=Path(working_dir),
-    )
     comparison = Comparison(
         datasets=datasets,
         models=models,
-        config=config,
+        project_display_name=project_display_name,
+        trainer=trainer,
+        refresh_interval=refresh_interval,
+        working_dir=working_dir,
     )
     return comparison.execute()
 
@@ -66,11 +63,19 @@ class Comparison:
         *,
         datasets: List[DatasetTypes],
         models: List[ModelTypes],
-        config: BenchmarkConfig,
+        project_display_name: str = "benchmark",
+        trainer: bool = False,
+        refresh_interval: int = 15,
+        working_dir: str = "benchmark",
     ):
         self.gretel_models = [m() for m in models if issubclass(m, GretelModel)]
         self.custom_models = [m() for m in models if not issubclass(m, GretelModel)]
-        self.config = config
+        self.config = BenchmarkConfig(
+            project_display_name=project_display_name,
+            trainer=trainer,
+            refresh_interval=refresh_interval,
+            working_dir=Path(working_dir),
+        )
         _validate_setup(self.config, self.gretel_models, self.custom_models, datasets)
 
         configure_session(api_key="prompt", cache="yes", validate=True)
