@@ -107,4 +107,4 @@ def _get_duration(job: Optional[Job]) -> Optional[float]:
     if job is None:
         return None
     else:
-        return job.billing_details["total_time_seconds"]
+        return job.billing_details.get("total_time_seconds")
