@@ -81,6 +81,7 @@ class MultiTable:
         gretel_model (str, optional): The underlying Gretel model to use. Default and acceptable models vary based on strategy.
         project_display_name (str, optional): Display name in the console for a new Gretel project holding models and artifacts. Defaults to "multi-table".
         refresh_interval (int, optional): Frequency in seconds to poll Gretel Cloud for job statuses. Must be at least 30. Defaults to 60 (1m).
+        hybrid_artifact_endpoint (str, optional): Artifact endpoint to use when running in a hybrid deployment.
         backup (Backup, optional): Should not be supplied manually; instead use the `restore` classmethod.
     """
 
@@ -92,6 +93,7 @@ class MultiTable:
         gretel_model: Optional[str] = None,
         project_display_name: Optional[str] = None,
         refresh_interval: Optional[int] = None,
+        hybrid_artifact_endpoint: Optional[str] = None,
         backup: Optional[Backup] = None,
     ):
         self._strategy = _validate_strategy(strategy)
@@ -100,8 +102,14 @@ class MultiTable:
         self._model_config = model_config
         self._set_refresh_interval(refresh_interval)
 
+        self.hybrid = False
+        default_runner = None
+        if hybrid_artifact_endpoint is not None:
+            self.hybrid = True
+            default_runner = "hybrid"
+
         self.relational_data = relational_data
-        self._artifact_collection = ArtifactCollection(hybrid=True)
+        self._artifact_collection = ArtifactCollection(hybrid=self.hybrid)
         self._latest_backup: Optional[Backup] = None
         self._transforms_train = TransformsTrain()
         self.transform_output_tables: Dict[str, pd.DataFrame] = {}
@@ -110,9 +118,13 @@ class MultiTable:
         self.synthetic_output_tables: Dict[str, pd.DataFrame] = {}
         self.evaluations = defaultdict(lambda: TableEvaluation())
 
-        self.hybrid = True
-
-        configure_session(api_key="prompt", cache="yes", validate=True)
+        configure_session(
+            api_key="prompt",
+            cache="yes",
+            validate=True,
+            default_runner=default_runner,
+            artifact_endpoint=hybrid_artifact_endpoint,
+        )
 
         if backup is None:
             self._complete_fresh_init(project_display_name)
