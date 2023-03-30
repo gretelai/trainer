@@ -38,7 +38,9 @@ class ArtifactCollection:
         existing = self.transforms_outputs_archive
         self.transforms_outputs_archive = self._upload_file(project, path, existing)
 
-    def _upload_file(self, project: Project, path: str, existing: Optional[str]) -> Optional[str]:
+    def _upload_file(
+        self, project: Project, path: str, existing: Optional[str]
+    ) -> Optional[str]:
         if self.hybrid:
             return None
 
