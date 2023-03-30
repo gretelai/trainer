@@ -3,6 +3,7 @@ from __future__ import annotations
 import logging
 import multiprocessing as mp
 from concurrent.futures import Future, ThreadPoolExecutor
+from datetime import datetime
 from multiprocessing.managers import DictProxy
 from pathlib import Path
 from typing import Any, Dict, List, Literal, Optional, Type, Union
@@ -30,6 +31,7 @@ from gretel_trainer.benchmark.gretel.strategy_trainer import GretelTrainerStrate
 
 logger = logging.getLogger(__name__)
 
+MAX_TRAINER_PROJECT_NAME_LENGTH = 45
 RUN_IDENTIFIER_SEPARATOR = "-"
 
 
@@ -41,10 +43,10 @@ def compare(
     *,
     datasets: List[DatasetTypes],
     models: List[ModelTypes],
-    project_display_name: str = "benchmark",
+    project_display_name: Optional[str] = None,
     trainer: bool = False,
     refresh_interval: int = 15,
-    working_dir: str = "benchmark",
+    working_dir: Optional[str] = None,
 ) -> Comparison:
     comparison = Comparison(
         datasets=datasets,
@@ -63,19 +65,23 @@ class Comparison:
         *,
         datasets: List[DatasetTypes],
         models: List[ModelTypes],
-        project_display_name: str = "benchmark",
+        project_display_name: Optional[str] = None,
         trainer: bool = False,
         refresh_interval: int = 15,
-        working_dir: str = "benchmark",
+        working_dir: Optional[str] = None,
     ):
         self.gretel_models = [m() for m in models if issubclass(m, GretelModel)]
         self.custom_models = [m() for m in models if not issubclass(m, GretelModel)]
+
+        project_display_name = project_display_name or _default_name(trainer)
+        working_dir = working_dir or project_display_name
         self.config = BenchmarkConfig(
             project_display_name=project_display_name,
             trainer=trainer,
             refresh_interval=refresh_interval,
             working_dir=Path(working_dir),
         )
+
         _validate_setup(self.config, self.gretel_models, self.custom_models, datasets)
 
         configure_session(api_key="prompt", cache="yes", validate=True)
@@ -280,7 +286,9 @@ def _validate_setup(
     _ensure_unique(model_names, "models")
 
     if config.trainer:
-        _validate_trainer_setup(gretel_models)
+        _validate_trainer_setup(
+            gretel_models, model_names, dataset_names, config.project_display_name
+        )
     else:
         _validate_sdk_setup(gretel_models)
 
@@ -290,7 +298,12 @@ def _ensure_unique(col: List[str], kind: str) -> None:
         raise BenchmarkException(f"{kind} must have unique names")
 
 
-def _validate_trainer_setup(gretel_models: List[GretelModel]) -> None:
+def _validate_trainer_setup(
+    gretel_models: List[GretelModel],
+    model_names: List[str],
+    dataset_names: List[str],
+    project_display_name: str,
+) -> None:
     unsupported_models = []
     for model in gretel_models:
         if model.trainer_model_type is None:
@@ -300,6 +313,20 @@ def _validate_trainer_setup(gretel_models: List[GretelModel]) -> None:
             )
             unsupported_models.append(model)
     if len(unsupported_models) > 0:
+        raise BenchmarkException("Invalid configuration")
+
+    len_longest_model_name = max(len(name) for name in model_names)
+    len_longest_dataset_name = max(len(name) for name in dataset_names)
+    len_project_display_name = len(project_display_name)
+    if (
+        len_longest_model_name + len_longest_dataset_name + len_project_display_name
+        > MAX_TRAINER_PROJECT_NAME_LENGTH
+    ):
+        logger.error(
+            "When running with Trainer, each run gets its own project named with the `project_display_name` plus the model and dataset names."
+            "Your current configuration leads to names that exceed the limit on project name length."
+            f"Please shorten any names you can (e.g. `project_display_name`, custom datasets or models) so that the total is <= {MAX_TRAINER_PROJECT_NAME_LENGTH} characters."
+        )
         raise BenchmarkException("Invalid configuration")
 
 
@@ -341,3 +368,8 @@ def _model_name(model: Union[GretelModel, CustomModel]) -> str:
         return model.name
     else:
         return type(model).__name__
+
+
+def _default_name(trainer: bool) -> str:
+    current_time = datetime.now().strftime("%Y%m%d%H%M%S")
+    return f"benchmark-{current_time}"
