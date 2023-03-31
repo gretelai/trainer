@@ -111,8 +111,13 @@ class Comparison:
 
         _trainer_project_index = 0
         for dataset in self.datasets:
+            artifact_key = _upload_dataset_to_project(
+                dataset.data_source, self._project, self.config.trainer
+            )
             for model in self.gretel_models:
-                self._setup_gretel_run(dataset, model, _trainer_project_index)
+                self._setup_gretel_run(
+                    dataset, model, artifact_key, _trainer_project_index
+                )
                 _trainer_project_index += 1
             for model in self.custom_models:
                 self._setup_custom_run(dataset, model)
@@ -210,7 +215,11 @@ class Comparison:
         }
 
     def _setup_gretel_run(
-        self, dataset: Dataset, model: GretelModel, trainer_project_index: int
+        self,
+        dataset: Dataset,
+        model: GretelModel,
+        artifact_key: Optional[str],
+        trainer_project_index: int,
     ) -> None:
         run_identifier = _make_run_identifier(model, dataset)
         strategy = self._set_gretel_strategy(
@@ -218,6 +227,7 @@ class Comparison:
             dataset=dataset,
             run_identifier=run_identifier,
             trainer_project_index=trainer_project_index,
+            artifact_key=artifact_key,
         )
         executor = Executor(
             strategy=strategy,
@@ -261,6 +271,7 @@ class Comparison:
         dataset: Dataset,
         run_identifier: str,
         trainer_project_index: int,
+        artifact_key: Optional[str],
     ) -> Union[GretelSDKStrategy, GretelTrainerStrategy]:
         if self.config.trainer:
             trainer_project_name = _trainer_project_name(
@@ -278,6 +289,7 @@ class Comparison:
             return GretelSDKStrategy(
                 benchmark_model=benchmark_model,
                 dataset=dataset,
+                artifact_key=artifact_key,
                 run_identifier=run_identifier,
                 project=self._project,
                 config=self.config,
@@ -377,3 +389,12 @@ def _trainer_project_name(config: BenchmarkConfig, index: int) -> str:
     prefix = config.project_display_name
     name = f"{prefix}-{index}"
     return name.replace("_", "-")
+
+
+def _upload_dataset_to_project(
+    source: str, project: Project, trainer: bool
+) -> Optional[str]:
+    if trainer:
+        return None
+
+    return project.upload_artifact(source)

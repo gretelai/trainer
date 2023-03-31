@@ -26,12 +26,14 @@ class GretelSDKStrategy:
         self,
         benchmark_model: GretelModel,
         dataset: Dataset,
+        artifact_key: Optional[str],
         run_identifier: str,
         project: Project,
         config: BenchmarkConfig,
     ):
         self.benchmark_model = benchmark_model
         self.dataset = dataset
+        self.artifact_key = artifact_key
         self.run_identifier = run_identifier
         self.project = project
         self.config = config
@@ -55,8 +57,9 @@ class GretelSDKStrategy:
 
     def train(self) -> None:
         model_config = self._format_model_config()
+        data_source = self.artifact_key or self.dataset.data_source
         self.model = self.project.create_model_obj(
-            model_config=model_config, data_source=self.dataset.data_source
+            model_config=model_config, data_source=data_source
         )
         self.model.submit_cloud()
         job_status = self._await_job(self.model, "training")
