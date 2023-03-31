@@ -73,7 +73,7 @@ class Comparison:
         self.gretel_models = [m() for m in models if issubclass(m, GretelModel)]
         self.custom_models = [m() for m in models if not issubclass(m, GretelModel)]
 
-        project_display_name = project_display_name or _default_name(trainer)
+        project_display_name = project_display_name or _default_name()
         working_dir = working_dir or project_display_name
         self.config = BenchmarkConfig(
             project_display_name=project_display_name,
@@ -382,6 +382,6 @@ def _model_name(model: Union[GretelModel, CustomModel]) -> str:
         return type(model).__name__
 
 
-def _default_name(trainer: bool) -> str:
+def _default_name() -> str:
     current_time = datetime.now().strftime("%Y%m%d%H%M%S")
     return f"benchmark-{current_time}"
