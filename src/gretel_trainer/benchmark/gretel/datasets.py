@@ -20,7 +20,7 @@ class GretelDataset:
 
     @cached_property
     def data_source(self) -> str:
-        return f"https://gretel-datasets.s3.amazonaws.com/{self.name}/data.csv"
+        return f"https://gretel-datasets.s3.amazonaws.com/{self.name}.csv"
 
     @cached_property
     def row_count(self) -> int:
