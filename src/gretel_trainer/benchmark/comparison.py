@@ -56,7 +56,7 @@ def compare(
         refresh_interval=refresh_interval,
         working_dir=working_dir,
     )
-    return comparison.execute()
+    return comparison.prepare().execute()
 
 
 class Comparison:
@@ -85,15 +85,19 @@ class Comparison:
         _validate_setup(self.config, self.gretel_models, self.custom_models, datasets)
 
         configure_session(api_key="prompt", cache="yes", validate=True)
-        self._project = self._make_project()
 
         self.config.working_dir.mkdir(exist_ok=True)
         self.datasets = [
             _make_dataset(dataset, self.config.working_dir) for dataset in datasets
         ]
-        self.executors: Dict[str, Executor] = {}
+        self._gretel_executors: Dict[str, Executor] = {}
+        self._custom_executors: Dict[str, Executor] = {}
         self.thread_pool = ThreadPoolExecutor(5)
         self.futures: Dict[str, Future] = {}
+
+    @property
+    def executors(self) -> Dict[str, Executor]:
+        return self._gretel_executors | self._custom_executors
 
     def _make_project(self) -> Project:
         display_name = self.config.project_display_name
@@ -102,17 +106,28 @@ class Comparison:
 
         return create_project(display_name=display_name)
 
-    def execute(self) -> Comparison:
-        custom_executors: List[Executor] = []
+    def prepare(self) -> Comparison:
+        self._project = self._make_project()
+
         for dataset in self.datasets:
             for model in self.gretel_models:
                 self._setup_gretel_run(dataset, model)
             for model in self.custom_models:
-                self._setup_custom_run(dataset, model, custom_executors)
-        if len(custom_executors) > 0:
-            self.futures["custom"] = self.thread_pool.submit(
-                _run_custom, custom_executors
+                self._setup_custom_run(dataset, model)
+
+        return self
+
+    def execute(self) -> Comparison:
+        for run_identifier, executor in self._gretel_executors.items():
+            self.futures[run_identifier] = self.thread_pool.submit(
+                _run_gretel, executor
             )
+
+        if len(self._custom_executors) > 0:
+            self.futures["custom"] = self.thread_pool.submit(
+                _run_custom, list(self._custom_executors.values())
+            )
+
         return self
 
     @property
@@ -207,14 +222,12 @@ class Comparison:
             evaluate_project=self._project,
             config=self.config,
         )
-        self.executors[run_identifier] = executor
-        self.futures[run_identifier] = self.thread_pool.submit(_run_gretel, executor)
+        self._gretel_executors[run_identifier] = executor
 
     def _setup_custom_run(
         self,
         dataset: Dataset,
         model: CustomModel,
-        collection: List[Executor],
     ) -> None:
         run_identifier = _make_run_identifier(model, dataset)
         strategy = CustomStrategy(
@@ -229,8 +242,7 @@ class Comparison:
             evaluate_project=self._project,
             config=self.config,
         )
-        self.executors[run_identifier] = executor
-        collection.append(executor)
+        self._custom_executors[run_identifier] = executor
 
     def _basic_status(self, future: Future) -> str:
         if future.done():
