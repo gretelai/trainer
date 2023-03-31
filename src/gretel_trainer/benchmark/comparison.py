@@ -31,7 +31,6 @@ from gretel_trainer.benchmark.gretel.strategy_trainer import GretelTrainerStrate
 
 logger = logging.getLogger(__name__)
 
-MAX_TRAINER_PROJECT_NAME_LENGTH = 45
 RUN_IDENTIFIER_SEPARATOR = "-"
 
 
@@ -92,6 +91,7 @@ class Comparison:
         ]
         self._gretel_executors: Dict[str, Executor] = {}
         self._custom_executors: Dict[str, Executor] = {}
+        self.trainer_project_names: Dict[str, str] = {}
         self.thread_pool = ThreadPoolExecutor(5)
         self.futures: Dict[str, Future] = {}
 
@@ -109,9 +109,11 @@ class Comparison:
     def prepare(self) -> Comparison:
         self._project = self._make_project()
 
+        _trainer_project_index = 0
         for dataset in self.datasets:
             for model in self.gretel_models:
-                self._setup_gretel_run(dataset, model)
+                self._setup_gretel_run(dataset, model, _trainer_project_index)
+                _trainer_project_index += 1
             for model in self.custom_models:
                 self._setup_custom_run(dataset, model)
 
@@ -207,14 +209,15 @@ class Comparison:
             "Total time (sec)": total_time,
         }
 
-    def _setup_gretel_run(self, dataset: Dataset, model: GretelModel) -> None:
+    def _setup_gretel_run(
+        self, dataset: Dataset, model: GretelModel, trainer_project_index: int
+    ) -> None:
         run_identifier = _make_run_identifier(model, dataset)
-        strategy = _set_gretel_strategy(
+        strategy = self._set_gretel_strategy(
             benchmark_model=model,
             dataset=dataset,
             run_identifier=run_identifier,
-            config=self.config,
-            project=self._project,
+            trainer_project_index=trainer_project_index,
         )
         executor = Executor(
             strategy=strategy,
@@ -251,6 +254,34 @@ class Comparison:
             return "Cancelled"
         else:
             return "Running"
+
+    def _set_gretel_strategy(
+        self,
+        benchmark_model: GretelModel,
+        dataset: Dataset,
+        run_identifier: str,
+        trainer_project_index: int,
+    ) -> Union[GretelSDKStrategy, GretelTrainerStrategy]:
+        if self.config.trainer:
+            trainer_project_name = _trainer_project_name(
+                self.config, trainer_project_index
+            )
+            self.trainer_project_names[run_identifier] = trainer_project_name
+            return GretelTrainerStrategy(
+                benchmark_model=benchmark_model,
+                dataset=dataset,
+                run_identifier=run_identifier,
+                project_name=trainer_project_name,
+                config=self.config,
+            )
+        else:
+            return GretelSDKStrategy(
+                benchmark_model=benchmark_model,
+                dataset=dataset,
+                run_identifier=run_identifier,
+                project=self._project,
+                config=self.config,
+            )
 
 
 def _run_gretel(executor: Executor) -> None:
@@ -298,9 +329,7 @@ def _validate_setup(
     _ensure_unique(model_names, "models")
 
     if config.trainer:
-        _validate_trainer_setup(
-            gretel_models, model_names, dataset_names, config.project_display_name
-        )
+        _validate_trainer_setup(gretel_models)
     else:
         _validate_sdk_setup(gretel_models)
 
@@ -310,12 +339,7 @@ def _ensure_unique(col: List[str], kind: str) -> None:
         raise BenchmarkException(f"{kind} must have unique names")
 
 
-def _validate_trainer_setup(
-    gretel_models: List[GretelModel],
-    model_names: List[str],
-    dataset_names: List[str],
-    project_display_name: str,
-) -> None:
+def _validate_trainer_setup(gretel_models: List[GretelModel]) -> None:
     unsupported_models = []
     for model in gretel_models:
         if model.trainer_model_type is None:
@@ -325,20 +349,6 @@ def _validate_trainer_setup(
             )
             unsupported_models.append(model)
     if len(unsupported_models) > 0:
-        raise BenchmarkException("Invalid configuration")
-
-    len_longest_model_name = max(len(name) for name in model_names)
-    len_longest_dataset_name = max(len(name) for name in dataset_names)
-    len_project_display_name = len(project_display_name)
-    if (
-        len_longest_model_name + len_longest_dataset_name + len_project_display_name
-        > MAX_TRAINER_PROJECT_NAME_LENGTH
-    ):
-        logger.error(
-            "When running with Trainer, each run gets its own project named with the `project_display_name` plus the model and dataset names."
-            "Your current configuration leads to names that exceed the limit on project name length."
-            f"Please shorten any names you can (e.g. `project_display_name`, custom datasets or models) so that the total is <= {MAX_TRAINER_PROJECT_NAME_LENGTH} characters."
-        )
         raise BenchmarkException("Invalid configuration")
 
 
@@ -351,30 +361,6 @@ def _validate_sdk_setup(gretel_models: List[GretelModel]) -> None:
         raise BenchmarkException("Invalid configuration")
 
 
-def _set_gretel_strategy(
-    benchmark_model: GretelModel,
-    dataset: Dataset,
-    run_identifier: str,
-    config: BenchmarkConfig,
-    project: Project,
-) -> Union[GretelSDKStrategy, GretelTrainerStrategy]:
-    if config.trainer:
-        return GretelTrainerStrategy(
-            benchmark_model=benchmark_model,
-            dataset=dataset,
-            run_identifier=run_identifier,
-            config=config,
-        )
-    else:
-        return GretelSDKStrategy(
-            benchmark_model=benchmark_model,
-            dataset=dataset,
-            run_identifier=run_identifier,
-            project=project,
-            config=config,
-        )
-
-
 def _model_name(model: Union[GretelModel, CustomModel]) -> str:
     if isinstance(model, GretelModel):
         return model.name
@@ -385,3 +371,9 @@ def _model_name(model: Union[GretelModel, CustomModel]) -> str:
 def _default_name() -> str:
     current_time = datetime.now().strftime("%Y%m%d%H%M%S")
     return f"benchmark-{current_time}"
+
+
+def _trainer_project_name(config: BenchmarkConfig, index: int) -> str:
+    prefix = config.project_display_name
+    name = f"{prefix}-{index}"
+    return name.replace("_", "-")

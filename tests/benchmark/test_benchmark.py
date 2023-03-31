@@ -254,30 +254,6 @@ def test_custom_gretel_model_configs_do_not_overwrite_each_other(
     assert set(model_names) == {"SharedDictLstm-iris", "SharedDictLstm-pets"}
 
 
-def test_lengthy_names_with_trainer_throws_an_exception(working_dir, project, df):
-    # Default project display name = 24 chars (benchmark-yyyymmddhhmmss)
-    # GretelLSTM = 10
-    # Remaining for dataset name = 45-24-10 = 11
-
-    too_long = make_dataset(df, datatype="tabular", name="x" * 12)
-    just_fits = make_dataset(df, datatype="tabular", name="x" * 11)
-
-    with pytest.raises(BenchmarkException):
-        Comparison(
-            datasets=[too_long],
-            models=[GretelLSTM],
-            working_dir=working_dir,
-            trainer=True,
-        )
-
-    Comparison(
-        datasets=[just_fits],
-        models=[GretelLSTM],
-        working_dir=working_dir,
-        trainer=True,
-    )
-
-
 def test_gptx_skips_too_many_columns(working_dir, project):
     two_columns = pd.DataFrame(
         data={"english": ["hello", "world"], "spanish": ["hola", "mundo"]}
