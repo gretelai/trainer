@@ -9,7 +9,7 @@ from pathlib import Path
 from typing import Optional
 
 import pandas as pd
-from gretel_client import configure_session
+from gretel_client.config import get_session_config, RunnerMode
 from gretel_client.projects import create_or_get_unique_project
 from gretel_synthetics.utils.header_clusters import cluster
 
@@ -53,8 +53,6 @@ class Trainer:
         cache_file: Optional[str] = None,
         overwrite: bool = True,
     ):
-        configure_session(api_key="prompt", cache="yes", validate=True)
-
         self.dataset_path: Optional[Path] = None
         self.run = None
         self.project_name = project_name
@@ -78,17 +76,18 @@ class Trainer:
 
         Args:
             cache_file (str, optional): Valid file path to load the cache file from. Defaults to `[project-name]-runner.json`
+            project_name (str, optional): Gretel project name. This should match the original project. Defaults to "trainer"
 
         Returns:
             Trainer: returns a Trainer instance with an initialized StrategyRunner class.
         """
-        project = create_or_get_unique_project(name=project_name)
-        model = cls(cache_file=cache_file, project_name=project_name, overwrite=False)
-
         if not os.path.exists(cache_file):
             raise ValueError(
                 f"Unable to find `{cache_file}`. Please specify a valid cache_file."
             )
+
+        project = create_or_get_unique_project(name=project_name)
+        trainer = cls(cache_file=cache_file, project_name=project_name, overwrite=False)
 
         # Cache file does not store all the data needed to fully rehydrate a StrategyRunner, but
         # 1) we don't need all the attributes to generate data from existing trained models, and
@@ -97,17 +96,18 @@ class Trainer:
         empty_df = pd.DataFrame()
         empty_model_config = {}
         empty_partition_constraints = strategy.PartitionConstraints(max_row_count=0)
-        model.run = runner.StrategyRunner(
+        trainer.run = runner.StrategyRunner(
             df=empty_df,
             model_config=empty_model_config,
             partition_constraints=empty_partition_constraints,
-            strategy_id=_sanitize_name(model._get_strategy_id()),
-            cache_file=model.cache_file,
-            cache_overwrite=model.overwrite,
-            project=model.project,
+            strategy_id=_sanitize_name(trainer._get_strategy_id()),
+            cache_file=trainer.cache_file,
+            cache_overwrite=trainer.overwrite,
+            project=trainer.project,
+            hybrid=trainer._hybrid,
         )
 
-        return model
+        return trainer
 
     def train(
         self, dataset_path: str, delimiter: str = ",", round_decimals: int = 4, seed_fields: Optional[list] = None,
@@ -170,6 +170,10 @@ class Trainer:
         ]
         return int(sum(scores) / len(scores))
 
+    @property
+    def _hybrid(self) -> bool:
+        return get_session_config().default_runner == RunnerMode.HYBRID
+
     def _preprocess_data(
         self, dataset_path: str, delimiter: str, round_decimals: int = 4
     ) -> pd.DataFrame:
@@ -229,6 +233,7 @@ class Trainer:
             model_config=model_config,
             partition_constraints=constraints,
             project=self.project,
+            hybrid=self._hybrid,
         )
         return run
 

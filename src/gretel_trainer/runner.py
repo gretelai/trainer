@@ -103,7 +103,7 @@ def _maybe_submit_job(
     job: Union[Model, RecordHandler]
 ) -> Optional[Union[Model, RecordHandler]]:
     try:
-        job = job.submit_cloud()
+        job = job.submit()
     except ApiException as err:
         if "Maximum number of" in str(err):
             logger.warning(
@@ -143,6 +143,7 @@ class StrategyRunner:
         model_config: dict,
         partition_constraints: PartitionConstraints,
         project: Project,
+        hybrid: bool,
         error_retry_limit: int = 3,
     ):
         self._df = df
@@ -154,6 +155,7 @@ class StrategyRunner:
         self._artifacts = []
         self.strategy_id = strategy_id
         self._status_counter = Counter()
+        self._hybrid = hybrid
         self._error_retry_limit = error_retry_limit
         self._strategy = self._load_strategy()
 
@@ -288,6 +290,10 @@ class StrategyRunner:
         return num_active < self._max_jobs_active
 
     def _remove_unused_artifact(self) -> Optional[str]:
+        # Artifact eviction is both unnecessary and unsupported in hybrid deployments
+        if self._hybrid:
+            return "__none__"
+
         project_artifacts = self._project.artifacts
         curr_artifacts = set()
 
