@@ -26,7 +26,7 @@ class _MultiTable(Protocol):
         ...
 
     @property
-    def hybrid(self) -> bool:
+    def _hybrid(self) -> bool:
         ...
 
     def _backup(self) -> None:

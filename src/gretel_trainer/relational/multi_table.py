@@ -19,6 +19,7 @@ import pandas as pd
 import requests
 import smart_open
 from gretel_client import configure_session
+from gretel_client.config import RunnerMode, get_session_config
 from gretel_client.projects import Project, create_project, get_project
 from gretel_client.projects.jobs import ACTIVE_STATES, END_STATES, Job, Status
 from gretel_client.projects.models import Model, read_model_config
@@ -102,21 +103,9 @@ class MultiTable:
         self._model_config = model_config
         self._set_refresh_interval(refresh_interval)
 
-        self.hybrid = False
         default_runner = None
         if hybrid_artifact_endpoint is not None:
-            self.hybrid = True
             default_runner = "hybrid"
-
-        self.relational_data = relational_data
-        self._artifact_collection = ArtifactCollection(hybrid=self.hybrid)
-        self._latest_backup: Optional[Backup] = None
-        self._transforms_train = TransformsTrain()
-        self.transform_output_tables: Dict[str, pd.DataFrame] = {}
-        self._synthetics_train = SyntheticsTrain()
-        self._synthetics_run: Optional[SyntheticsRun] = None
-        self.synthetic_output_tables: Dict[str, pd.DataFrame] = {}
-        self.evaluations = defaultdict(lambda: TableEvaluation())
 
         configure_session(
             api_key="prompt",
@@ -125,6 +114,16 @@ class MultiTable:
             default_runner=default_runner,
             artifact_endpoint=hybrid_artifact_endpoint,
         )
+
+        self.relational_data = relational_data
+        self._artifact_collection = ArtifactCollection(hybrid=self._hybrid)
+        self._latest_backup: Optional[Backup] = None
+        self._transforms_train = TransformsTrain()
+        self.transform_output_tables: Dict[str, pd.DataFrame] = {}
+        self._synthetics_train = SyntheticsTrain()
+        self._synthetics_run: Optional[SyntheticsRun] = None
+        self.synthetic_output_tables: Dict[str, pd.DataFrame] = {}
+        self.evaluations = defaultdict(lambda: TableEvaluation())
 
         if backup is None:
             self._complete_fresh_init(project_display_name)
@@ -378,7 +377,7 @@ class MultiTable:
         with open(backup_path, "w") as bak:
             json.dump(backup.as_dict, bak)
 
-        _upload_gretel_backup(self._project, str(backup_path), self.hybrid)
+        _upload_gretel_backup(self._project, str(backup_path), self._hybrid)
 
         self._latest_backup = backup
 
@@ -432,6 +431,10 @@ class MultiTable:
 
         return backup
 
+    @property
+    def _hybrid(self) -> bool:
+        return get_session_config().default_runner == RunnerMode.HYBRID
+
     def _set_refresh_interval(self, interval: Optional[int]) -> None:
         if interval is None:
             self._refresh_interval = 60
@@ -480,7 +483,7 @@ class MultiTable:
             transforms_train=self._transforms_train,
             multitable=self,
         )
-        run_task(task, self.hybrid)
+        run_task(task, self._hybrid)
 
     def run_transforms(
         self,
@@ -538,7 +541,7 @@ class MultiTable:
             record_handlers=transforms_record_handlers,
             multitable=self,
         )
-        run_task(task, self.hybrid)
+        run_task(task, self._hybrid)
 
         output_tables = self._strategy.label_encode_keys(
             self.relational_data, task.output_tables
@@ -595,7 +598,7 @@ class MultiTable:
             synthetics_train=self._synthetics_train,
             multitable=self,
         )
-        run_task(task, self.hybrid)
+        run_task(task, self._hybrid)
 
         for table in task.completed:
             model = self._synthetics_train.models[table]
@@ -722,7 +725,7 @@ class MultiTable:
             run_dir=run_dir,
             multitable=self,
         )
-        run_task(task, self.hybrid)
+        run_task(task, self._hybrid)
 
         output_tables = self._strategy.post_process_synthetic_results(
             task.output_tables, self._synthetics_run.preserved, self.relational_data
@@ -759,7 +762,7 @@ class MultiTable:
             project=evaluate_project,
             multitable=self,
         )
-        run_task(synthetics_evaluate_task, self.hybrid)
+        run_task(synthetics_evaluate_task, self._hybrid)
 
         for table in synthetics_evaluate_task.completed:
             self._strategy.update_evaluation_from_evaluate(

@@ -23,7 +23,7 @@ class MockMultiTable:
     _refresh_interval: int = 0
     _project: Project = Mock(artifacts=[])
     _strategy: Union[AncestralStrategy, IndependentStrategy] = AncestralStrategy()
-    hybrid: bool = False
+    _hybrid: bool = False
 
     def _backup(self) -> None:
         pass
