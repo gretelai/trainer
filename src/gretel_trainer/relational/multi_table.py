@@ -18,7 +18,6 @@ from typing import Any, Dict, List, Optional, Tuple, Union
 import pandas as pd
 import requests
 import smart_open
-from gretel_client import configure_session
 from gretel_client.config import RunnerMode, get_session_config
 from gretel_client.projects import Project, create_project, get_project
 from gretel_client.projects.jobs import ACTIVE_STATES, END_STATES, Job, Status
@@ -82,7 +81,6 @@ class MultiTable:
         gretel_model (str, optional): The underlying Gretel model to use. Default and acceptable models vary based on strategy.
         project_display_name (str, optional): Display name in the console for a new Gretel project holding models and artifacts. Defaults to "multi-table".
         refresh_interval (int, optional): Frequency in seconds to poll Gretel Cloud for job statuses. Must be at least 30. Defaults to 60 (1m).
-        hybrid_artifact_endpoint (str, optional): Artifact endpoint to use when running in a hybrid deployment.
         backup (Backup, optional): Should not be supplied manually; instead use the `restore` classmethod.
     """
 
@@ -94,7 +92,6 @@ class MultiTable:
         gretel_model: Optional[str] = None,
         project_display_name: Optional[str] = None,
         refresh_interval: Optional[int] = None,
-        hybrid_artifact_endpoint: Optional[str] = None,
         backup: Optional[Backup] = None,
     ):
         self._strategy = _validate_strategy(strategy)
@@ -102,19 +99,6 @@ class MultiTable:
         self._gretel_model = model_name
         self._model_config = model_config
         self._set_refresh_interval(refresh_interval)
-
-        default_runner = None
-        if hybrid_artifact_endpoint is not None:
-            default_runner = "hybrid"
-
-        configure_session(
-            api_key="prompt",
-            cache="yes",
-            validate=True,
-            default_runner=default_runner,
-            artifact_endpoint=hybrid_artifact_endpoint,
-        )
-
         self.relational_data = relational_data
         self._artifact_collection = ArtifactCollection(hybrid=self._hybrid)
         self._latest_backup: Optional[Backup] = None
