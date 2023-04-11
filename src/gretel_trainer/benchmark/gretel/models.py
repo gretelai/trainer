@@ -1,12 +1,11 @@
 from pathlib import Path
 from typing import Dict, Optional, Tuple, Union
 
-import gretel_trainer
-
 from gretel_client.projects.exceptions import ModelConfigError
 from gretel_client.projects.models import read_model_config
 from gretel_trainer import models
 from gretel_trainer.benchmark.core import BenchmarkException, DataSource, Datatype
+from gretel_trainer.models import _BaseConfig
 
 GretelModelConfig = Union[str, Path, Dict]
 
@@ -53,7 +52,7 @@ class GretelModel:
         return self.model_key in TRAINER_MODEL_TYPE_CONSTRUCTORS.keys()
 
     @property
-    def trainer_model_type(self) -> Optional[gretel_trainer.models._BaseConfig]:
+    def trainer_model_type(self) -> Optional[_BaseConfig]:
         return TRAINER_MODEL_TYPE_CONSTRUCTORS[self.model_key](self.config)
 
     def runnable(self, source: DataSource) -> bool:
