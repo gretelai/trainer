@@ -493,7 +493,7 @@ class StrategyRunner:
 
             if start_job:
                 artifact = self._partition_to_artifact(partition)
-                if artifact.id is None:
+                if artifact is None or artifact.id is None:
                     return None
                 return self.train_partition(partition, artifact)
 
