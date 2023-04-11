@@ -54,7 +54,7 @@ class _BaseConfig:
     _model_slug: str
 
     # Should be set by concrete constructors
-    config: Union[str, dict]
+    config: dict
     max_rows: int
     max_header_clusters: int
 
@@ -101,8 +101,6 @@ class _BaseConfig:
                 k: value if k == key else self._replace_nested_key(v, key, value)
                 for k, v in data.items()
             }
-        elif isinstance(data, list):
-            return [self._replace_nested_key(v, key, value) for v in data]
         else:
             return data
 
