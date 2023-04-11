@@ -176,23 +176,6 @@ class StrategyRunner:
         strategy.save_to(self._cache_file, overwrite=True)
         return strategy
 
-    @classmethod
-    def from_completed(
-        cls, project: Project, cache_file: Union[str, Path]
-    ) -> StrategyRunner:
-        cache_file = Path(cache_file)
-        if not cache_file.exists():
-            raise ValueError("cache file does not exist")
-
-        return cls(
-            strategy_id="__none__",
-            df=None,
-            cache_file=cache_file,
-            model_config=None,
-            partition_constraints=None,
-            project=project,
-        )
-
     def _update_job_status(self):
         # Get all jobs that have been created, we can do this
         # by just searching for any partitions have have a "model_id"
