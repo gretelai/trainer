@@ -698,11 +698,16 @@ class StrategyRunner:
         clear_cache: bool = False,
     ):
 
-        if seed_df is None and not num_records:
-            raise ValueError("must provide a seed_df or num_records to generate")
-
-        if isinstance(seed_df, pd.DataFrame) and num_records:
-            raise ValueError("must use one of seed_df or num_records only")
+        # TODO: pyright seems to only understand the types correctly in this implementation,
+        # but the more succinct version should work; revisit this and see if we can tighten
+        if seed_df is not None:
+            if num_records is not None:
+                raise ValueError("must use one of seed_df or num_records only")
+            else:
+                num_records = len(seed_df)
+        else:
+            if num_records is None:
+                raise ValueError("must provide a seed_df or num_records to generate")
 
         # Refresh all of the trained models
         logger.info("Loading existing model information...")
@@ -723,8 +728,6 @@ class StrategyRunner:
         # to generate from each model.
         found_seeds = False
         if isinstance(seed_df, pd.DataFrame):
-            num_records = len(seed_df)
-
             # Loop through all of the partitions and make sure we have some that
             # take seed values, if we don't have any partitions set for seeds
             # and we recieved a seed DF, we should error.
