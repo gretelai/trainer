@@ -145,12 +145,12 @@ def make_dataset(
 
     if source_type == pd.DataFrame:
         return DataFramesDataset(
-            dfs=sources,
+            dfs=sources,  # type:ignore
             datatype=datatype,
             local_dir=local_dir,
             namespace=namespace or "DataFrames",
         )
     else:
         return FilesDataset(
-            paths=sources, datatype=datatype, delimiter=delimiter, namespace=namespace
+            paths=sources, datatype=datatype, delimiter=delimiter, namespace=namespace  # type:ignore
         )
