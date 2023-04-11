@@ -113,7 +113,7 @@ class PartitionStrategy(BaseModel):
             id=id,
             partitions=partitions,
             header_cluster_count=constraints.header_cluster_count,
-            original_headers=list(df),
+            original_headers=list(df.columns),
             status_counter=None,
         )
 
