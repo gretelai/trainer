@@ -135,7 +135,7 @@ class PartitionStrategy(BaseModel):
 
     @property
     def row_partition_count(self) -> int:
-        return len(self.partitions) / self.header_cluster_count
+        return math.ceil(len(self.partitions) / self.header_cluster_count)
 
     def save_to(self, dest: Union[Path, str], overwrite: bool = False):
         location = Path(dest)
