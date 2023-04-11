@@ -110,7 +110,7 @@ def _build_partitions(
 
 class PartitionStrategy(BaseModel):
     id: str
-    partitions: Optional[List[Partition]]
+    partitions: List[Partition]
     header_cluster_count: int
     original_headers: Optional[List[str]]
     status_counter: Optional[dict]
