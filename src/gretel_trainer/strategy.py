@@ -26,11 +26,11 @@ class ColumnPartition(BaseModel):
 class Partition(BaseModel):
     idx: int
     rows: RowPartition
-    columns: Optional[ColumnPartition]
+    columns: ColumnPartition
     ctx: dict = Field(default_factory=dict)
 
     def extract_df(self, df: pd.DataFrame) -> pd.DataFrame:
-        if self.columns is not None:
+        if self.columns.headers is not None:
             df = df[self.columns.headers]
 
         return df.iloc[self.rows.start : self.rows.end]  # noqa
