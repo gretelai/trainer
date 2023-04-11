@@ -74,16 +74,6 @@ class GenPayload:
     max_invalid: Optional[int] = None
 
 
-def _needs_load(func):
-    @wraps(func)
-    def wrapper(inst: StrategyRunner, *args, **kwargs):
-        if not inst._loaded:
-            inst.load()
-        return func(inst, *args, **kwargs)
-
-    return wrapper
-
-
 @dataclass
 class RemoteDFPayload:
     partition: int
@@ -132,12 +122,11 @@ class StrategyRunner:
 
     _df: pd.DataFrame
     _cache_file: Path
-    _constraints = PartitionConstraints
-    _strategy = PartitionStrategy
+    _constraints: PartitionConstraints
+    _strategy: PartitionStrategy
     _model_config: dict
     _max_jobs_active: int
     _project: Project
-    _loaded: bool
     _artifacts: List[str]
     _cache_overwrite: bool
     _max_artifacts: int = 25
@@ -163,20 +152,14 @@ class StrategyRunner:
         self._constraints = partition_constraints
         self._model_config = model_config
         self._project = project
-        self._loaded = False
         self._cache_overwrite = cache_overwrite
         self._artifacts = []
         self.strategy_id = strategy_id
         self._status_counter = Counter()
         self._error_retry_limit = error_retry_limit
+        self._strategy = self._load()
 
-    def load(self):
-        """Hydrate the instance before we can start
-        doing work, must be called after init
-        """
-        if self._loaded:
-            return
-
+    def _load(self) -> PartitionStrategy:
         self._refresh_max_job_capacity()
 
         # If the cache file exists, we'll try and load an existing
@@ -184,15 +167,14 @@ class StrategyRunner:
         # provided constraints.
 
         if self._cache_file.exists() and not self._cache_overwrite:
-            self._strategy = PartitionStrategy.from_disk(self._cache_file)
+            strategy = PartitionStrategy.from_disk(self._cache_file)
         else:
-            self._strategy = PartitionStrategy.from_dataframe(
+            strategy = PartitionStrategy.from_dataframe(
                 self.strategy_id, self._df, self._constraints
             )
 
-        self._strategy.save_to(self._cache_file, overwrite=True)
-
-        self._loaded = True
+        strategy.save_to(self._cache_file, overwrite=True)
+        return strategy
 
     @classmethod
     def from_completed(
@@ -202,7 +184,7 @@ class StrategyRunner:
         if not cache_file.exists():
             raise ValueError("cache file does not exist")
 
-        inst = cls(
+        return cls(
             strategy_id="__none__",
             df=None,
             cache_file=cache_file,
@@ -210,8 +192,6 @@ class StrategyRunner:
             partition_constraints=None,
             project=project,
         )
-        inst.load()
-        return inst
 
     def _update_job_status(self):
         # Get all jobs that have been created, we can do this
@@ -307,7 +287,6 @@ class StrategyRunner:
             partition.ctx[HANDLER][STATUS] = current_handler.status
             self._strategy.save()
 
-    @_needs_load
     def cancel_all(self):
         partitions = self._strategy.query_glob(MODEL_ID, "*")
         for partition in partitions:
@@ -322,7 +301,6 @@ class StrategyRunner:
         self._max_jobs_active = get_me()["service_limits"]["max_jobs_active"]
 
     @property
-    @_needs_load
     def has_capacity(self) -> bool:
         num_active = len(self._gather_statuses(ACTIVE_STATES))
         self._refresh_max_job_capacity()
@@ -406,7 +384,6 @@ class StrategyRunner:
             artifact_id = self._project.upload_artifact(target_file)
             return ArtifactResult(id=artifact_id, record_count=len(df))
 
-    @_needs_load
     def train_partition(
         self, partition: Partition, artifact: ArtifactResult
     ) -> Optional[str]:
@@ -464,7 +441,6 @@ class StrategyRunner:
         )
         return model.model_id
 
-    @_needs_load
     def run_partition(
         self, partition: Partition, gen_payload: GenPayload
     ) -> Optional[str]:
@@ -510,7 +486,6 @@ class StrategyRunner:
         )
         return handler_obj.record_id
 
-    @_needs_load
     def train_next_partition(self) -> Optional[str]:
         start_job = False
         for partition in self._strategy.partitions:
@@ -539,7 +514,6 @@ class StrategyRunner:
                     return None
                 return self.train_partition(partition, artifact)
 
-    @_needs_load
     def run_next_partition(self, gen_payload: GenPayload) -> Optional[str]:
         start_job = False
         for partition in self._strategy.partitions:
@@ -597,7 +571,6 @@ class StrategyRunner:
 
                 return self.run_partition(partition, new_payload)
 
-    @_needs_load
     def clear_partition_runs(self):
         """
         Partitions should only be trained until they are 'completed', however we can run
@@ -616,7 +589,6 @@ class StrategyRunner:
                 out.append(partition)
         return out
 
-    @_needs_load
     def is_done(self, *, handler: bool = False) -> bool:
         done = 0
         for p in self._strategy.partitions:
@@ -640,7 +612,6 @@ class StrategyRunner:
 
         return done == len(self._strategy.partitions)
 
-    @_needs_load
     def train_all_partitions(self):
         logger.info(f"Processing {len(self._strategy.partitions)} partitions")
         while True:
@@ -661,7 +632,6 @@ class StrategyRunner:
 
         logger.info(dict(self._status_counter))
 
-    @_needs_load
     def _get_synthetic_data(self, job_type: str, artifact_type: str) -> pd.DataFrame:
         if job_type == "model":
             self._update_job_status()
@@ -736,7 +706,6 @@ class StrategyRunner:
             for partition in self._strategy.partitions
         ]
 
-    @_needs_load
     def generate_data(
         self,
         *,
