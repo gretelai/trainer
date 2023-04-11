@@ -114,7 +114,7 @@ class Trainer:
         self.run.train_all_partitions()
 
     def generate(
-        self, num_records: int = 500, seed_df: pd.DataFrame = None
+        self, num_records: int = 500, seed_df: Optional[pd.DataFrame] = None
     ) -> pd.DataFrame:
         """Generate synthetic data
 
@@ -177,7 +177,7 @@ class Trainer:
         return cache_file
 
     def _initialize_run(
-        self, df: pd.DataFrame = None, overwrite: bool = True, seed_fields: Optional[list] = None
+        self, df: Optional[pd.DataFrame] = None, overwrite: bool = True, seed_fields: Optional[list] = None
     ) -> runner.StrategyRunner:
         """Create training jobs"""
         constraints = None
