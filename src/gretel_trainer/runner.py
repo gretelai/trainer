@@ -34,7 +34,7 @@ from dataclasses import dataclass
 from functools import wraps
 from pathlib import Path
 from random import choice
-from typing import List, Optional, Union
+from typing import List, Optional, Tuple, Union
 
 import pandas as pd
 import smart_open
@@ -83,10 +83,9 @@ class RemoteDFPayload:
     handler_uid: str
     project: Project
     artifact_type: str
-    df: pd.DataFrame = None
 
 
-def _remote_dataframe_fetcher(payload: RemoteDFPayload) -> RemoteDFPayload:
+def _remote_dataframe_fetcher(payload: RemoteDFPayload) -> Tuple[RemoteDFPayload, pd.DataFrame]:
     # We need the model object no matter what
     model = Model(payload.project, model_id=payload.uid)
     job = model
@@ -97,8 +96,7 @@ def _remote_dataframe_fetcher(payload: RemoteDFPayload) -> RemoteDFPayload:
         job = RecordHandler(model, record_id=payload.handler_uid)
 
     download_url = job.get_artifact_link(payload.artifact_type)
-    payload.df = pd.read_csv(download_url, compression="gzip")
-    return payload
+    return payload, pd.read_csv(download_url, compression="gzip")
 
 
 def _maybe_submit_job(
@@ -656,10 +654,10 @@ class StrategyRunner:
         wait(futures, return_when=ALL_COMPLETED)
 
         for future in futures:
-            payload = future.result()  # type: RemoteDFPayload
+            payload, this_df = future.result()
 
             curr_df = df_chunks[payload.slot]
-            df_chunks[payload.slot] = pd.concat([curr_df, payload.df]).reset_index(
+            df_chunks[payload.slot] = pd.concat([curr_df, this_df]).reset_index(
                 drop=True
             )
 
