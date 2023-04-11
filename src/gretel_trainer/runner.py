@@ -79,8 +79,8 @@ class RemoteDFPayload:
     partition: int
     slot: int
     job_type: str
-    uid: str
-    handler_uid: str
+    uid: Optional[str]
+    handler_uid: Optional[str]
     project: Project
     artifact_type: str
 
