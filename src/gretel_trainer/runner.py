@@ -517,7 +517,7 @@ class StrategyRunner:
                 start_job = True
 
             if start_job:
-                use_seeds = False
+                seed_artifact_id = None
                 # If this partition has seed fields and we were given seeds, we need to upload
                 # the artifact first.
                 if partition.columns.seed_headers and isinstance(
@@ -535,7 +535,6 @@ class StrategyRunner:
                         logger.info(
                             "Partition has seed fields, uploading seed artifact..."
                         )
-                        use_seeds = True
                         removed_artifact = self._remove_unused_artifact()
                         if removed_artifact is None:
                             logger.info(
@@ -545,11 +544,12 @@ class StrategyRunner:
 
                         filename = f"{self.strategy_id}-seeds-{partition.idx}.csv"
                         artifact = self._df_to_artifact(gen_payload.seed_df, filename)
+                        seed_artifact_id = artifact.id
 
                 new_payload = GenPayload(
                     num_records=gen_payload.num_records,
                     max_invalid=gen_payload.max_invalid,
-                    seed_artifact_id=artifact.id if use_seeds else None,
+                    seed_artifact_id=seed_artifact_id,
                 )
 
                 return self.run_partition(partition, new_payload)
