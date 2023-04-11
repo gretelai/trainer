@@ -1,5 +1,7 @@
 """Main Trainer Module"""
 
+from __future__ import annotations
+
 import json
 import logging
 import os.path
@@ -71,14 +73,14 @@ class Trainer:
     @classmethod
     def load(
         cls, cache_file: str = DEFAULT_CACHE, project_name: str = DEFAULT_PROJECT
-    ) -> runner.StrategyRunner:
+    ) -> Trainer:
         """Load an existing project from a cache.
 
         Args:
             cache_file (str, optional): Valid file path to load the cache file from. Defaults to `[project-name]-runner.json`
 
         Returns:
-            Trainer: returns an initialized StrategyRunner class.
+            Trainer: returns a Trainer instance with an initialized StrategyRunner class.
         """
         project = create_or_get_unique_project(name=project_name)
         model = cls(cache_file=cache_file, project_name=project_name, overwrite=False)
