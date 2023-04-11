@@ -106,7 +106,7 @@ class Trainer:
         """
         self.dataset_path = Path(dataset_path)
         self.df = self._preprocess_data(
-            dataset_path=dataset_path, delimiter=delimiter, round_decimals=round_decimals
+            dataset_path=self.dataset_path, delimiter=delimiter, round_decimals=round_decimals
         )
         self.run = self._initialize_run(
             df=self.df, overwrite=self.overwrite, seed_fields=seed_fields
