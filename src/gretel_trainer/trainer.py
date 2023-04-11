@@ -47,8 +47,8 @@ class Trainer:
     def __init__(
         self,
         project_name: str = "trainer",
-        model_type: _BaseConfig = None,
-        cache_file: str = None,
+        model_type: Optional[_BaseConfig] = None,
+        cache_file: str = DEFAULT_CACHE,
         overwrite: bool = True,
     ):
         configure_session(api_key="prompt", cache="yes", validate=True)
@@ -92,7 +92,7 @@ class Trainer:
         return model
 
     def train(
-        self, dataset_path: str, delimiter: str = ",", round_decimals: int = 4, seed_fields: list = None,
+        self, dataset_path: str, delimiter: str = ",", round_decimals: int = 4, seed_fields: Optional[list] = None,
     ):
         """Train a model on the dataset
 
@@ -165,7 +165,7 @@ class Trainer:
         return cache_file
 
     def _initialize_run(
-        self, df: pd.DataFrame = None, overwrite: bool = True, seed_fields: list = None
+        self, df: pd.DataFrame = None, overwrite: bool = True, seed_fields: Optional[list] = None
     ) -> runner.StrategyRunner:
         """Create training jobs"""
         constraints = None
