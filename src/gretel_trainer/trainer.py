@@ -125,6 +125,11 @@ class Trainer:
         Returns:
             pd.DataFrame: Synthetic data.
         """
+        if self.run is None:
+            raise RuntimeError(
+                "Cannot generate data without training information. Train a model via `train` or try loading an existing project from cache via `load`."
+            )
+
         self.run.generate_data(
             num_records=num_records if seed_df is None else None,
             max_invalid=None,
@@ -138,6 +143,11 @@ class Trainer:
 
         Requires the model has been trained.
         """
+        if self.run is None:
+            raise RuntimeError(
+                "Cannot generate data without training information. Train a model via `train` or try loading an existing project from cache via `load`."
+            )
+
         scores = [
             sqs["synthetic_data_quality_score"]["score"]
             for sqs in self.run.get_sqs_information()
