@@ -4,6 +4,7 @@ from gretel_client.projects.projects import Project
 from typing_extensions import Protocol
 
 from gretel_trainer.relational.core import RelationalData
+from gretel_trainer.relational.sdk_extras import ExtendedGretelSDK
 from gretel_trainer.relational.strategies.ancestral import AncestralStrategy
 from gretel_trainer.relational.strategies.independent import IndependentStrategy
 
@@ -26,7 +27,7 @@ class _MultiTable(Protocol):
         ...
 
     @property
-    def _hybrid(self) -> bool:
+    def _extended_sdk(self) -> ExtendedGretelSDK:
         ...
 
     def _backup(self) -> None:

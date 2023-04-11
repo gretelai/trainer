@@ -9,8 +9,14 @@ from sqlalchemy import create_engine
 
 from gretel_trainer.relational.connectors import Connector
 from gretel_trainer.relational.core import RelationalData
+from gretel_trainer.relational.sdk_extras import ExtendedGretelSDK
 
 EXAMPLE_DBS = Path(__file__).parent.resolve() / "example_dbs"
+
+
+@pytest.fixture()
+def extended_sdk():
+    return ExtendedGretelSDK(hybrid=False)
 
 
 @pytest.fixture()

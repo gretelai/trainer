@@ -10,7 +10,10 @@ import pytest
 from gretel_client.projects.projects import Project
 
 from gretel_trainer.relational.core import RelationalData
-from gretel_trainer.relational.sdk_extras import MAX_PROJECT_ARTIFACTS
+from gretel_trainer.relational.sdk_extras import (
+    MAX_PROJECT_ARTIFACTS,
+    ExtendedGretelSDK,
+)
 from gretel_trainer.relational.strategies.ancestral import AncestralStrategy
 from gretel_trainer.relational.strategies.independent import IndependentStrategy
 from gretel_trainer.relational.tasks import SyntheticsRunTask
@@ -23,7 +26,7 @@ class MockMultiTable:
     _refresh_interval: int = 0
     _project: Project = Mock(artifacts=[])
     _strategy: Union[AncestralStrategy, IndependentStrategy] = AncestralStrategy()
-    _hybrid: bool = False
+    _extended_sdk: ExtendedGretelSDK = ExtendedGretelSDK(hybrid=False)
 
     def _backup(self) -> None:
         pass
@@ -105,7 +108,7 @@ def test_runs_post_processing_when_table_completes(pets, tmpdir):
     task.multitable._strategy = MockStrategy()  # type:ignore
 
     with patch(
-        "gretel_trainer.relational.tasks.synthetics_run.get_record_handler_data"
+        "gretel_trainer.relational.sdk_extras.ExtendedGretelSDK.get_record_handler_data"
     ) as get_rh_data:
         get_rh_data.return_value = raw_df
         task.handle_completed("table", Mock())

@@ -318,10 +318,16 @@ def configure_mocks(
     )
 
 
-def test_restore_not_yet_trained(project, pets):
-    with tempfile.TemporaryDirectory() as working_dir, tempfile.TemporaryDirectory() as testsetup_dir, patch(
-        "gretel_trainer.relational.multi_table.download_tar_artifact"
+@pytest.fixture(autouse=True)
+def download_tar_artifact():
+    with patch(
+        "gretel_trainer.relational.sdk_extras.ExtendedGretelSDK.download_tar_artifact"
     ) as download_tar_artifact:
+        yield download_tar_artifact
+
+
+def test_restore_not_yet_trained(project, pets, download_tar_artifact):
+    with tempfile.TemporaryDirectory() as working_dir, tempfile.TemporaryDirectory() as testsetup_dir:
         working_dir = Path(working_dir)
         testsetup_dir = Path(testsetup_dir)
 
@@ -347,10 +353,8 @@ def test_restore_not_yet_trained(project, pets):
         assert mt.relational_data.debug_summary() == pets.debug_summary()
 
 
-def test_restore_transforms(project, pets):
-    with tempfile.TemporaryDirectory() as working_dir, tempfile.TemporaryDirectory() as testsetup_dir, patch(
-        "gretel_trainer.relational.multi_table.download_tar_artifact"
-    ) as download_tar_artifact:
+def test_restore_transforms(project, pets, download_tar_artifact):
+    with tempfile.TemporaryDirectory() as working_dir, tempfile.TemporaryDirectory() as testsetup_dir:
         working_dir = Path(working_dir)
         testsetup_dir = Path(testsetup_dir)
 
@@ -389,10 +393,10 @@ def test_restore_transforms(project, pets):
         assert len(mt._transforms_train.lost_contact) == 0
 
 
-def test_restore_synthetics_training_still_in_progress(project, pets):
-    with tempfile.TemporaryDirectory() as working_dir, tempfile.TemporaryDirectory() as testsetup_dir, patch(
-        "gretel_trainer.relational.multi_table.download_tar_artifact"
-    ) as download_tar_artifact:
+def test_restore_synthetics_training_still_in_progress(
+    project, pets, download_tar_artifact
+):
+    with tempfile.TemporaryDirectory() as working_dir, tempfile.TemporaryDirectory() as testsetup_dir:
         working_dir = Path(working_dir)
         testsetup_dir = Path(testsetup_dir)
 
@@ -425,10 +429,10 @@ def test_restore_synthetics_training_still_in_progress(project, pets):
             mt = MultiTable.restore(backup_file)
 
 
-def test_restore_training_complete(project, pets, report_json_dict):
-    with tempfile.TemporaryDirectory() as working_dir, tempfile.TemporaryDirectory() as testsetup_dir, patch(
-        "gretel_trainer.relational.multi_table.download_tar_artifact"
-    ) as download_tar_artifact:
+def test_restore_training_complete(
+    project, pets, report_json_dict, download_tar_artifact
+):
+    with tempfile.TemporaryDirectory() as working_dir, tempfile.TemporaryDirectory() as testsetup_dir:
         working_dir = Path(working_dir)
         testsetup_dir = Path(testsetup_dir)
 
@@ -493,10 +497,10 @@ def test_restore_training_complete(project, pets, report_json_dict):
         assert mt.evaluations["pets"].cross_table_sqs is None
 
 
-def test_restore_training_one_failed(project, pets, report_json_dict):
-    with tempfile.TemporaryDirectory() as working_dir, tempfile.TemporaryDirectory() as testsetup_dir, patch(
-        "gretel_trainer.relational.multi_table.download_tar_artifact"
-    ) as download_tar_artifact:
+def test_restore_training_one_failed(
+    project, pets, report_json_dict, download_tar_artifact
+):
+    with tempfile.TemporaryDirectory() as working_dir, tempfile.TemporaryDirectory() as testsetup_dir:
         working_dir = Path(working_dir)
         testsetup_dir = Path(testsetup_dir)
 
@@ -563,10 +567,10 @@ def test_restore_training_one_failed(project, pets, report_json_dict):
         assert mt.evaluations["pets"].cross_table_sqs is None
 
 
-def test_restore_generate_completed(project, pets, report_json_dict):
-    with tempfile.TemporaryDirectory() as working_dir, tempfile.TemporaryDirectory() as testsetup_dir, patch(
-        "gretel_trainer.relational.multi_table.download_tar_artifact"
-    ) as download_tar_artifact:
+def test_restore_generate_completed(
+    project, pets, report_json_dict, download_tar_artifact
+):
+    with tempfile.TemporaryDirectory() as working_dir, tempfile.TemporaryDirectory() as testsetup_dir:
         working_dir = Path(working_dir)
         testsetup_dir = Path(testsetup_dir)
 
@@ -639,10 +643,10 @@ def test_restore_generate_completed(project, pets, report_json_dict):
         assert mt.evaluations["pets"].cross_table_sqs == 95
 
 
-def test_restore_generate_in_progress(project, pets, report_json_dict):
-    with tempfile.TemporaryDirectory() as working_dir, tempfile.TemporaryDirectory() as testsetup_dir, patch(
-        "gretel_trainer.relational.multi_table.download_tar_artifact"
-    ) as download_tar_artifact:
+def test_restore_generate_in_progress(
+    project, pets, report_json_dict, download_tar_artifact
+):
+    with tempfile.TemporaryDirectory() as working_dir, tempfile.TemporaryDirectory() as testsetup_dir:
         working_dir = Path(working_dir)
         testsetup_dir = Path(testsetup_dir)
 

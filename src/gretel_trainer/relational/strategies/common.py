@@ -9,12 +9,14 @@ from gretel_client.projects.models import Model
 from sklearn import preprocessing
 
 from gretel_trainer.relational.core import RelationalData
-from gretel_trainer.relational.sdk_extras import download_file_artifact
+from gretel_trainer.relational.sdk_extras import ExtendedGretelSDK
 
 logger = logging.getLogger(__name__)
 
 
-def download_artifacts(model: Model, out_filepath: Path, table_name: str) -> None:
+def download_artifacts(
+    model: Model, out_filepath: Path, table_name: str, extended_sdk: ExtendedGretelSDK
+) -> None:
     """
     Downloads all model artifacts to a subdirectory in the working directory.
     Returns the artifact directory path when successful.
@@ -23,7 +25,7 @@ def download_artifacts(model: Model, out_filepath: Path, table_name: str) -> Non
 
     for filetype, artifact_name in legend.items():
         out_path = f"{out_filepath}.{filetype}"
-        download_file_artifact(model, artifact_name, out_path)
+        extended_sdk.download_file_artifact(model, artifact_name, out_path)
 
 
 def read_report_json_data(model: Model, report_path: Path) -> Optional[Dict]:

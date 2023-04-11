@@ -7,12 +7,7 @@ from gretel_client.projects.jobs import ACTIVE_STATES, END_STATES, Job, Status
 from gretel_client.projects.projects import Project
 from typing_extensions import Protocol
 
-from gretel_trainer.relational.sdk_extras import (
-    cautiously_refresh_status,
-    delete_data_source,
-    get_job_id,
-    start_job_if_possible,
-)
+from gretel_trainer.relational.sdk_extras import ExtendedGretelSDK
 
 MAX_REFRESH_ATTEMPTS = 3
 
@@ -62,7 +57,7 @@ class Task(Protocol):
         ...
 
 
-def run_task(task: Task, hybrid: bool) -> None:
+def run_task(task: Task, extended_sdk: ExtendedGretelSDK) -> None:
     refresh_attempts: Dict[str, int] = defaultdict(int)
     first_pass = True
 
@@ -77,33 +72,34 @@ def run_task(task: Task, hybrid: bool) -> None:
                 continue
 
             job = task.get_job(table_name)
-            if get_job_id(job) is None:
-                start_job_if_possible(
+            if extended_sdk.get_job_id(job) is None:
+                extended_sdk.start_job_if_possible(
                     job=job,
                     table_name=table_name,
                     action=task.action,
                     project=task.project,
                     number_of_artifacts=task.artifacts_per_job,
-                    hybrid=hybrid,
                 )
                 continue
 
-            status = cautiously_refresh_status(job, table_name, refresh_attempts)
+            status = extended_sdk.cautiously_refresh_status(
+                job, table_name, refresh_attempts
+            )
 
             if refresh_attempts[table_name] >= MAX_REFRESH_ATTEMPTS:
                 _log_lost_contact(table_name)
                 task.handle_lost_contact(table_name)
-                delete_data_source(task.project, job, hybrid)
+                extended_sdk.delete_data_source(task.project, job)
                 continue
 
             if status == Status.COMPLETED:
                 _log_success(table_name, task.action)
                 task.handle_completed(table_name, job)
-                delete_data_source(task.project, job, hybrid)
+                extended_sdk.delete_data_source(task.project, job)
             elif status in END_STATES:
                 _log_failed(table_name, task.action)
                 task.handle_failed(table_name)
-                delete_data_source(task.project, job, hybrid)
+                extended_sdk.delete_data_source(task.project, job)
             else:
                 _log_in_progress(table_name, status, task.action)
 

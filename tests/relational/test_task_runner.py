@@ -57,19 +57,21 @@ class MockTask:
 
 @pytest.fixture(autouse=True)
 def get_job_id():
-    with patch("gretel_trainer.relational.task_runner.get_job_id") as _get_job_id:
+    with patch(
+        "gretel_trainer.relational.sdk_extras.ExtendedGretelSDK.get_job_id"
+    ) as _get_job_id:
         yield _get_job_id
 
 
 @pytest.fixture(autouse=True)
 def delete_data_source():
     with patch(
-        "gretel_trainer.relational.task_runner.delete_data_source"
+        "gretel_trainer.relational.sdk_extras.ExtendedGretelSDK.delete_data_source"
     ) as _delete_data_source:
         yield _delete_data_source
 
 
-def test_one_successful_model(get_job_id, delete_data_source):
+def test_one_successful_model(get_job_id, delete_data_source, extended_sdk):
     get_job_id.side_effect = [None, "id"]
 
     project = Mock(artifacts=[])
@@ -80,7 +82,7 @@ def test_one_successful_model(get_job_id, delete_data_source):
         project=project,
         models=models,
     )
-    run_task(task, hybrid=False)
+    run_task(task, extended_sdk)
 
     assert task.iteration_count == 2
     assert task.completed == ["table"]
@@ -88,7 +90,7 @@ def test_one_successful_model(get_job_id, delete_data_source):
     delete_data_source.assert_called_once()
 
 
-def test_one_failed_model(get_job_id, delete_data_source):
+def test_one_failed_model(get_job_id, delete_data_source, extended_sdk):
     get_job_id.side_effect = [None, "id"]
 
     project = Mock(artifacts=[])
@@ -99,7 +101,7 @@ def test_one_failed_model(get_job_id, delete_data_source):
         project=project,
         models=models,
     )
-    run_task(task, hybrid=False)
+    run_task(task, extended_sdk)
 
     assert task.iteration_count == 2
     assert task.completed == []
@@ -107,7 +109,7 @@ def test_one_failed_model(get_job_id, delete_data_source):
     delete_data_source.assert_called_once()
 
 
-def test_model_taking_awhile(get_job_id, delete_data_source):
+def test_model_taking_awhile(get_job_id, delete_data_source, extended_sdk):
     get_job_id.side_effect = [None, "id", "id"]
 
     project = Mock(artifacts=[])
@@ -120,7 +122,7 @@ def test_model_taking_awhile(get_job_id, delete_data_source):
         project=project,
         models=models,
     )
-    run_task(task, hybrid=False)
+    run_task(task, extended_sdk)
 
     assert task.iteration_count == 3
     assert task.completed == ["table"]
@@ -128,7 +130,7 @@ def test_model_taking_awhile(get_job_id, delete_data_source):
     delete_data_source.assert_called_once()
 
 
-def test_lose_contact_with_model(get_job_id, delete_data_source):
+def test_lose_contact_with_model(get_job_id, delete_data_source, extended_sdk):
     get_job_id.side_effect = [None, "id", "id", "id"]
 
     project = Mock(artifacts=[])
@@ -140,7 +142,7 @@ def test_lose_contact_with_model(get_job_id, delete_data_source):
         project=project,
         models=models,
     )
-    run_task(task, hybrid=False)
+    run_task(task, extended_sdk)
 
     # Bail after refresh fails MAX_REFRESH_ATTEMPTS times
     assert task.iteration_count == 4
@@ -150,7 +152,9 @@ def test_lose_contact_with_model(get_job_id, delete_data_source):
     delete_data_source.assert_called_once()
 
 
-def test_refresh_status_can_tolerate_blips(get_job_id, delete_data_source):
+def test_refresh_status_can_tolerate_blips(
+    get_job_id, delete_data_source, extended_sdk
+):
     get_job_id.side_effect = [None, "id", "id"]
 
     project = Mock(artifacts=[])
@@ -164,7 +168,7 @@ def test_refresh_status_can_tolerate_blips(get_job_id, delete_data_source):
         project=project,
         models=models,
     )
-    run_task(task, hybrid=False)
+    run_task(task, extended_sdk)
 
     assert task.iteration_count == 3
     assert task.completed == ["table"]
@@ -173,7 +177,9 @@ def test_refresh_status_can_tolerate_blips(get_job_id, delete_data_source):
     delete_data_source.assert_called_once()
 
 
-def test_defers_submission_if_no_room_in_project(get_job_id, delete_data_source):
+def test_defers_submission_if_no_room_in_project(
+    get_job_id, delete_data_source, extended_sdk
+):
     get_job_id.side_effect = [None, None, None, "id"]
     project = Mock()
     # First time through, we're at the project limit
@@ -194,14 +200,14 @@ def test_defers_submission_if_no_room_in_project(get_job_id, delete_data_source)
         project=project,
         models=models,
     )
-    run_task(task, hybrid=False)
+    run_task(task, extended_sdk)
 
     assert task.iteration_count == 4
     assert task.completed == ["table"]
     delete_data_source.assert_called_once()
 
 
-def test_several_models(delete_data_source):
+def test_several_models(delete_data_source, extended_sdk):
     project = Mock(artifacts=[])
 
     completed_model = Mock(status=Status.COMPLETED)
@@ -220,16 +226,16 @@ def test_several_models(delete_data_source):
         project=project,
         models=models,
     )
-    run_task(task, hybrid=False)
+    run_task(task, extended_sdk)
 
     assert task.completed == ["completed"]
     assert set(task.failed) == {"error", "cancelled", "lost"}
     delete_data_source.assert_has_calls(
         [
-            call(project, completed_model, False),
-            call(project, error_model, False),
-            call(project, cancelled_model, False),
-            call(project, lost_model, False),
+            call(project, completed_model),
+            call(project, error_model),
+            call(project, cancelled_model),
+            call(project, lost_model),
         ],
         any_order=True,
     )

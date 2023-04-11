@@ -45,13 +45,7 @@ from gretel_trainer.relational.model_config import (
     make_transform_config,
 )
 from gretel_trainer.relational.report.report import ReportPresenter, ReportRenderer
-from gretel_trainer.relational.sdk_extras import (
-    cautiously_refresh_status,
-    download_file_artifact,
-    download_tar_artifact,
-    get_job_id,
-    sqs_score_from_full_report,
-)
+from gretel_trainer.relational.sdk_extras import ExtendedGretelSDK
 from gretel_trainer.relational.strategies.ancestral import AncestralStrategy
 from gretel_trainer.relational.strategies.independent import IndependentStrategy
 from gretel_trainer.relational.task_runner import run_task
@@ -101,6 +95,7 @@ class MultiTable:
         self._set_refresh_interval(refresh_interval)
         self.relational_data = relational_data
         self._artifact_collection = ArtifactCollection(hybrid=self._hybrid)
+        self._extended_sdk = ExtendedGretelSDK(hybrid=self._hybrid)
         self._latest_backup: Optional[Backup] = None
         self._transforms_train = TransformsTrain()
         self.transform_output_tables: Dict[str, pd.DataFrame] = {}
@@ -141,7 +136,7 @@ class MultiTable:
                 "Cannot restore from backup: source archive is missing."
             )
         source_archive_path = self._working_dir / "source_tables.tar.gz"
-        download_tar_artifact(
+        self._extended_sdk.download_tar_artifact(
             self._project,
             source_archive_id,
             source_archive_path,
@@ -161,7 +156,7 @@ class MultiTable:
         # Debug summary
         debug_summary_id = backup.artifact_collection.gretel_debug_summary
         if debug_summary_id is not None:
-            download_file_artifact(
+            self._extended_sdk.download_file_artifact(
                 self._project,
                 debug_summary_id,
                 self._working_dir / "_gretel_debug_summary.json",
@@ -195,7 +190,7 @@ class MultiTable:
             synthetics_training_archive_path = (
                 self._working_dir / "synthetics_training.tar.gz"
             )
-            download_tar_artifact(
+            self._extended_sdk.download_tar_artifact(
                 self._project,
                 synthetics_training_archive_id,
                 synthetics_training_archive_path,
@@ -233,7 +228,7 @@ class MultiTable:
         for table in training_succeeded:
             model = self._synthetics_train.models[table]
             self._strategy.update_evaluation_from_model(
-                table, self.evaluations, model, self._working_dir
+                table, self.evaluations, model, self._working_dir, self._extended_sdk
             )
 
         training_failed = [
@@ -258,7 +253,7 @@ class MultiTable:
             synthetics_output_archive_path = (
                 self._working_dir / "synthetics_outputs.tar.gz"
             )
-            download_tar_artifact(
+            self._extended_sdk.download_tar_artifact(
                 self._project,
                 synthetics_outputs_archive_id,
                 synthetics_output_archive_path,
@@ -320,7 +315,7 @@ class MultiTable:
                 data_source = rh.data_source
                 if data_source is not None:
                     try:
-                        download_file_artifact(
+                        self._extended_sdk.download_file_artifact(
                             self._project,
                             data_source,
                             self._working_dir
@@ -467,7 +462,7 @@ class MultiTable:
             transforms_train=self._transforms_train,
             multitable=self,
         )
-        run_task(task, self._hybrid)
+        run_task(task, self._extended_sdk)
 
     def run_transforms(
         self,
@@ -525,7 +520,7 @@ class MultiTable:
             record_handlers=transforms_record_handlers,
             multitable=self,
         )
-        run_task(task, self._hybrid)
+        run_task(task, self._extended_sdk)
 
         output_tables = self._strategy.label_encode_keys(
             self.relational_data, task.output_tables
@@ -582,12 +577,12 @@ class MultiTable:
             synthetics_train=self._synthetics_train,
             multitable=self,
         )
-        run_task(task, self._hybrid)
+        run_task(task, self._extended_sdk)
 
         for table in task.completed:
             model = self._synthetics_train.models[table]
             self._strategy.update_evaluation_from_model(
-                table, self.evaluations, model, self._working_dir
+                table, self.evaluations, model, self._working_dir, self._extended_sdk
             )
 
         # TODO: consider moving this to before running the task
@@ -709,7 +704,7 @@ class MultiTable:
             run_dir=run_dir,
             multitable=self,
         )
-        run_task(task, self._hybrid)
+        run_task(task, self._extended_sdk)
 
         output_tables = self._strategy.post_process_synthetic_results(
             task.output_tables, self._synthetics_run.preserved, self.relational_data
@@ -746,7 +741,7 @@ class MultiTable:
             project=evaluate_project,
             multitable=self,
         )
-        run_task(synthetics_evaluate_task, self._hybrid)
+        run_task(synthetics_evaluate_task, self._extended_sdk)
 
         for table in synthetics_evaluate_task.completed:
             self._strategy.update_evaluation_from_evaluate(
@@ -754,6 +749,7 @@ class MultiTable:
                 evaluate_model=evaluate_models[table],
                 evaluations=self.evaluations,
                 working_dir=self._working_dir,
+                extended_sdk=self._extended_sdk,
             )
 
         evaluate_project.delete()

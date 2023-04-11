@@ -8,10 +8,6 @@ from gretel_client.projects.models import Model
 from gretel_client.projects.projects import Project
 from gretel_client.projects.records import RecordHandler
 
-from gretel_trainer.relational.sdk_extras import (
-    get_record_handler_data,
-    start_job_if_possible,
-)
 from gretel_trainer.relational.tasks.common import _MultiTable
 from gretel_trainer.relational.workflow_state import SyntheticsRun, SyntheticsTrain
 
@@ -83,7 +79,7 @@ class SyntheticsRunTask:
         return self.synthetics_run.record_handlers[table]
 
     def handle_completed(self, table: str, job: Job) -> None:
-        record_handler_data = get_record_handler_data(job)
+        record_handler_data = self.multitable._extended_sdk.get_record_handler_data(job)
         post_processed_data = (
             self.multitable._strategy.post_process_individual_synthetic_result(
                 table, self.multitable.relational_data, record_handler_data
@@ -139,13 +135,12 @@ class SyntheticsRunTask:
             self.synthetics_run.record_handlers[table_name] = record_handler
             # Attempt starting the record handler right away. If it can't start right at this moment,
             # the regular task runner check will handle starting it when possible.
-            start_job_if_possible(
+            self.multitable._extended_sdk.start_job_if_possible(
                 job=record_handler,
                 table_name=table_name,
                 action=self.action,
                 project=self.project,
                 number_of_artifacts=self.artifacts_per_job,
-                hybrid=self.multitable._hybrid,
             )
 
         self.multitable._backup()
