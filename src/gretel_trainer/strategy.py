@@ -41,17 +41,9 @@ class Partition(BaseModel):
 
 @dataclass
 class PartitionConstraints:
-    max_row_count: Optional[int] = None
-    max_row_partitions: Optional[int] = None
+    max_row_count: int
     header_clusters: Optional[List[List[str]]] = None
     seed_headers: Optional[List[str]] = None
-
-    def __post_init__(self):
-        if self.max_row_count is not None and self.max_row_partitions is not None:
-            raise AttributeError("cannot use both max_row_count and max_row_partitions")
-
-        if self.max_row_count is None and self.max_row_partitions is None:
-            raise AttributeError("must use one of max_row_count or max_row_partitions")
 
     @property
     def header_cluster_count(self) -> int:
@@ -71,11 +63,7 @@ def _build_partitions(
 
     partitions = []
     partition_idx = 0
-
-    if constraints.max_row_partitions is not None:
-        partition_count = constraints.max_row_partitions
-    elif constraints.max_row_count is not None:
-        partition_count = math.ceil(total_rows / constraints.max_row_count)
+    partition_count = math.ceil(total_rows / constraints.max_row_count)
 
     # We need to break up the number of rows into roughly even chunks
     chunk_size, remain = divmod(total_rows, partition_count)

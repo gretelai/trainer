@@ -34,34 +34,20 @@ def header_clusters_seed(test_df) -> ClusterData:
     return ClusterData(clusters=clusters, seeds=seeds)
 
 
-def test_invalid_partition_constraints():
-    with pytest.raises(AttributeError):
-        PartitionConstraints(max_row_count=1, max_row_partitions=1)
-
-    with pytest.raises(AttributeError):
-        PartitionConstraints()
-
-
 @pytest.mark.parametrize(
     "constraints",
     [
-        PartitionConstraints(max_row_partitions=3),
-        PartitionConstraints(max_row_partitions=20),
         PartitionConstraints(max_row_count=1000),
         PartitionConstraints(max_row_count=100),
     ],
 )
 def test_strategy_all_columns(constraints: PartitionConstraints, test_df):
     strategy = PartitionStrategy.from_dataframe("foo", test_df, constraints)
-    if constraints.max_row_partitions:
-        assert constraints.max_row_partitions == strategy.partition_count
-
-    if constraints.max_row_count:
-        assert (
-            len(test_df) // constraints.max_row_count
-            <= strategy.partition_count
-            <= len(test_df) // constraints.max_row_count + 1
-        )
+    assert (
+        len(test_df) // constraints.max_row_count
+        <= strategy.partition_count
+        <= len(test_df) // constraints.max_row_count + 1
+    )
 
     # partitions are of roughly equal size
     extracted_df_lengths = [len(partition.extract_df(test_df)) for partition in strategy.partitions]
@@ -81,8 +67,6 @@ def test_strategy_all_columns(constraints: PartitionConstraints, test_df):
 @pytest.mark.parametrize(
     "constraints",
     [
-        PartitionConstraints(max_row_partitions=3),
-        PartitionConstraints(max_row_partitions=20),
         PartitionConstraints(max_row_count=1000),
         PartitionConstraints(max_row_count=100),
     ],
@@ -93,18 +77,11 @@ def test_strategy_column_batches(
     constraints.header_clusters = header_clusters
 
     strategy = PartitionStrategy.from_dataframe("foo", test_df, constraints)
-    if constraints.max_row_partitions:
-        assert (
-            constraints.max_row_partitions * len(header_clusters)
-            == strategy.partition_count
-        )
-
-    if constraints.max_row_count:
-        assert (
-            len(test_df) // constraints.max_row_count
-            <= strategy.partition_count / len(header_clusters)
-            <= len(test_df) // constraints.max_row_count + 1
-        )
+    assert (
+        len(test_df) // constraints.max_row_count
+        <= strategy.partition_count / len(header_clusters)
+        <= len(test_df) // constraints.max_row_count + 1
+    )
 
     # partitions are of roughly equal size
     extracted_df_lengths = [len(partition.extract_df(test_df)) for partition in strategy.partitions]
@@ -124,14 +101,8 @@ def test_strategy_column_batches(
     assert final.shape == test_df.shape
 
 
-@pytest.mark.parametrize(
-    "constraints",
-    [
-        PartitionConstraints(max_row_partitions=3),
-        PartitionConstraints(max_row_count=100),
-    ],
-)
-def test_strategy_seeds(constraints: PartitionConstraints, test_df, header_clusters_seed: ClusterData):
+def test_strategy_seeds(test_df, header_clusters_seed: ClusterData):
+    constraints = PartitionConstraints(max_row_count=100)
     constraints.header_clusters = header_clusters_seed.clusters
     constraints.seed_headers = header_clusters_seed.seeds
     strategy = PartitionStrategy.from_dataframe("foo", test_df, constraints)
@@ -145,7 +116,7 @@ def test_strategy_seeds(constraints: PartitionConstraints, test_df, header_clust
 def test_read_write(test_df, header_clusters, tmpdir):
     save_location = Path(tmpdir) / "data.json"
     constraints = PartitionConstraints(
-        max_row_partitions=3, header_clusters=header_clusters
+        max_row_count=100, header_clusters=header_clusters
     )
     strategy = PartitionStrategy.from_dataframe("foo", test_df, constraints)
 
