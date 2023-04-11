@@ -436,7 +436,7 @@ class StrategyRunner:
         handler_dict = partition.ctx.get(HANDLER)
         if handler_dict is None:
             partition.ctx[HANDLER] = {}
-        attempt = partition.ctx.get(HANDLER).get(ATTEMPT, 0) + 1
+        attempt = partition.ctx.get(HANDLER, {}).get(ATTEMPT, 0) + 1
         model_id = partition.ctx.get(MODEL_ID)
 
         # Hydrate our trained model so we can start the handler
