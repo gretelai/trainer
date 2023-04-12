@@ -680,3 +680,68 @@ def test_restore_generate_in_progress(
     assert mt.evaluations["humans"].cross_table_sqs is None
     assert mt.evaluations["pets"].individual_sqs == 95
     assert mt.evaluations["pets"].cross_table_sqs is None
+
+
+def test_restore_hybrid_run(project, pets, report_json_dict, working_dir):
+    # In hybrid contexts, the ArtifactCollection does not track or upload anything to the project.
+    # We are entirely reliant upon the local directory for those artifacts.
+    # For testing, this means we set up everything in the working directory already.
+
+    synthetics_record_handlers = {
+        "humans": make_mock_record_handler(name="humans", status="completed"),
+        "pets": make_mock_record_handler(name="pets", status="completed"),
+    }
+
+    synthetics_models = {
+        "humans": make_mock_model(
+            name="humans",
+            status="completed",
+            setup_path=working_dir,
+            record_handler=synthetics_record_handlers["humans"],
+            report_json=report_json_dict,
+        ),
+        "pets": make_mock_model(
+            name="pets",
+            status="completed",
+            setup_path=working_dir,
+            record_handler=synthetics_record_handlers["pets"],
+            report_json=report_json_dict,
+        ),
+    }
+
+    create_standin_project_artifacts(pets, working_dir)
+    download_tar_artifact = Mock()
+    configure_mocks(
+        project,
+        download_tar_artifact,
+        working_dir,
+        working_dir,
+        synthetics_models,
+    )
+
+    backup_object = make_backup(
+        rel_data=pets,
+        working_dir=working_dir,
+        artifact_collection=ArtifactCollection(hybrid=True),
+        transforms_models={},
+        synthetics_models=synthetics_models,
+        synthetics_record_handlers=synthetics_record_handlers,
+    )
+    backup_file = write_backup(backup_object, working_dir)
+
+    mt = MultiTable.restore(backup_file)
+
+    # No need to assert artifacts are present in working_dir because we set it up that way
+    # and hybrid restore would not work otherwise.
+
+    assert len(mt._synthetics_train.models) == 2
+    assert mt._synthetics_run is not None
+    assert len(mt.synthetic_output_tables) == 2
+    assert mt.evaluations["humans"].individual_sqs == 95
+    assert mt.evaluations["humans"].cross_table_sqs == 95
+    assert mt.evaluations["pets"].individual_sqs == 95
+    assert mt.evaluations["pets"].cross_table_sqs == 95
+
+    # The ArtifactCollection will not have uploaded any archive files,
+    # so restore will not try to download any.
+    download_tar_artifact.assert_not_called()

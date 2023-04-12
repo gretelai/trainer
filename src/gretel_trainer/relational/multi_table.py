@@ -130,17 +130,18 @@ class MultiTable:
         self._artifact_collection = backup.artifact_collection
 
         # RelationalData
+        source_archive_path = self._working_dir / "source_tables.tar.gz"
         source_archive_id = backup.artifact_collection.source_archive
-        if source_archive_id is None:
+        if source_archive_id is not None:
+            self._extended_sdk.download_tar_artifact(
+                self._project,
+                source_archive_id,
+                source_archive_path,
+            )
+        if not source_archive_path.exists():
             raise MultiTableException(
                 "Cannot restore from backup: source archive is missing."
             )
-        source_archive_path = self._working_dir / "source_tables.tar.gz"
-        self._extended_sdk.download_tar_artifact(
-            self._project,
-            source_archive_id,
-            source_archive_path,
-        )
         with tarfile.open(source_archive_path, "r:gz") as tar:
             tar.extractall(path=self._working_dir)
         for table_name, table_backup in backup.relational_data.tables.items():
@@ -183,18 +184,19 @@ class MultiTable:
 
         logger.info("Restoring synthetics models")
 
+        synthetics_training_archive_path = (
+            self._working_dir / "synthetics_training.tar.gz"
+        )
         synthetics_training_archive_id = (
             self._artifact_collection.synthetics_training_archive
         )
         if synthetics_training_archive_id is not None:
-            synthetics_training_archive_path = (
-                self._working_dir / "synthetics_training.tar.gz"
-            )
             self._extended_sdk.download_tar_artifact(
                 self._project,
                 synthetics_training_archive_id,
                 synthetics_training_archive_path,
             )
+        if synthetics_training_archive_path.exists():
             with tarfile.open(synthetics_training_archive_path, "r:gz") as tar:
                 tar.extractall(path=self._working_dir)
 
@@ -244,20 +246,19 @@ class MultiTable:
 
         # Synthetics Generate
         ## First, download the outputs archive if present and extract the data.
+        synthetics_output_archive_path = self._working_dir / "synthetics_outputs.tar.gz"
         synthetics_outputs_archive_id = (
             self._artifact_collection.synthetics_outputs_archive
         )
         any_outputs = False
         if synthetics_outputs_archive_id is not None:
-            any_outputs = True
-            synthetics_output_archive_path = (
-                self._working_dir / "synthetics_outputs.tar.gz"
-            )
             self._extended_sdk.download_tar_artifact(
                 self._project,
                 synthetics_outputs_archive_id,
                 synthetics_output_archive_path,
             )
+        if synthetics_output_archive_path.exists():
+            any_outputs = True
             with tarfile.open(synthetics_output_archive_path, "r:gz") as tar:
                 tar.extractall(path=self._working_dir)
 
