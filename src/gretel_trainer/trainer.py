@@ -106,7 +106,7 @@ class Trainer:
         """
         self.dataset_path = Path(dataset_path)
         self.df = self._preprocess_data(
-            dataset_path=self.dataset_path, delimiter=delimiter, round_decimals=round_decimals
+            dataset_path=dataset_path, delimiter=delimiter, round_decimals=round_decimals
         )
         self.run = self._initialize_run(
             df=self.df, overwrite=self.overwrite, seed_fields=seed_fields
@@ -155,10 +155,10 @@ class Trainer:
         return int(sum(scores) / len(scores))
 
     def _preprocess_data(
-        self, dataset_path: Path, delimiter: str, round_decimals: int = 4
+        self, dataset_path: str, delimiter: str, round_decimals: int = 4
     ) -> pd.DataFrame:
         """Preprocess input data"""
-        tmp = pd.read_csv(str(dataset_path), sep=delimiter, low_memory=False)
+        tmp = pd.read_csv(dataset_path, sep=delimiter, low_memory=False)
         tmp = tmp.round(round_decimals)
         return tmp
 
