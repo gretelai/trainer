@@ -696,16 +696,14 @@ class StrategyRunner:
         clear_cache: bool = False,
     ):
 
-        # TODO: pyright seems to only understand the types correctly in this implementation,
-        # but the more succinct version should work; revisit this and see if we can tighten
-        if seed_df is not None:
-            if num_records is not None:
-                raise ValueError("must use one of seed_df or num_records only")
-            else:
-                num_records = len(seed_df)
-        else:
-            if num_records is None:
-                raise ValueError("must provide a seed_df or num_records to generate")
+        if seed_df is None and not num_records:
+            raise ValueError("must provide a seed_df or num_records to generate")
+
+        if seed_df is not None and num_records:
+            raise ValueError("must use one of seed_df or num_records only")
+
+        # Pyright's type-narrowing doesn't understand that at this point exactly one of num_records and seed_df is None
+        num_records = num_records or len(seed_df)  # type:ignore
 
         # Refresh all of the trained models
         logger.info("Loading existing model information...")
