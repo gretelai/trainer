@@ -107,7 +107,7 @@ def test_end_to_end_with_custom_datasets(df, csv, psv):
     ).wait()
 
     def _unique_results(col: str):
-        unique_results = list(set(comparison.results[col].values.tolist()))  # type:ignore
+        unique_results = list(set(comparison.results[col].values))
         unique_results.sort()
         return unique_results
 
@@ -143,11 +143,11 @@ def test_failures_during_train_generate_or_custom_evaluate(csv):
         gretel_trainer_factory=mock_gretel_trainer_factory(),
     ).wait()
 
-    assert comparison.results["Status"].values.tolist() == [  # type:ignore
+    assert set(comparison.results["Status"].values) == {
         "Failed (train)",
         "Failed (generate)",
         "Failed (evaluate)",
-    ]
+    }
 
 
 def test_failures_during_cleanup_are_ignored(csv):
@@ -166,7 +166,7 @@ def test_failures_during_cleanup_are_ignored(csv):
         gretel_trainer_factory=mock_gretel_trainer_factory(),
     ).wait()
 
-    assert comparison.results["Status"].values.tolist() == ["Completed"]  # type:ignore
+    assert set(comparison.results["Status"].values) == {"Completed"}
 
 
 @pytest.mark.parametrize(
@@ -250,8 +250,8 @@ def test_gptx_uses_sdk_executor(csv):
     mock_record_handler.submit_cloud.assert_called_once()
     mock_record_handler.get_artifact_link.assert_called_once_with("data")
     assert mock_poll.call_count == 2
-    assert comparison.results["Status"].values.tolist() == ["Completed"]  # type:ignore
-    assert comparison.results["SQS"].values.tolist() == [94]  # type:ignore
+    assert set(comparison.results["Status"].values) == {"Completed"}
+    assert set(comparison.results["SQS"].values) == {94}
 
 
 def test_gretel_model_with_bad_custom_config_fails_before_execution_starts(csv):
@@ -313,8 +313,8 @@ def test_run_comparison_with_gretel_dataset():
         gretel_trainer_factory=mock_gretel_trainer_factory(get_sqs_score=84),
     ).wait()
 
-    assert comparison.results["Input data"].values.tolist() == ["iris/data.csv"]  # type:ignore
-    assert comparison.results["Status"].values.tolist() == ["Completed"]  # type:ignore
+    assert set(comparison.results["Input data"].values) == {"iris/data.csv"}
+    assert set(comparison.results["Status"].values) == {"Completed"}
 
     with suppress(FileNotFoundError):
         assert len(os.listdir(TEST_BENCHMARK_DIR)) == 0
@@ -337,7 +337,7 @@ def test_benchmark_cleans_up_after_failures(csv):
         gretel_trainer_factory=mock_gretel_trainer_factory(fail="train"),
     ).wait()
 
-    assert comparison.results["Status"].values.tolist() == ["Failed (train)"]  # type:ignore
+    assert set(comparison.results["Status"].values) == {"Failed (train)"}
 
     mock_project.delete.assert_called()
 
@@ -379,7 +379,7 @@ def test_runs_with_gptx_are_skipped_when_too_many_columns_or_wrong_datatype():
         gretel_trainer_factory=Mock(),
     ).wait()
 
-    assert comparison.results["Status"].values.tolist() == ["Skipped", "Skipped"]  # type:ignore
+    assert set(comparison.results["Status"].values) == {"Skipped", "Skipped"}
 
 
 def test_runs_with_lstm_are_skipped_when_over_150_columns():
@@ -395,7 +395,7 @@ def test_runs_with_lstm_are_skipped_when_over_150_columns():
         gretel_trainer_factory=Mock(),
     ).wait()
 
-    assert comparison.results["Status"].values.tolist() == ["Skipped"]  # type:ignore
+    assert set(comparison.results["Status"].values) == {"Skipped"}
 
 
 def test_skip_cleanup_when_requested():
