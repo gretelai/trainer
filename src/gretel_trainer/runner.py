@@ -155,9 +155,9 @@ class StrategyRunner:
         self.strategy_id = strategy_id
         self._status_counter = Counter()
         self._error_retry_limit = error_retry_limit
-        self._strategy = self._load()
+        self._strategy = self._load_strategy()
 
-    def _load(self) -> PartitionStrategy:
+    def _load_strategy(self) -> PartitionStrategy:
         self._refresh_max_job_capacity()
 
         # If the cache file exists, we'll try and load an existing
