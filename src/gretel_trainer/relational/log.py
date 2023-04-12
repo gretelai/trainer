@@ -1,4 +1,5 @@
 import logging
+from contextlib import contextmanager
 
 RELATIONAL = "gretel_trainer.relational"
 
@@ -17,3 +18,14 @@ logger.setLevel("INFO")
 # (This prevents duplicate log output in Colab)
 for root_handler in logging.root.handlers:
     logging.root.removeHandler(root_handler)
+
+
+@contextmanager
+def silent_logs():
+    logger = logging.getLogger(RELATIONAL)
+    current_level = logger.getEffectiveLevel()
+    logger.setLevel("CRITICAL")
+    try:
+        yield
+    finally:
+        logger.setLevel(current_level)

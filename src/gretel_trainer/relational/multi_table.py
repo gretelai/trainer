@@ -39,6 +39,7 @@ from gretel_trainer.relational.core import (
     RelationalData,
     TableEvaluation,
 )
+from gretel_trainer.relational.log import silent_logs
 from gretel_trainer.relational.model_config import (
     make_evaluate_config,
     make_synthetics_config,
@@ -229,9 +230,14 @@ class MultiTable:
         ]
         for table in training_succeeded:
             model = self._synthetics_train.models[table]
-            self._strategy.update_evaluation_from_model(
-                table, self.evaluations, model, self._working_dir, self._extended_sdk
-            )
+            with silent_logs():
+                self._strategy.update_evaluation_from_model(
+                    table,
+                    self.evaluations,
+                    model,
+                    self._working_dir,
+                    self._extended_sdk,
+                )
 
         training_failed = [
             table
