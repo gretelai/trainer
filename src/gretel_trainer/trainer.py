@@ -48,9 +48,9 @@ class Trainer:
 
     def __init__(
         self,
-        project_name: str = "trainer",
+        project_name: str = DEFAULT_PROJECT,
         model_type: Optional[_BaseConfig] = None,
-        cache_file: str = DEFAULT_CACHE,
+        cache_file: Optional[str] = None,
         overwrite: bool = True,
     ):
         configure_session(api_key="prompt", cache="yes", validate=True)
@@ -61,6 +61,7 @@ class Trainer:
         self.project_name = project_name
         self.project = create_or_get_unique_project(name=project_name)
         self.overwrite = overwrite
+        cache_file = cache_file or f"{project_name}-runner.json"
         self.cache_file = self._get_cache_file(cache_file)
         self.model_type = model_type
 
