@@ -55,7 +55,6 @@ class Trainer:
     ):
         configure_session(api_key="prompt", cache="yes", validate=True)
 
-        self.df = None
         self.dataset_path: Optional[Path] = None
         self.run = None
         self.project_name = project_name
@@ -91,7 +90,23 @@ class Trainer:
                 f"Unable to find `{cache_file}`. Please specify a valid cache_file."
             )
 
-        model.run = model._initialize_run(df=None, overwrite=model.overwrite)
+        # Cache file does not store all the data needed to fully rehydrate a StrategyRunner, but
+        # 1) we don't need all the attributes to generate data from existing trained models, and
+        # 2) if we do want to train from scratch, Trainer#train will create a new StrategyRunner
+        #    with legitimate values for these attributes.
+        empty_df = pd.DataFrame()
+        empty_model_config = {}
+        empty_partition_constraints = strategy.PartitionConstraints(max_row_count=0)
+        model.run = runner.StrategyRunner(
+            df=empty_df,
+            model_config=empty_model_config,
+            partition_constraints=empty_partition_constraints,
+            strategy_id=_sanitize_name(model._get_strategy_id()),
+            cache_file=model.cache_file,
+            cache_overwrite=model.overwrite,
+            project=model.project,
+        )
+
         return model
 
     def train(
@@ -178,43 +193,33 @@ class Trainer:
         return cache_file
 
     def _initialize_run(
-        self, df: Optional[pd.DataFrame] = None, overwrite: bool = True, seed_fields: Optional[list] = None
+        self, df: pd.DataFrame, overwrite: bool, seed_fields: Optional[list]
     ) -> runner.StrategyRunner:
         """Create training jobs"""
-        constraints = None
-        model_config = None
+        if self.model_type is None:
+            self.model_type = determine_best_model(df)
+            logger.debug(json.dumps(self.model_type.config, indent=2))
 
-        if df is None:
-            df = pd.DataFrame()
+        model_config = self.model_type.config
 
-        if not df.empty:
-            if self.model_type is None:
-                self.model_type = determine_best_model(df)
-                logger.debug(json.dumps(self.model_type.config, indent=2))
+        header_clusters = cluster(
+            df,
+            maxsize=self.model_type.max_header_clusters,
+            header_prefix=seed_fields,
+            plot=False,
+        )
+        logger.info(
+            f"Header clustering created {len(header_clusters)} cluster(s) "
+            f"of length(s) {[len(x) for x in header_clusters]}"
+        )
 
-            model_config = self.model_type.config
+        constraints = strategy.PartitionConstraints(
+            header_clusters=header_clusters,
+            max_row_count=self.model_type.max_rows,
+            seed_headers=seed_fields,
+        )
 
-            header_clusters = cluster(
-                df,
-                maxsize=self.model_type.max_header_clusters,
-                header_prefix=seed_fields,
-                plot=False,
-            )
-            logger.info(
-                f"Header clustering created {len(header_clusters)} cluster(s) "
-                f"of length(s) {[len(x) for x in header_clusters]}"
-            )
-
-            constraints = strategy.PartitionConstraints(
-                header_clusters=header_clusters,
-                max_row_count=self.model_type.max_rows,
-                seed_headers=seed_fields,
-            )
-
-        if self.dataset_path is None:
-            strategy_id = f"{self.project_name}"
-        else:
-            strategy_id = f"{self.project_name}-{self.dataset_path.stem}"
+        strategy_id = self._get_strategy_id()
 
         run = runner.StrategyRunner(
             strategy_id=_sanitize_name(strategy_id),
@@ -226,3 +231,9 @@ class Trainer:
             project=self.project,
         )
         return run
+
+    def _get_strategy_id(self) -> str:
+        strategy_id = self.project_name
+        if self.dataset_path is not None:
+            strategy_id += f"-{self.dataset_path.stem}"
+        return strategy_id
