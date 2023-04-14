@@ -41,6 +41,9 @@ class ArtifactCollection:
     def _upload_file(
         self, project: Project, path: str, existing: Optional[str]
     ) -> Optional[str]:
+        # We do not upload any of these artifacts in hybrid contexts because they are intended to be
+        # "singleton" objects, but we cannot list or delete items in users' artifact endpoints, so
+        # we would end up polluting their endpoints with many nearly-duplicative copies of these files.
         if self.hybrid:
             return None
 
