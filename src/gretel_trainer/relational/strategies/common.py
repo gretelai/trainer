@@ -15,11 +15,10 @@ logger = logging.getLogger(__name__)
 
 
 def download_artifacts(
-    model: Model, out_filepath: Path, table_name: str, extended_sdk: ExtendedGretelSDK
+    model: Model, out_filepath: Path, extended_sdk: ExtendedGretelSDK
 ) -> None:
     """
     Downloads all model artifacts to a subdirectory in the working directory.
-    Returns the artifact directory path when successful.
     """
     legend = {"html": "report", "json": "report_json"}
 
