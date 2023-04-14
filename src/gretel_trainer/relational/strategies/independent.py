@@ -198,9 +198,7 @@ class IndependentStrategy:
     ) -> None:
         logger.info(f"Downloading cross table evaluation reports for `{table_name}`.")
         out_filepath = working_dir / f"synthetics_cross_table_evaluation_{table_name}"
-        common.download_artifacts(
-            evaluate_model, out_filepath, extended_sdk
-        )
+        common.download_artifacts(evaluate_model, out_filepath, extended_sdk)
 
         evaluation = evaluations[table_name]
         evaluation.cross_table_report_json = common.read_report_json_data(

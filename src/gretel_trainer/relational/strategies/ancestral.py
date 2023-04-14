@@ -309,9 +309,7 @@ class AncestralStrategy:
     ) -> None:
         logger.info(f"Downloading individual evaluation reports for `{table_name}`.")
         out_filepath = working_dir / f"synthetics_individual_evaluation_{table_name}"
-        common.download_artifacts(
-            evaluate_model, out_filepath, extended_sdk
-        )
+        common.download_artifacts(evaluate_model, out_filepath, extended_sdk)
 
         evaluation = evaluations[table_name]
         evaluation.individual_report_json = common.read_report_json_data(
