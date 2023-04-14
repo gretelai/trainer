@@ -53,7 +53,7 @@ class ActionUtils:
             (self.settings.source_db, self.settings.sink_db), ("source db", "sink db")
         ):
             if conn is None:
-                errors.append(f"{conn} connection string is not set")
+                errors.append(f"{desc} connection string is not set")
 
             engine = create_engine(conn.get_secret_value())
             try:
