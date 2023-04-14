@@ -174,6 +174,7 @@ class AncestralStrategy:
     ) -> pd.DataFrame:
         seed_df = pd.DataFrame()
 
+        source_data = rel_data.get_table_data(table)
         for fk in rel_data.get_foreign_keys(table):
             parent_table_data = output_tables[fk.parent_table_name]
             parent_table_data = ancestry.prepend_foreign_key_lineage(
@@ -181,13 +182,8 @@ class AncestralStrategy:
             )
 
             # Get FK frequencies
-            freqs = (
-                rel_data.get_table_data(table)
-                .groupby([fk.column_name])
-                .size()
-                .reset_index()
-            )
-            freqs = sorted(list(freqs[0]), reverse=True)
+            freqs = common.get_frequencies(source_data, fk.column_name)
+            freqs = sorted(freqs, reverse=True)
             f = 0
 
             # Make a list of parent_table indicies matching FK frequencies
@@ -248,8 +244,8 @@ class AncestralStrategy:
         processed = synthetic_table
 
         primary_key = ancestry.get_multigenerational_primary_key(rel_data, table_name)
-        if primary_key is not None:
-            processed[primary_key] = [i for i in range(len(synthetic_table))]
+        for col in primary_key:
+            processed[col] = [i for i in range(len(synthetic_table))]
 
         foreign_key_maps = ancestry.get_ancestral_foreign_key_maps(rel_data, table_name)
         for fk, parent_pk in foreign_key_maps:

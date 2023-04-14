@@ -59,10 +59,10 @@ class Connector:
 
             logger.debug(f"Extracting source data from `{table_name}`")
             df = pd.read_sql_table(table_name, self.engine)
-            primary_key = None
+            primary_key = []
             for column in table.columns:
                 if column.primary_key:
-                    primary_key = column.name
+                    primary_key.append(column.name)
                 for f_key in column.foreign_keys:
                     referenced_table = f_key.column.table.name
                     referenced_column = f_key.column.name

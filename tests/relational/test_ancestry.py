@@ -112,11 +112,13 @@ def test_whether_column_is_ancestral(mutagenesis):
 
 
 def test_primary_key_in_multigenerational_format(mutagenesis):
-    assert ancestry.get_multigenerational_primary_key(mutagenesis, "bond") is None
-    assert (
-        ancestry.get_multigenerational_primary_key(mutagenesis, "atom")
-        == "self|atom_id"
-    )
+    assert ancestry.get_multigenerational_primary_key(mutagenesis, "bond") == [
+        "self|atom1_id",
+        "self|atom2_id",
+    ]
+    assert ancestry.get_multigenerational_primary_key(mutagenesis, "atom") == [
+        "self|atom_id"
+    ]
 
 
 def test_ancestral_foreign_key_maps(ecom):

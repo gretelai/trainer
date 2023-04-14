@@ -71,7 +71,11 @@
         {% for table_data in presenter.report_table_data %}
         <tr>
           <td><b>{{ table_data.table }}</b></td>
-          <td><span id="{{ table_data.table }}_{{ table_data.pk }}" data-pk class="label">{{ table_data.pk }}</span></td>
+          <td>
+            {% for pk in table_data.pk %}
+            <span id="{{ table_data.table }}_{{ pk }}" data-pk class="label">{{ pk }}</span>
+            {% endfor %}
+          </td>
           <td>
             {% for fk in table_data.fks %}
             <span class="label" data-fk-from="{{ fk.parent_table_name }}_{{ fk.parent_column_name }}">{{ fk.column_name }}</span>&nbsp;

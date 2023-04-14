@@ -40,8 +40,8 @@ def test_mutagenesis_relational_data(mutagenesis):
     assert mutagenesis.get_parents("bond") == ["atom"]
     assert mutagenesis.get_parents("atom") == ["molecule"]
 
-    assert mutagenesis.get_primary_key("bond") is None
-    assert mutagenesis.get_primary_key("atom") == "atom_id"
+    assert mutagenesis.get_primary_key("bond") == ["atom1_id", "atom2_id"]
+    assert mutagenesis.get_primary_key("atom") == ["atom_id"]
 
     assert set(mutagenesis.get_all_key_columns("bond")) == {"atom1_id", "atom2_id"}
     assert set(mutagenesis.get_all_key_columns("atom")) == {"atom_id", "molecule_id"}
@@ -104,13 +104,16 @@ def test_remove_foreign_key():
 
 
 def test_set_primary_key(ecom):
-    assert ecom.get_primary_key("users") == "id"
+    assert ecom.get_primary_key("users") == ["id"]
 
     ecom.set_primary_key(table="users", primary_key=None)
-    assert ecom.get_primary_key("users") is None
+    assert ecom.get_primary_key("users") == []
+
+    ecom.set_primary_key(table="users", primary_key=["first_name", "last_name"])
+    assert ecom.get_primary_key("users") == ["first_name", "last_name"]
 
     ecom.set_primary_key(table="users", primary_key="id")
-    assert ecom.get_primary_key("users") == "id"
+    assert ecom.get_primary_key("users") == ["id"]
 
     # Can't set primary key on an unknown table
     with pytest.raises(MultiTableException):
@@ -125,18 +128,18 @@ def test_relational_data_as_dict(ecom):
     as_dict = ecom.as_dict("test_out")
 
     assert as_dict["tables"] == {
-        "users": {"primary_key": "id", "csv_path": "test_out/users.csv"},
-        "events": {"primary_key": "id", "csv_path": "test_out/events.csv"},
+        "users": {"primary_key": ["id"], "csv_path": "test_out/users.csv"},
+        "events": {"primary_key": ["id"], "csv_path": "test_out/events.csv"},
         "distribution_center": {
-            "primary_key": "id",
+            "primary_key": ["id"],
             "csv_path": "test_out/distribution_center.csv",
         },
-        "products": {"primary_key": "id", "csv_path": "test_out/products.csv"},
+        "products": {"primary_key": ["id"], "csv_path": "test_out/products.csv"},
         "inventory_items": {
-            "primary_key": "id",
+            "primary_key": ["id"],
             "csv_path": "test_out/inventory_items.csv",
         },
-        "order_items": {"primary_key": "id", "csv_path": "test_out/order_items.csv"},
+        "order_items": {"primary_key": ["id"], "csv_path": "test_out/order_items.csv"},
     }
     assert set(as_dict["foreign_keys"]) == {
         ("events.user_id", "users.id"),
@@ -174,13 +177,13 @@ def test_ecommerce_filesystem_serde(ecom):
         assert ecom.get_foreign_keys(table) == from_json.get_foreign_keys(table)
 
 
-def test_filesystem_serde_accepts_missing_primary_keys(mutagenesis):
+def test_filesystem_serde_accepts_composite_primary_keys(mutagenesis):
     with tempfile.TemporaryDirectory() as tmp:
         mutagenesis.to_filesystem(tmp)
         from_json = RelationalData.from_filesystem(f"{tmp}/metadata.json")
 
-    assert from_json.get_primary_key("bond") is None
-    assert from_json.get_primary_key("atom") == "atom_id"
+    assert from_json.get_primary_key("bond") == ["atom1_id", "atom2_id"]
+    assert from_json.get_primary_key("atom") == ["atom_id"]
 
 
 def test_debug_summary(ecom, mutagenesis):
@@ -191,13 +194,13 @@ def test_debug_summary(ecom, mutagenesis):
         "tables": {
             "users": {
                 "column_count": 3,
-                "primary_key": "id",
+                "primary_key": ["id"],
                 "foreign_key_count": 0,
                 "foreign_keys": [],
             },
             "events": {
                 "column_count": 4,
-                "primary_key": "id",
+                "primary_key": ["id"],
                 "foreign_key_count": 1,
                 "foreign_keys": [
                     {
@@ -209,13 +212,13 @@ def test_debug_summary(ecom, mutagenesis):
             },
             "distribution_center": {
                 "column_count": 2,
-                "primary_key": "id",
+                "primary_key": ["id"],
                 "foreign_key_count": 0,
                 "foreign_keys": [],
             },
             "products": {
                 "column_count": 4,
-                "primary_key": "id",
+                "primary_key": ["id"],
                 "foreign_key_count": 1,
                 "foreign_keys": [
                     {
@@ -227,7 +230,7 @@ def test_debug_summary(ecom, mutagenesis):
             },
             "inventory_items": {
                 "column_count": 5,
-                "primary_key": "id",
+                "primary_key": ["id"],
                 "foreign_key_count": 2,
                 "foreign_keys": [
                     {
@@ -244,7 +247,7 @@ def test_debug_summary(ecom, mutagenesis):
             },
             "order_items": {
                 "column_count": 5,
-                "primary_key": "id",
+                "primary_key": ["id"],
                 "foreign_key_count": 2,
                 "foreign_keys": [
                     {
@@ -269,7 +272,7 @@ def test_debug_summary(ecom, mutagenesis):
         "tables": {
             "bond": {
                 "column_count": 3,
-                "primary_key": None,
+                "primary_key": ["atom1_id", "atom2_id"],
                 "foreign_key_count": 2,
                 "foreign_keys": [
                     {
@@ -286,7 +289,7 @@ def test_debug_summary(ecom, mutagenesis):
             },
             "atom": {
                 "column_count": 4,
-                "primary_key": "atom_id",
+                "primary_key": ["atom_id"],
                 "foreign_key_count": 1,
                 "foreign_keys": [
                     {
@@ -298,7 +301,7 @@ def test_debug_summary(ecom, mutagenesis):
             },
             "molecule": {
                 "column_count": 2,
-                "primary_key": "molecule_id",
+                "primary_key": ["molecule_id"],
                 "foreign_key_count": 0,
                 "foreign_keys": [],
             },

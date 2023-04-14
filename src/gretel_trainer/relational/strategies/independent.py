@@ -1,3 +1,4 @@
+import itertools
 import logging
 import random
 from pathlib import Path
@@ -45,16 +46,16 @@ class IndependentStrategy:
         training_data = {}
 
         for table_name in rel_data.list_all_tables():
-            data = rel_data.get_table_data(table_name)
             columns_to_drop = []
-
-            primary_key = rel_data.get_primary_key(table_name)
-            if primary_key is not None:
-                columns_to_drop.append(primary_key)
-            foreign_keys = rel_data.get_foreign_keys(table_name)
+            columns_to_drop.extend(rel_data.get_primary_key(table_name))
             columns_to_drop.extend(
-                [foreign_key.column_name for foreign_key in foreign_keys]
+                [
+                    foreign_key.column_name
+                    for foreign_key in rel_data.get_foreign_keys(table_name)
+                ]
             )
+
+            data = rel_data.get_table_data(table_name)
             data = data.drop(columns=columns_to_drop)
 
             training_data[table_name] = data
@@ -217,18 +218,19 @@ def _synthesize_primary_keys(
     """
     processed = {}
     for table_name, synth_data in synth_tables.items():
-        out_df = synth_data.copy()
+        processed[table_name] = synth_data.copy()
         if table_name in preserved:
-            processed[table_name] = out_df
             continue
 
-        primary_key = rel_data.get_primary_key(table_name)
-        if primary_key is None:
-            processed[table_name] = out_df
-            continue
-
-        out_df[primary_key] = [i for i in range(len(synth_data))]
-        processed[table_name] = out_df
+        source_data = rel_data.get_table_data(table_name)
+        for pk_column in rel_data.get_primary_key(table_name):
+            source_frequencies = common.get_frequencies(source_data, pk_column)
+            synthetic_pk_values = _collect_values(
+                values=list(range(len(synth_data))),
+                frequencies=source_frequencies,
+                total=len(synth_data),
+            )
+            processed[table_name][pk_column] = synthetic_pk_values
 
     return processed
 
@@ -259,15 +261,12 @@ def _synthesize_foreign_keys(
                 )
 
             original_table_data = rel_data.get_table_data(table_name)
-            original_fk_frequencies = (
-                original_table_data.groupby(foreign_key.column_name)
-                .size()
-                .reset_index()
+            fk_frequencies = common.get_frequencies(
+                original_table_data, foreign_key.column_name
             )
-            frequencies = list(original_fk_frequencies[0])
 
-            new_fk_values = _collect_new_foreign_key_values(
-                synth_pk_values, frequencies, len(out_df)
+            new_fk_values = _collect_values(
+                synth_pk_values, fk_frequencies, len(out_df)
             )
 
             out_df[foreign_key.column_name] = new_fk_values
@@ -277,7 +276,7 @@ def _synthesize_foreign_keys(
     return processed
 
 
-def _collect_new_foreign_key_values(
+def _collect_values(
     values: List[Any],
     frequencies: List[int],
     total: int,
@@ -285,27 +284,27 @@ def _collect_new_foreign_key_values(
     freqs = sorted(frequencies)
 
     # Loop through frequencies in ascending order,
-    # adding "that many" of the next valid FK value
+    # adding "that many" of the next valid value
     # to the output collection
     v = 0
     f = 0
-    new_fk_values = []
-    while len(new_fk_values) < total:
+    new_values = []
+    while len(new_values) < total:
         fk_value = values[v]
 
         for _ in range(freqs[f]):
-            new_fk_values.append(fk_value)
+            new_values.append(fk_value)
 
         v = _safe_inc(v, values)
         f = _safe_inc(f, freqs)
 
     # trim potential excess
-    new_fk_values = new_fk_values[0:total]
+    new_values = new_values[0:total]
 
     # shuffle for realism
-    random.shuffle(new_fk_values)
+    random.shuffle(new_values)
 
-    return new_fk_values
+    return new_values
 
 
 def _safe_inc(i: int, col: List[Any]) -> int:

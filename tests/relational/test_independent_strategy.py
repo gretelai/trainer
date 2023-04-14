@@ -97,60 +97,33 @@ def test_post_processing_one_to_one(pets):
         ),
     }
 
-    processed = strategy.post_process_synthetic_results(raw_synth_tables, [], pets)
+    # Normally we shuffle synthesized keys for realism, but for deterministic testing we sort instead
+    with patch("random.shuffle") as shuffle:
+        shuffle = sorted
+        processed = strategy.post_process_synthetic_results(raw_synth_tables, [], pets)
 
+    # Fields from the raw results do not change
     pdtest.assert_frame_equal(
         processed["humans"],
         pd.DataFrame(
             data={
                 "name": ["Michael", "Dominique", "Dirk"],
                 "city": ["Chicago", "Atlanta", "Dallas"],
-                "id": [0, 1, 2],  # contiguous set of integers
+                "id": [0, 1, 2],
             }
         ),
     )
-
-    # FK order varies, so here we only assert on the deterministic fields
     pdtest.assert_frame_equal(
-        processed["pets"][["name", "age", "id"]],
+        processed["pets"],
         pd.DataFrame(
             data={
                 "name": ["Bull", "Hawk", "Maverick"],
                 "age": [6, 0, 1],
-                "id": [0, 1, 2],  # contiguous set of integers
+                "id": [0, 1, 2],
+                "human_id": [0, 1, 2],
             }
         ),
     )
-
-    # Given 1:1 FK:PK relationship and record_size_ratio of 1,
-    # we expect to see all PKs present in the FK column
-    # (though we can't guarantee their order)
-    assert set(processed["pets"]["human_id"]) == {0, 1, 2}
-
-
-def test_post_processing_one_to_one_foreign_keys(pets):
-    strategy = IndependentStrategy()
-
-    raw_synth_tables = {
-        "humans": pd.DataFrame(
-            data={
-                "name": ["Michael", "Dominique", "Dirk"],
-                "city": ["Chicago", "Atlanta", "Dallas"],
-            }
-        ),
-        "pets": pd.DataFrame(
-            data={
-                "name": ["Bull", "Hawk", "Maverick"],
-                "age": [6, 0, 1],
-            }
-        ),
-    }
-
-    processed = strategy.post_process_synthetic_results(raw_synth_tables, [], pets)
-
-    fk_values = set(processed["pets"]["human_id"])
-
-    assert fk_values == {0, 1, 2}
 
 
 def test_post_processing_foreign_keys_with_skewed_frequencies_and_different_size_tables(

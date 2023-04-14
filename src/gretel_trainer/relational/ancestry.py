@@ -12,12 +12,10 @@ _END_LINEAGE = "|"
 
 def get_multigenerational_primary_key(
     rel_data: RelationalData, table: str
-) -> Optional[str]:
-    pk = rel_data.get_primary_key(table)
-    if pk is None:
-        return None
-    else:
-        return f"{_START_LINEAGE}{_END_LINEAGE}{pk}"
+) -> List[str]:
+    return [
+        f"{_START_LINEAGE}{_END_LINEAGE}{pk}" for pk in rel_data.get_primary_key(table)
+    ]
 
 
 def get_ancestral_foreign_key_maps(

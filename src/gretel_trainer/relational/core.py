@@ -126,26 +126,43 @@ class ForeignKey:
     parent_table_name: str
 
 
+PublicPrimaryKeyType = Optional[Union[str, List[str]]]
+
+
 class RelationalData:
     def __init__(self):
         self.graph = networkx.DiGraph()
 
     def add_table(
-        self, *, name: str, primary_key: Optional[str], data: pd.DataFrame
+        self,
+        *,
+        name: str,
+        primary_key: PublicPrimaryKeyType,
+        data: pd.DataFrame,
     ) -> None:
+        primary_key = self._format_primary_key(primary_key)
         self.graph.add_node(name, primary_key=primary_key, data=data)
 
-    def set_primary_key(self, *, table: str, primary_key: Optional[str]) -> None:
+    def set_primary_key(self, *, table: str, primary_key: PublicPrimaryKeyType) -> None:
         if table not in self.list_all_tables():
             raise MultiTableException(f"Unrecognized table name: `{table}`")
 
-        if (
-            primary_key is not None
-            and primary_key not in self.get_table_data(table).columns
-        ):
-            raise MultiTableException(f"Unrecognized column name: `{primary_key}`")
+        primary_key = self._format_primary_key(primary_key)
+
+        known_columns = self.get_table_data(table).columns
+        for col in primary_key:
+            if col not in known_columns:
+                raise MultiTableException(f"Unrecognized column name: `{primary_key}`")
 
         self.graph.nodes[table]["primary_key"] = primary_key
+
+    def _format_primary_key(self, pk: PublicPrimaryKeyType) -> List[str]:
+        if pk is None:
+            return []
+        elif isinstance(pk, str):
+            return [pk]
+        else:
+            return pk
 
     def add_foreign_key(self, *, foreign_key: str, referencing: str) -> None:
         """Format of both str arguments should be `table_name.column_name`"""
@@ -246,7 +263,7 @@ class RelationalData:
 
         return list(descendants)
 
-    def get_primary_key(self, table: str) -> Optional[str]:
+    def get_primary_key(self, table: str) -> List[str]:
         return self.graph.nodes[table]["primary_key"]
 
     def get_table_data(self, table: str) -> pd.DataFrame:
@@ -260,11 +277,9 @@ class RelationalData:
         return foreign_keys
 
     def get_all_key_columns(self, table: str) -> List[str]:
-        key_columns = [fk.column_name for fk in self.get_foreign_keys(table)]
-        pk = self.get_primary_key(table)
-        if pk is not None:
-            key_columns.append(pk)
-        return key_columns
+        return self.get_primary_key(table) + [
+            fk.column_name for fk in self.get_foreign_keys(table)
+        ]
 
     def debug_summary(self) -> Dict[str, Any]:
         max_depth = dag_longest_path_length(self.graph)

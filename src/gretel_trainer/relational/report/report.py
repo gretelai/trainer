@@ -36,7 +36,7 @@ class ReportRenderer:
 @dataclass
 class ReportTableData:
     table: str
-    pk: Optional[str]
+    pk: List[str]
     fks: List[ForeignKey]
 
 

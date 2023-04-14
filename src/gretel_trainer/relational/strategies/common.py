@@ -1,7 +1,7 @@
 import json
 import logging
 from pathlib import Path
-from typing import Dict, Optional, Set, Tuple
+from typing import Dict, List, Optional, Set, Tuple
 
 import pandas as pd
 import smart_open
@@ -53,45 +53,47 @@ def label_encode_keys(
     runs all values through a LabelEncoder and updates tables' columns to use LE-transformed values.
     """
     for table_name, df in tables.items():
-        primary_key = rel_data.get_primary_key(table_name)
-        if primary_key is None:
-            continue
+        for primary_key_column in rel_data.get_primary_key(table_name):
 
-        # Get a set of the tables and columns in `tables` referencing this PK
-        fk_references: Set[Tuple[str, str]] = set()
-        for descendant in rel_data.get_descendants(table_name):
-            if tables.get(descendant) is None:
-                continue
-            fks = rel_data.get_foreign_keys(descendant)
-            for fk in fks:
-                if (
-                    fk.parent_table_name == table_name
-                    and fk.parent_column_name == primary_key
-                ):
-                    fk_references.add((descendant, fk.column_name))
+            # Get a set of the tables and columns in `tables` referencing this PK
+            fk_references: Set[Tuple[str, str]] = set()
+            for descendant in rel_data.get_descendants(table_name):
+                if tables.get(descendant) is None:
+                    continue
+                fks = rel_data.get_foreign_keys(descendant)
+                for fk in fks:
+                    if (
+                        fk.parent_table_name == table_name
+                        and fk.parent_column_name == primary_key_column
+                    ):
+                        fk_references.add((descendant, fk.column_name))
 
-        # Collect column values from PK and FK columns into a set
-        source_values = set()
-        source_values.update(df[primary_key].to_list())
-        for fk_ref in fk_references:
-            fk_tbl, fk_col = fk_ref
-            fk_df = tables.get(fk_tbl)
-            if fk_df is None:
-                continue
-            source_values.update(fk_df[fk_col].to_list())
+            # Collect column values from PK and FK columns into a set
+            source_values = set()
+            source_values.update(df[primary_key_column].to_list())
+            for fk_ref in fk_references:
+                fk_tbl, fk_col = fk_ref
+                fk_df = tables.get(fk_tbl)
+                if fk_df is None:
+                    continue
+                source_values.update(fk_df[fk_col].to_list())
 
-        # Fit a label encoder on all values
-        le = preprocessing.LabelEncoder()
-        le.fit(list(source_values))
+            # Fit a label encoder on all values
+            le = preprocessing.LabelEncoder()
+            le.fit(list(source_values))
 
-        # Update PK and FK columns using the label encoder
-        df[primary_key] = le.transform(df[primary_key])
+            # Update PK and FK columns using the label encoder
+            df[primary_key_column] = le.transform(df[primary_key_column])
 
-        for fk_ref in fk_references:
-            fk_tbl, fk_col = fk_ref
-            fk_df = tables.get(fk_tbl)
-            if fk_df is None:
-                continue
-            fk_df[fk_col] = le.transform(fk_df[fk_col])
+            for fk_ref in fk_references:
+                fk_tbl, fk_col = fk_ref
+                fk_df = tables.get(fk_tbl)
+                if fk_df is None:
+                    continue
+                fk_df[fk_col] = le.transform(fk_df[fk_col])
 
     return tables
+
+
+def get_frequencies(table_data: pd.DataFrame, col: str) -> List[int]:
+    return list(table_data.groupby(col).size().reset_index()[0])
