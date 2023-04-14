@@ -1,4 +1,5 @@
 import logging
+import shutil
 from contextlib import suppress
 from pathlib import Path
 from typing import Any, Dict, Optional, Union
@@ -53,8 +54,10 @@ class ExtendedGretelSDK:
     ) -> None:
         download_link = gretel_object.get_artifact_link(artifact_name)
         try:
-            with open(out_path, "wb+") as out:
-                out.write(smart_open.open(download_link, "rb").read())
+            with smart_open.open(download_link) as src, smart_open.open(
+                out_path, "w"
+            ) as dest:
+                shutil.copyfileobj(src, dest)
         except:
             logger.warning(f"Failed to download `{artifact_name}`")
 
