@@ -123,7 +123,7 @@ class MultiTable:
         logger.info(
             f"Created project `{self._project.display_name}` with unique name `{self._project.name}`."
         )
-        self._working_dir = _mkdir(self._project.name, base_work_dir)
+        self._working_dir = _mkdir(self._project.name, base_work_dir=base_work_dir)
         self._create_debug_summary()
         logger.info("Uploading initial configuration state to project.")
         self._upload_sources_to_project()
@@ -867,7 +867,7 @@ def _table_trained_successfully(
         return model.status == Status.COMPLETED
 
 
-def _mkdir(name: str, base_work_dir: Optional[str]) -> Path:
+def _mkdir(name: str, base_work_dir: Optional[str] = None) -> Path:
     if base_work_dir:
         d = Path(base_work_dir) / Path(name)
     else:
