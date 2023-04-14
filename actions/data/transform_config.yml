@@ -1,0 +1,74 @@
+schema_version: "1.0"
+name: "telecom-transforms"
+models:
+  - transforms:
+      data_source: "_"
+      use_nlp: false
+      policies:
+        - name: users_transform
+          rules:
+            - name: fake_names_and_email
+              conditions:
+                field_label:
+                  - person_name
+                  - email_address
+              transforms:
+                - type: fake
+            - name: date_shift
+              conditions:
+                field_name:
+                  - created_at
+              transforms:
+                - type: dateshift
+                  attrs:
+                    min: -400
+                    max: 65
+                    formats: "%Y-%m-%d %H:%M:%S UTC"
+            - name: numeric_shifts
+              conditions:
+                field_name:
+                  - age
+                  - latitude
+                  - longitude
+              transforms:
+                - type: numbershift
+                  attrs:
+                    min: 10
+                    max: 10
+        - name: events_transform
+          rules:
+            - name: fake_ip_address
+              conditions:
+                value_label:
+                  - ip_address
+              transforms:
+                - type: fake
+            - name: numeric_shifts_small
+              conditions:
+                field_name:
+                  - latitude
+                  - longitude
+              transforms:
+                - type: numbershift
+                  attrs:
+                    min: 10
+                    max: 10
+            - name: date_shift
+              conditions:
+                field_name:
+                  - created_at
+              transforms:
+                - type: dateshift
+                  attrs:
+                    min: -400
+                    max: 65
+                    formats: "%Y-%m-%d %H:%M:%S UTC"
+            - name: numeric_shifts_big
+              conditions:
+                field_name:
+                  - id
+              transforms:
+                - type: numbershift
+                  attrs:
+                    min: 10
+                    max: 100000

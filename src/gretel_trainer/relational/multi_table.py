@@ -5,29 +5,23 @@ import logging
 import os
 import shutil
 import tarfile
-import time
 from collections import defaultdict
-from concurrent.futures import ThreadPoolExecutor, as_completed
 from contextlib import suppress
-from dataclasses import dataclass, field, replace
+from dataclasses import replace
 from datetime import datetime
-from enum import Enum
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple, Union
+from typing import Dict, List, Optional, Tuple, Union
 
 import pandas as pd
-import requests
 import smart_open
 from gretel_client import configure_session
 from gretel_client.projects import Project, create_project, get_project
-from gretel_client.projects.jobs import ACTIVE_STATES, END_STATES, Job, Status
-from gretel_client.projects.models import Model, read_model_config
+from gretel_client.projects.jobs import ACTIVE_STATES, END_STATES, Status
 from gretel_client.projects.records import RecordHandler
 
 from gretel_trainer.relational.artifacts import ArtifactCollection, add_to_tar
 from gretel_trainer.relational.backup import (
     Backup,
-    BackupForeignKey,
     BackupGenerate,
     BackupRelationalData,
     BackupSyntheticsTrain,
@@ -46,13 +40,8 @@ from gretel_trainer.relational.model_config import (
 )
 from gretel_trainer.relational.report.report import ReportPresenter, ReportRenderer
 from gretel_trainer.relational.sdk_extras import (
-    cautiously_refresh_status,
-    delete_data_source,
     download_file_artifact,
     download_tar_artifact,
-    get_job_id,
-    room_in_project,
-    sqs_score_from_full_report,
 )
 from gretel_trainer.relational.strategies.ancestral import AncestralStrategy
 from gretel_trainer.relational.strategies.independent import IndependentStrategy
@@ -84,6 +73,7 @@ class MultiTable:
         project_display_name (str, optional): Display name in the console for a new Gretel project holding models and artifacts. Defaults to "multi-table".
         refresh_interval (int, optional): Frequency in seconds to poll Gretel Cloud for job statuses. Must be at least 30. Defaults to 60 (1m).
         backup (Backup, optional): Should not be supplied manually; instead use the `restore` classmethod.
+        base_work_dir (str, optional): If provided, the concrete working directories created will all be contained within this directory
     """
 
     def __init__(
@@ -95,6 +85,7 @@ class MultiTable:
         project_display_name: Optional[str] = None,
         refresh_interval: Optional[int] = None,
         backup: Optional[Backup] = None,
+        base_work_dir: Optional[str] = None,
     ):
         self._strategy = _validate_strategy(strategy)
         model_name, model_config = self._validate_gretel_model(gretel_model)
@@ -114,18 +105,25 @@ class MultiTable:
 
         configure_session(api_key="prompt", cache="yes", validate=True)
 
+        if base_work_dir is not None and not Path(base_work_dir).is_dir():
+            raise ValueError(
+                "If using 'base_work_dir', it must be an existing directory."
+            )
+
         if backup is None:
-            self._complete_fresh_init(project_display_name)
+            self._complete_fresh_init(project_display_name, base_work_dir)
         else:
             self._complete_init_from_backup(backup)
 
-    def _complete_fresh_init(self, project_display_name: Optional[str]) -> None:
+    def _complete_fresh_init(
+        self, project_display_name: Optional[str], base_work_dir: Optional[str]
+    ) -> None:
         project_display_name = project_display_name or "multi-table"
         self._project = create_project(display_name=project_display_name)
         logger.info(
             f"Created project `{self._project.display_name}` with unique name `{self._project.name}`."
         )
-        self._working_dir = _mkdir(self._project.name)
+        self._working_dir = _mkdir(self._project.name, base_work_dir)
         self._create_debug_summary()
         logger.info("Uploading initial configuration state to project.")
         self._upload_sources_to_project()
@@ -869,8 +867,12 @@ def _table_trained_successfully(
         return model.status == Status.COMPLETED
 
 
-def _mkdir(name: str) -> Path:
-    d = Path(name)
+def _mkdir(name: str, base_work_dir: Optional[str]) -> Path:
+    if base_work_dir:
+        d = Path(base_work_dir) / Path(name)
+    else:
+        d = Path(name)
+
     os.makedirs(d, exist_ok=True)
     return d
 

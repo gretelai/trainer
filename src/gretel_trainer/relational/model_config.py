@@ -1,4 +1,5 @@
 from typing import Any, Dict, List
+from copy import deepcopy
 
 from gretel_client.projects.models import read_model_config
 
@@ -29,7 +30,7 @@ def make_synthetics_config(table: str, config: GretelModelConfig) -> Dict[str, A
 def make_transform_config(
     rel_data: RelationalData, table: str, config: GretelModelConfig
 ) -> Dict[str, Any]:
-    tailored_config = read_model_config(config)
+    tailored_config = read_model_config(deepcopy(config))
     tailored_config["name"] = _model_name("transforms", table)
 
     key_columns = rel_data.get_all_key_columns(table)
