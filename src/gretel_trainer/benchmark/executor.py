@@ -92,6 +92,11 @@ class Executor:
             return None
         else:
             return self.evaluate_report_json["synthetic_data_quality_score"]["score"]
+    
+    def get_report_score(self, key: str) -> Optional[int]:
+        if self.evaluate_report_json is None:
+            return None
+        return self.evaluate_report_json[key]["score"]
 
     def _maybe_skip(self) -> None:
         if not self.strategy.runnable():

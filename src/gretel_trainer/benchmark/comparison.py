@@ -1,12 +1,11 @@
 from __future__ import annotations
 
 import logging
-import multiprocessing as mp
 from concurrent.futures import Future, ThreadPoolExecutor
 from datetime import datetime
-from multiprocessing.managers import DictProxy
+from inspect import isclass
 from pathlib import Path
-from typing import Any, Dict, List, Literal, Optional, Type, Union
+from typing import Any, Dict, List, Optional, Type, Union
 
 import pandas as pd
 from gretel_client import configure_session
@@ -33,6 +32,14 @@ logger = logging.getLogger(__name__)
 
 RUN_IDENTIFIER_SEPARATOR = "-"
 
+ALL_REPORT_SCORES = {
+    "SQS": "synthetic_data_quality_score",
+    "FCS": "field_correlation_stability",
+    "PCS": "principal_component_stability",
+    "FDS": "field_distribution_stability",
+    "PPL": "privacy_protection_level",
+}
+
 
 DatasetTypes = Union[CustomDataset, GretelDataset]
 ModelTypes = Union[Type[CustomModel], Type[GretelModel]]
@@ -46,6 +53,7 @@ def compare(
     trainer: bool = False,
     refresh_interval: int = 15,
     working_dir: Optional[str] = None,
+    additional_report_scores: Optional[List[str]] = None,
 ) -> Comparison:
     comparison = Comparison(
         datasets=datasets,
@@ -54,6 +62,7 @@ def compare(
         trainer=trainer,
         refresh_interval=refresh_interval,
         working_dir=working_dir,
+        additional_report_scores=additional_report_scores,
     )
     return comparison.prepare().execute()
 
@@ -68,9 +77,11 @@ class Comparison:
         trainer: bool = False,
         refresh_interval: int = 15,
         working_dir: Optional[str] = None,
+        additional_report_scores: Optional[List[str]] = None,
     ):
-        self.gretel_models = [m() for m in models if issubclass(m, GretelModel)]
-        self.custom_models = [m() for m in models if not issubclass(m, GretelModel)]
+        model_instances = [m() if isclass(m) else m for m in models]
+        self.gretel_models = [m for m in model_instances if isinstance(m, GretelModel)]
+        self.custom_models = [m for m in model_instances if not isinstance(m, GretelModel)]
 
         project_display_name = project_display_name or _default_name()
         working_dir = working_dir or project_display_name
@@ -94,6 +105,12 @@ class Comparison:
         self.trainer_project_names: Dict[str, str] = {}
         self.thread_pool = ThreadPoolExecutor(5)
         self.futures: Dict[str, Future] = {}
+
+        self._extra_report_scores = {
+            score_name: ALL_REPORT_SCORES[score_name]
+            for score_name in (additional_report_scores or [])
+            if score_name != "SQS"
+        }
 
     @property
     def executors(self) -> Dict[str, Executor]:
@@ -209,6 +226,10 @@ class Comparison:
             "Columns": executor.strategy.dataset.column_count,
             "Status": executor.status.value,
             "SQS": executor.get_sqs_score(),
+            **{
+                score_name: executor.get_report_score(score_key)
+                for score_name, score_key in self._extra_report_scores
+            },
             "Train time (sec)": train_time,
             "Generate time (sec)": generate_time,
             "Total time (sec)": total_time,
