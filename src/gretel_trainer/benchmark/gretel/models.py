@@ -160,7 +160,7 @@ def configure_model(
 
 
 def _recursive_dict_update(a: dict, b: dict, _ctx: str = "") -> dict:
-    for k, vb in b.keys():
+    for k, vb in b.items():
         if not isinstance(va := a.get(k, None), dict):
             # Overwrite non-dict entries
             a[k] = vb
