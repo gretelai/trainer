@@ -1,4 +1,3 @@
-import itertools
 import logging
 import random
 from pathlib import Path
@@ -128,6 +127,7 @@ class IndependentStrategy:
         table_name: str,
         rel_data: RelationalData,
         synthetic_table: pd.DataFrame,
+        record_size_ratio: float,
     ) -> pd.DataFrame:
         """
         No-op. This strategy does not apply any changes to individual table results upon record handler completion.
@@ -140,9 +140,12 @@ class IndependentStrategy:
         synth_tables: Dict[str, pd.DataFrame],
         preserved: List[str],
         rel_data: RelationalData,
+        record_size_ratio: float,
     ) -> Dict[str, pd.DataFrame]:
         "Synthesizes primary and foreign keys"
-        synth_tables = _synthesize_primary_keys(synth_tables, preserved, rel_data)
+        synth_tables = _synthesize_primary_keys(
+            synth_tables, preserved, rel_data, record_size_ratio
+        )
         synth_tables = _synthesize_foreign_keys(synth_tables, rel_data)
         return synth_tables
 
@@ -211,6 +214,7 @@ def _synthesize_primary_keys(
     synth_tables: Dict[str, pd.DataFrame],
     preserved: List[str],
     rel_data: RelationalData,
+    record_size_ratio: float,
 ) -> Dict[str, pd.DataFrame]:
     """
     Alters primary key columns on all tables *except* preserved.
@@ -222,15 +226,23 @@ def _synthesize_primary_keys(
         if table_name in preserved:
             continue
 
-        source_data = rel_data.get_table_data(table_name)
-        for pk_column in rel_data.get_primary_key(table_name):
-            source_frequencies = common.get_frequencies(source_data, pk_column)
-            synthetic_pk_values = _collect_values(
-                values=list(range(len(synth_data))),
-                frequencies=source_frequencies,
-                total=len(synth_data),
+        primary_key = rel_data.get_primary_key(table_name)
+        synth_row_count = len(synth_data)
+
+        if len(primary_key) == 0:
+            continue
+        elif len(primary_key) == 1:
+            processed[table_name][primary_key[0]] = [i for i in range(synth_row_count)]
+        else:
+            synthetic_pk_columns = common.make_composite_pk_columns(
+                table_name=table_name,
+                rel_data=rel_data,
+                primary_key=primary_key,
+                synth_row_count=synth_row_count,
+                record_size_ratio=record_size_ratio,
             )
-            processed[table_name][pk_column] = synthetic_pk_values
+            for index, col in enumerate(primary_key):
+                processed[table_name][col] = synthetic_pk_columns[index]
 
     return processed
 

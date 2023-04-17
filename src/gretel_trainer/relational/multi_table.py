@@ -714,7 +714,10 @@ class MultiTable:
         run_task(task, self._extended_sdk)
 
         output_tables = self._strategy.post_process_synthetic_results(
-            task.output_tables, self._synthetics_run.preserved, self.relational_data
+            synth_tables=task.output_tables,
+            preserved=self._synthetics_run.preserved,
+            rel_data=self.relational_data,
+            record_size_ratio=self._synthetics_run.record_size_ratio,
         )
 
         for table, synth_df in output_tables.items():

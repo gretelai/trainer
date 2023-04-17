@@ -100,7 +100,9 @@ def test_post_processing_one_to_one(pets):
     # Normally we shuffle synthesized keys for realism, but for deterministic testing we sort instead
     with patch("random.shuffle") as shuffle:
         shuffle = sorted
-        processed = strategy.post_process_synthetic_results(raw_synth_tables, [], pets)
+        processed = strategy.post_process_synthetic_results(
+            raw_synth_tables, [], pets, 1
+        )
 
     # Fields from the raw results do not change
     pdtest.assert_frame_equal(
@@ -139,7 +141,9 @@ def test_post_processing_foreign_keys_with_skewed_frequencies_and_different_size
         "trips": pd.DataFrame(data={"purpose": ["w"] * 150}),
     }
 
-    processed = strategy.post_process_synthetic_results(raw_synth_tables, [], trips)
+    processed = strategy.post_process_synthetic_results(
+        raw_synth_tables, [], trips, 1.5
+    )
     processed_trips = processed["trips"]
 
     fk_values = set(processed["trips"]["vehicle_type_id"])

@@ -430,7 +430,7 @@ def test_post_processing_individual_synthetic_result(ecom):
     )
 
     processed_events = strategy.post_process_individual_synthetic_result(
-        "events", ecom, synth_events
+        "events", ecom, synth_events, 1
     )
 
     expected_post_processing = pd.DataFrame(
@@ -471,7 +471,9 @@ def test_post_process_synthetic_results(ecom):
         "users": out_users,
     }
 
-    processed_tables = strategy.post_process_synthetic_results(output_tables, [], ecom)
+    processed_tables = strategy.post_process_synthetic_results(
+        output_tables, [], ecom, 1
+    )
 
     expected_events = pd.DataFrame(
         data={

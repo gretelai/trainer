@@ -1,5 +1,8 @@
+import itertools
 import json
 import logging
+import math
+import random
 from pathlib import Path
 from typing import Dict, List, Optional, Set, Tuple
 
@@ -93,6 +96,29 @@ def label_encode_keys(
                 fk_df[fk_col] = le.transform(fk_df[fk_col])
 
     return tables
+
+
+def make_composite_pk_columns(
+    table_name: str,
+    rel_data: RelationalData,
+    primary_key: List[str],
+    synth_row_count: int,
+    record_size_ratio: float,
+) -> List[Tuple]:
+    source_data = rel_data.get_table_data(table_name)
+    new_key_columns_values = []
+    for col in primary_key:
+        unique_values_count = len(set(source_data[col]))
+        synth_values_count = math.ceil(unique_values_count * record_size_ratio)
+        new_key = [i for i in range(synth_values_count)]
+        random.shuffle(new_key)
+        new_key_columns_values.append(new_key)
+
+    combinations = list(itertools.product(*new_key_columns_values))
+    random.shuffle(combinations)
+    combinations = combinations[0:synth_row_count]
+
+    return list(zip(*combinations))
 
 
 def get_frequencies(table_data: pd.DataFrame, col: str) -> List[int]:

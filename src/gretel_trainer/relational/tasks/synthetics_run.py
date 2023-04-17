@@ -82,7 +82,10 @@ class SyntheticsRunTask:
         record_handler_data = self.multitable._extended_sdk.get_record_handler_data(job)
         post_processed_data = (
             self.multitable._strategy.post_process_individual_synthetic_result(
-                table, self.multitable.relational_data, record_handler_data
+                table_name=table,
+                rel_data=self.multitable.relational_data,
+                synthetic_table=record_handler_data,
+                record_size_ratio=self.synthetics_run.record_size_ratio,
             )
         )
         self.working_tables[table] = post_processed_data

@@ -236,6 +236,7 @@ class AncestralStrategy:
         table_name: str,
         rel_data: RelationalData,
         synthetic_table: pd.DataFrame,
+        record_size_ratio: float,
     ) -> pd.DataFrame:
         """
         Replaces primary key values with a new, contiguous set of values.
@@ -243,9 +244,27 @@ class AncestralStrategy:
         """
         processed = synthetic_table
 
-        primary_key = ancestry.get_multigenerational_primary_key(rel_data, table_name)
-        for col in primary_key:
-            processed[col] = [i for i in range(len(synthetic_table))]
+        primary_key = rel_data.get_primary_key(table_name)
+        multigenerational_primary_key = ancestry.get_multigenerational_primary_key(
+            rel_data, table_name
+        )
+
+        if len(multigenerational_primary_key) == 0:
+            pass
+        elif len(multigenerational_primary_key) == 1:
+            processed[multigenerational_primary_key[0]] = [
+                i for i in range(len(synthetic_table))
+            ]
+        else:
+            synthetic_pk_columns = common.make_composite_pk_columns(
+                table_name=table_name,
+                rel_data=rel_data,
+                primary_key=primary_key,
+                synth_row_count=len(synthetic_table),
+                record_size_ratio=record_size_ratio,
+            )
+            for index, col in enumerate(multigenerational_primary_key):
+                processed[col] = synthetic_pk_columns[index]
 
         foreign_key_maps = ancestry.get_ancestral_foreign_key_maps(rel_data, table_name)
         for fk, parent_pk in foreign_key_maps:
@@ -255,16 +274,17 @@ class AncestralStrategy:
 
     def post_process_synthetic_results(
         self,
-        output_tables: Dict[str, pd.DataFrame],
+        synth_tables: Dict[str, pd.DataFrame],
         preserved: List[str],
         rel_data: RelationalData,
+        record_size_ratio: float,
     ) -> Dict[str, pd.DataFrame]:
         """
         Restores tables from multigenerational to original shape
         """
         return {
             table_name: ancestry.drop_ancestral_data(df)
-            for table_name, df in output_tables.items()
+            for table_name, df in synth_tables.items()
         }
 
     def update_evaluation_from_model(
