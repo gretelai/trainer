@@ -1,4 +1,4 @@
-name: build
+Makefile:7name: build
 
 on: [push]
 
