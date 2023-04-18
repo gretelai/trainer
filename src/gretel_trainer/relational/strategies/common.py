@@ -105,20 +105,21 @@ def make_composite_pk_columns(
     synth_row_count: int,
     record_size_ratio: float,
 ) -> List[Tuple]:
-    source_data = rel_data.get_table_data(table_name)
+    source_pk_columns = rel_data.get_table_data(table_name)[primary_key]
+    unique_counts = source_pk_columns.nunique(axis=0)
     new_key_columns_values = []
     for col in primary_key:
-        unique_values_count = len(set(source_data[col]))
-        synth_values_count = math.ceil(unique_values_count * record_size_ratio)
-        new_key = [i for i in range(synth_values_count)]
-        random.shuffle(new_key)
-        new_key_columns_values.append(new_key)
+        synth_values_count = math.ceil(unique_counts[col] * record_size_ratio)
+        new_key_columns_values.append(range(synth_values_count))
 
-    combinations = list(itertools.product(*new_key_columns_values))
-    random.shuffle(combinations)
-    combinations = combinations[0:synth_row_count]
+    results = set()
+    while len(results) < synth_row_count:
+        key_combination = tuple(
+            [random.choice(vals) for vals in new_key_columns_values]
+        )
+        results.add(key_combination)
 
-    return list(zip(*combinations))
+    return list(zip(*results))
 
 
 def get_frequencies(table_data: pd.DataFrame, col: str) -> List[int]:
