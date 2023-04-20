@@ -54,9 +54,9 @@ class ExtendedGretelSDK:
     ) -> None:
         download_link = gretel_object.get_artifact_link(artifact_name)
         try:
-            with smart_open.open(download_link) as src, smart_open.open(
-                out_path, "w"
-            ) as dest:
+            with smart_open.open(
+                download_link, "rb", ignore_ext=True
+            ) as src, smart_open.open(out_path, "wb", ignore_ext=True) as dest:
                 shutil.copyfileobj(src, dest)
         except:
             logger.warning(f"Failed to download `{artifact_name}`")
