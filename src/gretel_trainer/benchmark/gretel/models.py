@@ -1,7 +1,7 @@
 import copy
 from inspect import isclass
 from pathlib import Path
-from typing import Dict, Optional, Type, Union
+from typing import cast, Dict, Optional, Type, Union
 
 from gretel_client.projects.exceptions import ModelConfigError
 from gretel_client.projects.models import read_model_config
@@ -153,10 +153,13 @@ def configure_model(
     Returns:
         A GretelModel instance..
     """
-    if isclass(model):
-        model = model()
+    model_instance = cast(GretelModel, model() if isclass(model) else model)
 
-    return _GretelModelWithOverrides(delegate=model, name=name, extra_config=extra_config)
+    return _GretelModelWithOverrides(
+        delegate=model_instance,
+        name=name,
+        extra_config=extra_config,
+    )
 
 
 def _recursive_dict_update(a: dict, b: dict, _ctx: str = "") -> dict:

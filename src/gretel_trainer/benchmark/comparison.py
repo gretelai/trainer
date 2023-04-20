@@ -5,7 +5,7 @@ from concurrent.futures import Future, ThreadPoolExecutor
 from datetime import datetime
 from inspect import isclass
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple, Type, Union
+from typing import Any, cast, Dict, List, Optional, Tuple, Type, Union
 
 import pandas as pd
 from gretel_client import configure_session
@@ -84,9 +84,16 @@ class Comparison:
         working_dir: Optional[str] = None,
         additional_report_scores: Optional[List[str]] = None,
     ):
-        model_instances = [m() if isclass(m) else m for m in models]
-        self.gretel_models = [m for m in model_instances if isinstance(m, GretelModel)]
-        self.custom_models = [m for m in model_instances if not isinstance(m, GretelModel)]
+        model_instances = [
+            cast(Union[GretelModel, CustomModel], m() if isclass(m) else m)
+            for m in models
+        ]
+        self.gretel_models = [
+            m for m in model_instances if isinstance(m, GretelModel)
+        ]
+        self.custom_models = [
+            m for m in model_instances if not isinstance(m, GretelModel)
+        ]
 
         project_display_name = project_display_name or _default_name()
         working_dir = working_dir or project_display_name
