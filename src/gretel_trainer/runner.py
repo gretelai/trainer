@@ -34,7 +34,7 @@ from dataclasses import dataclass
 from functools import wraps
 from pathlib import Path
 from random import choice
-from typing import List, Optional, Union
+from typing import List, Optional, Tuple, Union
 
 import pandas as pd
 import smart_open
@@ -74,29 +74,18 @@ class GenPayload:
     max_invalid: Optional[int] = None
 
 
-def _needs_load(func):
-    @wraps(func)
-    def wrapper(inst: StrategyRunner, *args, **kwargs):
-        if not inst._loaded:
-            inst.load()
-        return func(inst, *args, **kwargs)
-
-    return wrapper
-
-
 @dataclass
 class RemoteDFPayload:
     partition: int
     slot: int
     job_type: str
-    uid: str
-    handler_uid: str
+    uid: Optional[str]
+    handler_uid: Optional[str]
     project: Project
     artifact_type: str
-    df: pd.DataFrame = None
 
 
-def _remote_dataframe_fetcher(payload: RemoteDFPayload) -> RemoteDFPayload:
+def _remote_dataframe_fetcher(payload: RemoteDFPayload) -> Tuple[RemoteDFPayload, pd.DataFrame]:
     # We need the model object no matter what
     model = Model(payload.project, model_id=payload.uid)
     job = model
@@ -107,8 +96,7 @@ def _remote_dataframe_fetcher(payload: RemoteDFPayload) -> RemoteDFPayload:
         job = RecordHandler(model, record_id=payload.handler_uid)
 
     download_url = job.get_artifact_link(payload.artifact_type)
-    payload.df = pd.read_csv(download_url, compression="gzip")
-    return payload
+    return payload, pd.read_csv(download_url, compression="gzip")
 
 
 def _maybe_submit_job(
@@ -132,12 +120,11 @@ class StrategyRunner:
 
     _df: pd.DataFrame
     _cache_file: Path
-    _constraints = PartitionConstraints
-    _strategy = PartitionStrategy
+    _constraints: PartitionConstraints
+    _strategy: PartitionStrategy
     _model_config: dict
     _max_jobs_active: int
     _project: Project
-    _loaded: bool
     _artifacts: List[str]
     _cache_overwrite: bool
     _max_artifacts: int = 25
@@ -163,20 +150,14 @@ class StrategyRunner:
         self._constraints = partition_constraints
         self._model_config = model_config
         self._project = project
-        self._loaded = False
         self._cache_overwrite = cache_overwrite
         self._artifacts = []
         self.strategy_id = strategy_id
         self._status_counter = Counter()
         self._error_retry_limit = error_retry_limit
+        self._strategy = self._load_strategy()
 
-    def load(self):
-        """Hydrate the instance before we can start
-        doing work, must be called after init
-        """
-        if self._loaded:
-            return
-
+    def _load_strategy(self) -> PartitionStrategy:
         self._refresh_max_job_capacity()
 
         # If the cache file exists, we'll try and load an existing
@@ -184,34 +165,14 @@ class StrategyRunner:
         # provided constraints.
 
         if self._cache_file.exists() and not self._cache_overwrite:
-            self._strategy = PartitionStrategy.from_disk(self._cache_file)
+            strategy = PartitionStrategy.from_disk(self._cache_file)
         else:
-            self._strategy = PartitionStrategy.from_dataframe(
+            strategy = PartitionStrategy.from_dataframe(
                 self.strategy_id, self._df, self._constraints
             )
 
-        self._strategy.save_to(self._cache_file, overwrite=True)
-
-        self._loaded = True
-
-    @classmethod
-    def from_completed(
-        cls, project: Project, cache_file: Union[str, Path]
-    ) -> StrategyRunner:
-        cache_file = Path(cache_file)
-        if not cache_file.exists():
-            raise ValueError("cache file does not exist")
-
-        inst = cls(
-            strategy_id="__none__",
-            df=None,
-            cache_file=cache_file,
-            model_config=None,
-            partition_constraints=None,
-            project=project,
-        )
-        inst.load()
-        return inst
+        strategy.save_to(self._cache_file, overwrite=True)
+        return strategy
 
     def _update_job_status(self):
         # Get all jobs that have been created, we can do this
@@ -307,7 +268,6 @@ class StrategyRunner:
             partition.ctx[HANDLER][STATUS] = current_handler.status
             self._strategy.save()
 
-    @_needs_load
     def cancel_all(self):
         partitions = self._strategy.query_glob(MODEL_ID, "*")
         for partition in partitions:
@@ -322,7 +282,6 @@ class StrategyRunner:
         self._max_jobs_active = get_me()["service_limits"]["max_jobs_active"]
 
     @property
-    @_needs_load
     def has_capacity(self) -> bool:
         num_active = len(self._gather_statuses(ACTIVE_STATES))
         self._refresh_max_job_capacity()
@@ -406,7 +365,6 @@ class StrategyRunner:
             artifact_id = self._project.upload_artifact(target_file)
             return ArtifactResult(id=artifact_id, record_count=len(df))
 
-    @_needs_load
     def train_partition(
         self, partition: Partition, artifact: ArtifactResult
     ) -> Optional[str]:
@@ -464,7 +422,6 @@ class StrategyRunner:
         )
         return model.model_id
 
-    @_needs_load
     def run_partition(
         self, partition: Partition, gen_payload: GenPayload
     ) -> Optional[str]:
@@ -477,7 +434,7 @@ class StrategyRunner:
         handler_dict = partition.ctx.get(HANDLER)
         if handler_dict is None:
             partition.ctx[HANDLER] = {}
-        attempt = partition.ctx.get(HANDLER).get(ATTEMPT, 0) + 1
+        attempt = partition.ctx.get(HANDLER, {}).get(ATTEMPT, 0) + 1
         model_id = partition.ctx.get(MODEL_ID)
 
         # Hydrate our trained model so we can start the handler
@@ -510,7 +467,6 @@ class StrategyRunner:
         )
         return handler_obj.record_id
 
-    @_needs_load
     def train_next_partition(self) -> Optional[str]:
         start_job = False
         for partition in self._strategy.partitions:
@@ -535,11 +491,10 @@ class StrategyRunner:
 
             if start_job:
                 artifact = self._partition_to_artifact(partition)
-                if artifact.id is None:
+                if artifact is None or artifact.id is None:
                     return None
                 return self.train_partition(partition, artifact)
 
-    @_needs_load
     def run_next_partition(self, gen_payload: GenPayload) -> Optional[str]:
         start_job = False
         for partition in self._strategy.partitions:
@@ -560,7 +515,7 @@ class StrategyRunner:
                 start_job = True
 
             if start_job:
-                use_seeds = False
+                seed_artifact_id = None
                 # If this partition has seed fields and we were given seeds, we need to upload
                 # the artifact first.
                 if partition.columns.seed_headers and isinstance(
@@ -578,7 +533,6 @@ class StrategyRunner:
                         logger.info(
                             "Partition has seed fields, uploading seed artifact..."
                         )
-                        use_seeds = True
                         removed_artifact = self._remove_unused_artifact()
                         if removed_artifact is None:
                             logger.info(
@@ -588,16 +542,16 @@ class StrategyRunner:
 
                         filename = f"{self.strategy_id}-seeds-{partition.idx}.csv"
                         artifact = self._df_to_artifact(gen_payload.seed_df, filename)
+                        seed_artifact_id = artifact.id
 
                 new_payload = GenPayload(
                     num_records=gen_payload.num_records,
                     max_invalid=gen_payload.max_invalid,
-                    seed_artifact_id=artifact.id if use_seeds else None,
+                    seed_artifact_id=seed_artifact_id,
                 )
 
                 return self.run_partition(partition, new_payload)
 
-    @_needs_load
     def clear_partition_runs(self):
         """
         Partitions should only be trained until they are 'completed', however we can run
@@ -616,7 +570,6 @@ class StrategyRunner:
                 out.append(partition)
         return out
 
-    @_needs_load
     def is_done(self, *, handler: bool = False) -> bool:
         done = 0
         for p in self._strategy.partitions:
@@ -640,7 +593,6 @@ class StrategyRunner:
 
         return done == len(self._strategy.partitions)
 
-    @_needs_load
     def train_all_partitions(self):
         logger.info(f"Processing {len(self._strategy.partitions)} partitions")
         while True:
@@ -661,7 +613,6 @@ class StrategyRunner:
 
         logger.info(dict(self._status_counter))
 
-    @_needs_load
     def _get_synthetic_data(self, job_type: str, artifact_type: str) -> pd.DataFrame:
         if job_type == "model":
             self._update_job_status()
@@ -703,10 +654,10 @@ class StrategyRunner:
         wait(futures, return_when=ALL_COMPLETED)
 
         for future in futures:
-            payload = future.result()  # type: RemoteDFPayload
+            payload, this_df = future.result()
 
             curr_df = df_chunks[payload.slot]
-            df_chunks[payload.slot] = pd.concat([curr_df, payload.df]).reset_index(
+            df_chunks[payload.slot] = pd.concat([curr_df, this_df]).reset_index(
                 drop=True
             )
 
@@ -736,7 +687,6 @@ class StrategyRunner:
             for partition in self._strategy.partitions
         ]
 
-    @_needs_load
     def generate_data(
         self,
         *,
@@ -749,8 +699,11 @@ class StrategyRunner:
         if seed_df is None and not num_records:
             raise ValueError("must provide a seed_df or num_records to generate")
 
-        if isinstance(seed_df, pd.DataFrame) and num_records:
+        if seed_df is not None and num_records:
             raise ValueError("must use one of seed_df or num_records only")
+
+        # Pyright's type-narrowing doesn't understand that at this point exactly one of num_records and seed_df is None
+        num_records = num_records or len(seed_df)  # type:ignore
 
         # Refresh all of the trained models
         logger.info("Loading existing model information...")
@@ -771,8 +724,6 @@ class StrategyRunner:
         # to generate from each model.
         found_seeds = False
         if isinstance(seed_df, pd.DataFrame):
-            num_records = len(seed_df)
-
             # Loop through all of the partitions and make sure we have some that
             # take seed values, if we don't have any partitions set for seeds
             # and we recieved a seed DF, we should error.

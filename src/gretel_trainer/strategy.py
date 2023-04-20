@@ -26,11 +26,11 @@ class ColumnPartition(BaseModel):
 class Partition(BaseModel):
     idx: int
     rows: RowPartition
-    columns: Optional[ColumnPartition]
+    columns: ColumnPartition
     ctx: dict = Field(default_factory=dict)
 
     def extract_df(self, df: pd.DataFrame) -> pd.DataFrame:
-        if self.columns is not None:
+        if self.columns.headers is not None:
             df = df[self.columns.headers]
 
         return df.iloc[self.rows.start : self.rows.end]  # noqa
@@ -41,17 +41,9 @@ class Partition(BaseModel):
 
 @dataclass
 class PartitionConstraints:
-    max_row_count: Optional[int] = None
-    max_row_partitions: Optional[int] = None
+    max_row_count: int
     header_clusters: Optional[List[List[str]]] = None
     seed_headers: Optional[List[str]] = None
-
-    def __post_init__(self):
-        if self.max_row_count is not None and self.max_row_partitions is not None:
-            raise AttributeError("cannot use both max_row_count and max_row_partitions")
-
-        if self.max_row_count is None and self.max_row_partitions is None:
-            raise AttributeError("must use one of max_row_count or max_row_partitions")
 
     @property
     def header_cluster_count(self) -> int:
@@ -71,11 +63,7 @@ def _build_partitions(
 
     partitions = []
     partition_idx = 0
-
-    if constraints.max_row_partitions is not None:
-        partition_count = constraints.max_row_partitions
-    elif constraints.max_row_count is not None:
-        partition_count = math.ceil(total_rows / constraints.max_row_count)
+    partition_count = math.ceil(total_rows / constraints.max_row_count)
 
     # We need to break up the number of rows into roughly even chunks
     chunk_size, remain = divmod(total_rows, partition_count)
@@ -110,7 +98,7 @@ def _build_partitions(
 
 class PartitionStrategy(BaseModel):
     id: str
-    partitions: Optional[List[Partition]]
+    partitions: List[Partition]
     header_cluster_count: int
     original_headers: Optional[List[str]]
     status_counter: Optional[dict]
@@ -125,7 +113,8 @@ class PartitionStrategy(BaseModel):
             id=id,
             partitions=partitions,
             header_cluster_count=constraints.header_cluster_count,
-            original_headers=list(df),
+            original_headers=list(df.columns),
+            status_counter=None,
         )
 
     @classmethod
@@ -146,7 +135,7 @@ class PartitionStrategy(BaseModel):
 
     @property
     def row_partition_count(self) -> int:
-        return len(self.partitions) / self.header_cluster_count
+        return math.ceil(len(self.partitions) / self.header_cluster_count)
 
     def save_to(self, dest: Union[Path, str], overwrite: bool = False):
         location = Path(dest)

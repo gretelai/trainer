@@ -3,19 +3,19 @@ from typing import Callable, Optional, Union
 
 import pandas as pd
 
-import gretel_trainer
 
 from gretel_trainer.benchmark.core import DataSource
 from gretel_trainer.benchmark.gretel.models import GretelModel
 from gretel_trainer.benchmark.gretel.sdk import GretelSDK
 from gretel_trainer.benchmark.gretel.trainer import TrainerFactory
+from gretel_trainer.models import _BaseConfig
 
 
 class _GretelTrainerExecutor:
     def __init__(
         self,
         project_name: str,
-        trainer_model_type: Optional[gretel_trainer.models._BaseConfig],
+        trainer_model_type: Optional[_BaseConfig],
         trainer_factory: TrainerFactory,
         benchmark_dir: str,
     ):

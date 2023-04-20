@@ -52,7 +52,7 @@ def make_task(
         ),
         synthetics_train=SyntheticsTrain(
             training_columns={
-                table: rel_data.get_table_data(table).columns
+                table: list(rel_data.get_table_data(table).columns)
                 for table in rel_data.list_all_tables()
             },
             models={
@@ -109,7 +109,9 @@ def test_runs_post_processing_when_table_completes(pets, tmpdir):
         get_rh_data.return_value = raw_df
         task.handle_completed("table", Mock())
 
-    pdtest.assert_frame_equal(task.working_tables["table"], raw_df.head(1))
+    post_processed = task.working_tables["table"]
+    assert post_processed is not None
+    pdtest.assert_frame_equal(post_processed, raw_df.head(1))
 
 
 def test_starts_jobs_for_ready_tables(pets, tmpdir):

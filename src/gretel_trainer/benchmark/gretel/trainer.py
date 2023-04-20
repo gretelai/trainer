@@ -18,4 +18,4 @@ class GretelTrainer(Protocol):
 
 TrainerFactory = Callable[..., GretelTrainer]
 
-ActualGretelTrainer: TrainerFactory = trainer.Trainer
+ActualGretelTrainer: TrainerFactory = trainer.Trainer  # type:ignore
