@@ -16,6 +16,7 @@ class CustomDataset:
     row_count: int = field(init=False, repr=False)
     column_count: int = field(init=False, repr=False)
     delimiter: str
+    public: bool = field(repr=False, default=False)
 
     def __post_init__(self):
         if isinstance(self.data_source, str):
@@ -24,6 +25,8 @@ class CustomDataset:
             rows, cols = self.data_source.shape
         self.row_count = rows
         self.column_count = cols
+        if self.public and not isinstance(self.data_source, str):
+            raise ValueError("datasets specified as dataframes can't be public")
 
 
 def _to_datatype(d: Union[str, Datatype]) -> Datatype:

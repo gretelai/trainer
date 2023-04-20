@@ -93,6 +93,11 @@ class Executor:
         else:
             return self.evaluate_report_json["synthetic_data_quality_score"]["score"]
 
+    def get_report_score(self, key: str) -> Optional[int]:
+        if self.evaluate_report_json is None:
+            return None
+        return self.evaluate_report_json[key]["score"]
+
     def _maybe_skip(self) -> None:
         if not self.strategy.runnable():
             self._log("skipping")
@@ -124,13 +129,15 @@ class Executor:
         self._log("starting evaluation")
         self.status = Status.Evaluating
 
-        self.evaluate_model = create_evaluate_model(
-            project=self.evaluate_project,
-            data_source=str(run_out_path(self.config.working_dir, self.run_identifier)),
-            ref_data=self.strategy.evaluate_ref_data,
-            run_identifier=self.run_identifier,
-        )
+        records_file = str(run_out_path(self.config.working_dir, self.run_identifier))
+        records_artifact_key = self.evaluate_project.upload_artifact(records_file)
         try:
+            self.evaluate_model = create_evaluate_model(
+                project=self.evaluate_project,
+                data_source=records_artifact_key,
+                ref_data=self.strategy.evaluate_ref_data,
+                run_identifier=self.run_identifier,
+            )
             self.evaluate_report_json = run_evaluate(
                 evaluate_model=self.evaluate_model,
                 run_identifier=self.run_identifier,
@@ -142,6 +149,11 @@ class Executor:
             self._log("evaluation failed")
             self.status = Status.FailedEvaluate
             self.exception = e
+        finally:
+            try:
+                self.evaluate_project.delete_artifact(records_artifact_key)
+            except:
+                pass
 
     def _log(self, msg: str) -> None:
         log(self.run_identifier, msg)

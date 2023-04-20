@@ -37,6 +37,10 @@ class GretelDataset:
     def __repr__(self) -> str:
         return f"GretelDataset(name={self.name}, datatype={self.datatype})"
 
+    @property
+    def public(self) -> bool:
+        return True
+
 
 class GretelDatasetRepo:
     def __init__(self):

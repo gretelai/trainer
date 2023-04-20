@@ -1,7 +1,7 @@
 import csv
 import logging
 import time
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
 from typing import Tuple, Type, Union
@@ -29,7 +29,7 @@ class Dataset:
     data_source: str
     row_count: int
     column_count: int
-
+    public: bool = field(default=False)
 
 @dataclass
 class BenchmarkConfig:
