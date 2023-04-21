@@ -76,6 +76,7 @@ def test_backup():
     artifact_collection = ArtifactCollection(
         gretel_debug_summary="gretel_abc__gretel_debug_summary.json",
         source_archive="gretel_abc_source_tables.tar.gz",
+        hybrid=False,
     )
     backup = Backup(
         project_name="my-project",

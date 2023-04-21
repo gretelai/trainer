@@ -13,6 +13,7 @@ from gretel_trainer.relational.core import (
     RelationalData,
     TableEvaluation,
 )
+from gretel_trainer.relational.sdk_extras import ExtendedGretelSDK
 
 logger = logging.getLogger(__name__)
 
@@ -150,10 +151,11 @@ class IndependentStrategy:
         evaluations: Dict[str, TableEvaluation],
         model: Model,
         working_dir: Path,
+        extended_sdk: ExtendedGretelSDK,
     ) -> None:
         logger.info(f"Downloading individual evaluation reports for `{table_name}`.")
         out_filepath = working_dir / f"synthetics_individual_evaluation_{table_name}"
-        common.download_artifacts(model, out_filepath, table_name)
+        common.download_artifacts(model, out_filepath, extended_sdk)
 
         evaluation = evaluations[table_name]
         evaluation.individual_report_json = common.read_report_json_data(
@@ -192,10 +194,11 @@ class IndependentStrategy:
         evaluations: Dict[str, TableEvaluation],
         evaluate_model: Model,
         working_dir: Path,
+        extended_sdk: ExtendedGretelSDK,
     ) -> None:
         logger.info(f"Downloading cross table evaluation reports for `{table_name}`.")
         out_filepath = working_dir / f"synthetics_cross_table_evaluation_{table_name}"
-        common.download_artifacts(evaluate_model, out_filepath, table_name)
+        common.download_artifacts(evaluate_model, out_filepath, extended_sdk)
 
         evaluation = evaluations[table_name]
         evaluation.cross_table_report_json = common.read_report_json_data(

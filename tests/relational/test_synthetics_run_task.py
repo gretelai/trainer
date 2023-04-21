@@ -10,7 +10,10 @@ import pytest
 from gretel_client.projects.projects import Project
 
 from gretel_trainer.relational.core import RelationalData
-from gretel_trainer.relational.sdk_extras import MAX_PROJECT_ARTIFACTS
+from gretel_trainer.relational.sdk_extras import (
+    MAX_PROJECT_ARTIFACTS,
+    ExtendedGretelSDK,
+)
 from gretel_trainer.relational.strategies.ancestral import AncestralStrategy
 from gretel_trainer.relational.strategies.independent import IndependentStrategy
 from gretel_trainer.relational.tasks import SyntheticsRunTask
@@ -23,6 +26,7 @@ class MockMultiTable:
     _refresh_interval: int = 0
     _project: Project = Mock(artifacts=[])
     _strategy: Union[AncestralStrategy, IndependentStrategy] = AncestralStrategy()
+    _extended_sdk: ExtendedGretelSDK = ExtendedGretelSDK(hybrid=False)
 
     def _backup(self) -> None:
         pass
@@ -104,7 +108,7 @@ def test_runs_post_processing_when_table_completes(pets, tmpdir):
     task.multitable._strategy = MockStrategy()  # type:ignore
 
     with patch(
-        "gretel_trainer.relational.tasks.synthetics_run.get_record_handler_data"
+        "gretel_trainer.relational.sdk_extras.ExtendedGretelSDK.get_record_handler_data"
     ) as get_rh_data:
         get_rh_data.return_value = raw_df
         task.handle_completed("table", Mock())
@@ -126,7 +130,7 @@ def test_starts_jobs_for_ready_tables(pets, tmpdir):
     task.synthetics_train.models[
         "humans"
     ].create_record_handler_obj.assert_called_once()
-    task.synthetics_run.record_handlers["humans"].submit_cloud.assert_called_once()
+    task.synthetics_run.record_handlers["humans"].submit.assert_called_once()
 
 
 def test_defers_jobs_if_no_room(pets, tmpdir):
@@ -146,7 +150,7 @@ def test_defers_jobs_if_no_room(pets, tmpdir):
     task.synthetics_train.models[
         "humans"
     ].create_record_handler_obj.assert_called_once()
-    task.synthetics_run.record_handlers["humans"].submit_cloud.assert_not_called()
+    task.synthetics_run.record_handlers["humans"].submit.assert_not_called()
 
 
 def test_does_not_restart_existing_deferred_jobs(pets, tmpdir):
@@ -163,7 +167,7 @@ def test_does_not_restart_existing_deferred_jobs(pets, tmpdir):
     task.synthetics_train.models[
         "humans"
     ].create_record_handler_obj.assert_called_once()
-    task.synthetics_run.record_handlers["humans"].submit_cloud.assert_not_called()
+    task.synthetics_run.record_handlers["humans"].submit.assert_not_called()
 
     task.synthetics_train.models["humans"].reset_mock()
 

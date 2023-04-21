@@ -494,7 +494,9 @@ def test_post_process_synthetic_results(ecom):
     pdtest.assert_frame_equal(expected_users, processed_tables["users"])
 
 
-def test_uses_trained_model_to_update_cross_table_scores(report_json_dict):
+def test_uses_trained_model_to_update_cross_table_scores(
+    report_json_dict, extended_sdk
+):
     strategy = AncestralStrategy()
     evaluations = {
         "table_1": TableEvaluation(),
@@ -512,7 +514,7 @@ def test_uses_trained_model_to_update_cross_table_scores(report_json_dict):
             f.write(json.dumps(report_json_dict))
 
         strategy.update_evaluation_from_model(
-            "table_1", evaluations, model, working_dir
+            "table_1", evaluations, model, working_dir, extended_sdk
         )
 
     evaluation = evaluations["table_1"]
@@ -525,7 +527,7 @@ def test_uses_trained_model_to_update_cross_table_scores(report_json_dict):
 
 
 def test_falls_back_to_fetching_report_json_when_download_artifacts_fails(
-    report_json_dict,
+    report_json_dict, extended_sdk
 ):
     strategy = AncestralStrategy()
     evaluations = {
@@ -544,7 +546,7 @@ def test_falls_back_to_fetching_report_json_when_download_artifacts_fails(
         get_json.return_value = report_json_dict
 
         strategy.update_evaluation_from_model(
-            "table_1", evaluations, model, working_dir
+            "table_1", evaluations, model, working_dir, extended_sdk
         )
 
     evaluation = evaluations["table_1"]
