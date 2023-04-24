@@ -141,12 +141,20 @@ class RelationalData:
         primary_key: UserFriendlyPrimaryKeyT,
         data: pd.DataFrame,
     ) -> None:
+        """
+        Add a table. The primary key can be None (if one is not defined on the table),
+        a string column name (most common), or a list of multiple string column names (composite key).
+        """
         primary_key = self._format_key_column(primary_key)
         self.graph.add_node(name, primary_key=primary_key, data=data)
 
     def set_primary_key(
         self, *, table: str, primary_key: UserFriendlyPrimaryKeyT
     ) -> None:
+        """
+        (Re)set the primary key on an existing table.
+        If the table does not yet exist in the instance's collection, add it via `add_table`.
+        """
         if table not in self.list_all_tables():
             raise MultiTableException(f"Unrecognized table name: `{table}`")
 
@@ -173,7 +181,11 @@ class RelationalData:
         foreign_key: UserFriendlyForeignKeyT,
         referencing: UserFriendlyForeignKeyT,
     ) -> None:
-        """TODO: update docstring"""
+        """
+        Add a foreign key relationship between two tables.
+        The first element of each tuple argument is a table name.
+        The second element can be a single column (most common) or a list of columns (for composite keys).
+        """
         known_tables = self.list_all_tables()
         fk_table, fk_columns = foreign_key
         fk_columns = self._format_key_column(fk_columns)
@@ -210,6 +222,11 @@ class RelationalData:
         edge["via"] = via
 
     def remove_foreign_key(self, foreign_key: UserFriendlyForeignKeyT) -> None:
+        """
+        Remove an existing foreign key.
+        The first element of the tuple argument is a table name.
+        The second element can be a single column (most common) or a list of columns (for composite keys).
+        """
         fk_table, fk_columns = foreign_key
         fk_columns = self._format_key_column(fk_columns)
 
