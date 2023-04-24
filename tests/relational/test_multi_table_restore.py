@@ -426,7 +426,7 @@ def test_restore_synthetics_training_still_in_progress(
     backup_file = create_backup(pets, working_dir, synthetics_models=synthetics_models)
 
     with pytest.raises(MultiTableException):
-        mt = MultiTable.restore(backup_file)
+        MultiTable.restore(backup_file)
 
 
 def test_restore_training_complete(

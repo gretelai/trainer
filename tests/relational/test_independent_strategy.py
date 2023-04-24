@@ -1,5 +1,4 @@
 import json
-import os
 import tempfile
 from collections import defaultdict
 from pathlib import Path
@@ -7,9 +6,7 @@ from unittest.mock import Mock, patch
 
 import pandas as pd
 import pandas.testing as pdtest
-import smart_open
 
-import gretel_trainer.relational.ancestry as ancestry
 from gretel_trainer.relational.core import TableEvaluation
 from gretel_trainer.relational.strategies.independent import IndependentStrategy
 

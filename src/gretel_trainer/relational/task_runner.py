@@ -3,7 +3,7 @@ import time
 from collections import defaultdict
 from typing import Dict, List
 
-from gretel_client.projects.jobs import ACTIVE_STATES, END_STATES, Job, Status
+from gretel_client.projects.jobs import END_STATES, Job, Status
 from gretel_client.projects.projects import Project
 from typing_extensions import Protocol
 

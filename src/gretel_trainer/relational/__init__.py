@@ -1,5 +1,3 @@
-import logging
-
 import gretel_trainer.relational.log
 from gretel_trainer.relational.connectors import (
     Connector,

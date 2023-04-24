@@ -7,7 +7,6 @@ from unittest.mock import Mock, patch
 import pandas as pd
 import pandas.testing as pdtest
 import pytest
-import smart_open
 
 import gretel_trainer.relational.ancestry as ancestry
 from gretel_trainer.relational.core import MultiTableException, TableEvaluation

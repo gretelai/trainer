@@ -4,7 +4,6 @@ from typing import Dict, List, Optional
 
 import pandas as pd
 from gretel_client.projects.jobs import ACTIVE_STATES, Job
-from gretel_client.projects.models import Model
 from gretel_client.projects.projects import Project
 from gretel_client.projects.records import RecordHandler
 
