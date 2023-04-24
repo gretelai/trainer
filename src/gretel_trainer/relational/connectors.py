@@ -6,11 +6,7 @@ from sqlalchemy import create_engine, inspect
 from sqlalchemy.engine.base import Engine
 from sqlalchemy.exc import OperationalError
 
-from gretel_trainer.relational.core import (
-    MultiTableException,
-    RelationalData,
-    TableAndKeyT,
-)
+from gretel_trainer.relational.core import MultiTableException, RelationalData
 
 logger = logging.getLogger(__name__)
 
@@ -54,7 +50,7 @@ class Connector:
         inspector = inspect(self.engine)
 
         relational_data = RelationalData()
-        foreign_keys: List[Tuple[TableAndKeyT, TableAndKeyT]] = []
+        foreign_keys: List[Tuple[str, dict]] = []
 
         for table_name in inspector.get_table_names():
             if _skip_table(table_name, only, ignore):
@@ -64,22 +60,18 @@ class Connector:
             df = pd.read_sql_table(table_name, self.engine)
             primary_key = inspector.get_pk_constraint(table_name)["constrained_columns"]
             for fk in inspector.get_foreign_keys(table_name):
-                referenced_table = fk["referred_table"]
-                if _skip_table(referenced_table, only, ignore):
+                if _skip_table(fk["referred_table"], only, ignore):
                     continue
-                foreign_keys.append(
-                    (
-                        (table_name, fk["constrained_columns"]),
-                        (referenced_table, fk["referred_columns"]),
-                    )
-                )
+                else:
+                    foreign_keys.append((table_name, fk))
 
             relational_data.add_table(name=table_name, primary_key=primary_key, data=df)
 
-        for foreign_key_tuple in foreign_keys:
-            foreign_key, referencing = foreign_key_tuple
+        for foreign_key in foreign_keys:
+            table, fk = foreign_key
             relational_data.add_foreign_key(
-                foreign_key=foreign_key, referencing=referencing
+                foreign_key=(table, fk["constrained_columns"]),
+                referencing=(fk["referred_table"], fk["referred_columns"]),
             )
 
         return relational_data

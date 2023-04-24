@@ -126,9 +126,8 @@ class ForeignKey:
     parent_columns: List[str]
 
 
-TableAndKeyT = Tuple[str, List[str]]
-UserFriendlyKeyT = Optional[Union[str, List[str]]]
-UserFriendlyTableAndKeyT = Tuple[str, Union[str, List[str]]]
+UserFriendlyPrimaryKeyT = Optional[Union[str, List[str]]]
+UserFriendlyForeignKeyT = Tuple[str, Union[str, List[str]]]
 
 
 class RelationalData:
@@ -139,13 +138,15 @@ class RelationalData:
         self,
         *,
         name: str,
-        primary_key: UserFriendlyKeyT,
+        primary_key: UserFriendlyPrimaryKeyT,
         data: pd.DataFrame,
     ) -> None:
         primary_key = self._format_key_column(primary_key)
         self.graph.add_node(name, primary_key=primary_key, data=data)
 
-    def set_primary_key(self, *, table: str, primary_key: UserFriendlyKeyT) -> None:
+    def set_primary_key(
+        self, *, table: str, primary_key: UserFriendlyPrimaryKeyT
+    ) -> None:
         if table not in self.list_all_tables():
             raise MultiTableException(f"Unrecognized table name: `{table}`")
 
@@ -169,8 +170,8 @@ class RelationalData:
     def add_foreign_key(
         self,
         *,
-        foreign_key: UserFriendlyTableAndKeyT,
-        referencing: UserFriendlyTableAndKeyT,
+        foreign_key: UserFriendlyForeignKeyT,
+        referencing: UserFriendlyForeignKeyT,
     ) -> None:
         """TODO: update docstring"""
         known_tables = self.list_all_tables()
@@ -208,7 +209,7 @@ class RelationalData:
         )
         edge["via"] = via
 
-    def remove_foreign_key(self, foreign_key: UserFriendlyTableAndKeyT) -> None:
+    def remove_foreign_key(self, foreign_key: UserFriendlyForeignKeyT) -> None:
         fk_table, fk_columns = foreign_key
         fk_columns = self._format_key_column(fk_columns)
 
