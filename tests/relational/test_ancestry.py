@@ -82,6 +82,24 @@ def test_mutagenesis_add_and_remove_ancestor_data(mutagenesis):
     assert set(restored_bond.columns) == {"type", "atom1_id", "atom2_id"}
 
 
+def test_tpch_add_and_remove_ancestor_data(tpch):
+    lineitem_with_ancestors = ancestry.get_table_data_with_ancestors(tpch, "lineitem")
+    assert set(lineitem_with_ancestors.columns) == {
+        "self|l_partkey",
+        "self|l_suppkey",
+        "self|l_quantity",
+        "self.l_partkey+l_suppkey|ps_partkey",
+        "self.l_partkey+l_suppkey|ps_suppkey",
+        "self.l_partkey+l_suppkey|ps_availqty",
+        "self.l_partkey+l_suppkey.ps_partkey|p_partkey",
+        "self.l_partkey+l_suppkey.ps_partkey|p_name",
+        "self.l_partkey+l_suppkey.ps_suppkey|s_suppkey",
+        "self.l_partkey+l_suppkey.ps_suppkey|s_name",
+    }
+    restored_lineitem = ancestry.drop_ancestral_data(lineitem_with_ancestors)
+    assert set(restored_lineitem.columns) == {"l_partkey", "l_suppkey", "l_quantity"}
+
+
 def test_ancestral_data_from_different_tablesets(source_nba, synthetic_nba):
     source_nba, _, _, _ = source_nba
     _, custom_states, custom_cities, custom_teams = synthetic_nba

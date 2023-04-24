@@ -68,6 +68,11 @@ def mutagenesis() -> RelationalData:
 
 
 @pytest.fixture()
+def tpch() -> RelationalData:
+    return rel_data_from_example_db("tpch")
+
+
+@pytest.fixture()
 def art() -> RelationalData:
     return rel_data_from_example_db("art")
 

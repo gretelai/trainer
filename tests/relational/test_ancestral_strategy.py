@@ -139,6 +139,24 @@ def test_prepare_training_data_translates_alphanumeric_keys_and_adds_min_max_rec
     assert last_two["self.artist_id|id"].to_list() == [0, 200]
 
 
+def test_prepare_training_data_with_composite_keys(tpch):
+    strategy = AncestralStrategy()
+    training_data = strategy.prepare_training_data(tpch)
+
+    assert set(training_data["lineitem"].columns) == {
+        "self|l_partkey",
+        "self|l_suppkey",
+        "self|l_quantity",
+        "self.l_partkey+l_suppkey|ps_partkey",
+        "self.l_partkey+l_suppkey|ps_suppkey",
+        "self.l_partkey+l_suppkey|ps_availqty",
+        "self.l_partkey+l_suppkey.ps_partkey|p_partkey",
+        "self.l_partkey+l_suppkey.ps_partkey|p_name",
+        "self.l_partkey+l_suppkey.ps_suppkey|s_suppkey",
+        "self.l_partkey+l_suppkey.ps_suppkey|s_name",
+    }
+
+
 def test_retraining_a_set_of_tables_forces_retraining_descendants_as_well(ecom):
     strategy = AncestralStrategy()
     assert set(strategy.tables_to_retrain(["users"], ecom)) == {
