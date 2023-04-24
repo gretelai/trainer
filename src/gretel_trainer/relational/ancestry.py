@@ -21,22 +21,29 @@ def get_multigenerational_primary_key(
 
 def get_ancestral_foreign_key_maps(
     rel_data: RelationalData, table: str
-) -> List[Tuple[List[str], List[str]]]:
-    def _ancestral_fk_map(fk: ForeignKey) -> Tuple[List[str], List[str]]:
-        fk_cols = fk.columns
-        ref_cols = fk.parent_columns
+) -> List[Tuple[str, str]]:
+    def _ancestral_fk_map(fk: ForeignKey) -> List[Tuple[str, str]]:
+        maps = []
 
-        ancestral_foreign_keys = [
-            f"{_START_LINEAGE}{_END_LINEAGE}{fk_col}" for fk_col in fk_cols
-        ]
-        ancestral_referenced_cols = [
-            f"{_START_LINEAGE}{_GEN_DELIMITER}{fk_cols[i]}{_END_LINEAGE}{ref_cols[i]}"
-            for i in range(len(fk_cols))
-        ]
+        for i in range(len(fk.columns)):
+            fk_columns = _COL_DELIMITER.join(fk.columns)
+            fk_col = fk.columns[i]
+            ref_col = fk.parent_columns[i]
 
-        return (ancestral_foreign_keys, ancestral_referenced_cols)
+            maps.append(
+                (
+                    f"{_START_LINEAGE}{_END_LINEAGE}{fk_col}",
+                    f"{_START_LINEAGE}{_GEN_DELIMITER}{fk_columns}{_END_LINEAGE}{ref_col}",
+                )
+            )
 
-    return [_ancestral_fk_map(fk) for fk in rel_data.get_foreign_keys(table)]
+        return maps
+
+    return [
+        fkmap
+        for fk in rel_data.get_foreign_keys(table)
+        for fkmap in _ancestral_fk_map(fk)
+    ]
 
 
 def get_table_data_with_ancestors(

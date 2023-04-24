@@ -266,9 +266,9 @@ class AncestralStrategy:
             for index, col in enumerate(multigenerational_primary_key):
                 processed[col] = synthetic_pk_columns[index]
 
-        foreign_key_maps = ancestry.get_ancestral_foreign_key_maps(rel_data, table_name)
-        for fk, parent_pk in foreign_key_maps:
-            processed[fk] = processed[parent_pk]
+        for fk_map in ancestry.get_ancestral_foreign_key_maps(rel_data, table_name):
+            fk_col, parent_pk_col = fk_map
+            processed[fk_col] = processed[parent_pk_col]
 
         return processed
 

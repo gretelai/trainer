@@ -461,6 +461,45 @@ def test_post_processing_individual_synthetic_result(ecom):
     pdtest.assert_frame_equal(expected_post_processing, processed_events)
 
 
+def test_post_processing_individual_synthetic_result_composite_keys(tpch):
+    strategy = AncestralStrategy()
+    synth_lineitem = pd.DataFrame(
+        data={
+            "self|l_partkey": [10, 20, 30, 40],
+            "self|l_suppkey": [10, 20, 30, 40],
+            "self|l_quantity": [42, 42, 42, 42],
+            "self.l_partkey+l_suppkey|ps_partkey": [2, 3, 4, 5],
+            "self.l_partkey+l_suppkey|ps_suppkey": [6, 7, 8, 9],
+            "self.l_partkey+l_suppkey|ps_availqty": [80, 80, 80, 80],
+            "self.l_partkey+l_suppkey.ps_partkey|p_partkey": [2, 3, 4, 5],
+            "self.l_partkey+l_suppkey.ps_partkey|p_name": ["a", "b", "c", "d"],
+            "self.l_partkey+l_suppkey.ps_suppkey|s_suppkey": [6, 7, 8, 9],
+            "self.l_partkey+l_suppkey.ps_suppkey|s_name": ["e", "f", "g", "h"],
+        }
+    )
+
+    processed_lineitem = strategy.post_process_individual_synthetic_result(
+        "lineitem", tpch, synth_lineitem, 1
+    )
+
+    expected_post_processing = pd.DataFrame(
+        data={
+            "self|l_partkey": [2, 3, 4, 5],
+            "self|l_suppkey": [6, 7, 8, 9],
+            "self|l_quantity": [42, 42, 42, 42],
+            "self.l_partkey+l_suppkey|ps_partkey": [2, 3, 4, 5],
+            "self.l_partkey+l_suppkey|ps_suppkey": [6, 7, 8, 9],
+            "self.l_partkey+l_suppkey|ps_availqty": [80, 80, 80, 80],
+            "self.l_partkey+l_suppkey.ps_partkey|p_partkey": [2, 3, 4, 5],
+            "self.l_partkey+l_suppkey.ps_partkey|p_name": ["a", "b", "c", "d"],
+            "self.l_partkey+l_suppkey.ps_suppkey|s_suppkey": [6, 7, 8, 9],
+            "self.l_partkey+l_suppkey.ps_suppkey|s_name": ["e", "f", "g", "h"],
+        }
+    )
+
+    pdtest.assert_frame_equal(expected_post_processing, processed_lineitem)
+
+
 def test_post_process_synthetic_results(ecom):
     strategy = AncestralStrategy()
     out_events = pd.DataFrame(
