@@ -1,4 +1,3 @@
-import itertools
 import json
 import logging
 import math
@@ -65,11 +64,12 @@ def label_encode_keys(
                     continue
                 fks = rel_data.get_foreign_keys(descendant)
                 for fk in fks:
-                    if (
-                        fk.parent_table_name == table_name
-                        and fk.parent_column_name == primary_key_column
-                    ):
-                        fk_references.add((descendant, fk.column_name))
+                    if fk.parent_table_name != table_name:
+                        continue
+
+                    for i in range(len(fk.columns)):
+                        if fk.parent_columns[i] == primary_key_column:
+                            fk_references.add((descendant, fk.columns[i]))
 
             # Collect column values from PK and FK columns into a set
             source_values = set()
@@ -122,5 +122,5 @@ def make_composite_pk_columns(
     return list(zip(*results))
 
 
-def get_frequencies(table_data: pd.DataFrame, col: str) -> List[int]:
-    return list(table_data.groupby(col).size().reset_index()[0])
+def get_frequencies(table_data: pd.DataFrame, cols: List[str]) -> List[int]:
+    return list(table_data.groupby(cols).size().reset_index()[0])

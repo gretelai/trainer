@@ -20,7 +20,8 @@ def test_backup_relational_data(trips):
         },
         foreign_keys=[
             BackupForeignKey(
-                foreign_key="trips.vehicle_type_id", referencing="vehicle_types.id"
+                foreign_key=("trips", ["vehicle_type_id"]),
+                referencing=("vehicle_types", ["id"]),
             )
         ],
     )
@@ -40,7 +41,8 @@ def test_backup():
         },
         foreign_keys=[
             BackupForeignKey(
-                foreign_key="address.customer_id", referencing="customer.id"
+                foreign_key=("address", ["customer_id"]),
+                referencing=("customer", ["id"]),
             )
         ],
     )
@@ -93,5 +95,11 @@ def test_backup():
 
     j = json.dumps(backup.as_dict)
     rehydrated = Backup.from_dict(json.loads(j))
+
+    # JSON will load the TableAndKeyT values in as lists instead of tuples.
+    # We fix that here for the unit test; in production the distinction won't matter.
+    for fk in rehydrated.relational_data.foreign_keys:
+        fk.foreign_key = tuple(fk.foreign_key)
+        fk.referencing = tuple(fk.referencing)
 
     assert rehydrated == backup

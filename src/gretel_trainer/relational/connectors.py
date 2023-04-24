@@ -6,7 +6,11 @@ from sqlalchemy import create_engine, inspect
 from sqlalchemy.engine.base import Engine
 from sqlalchemy.exc import OperationalError
 
-from gretel_trainer.relational.core import MultiTableException, RelationalData
+from gretel_trainer.relational.core import (
+    MultiTableException,
+    RelationalData,
+    TableAndKeyT,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -50,7 +54,7 @@ class Connector:
         inspector = inspect(self.engine)
 
         relational_data = RelationalData()
-        foreign_keys: List[Tuple[str, str]] = []
+        foreign_keys: List[Tuple[TableAndKeyT, TableAndKeyT]] = []
 
         for table_name in inspector.get_table_names():
             if _skip_table(table_name, only, ignore):
@@ -65,8 +69,8 @@ class Connector:
                     continue
                 foreign_keys.append(
                     (
-                        f"{table_name}.{fk['constrained_columns'][0]}",
-                        f"{referenced_table}.{fk['referred_columns'][0]}"
+                        (table_name, fk["constrained_columns"]),
+                        (referenced_table, fk["referred_columns"]),
                     )
                 )
 

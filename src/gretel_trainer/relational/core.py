@@ -4,7 +4,7 @@ import json
 import logging
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Union, overload
+from typing import Any, Dict, List, Optional, Tuple, Union, overload
 
 import networkx
 import pandas as pd
@@ -121,12 +121,14 @@ class TableEvaluation:
 @dataclass
 class ForeignKey:
     table_name: str
-    column_name: str
-    parent_column_name: str
+    columns: List[str]
     parent_table_name: str
+    parent_columns: List[str]
 
 
-PublicPrimaryKeyType = Optional[Union[str, List[str]]]
+TableAndKeyT = Tuple[str, List[str]]
+UserFriendlyKeyT = Optional[Union[str, List[str]]]
+UserFriendlyTableAndKeyT = Tuple[str, Union[str, List[str]]]
 
 
 class RelationalData:
@@ -137,17 +139,17 @@ class RelationalData:
         self,
         *,
         name: str,
-        primary_key: PublicPrimaryKeyType,
+        primary_key: UserFriendlyKeyT,
         data: pd.DataFrame,
     ) -> None:
-        primary_key = self._format_primary_key(primary_key)
+        primary_key = self._format_key_column(primary_key)
         self.graph.add_node(name, primary_key=primary_key, data=data)
 
-    def set_primary_key(self, *, table: str, primary_key: PublicPrimaryKeyType) -> None:
+    def set_primary_key(self, *, table: str, primary_key: UserFriendlyKeyT) -> None:
         if table not in self.list_all_tables():
             raise MultiTableException(f"Unrecognized table name: `{table}`")
 
-        primary_key = self._format_primary_key(primary_key)
+        primary_key = self._format_key_column(primary_key)
 
         known_columns = self.get_table_data(table).columns
         for col in primary_key:
@@ -156,19 +158,26 @@ class RelationalData:
 
         self.graph.nodes[table]["primary_key"] = primary_key
 
-    def _format_primary_key(self, pk: PublicPrimaryKeyType) -> List[str]:
-        if pk is None:
+    def _format_key_column(self, key: Optional[Union[str, List[str]]]) -> List[str]:
+        if key is None:
             return []
-        elif isinstance(pk, str):
-            return [pk]
+        elif isinstance(key, str):
+            return [key]
         else:
-            return pk
+            return key
 
-    def add_foreign_key(self, *, foreign_key: str, referencing: str) -> None:
-        """Format of both str arguments should be `table_name.column_name`"""
+    def add_foreign_key(
+        self,
+        *,
+        foreign_key: UserFriendlyTableAndKeyT,
+        referencing: UserFriendlyTableAndKeyT,
+    ) -> None:
+        """TODO: update docstring"""
         known_tables = self.list_all_tables()
-        fk_table, fk_column = foreign_key.split(".")
-        referenced_table, referenced_column = referencing.split(".")
+        fk_table, fk_columns = foreign_key
+        fk_columns = self._format_key_column(fk_columns)
+        referenced_table, referenced_columns = referencing
+        referenced_columns = self._format_key_column(referenced_columns)
 
         abort = False
         if fk_table not in known_tables:
@@ -176,6 +185,11 @@ class RelationalData:
             abort = True
         if referenced_table not in known_tables:
             logger.warning(f"Unrecognized table name: `{referenced_table}`")
+            abort = True
+        if len(fk_columns) != len(referenced_columns):
+            logger.warning(
+                "Foreign key and referenced columns must be of the same length"
+            )
             abort = True
 
         if abort:
@@ -187,32 +201,31 @@ class RelationalData:
         via.append(
             ForeignKey(
                 table_name=fk_table,
-                column_name=fk_column,
-                parent_column_name=referenced_column,
+                columns=self._format_key_column(fk_columns),
                 parent_table_name=referenced_table,
+                parent_columns=self._format_key_column(referenced_columns),
             )
         )
         edge["via"] = via
 
-    def remove_foreign_key(self, foreign_key: str) -> None:
-        fk_table, fk_column = foreign_key.split(".")
+    def remove_foreign_key(self, foreign_key: UserFriendlyTableAndKeyT) -> None:
+        fk_table, fk_columns = foreign_key
+        fk_columns = self._format_key_column(fk_columns)
 
         if fk_table not in self.list_all_tables():
             raise MultiTableException(f"Unrecognized table name: `{fk_table}`")
 
-        if fk_column not in self.get_table_data(fk_table).columns:
-            raise MultiTableException(
-                f"Column `{fk_column}` does not exist on table `{fk_table}`"
-            )
+        if any(col not in self.get_table_data(fk_table).columns for col in fk_columns):
+            raise MultiTableException(f"Column does not exist on table `{fk_table}`")
 
         key_to_remove = None
         for fk in self.get_foreign_keys(fk_table):
-            if fk.column_name == fk_column:
+            if fk.columns == fk_columns:
                 key_to_remove = fk
 
         if key_to_remove is None:
             raise MultiTableException(
-                f"Column `{fk_column}` on table `{fk_table}` is not a foreign key"
+                f"`{fk_columns}` on table `{fk_table}` is not a foreign key"
             )
 
         edge = self.graph.edges[fk_table, key_to_remove.parent_table_name]
@@ -277,9 +290,11 @@ class RelationalData:
         return foreign_keys
 
     def get_all_key_columns(self, table: str) -> List[str]:
-        return self.get_primary_key(table) + [
-            fk.column_name for fk in self.get_foreign_keys(table)
-        ]
+        all_key_cols = []
+        all_key_cols.extend(self.get_primary_key(table))
+        for fk in self.get_foreign_keys(table):
+            all_key_cols.extend(fk.columns)
+        return all_key_cols
 
     def debug_summary(self) -> Dict[str, Any]:
         max_depth = dag_longest_path_length(self.graph)
@@ -295,9 +310,9 @@ class RelationalData:
                 this_table_foreign_key_count = this_table_foreign_key_count + 1
                 foreign_keys.append(
                     {
-                        "column_name": key.column_name,
-                        "parent_column_name": key.parent_column_name,
+                        "columns": key.columns,
                         "parent_table_name": key.parent_table_name,
+                        "parent_columns": key.parent_columns,
                     }
                 )
             tables[table] = {
@@ -322,8 +337,8 @@ class RelationalData:
             }
             keys = [
                 (
-                    f"{table}.{key.column_name}",
-                    f"{key.parent_table_name}.{key.parent_column_name}",
+                    (table, key.columns),
+                    (key.parent_table_name, key.parent_columns),
                 )
                 for key in self.get_foreign_keys(table)
             ]

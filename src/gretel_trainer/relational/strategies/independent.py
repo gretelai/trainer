@@ -8,11 +8,7 @@ from gretel_client.projects.models import Model
 
 import gretel_trainer.relational.ancestry as ancestry
 import gretel_trainer.relational.strategies.common as common
-from gretel_trainer.relational.core import (
-    MultiTableException,
-    RelationalData,
-    TableEvaluation,
-)
+from gretel_trainer.relational.core import RelationalData, TableEvaluation
 from gretel_trainer.relational.sdk_extras import ExtendedGretelSDK
 
 logger = logging.getLogger(__name__)
@@ -47,12 +43,8 @@ class IndependentStrategy:
         for table_name in rel_data.list_all_tables():
             columns_to_drop = []
             columns_to_drop.extend(rel_data.get_primary_key(table_name))
-            columns_to_drop.extend(
-                [
-                    foreign_key.column_name
-                    for foreign_key in rel_data.get_foreign_keys(table_name)
-                ]
-            )
+            for foreign_key in rel_data.get_foreign_keys(table_name):
+                columns_to_drop.extend(foreign_key.columns)
 
             data = rel_data.get_table_data(table_name)
             data = data.drop(columns=columns_to_drop)
@@ -266,22 +258,22 @@ def _synthesize_foreign_keys(
                 # The synthetic data for this table may still be useful, but we do not have valid synthetic
                 # primary key values to set in this table's foreign key column. Instead of introducing dangling
                 # pointers, set the entire column to None.
-                synth_pk_values = [None]
+                synth_pk_values = [None] * len(foreign_key.parent_columns)
             else:
-                synth_pk_values = list(
-                    parent_synth_table[foreign_key.parent_column_name]
-                )
+                synth_pk_values = parent_synth_table[
+                    foreign_key.parent_columns
+                ].values.tolist()
 
             original_table_data = rel_data.get_table_data(table_name)
             fk_frequencies = common.get_frequencies(
-                original_table_data, foreign_key.column_name
+                original_table_data, foreign_key.columns
             )
 
             new_fk_values = _collect_values(
                 synth_pk_values, fk_frequencies, len(out_df)
             )
 
-            out_df[foreign_key.column_name] = new_fk_values
+            out_df[foreign_key.columns] = new_fk_values
 
         processed[table_name] = out_df
 

@@ -2,7 +2,6 @@ import os
 import tempfile
 
 import pandas as pd
-import pandas.testing as pdtest
 import pytest
 
 from gretel_trainer.relational.core import MultiTableException, RelationalData
@@ -53,16 +52,22 @@ def test_add_foreign_key_checks_if_tables_exist():
     rel_data.add_table(name="events", primary_key="id", data=pd.DataFrame())
 
     # attempt to add a foreign key to an unrecognized table
-    rel_data.add_foreign_key(foreign_key="events.user_id", referencing="USR.id")
+    rel_data.add_foreign_key(
+        foreign_key=("events", "user_id"), referencing=("USR", "id")
+    )
     assert len(rel_data.get_foreign_keys("events")) == 0
     assert set(rel_data.list_all_tables()) == {"users", "events"}
 
     # again from the opposite side
-    rel_data.add_foreign_key(foreign_key="EVNT.user_id", referencing="users.id")
+    rel_data.add_foreign_key(
+        foreign_key=("EVNT", "user_id"), referencing=("users", "id")
+    )
     assert set(rel_data.list_all_tables()) == {"users", "events"}
 
     # add a foreign key correctly
-    rel_data.add_foreign_key(foreign_key="events.user_id", referencing="users.id")
+    rel_data.add_foreign_key(
+        foreign_key=("events", "user_id"), referencing=("users", "id")
+    )
     assert len(rel_data.get_foreign_keys("events")) == 1
 
 
@@ -79,27 +84,33 @@ def test_remove_foreign_key():
 
     # Can't remove a foreign key from a nonexistent table
     with pytest.raises(MultiTableException):
-        rel_data.remove_foreign_key("not_a_table.user_id")
+        rel_data.remove_foreign_key(("not_a_table", "user_id"))
 
     # Can't remove a foreign key that is not a column on the table
     with pytest.raises(MultiTableException):
-        rel_data.remove_foreign_key("events.not_a_column")
+        rel_data.remove_foreign_key(("events", "not_a_column"))
 
     # Can't remove a foreign key that is not a foreign key
     with pytest.raises(MultiTableException):
-        rel_data.remove_foreign_key("events.id")
+        rel_data.remove_foreign_key(("events", "id"))
 
-    rel_data.add_foreign_key(foreign_key="events.user_id", referencing="users.id")
+    rel_data.add_foreign_key(
+        foreign_key=("events", "user_id"), referencing=("users", "id")
+    )
     assert len(rel_data.get_foreign_keys("events")) == 1
 
-    rel_data.remove_foreign_key("events.user_id")
+    rel_data.remove_foreign_key(("events", "user_id"))
     assert len(rel_data.get_foreign_keys("events")) == 0
 
     # You can remove one FK from a table without affecting another FK to the same table
-    rel_data.add_foreign_key(foreign_key="events.user_id", referencing="users.id")
-    rel_data.add_foreign_key(foreign_key="events.other_user_id", referencing="users.id")
+    rel_data.add_foreign_key(
+        foreign_key=("events", "user_id"), referencing=("users", "id")
+    )
+    rel_data.add_foreign_key(
+        foreign_key=("events", "other_user_id"), referencing=("users", "id")
+    )
     assert len(rel_data.get_foreign_keys("events")) == 2
-    rel_data.remove_foreign_key("events.user_id")
+    rel_data.remove_foreign_key(("events", "user_id"))
     assert len(rel_data.get_foreign_keys("events")) == 1
 
 
@@ -141,14 +152,19 @@ def test_relational_data_as_dict(ecom):
         },
         "order_items": {"primary_key": ["id"], "csv_path": "test_out/order_items.csv"},
     }
-    assert set(as_dict["foreign_keys"]) == {
-        ("events.user_id", "users.id"),
-        ("order_items.user_id", "users.id"),
-        ("order_items.inventory_item_id", "inventory_items.id"),
-        ("inventory_items.product_id", "products.id"),
-        ("inventory_items.product_distribution_center_id", "distribution_center.id"),
-        ("products.distribution_center_id", "distribution_center.id"),
-    }
+    expected_foreign_keys = [
+        (("events", ["user_id"]), ("users", ["id"])),
+        (("order_items", ["user_id"]), ("users", ["id"])),
+        (("order_items", ["inventory_item_id"]), ("inventory_items", ["id"])),
+        (("inventory_items", ["product_id"]), ("products", ["id"])),
+        (
+            ("inventory_items", ["product_distribution_center_id"]),
+            ("distribution_center", ["id"]),
+        ),
+        (("products", ["distribution_center_id"]), ("distribution_center", ["id"])),
+    ]
+    for expected_fk in expected_foreign_keys:
+        assert expected_fk in as_dict["foreign_keys"]
 
 
 def test_ecommerce_filesystem_serde(ecom):
@@ -204,9 +220,9 @@ def test_debug_summary(ecom, mutagenesis):
                 "foreign_key_count": 1,
                 "foreign_keys": [
                     {
-                        "column_name": "user_id",
-                        "parent_column_name": "id",
+                        "columns": ["user_id"],
                         "parent_table_name": "users",
+                        "parent_columns": ["id"],
                     }
                 ],
             },
@@ -222,9 +238,9 @@ def test_debug_summary(ecom, mutagenesis):
                 "foreign_key_count": 1,
                 "foreign_keys": [
                     {
-                        "column_name": "distribution_center_id",
-                        "parent_column_name": "id",
+                        "columns": ["distribution_center_id"],
                         "parent_table_name": "distribution_center",
+                        "parent_columns": ["id"],
                     }
                 ],
             },
@@ -234,14 +250,14 @@ def test_debug_summary(ecom, mutagenesis):
                 "foreign_key_count": 2,
                 "foreign_keys": [
                     {
-                        "column_name": "product_id",
-                        "parent_column_name": "id",
+                        "columns": ["product_id"],
                         "parent_table_name": "products",
+                        "parent_columns": ["id"],
                     },
                     {
-                        "column_name": "product_distribution_center_id",
-                        "parent_column_name": "id",
+                        "columns": ["product_distribution_center_id"],
                         "parent_table_name": "distribution_center",
+                        "parent_columns": ["id"],
                     },
                 ],
             },
@@ -251,14 +267,14 @@ def test_debug_summary(ecom, mutagenesis):
                 "foreign_key_count": 2,
                 "foreign_keys": [
                     {
-                        "column_name": "user_id",
-                        "parent_column_name": "id",
+                        "columns": ["user_id"],
                         "parent_table_name": "users",
+                        "parent_columns": ["id"],
                     },
                     {
-                        "column_name": "inventory_item_id",
-                        "parent_column_name": "id",
+                        "columns": ["inventory_item_id"],
                         "parent_table_name": "inventory_items",
+                        "parent_columns": ["id"],
                     },
                 ],
             },
@@ -276,14 +292,14 @@ def test_debug_summary(ecom, mutagenesis):
                 "foreign_key_count": 2,
                 "foreign_keys": [
                     {
-                        "column_name": "atom1_id",
-                        "parent_column_name": "atom_id",
+                        "columns": ["atom1_id"],
                         "parent_table_name": "atom",
+                        "parent_columns": ["atom_id"],
                     },
                     {
-                        "column_name": "atom2_id",
-                        "parent_column_name": "atom_id",
+                        "columns": ["atom2_id"],
                         "parent_table_name": "atom",
+                        "parent_columns": ["atom_id"],
                     },
                 ],
             },
@@ -293,9 +309,9 @@ def test_debug_summary(ecom, mutagenesis):
                 "foreign_key_count": 1,
                 "foreign_keys": [
                     {
-                        "column_name": "molecule_id",
-                        "parent_column_name": "molecule_id",
+                        "columns": ["molecule_id"],
                         "parent_table_name": "molecule",
+                        "parent_columns": ["molecule_id"],
                     }
                 ],
             },

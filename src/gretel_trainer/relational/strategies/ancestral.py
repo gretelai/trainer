@@ -178,11 +178,11 @@ class AncestralStrategy:
         for fk in rel_data.get_foreign_keys(table):
             parent_table_data = output_tables[fk.parent_table_name]
             parent_table_data = ancestry.prepend_foreign_key_lineage(
-                parent_table_data, fk.column_name
+                parent_table_data, fk.columns
             )
 
             # Get FK frequencies
-            freqs = common.get_frequencies(source_data, fk.column_name)
+            freqs = common.get_frequencies(source_data, fk.columns)
             freqs = sorted(freqs, reverse=True)
             f = 0
 
@@ -362,8 +362,8 @@ def _add_artifical_rows_for_seeding(
         max_fk_record = two_records.tail(1).copy()
 
         for foreign_key in foreign_keys:
-            min_fk_record[foreign_key.column_name] = 0
-            max_fk_record[foreign_key.column_name] = max_pk_values[
+            min_fk_record[foreign_key.columns] = 0
+            max_fk_record[foreign_key.columns] = max_pk_values[
                 foreign_key.parent_table_name
             ]
 

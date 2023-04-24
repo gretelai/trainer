@@ -1,11 +1,10 @@
 from __future__ import annotations
 
-import json
 from dataclasses import asdict, dataclass
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional
 
 from gretel_trainer.relational.artifacts import ArtifactCollection
-from gretel_trainer.relational.core import ForeignKey, RelationalData
+from gretel_trainer.relational.core import ForeignKey, RelationalData, TableAndKeyT
 
 
 @dataclass
@@ -15,14 +14,14 @@ class BackupRelationalDataTable:
 
 @dataclass
 class BackupForeignKey:
-    foreign_key: str
-    referencing: str
+    foreign_key: TableAndKeyT
+    referencing: TableAndKeyT
 
     @classmethod
     def from_fk(cls, fk: ForeignKey) -> BackupForeignKey:
         return BackupForeignKey(
-            foreign_key=f"{fk.table_name}.{fk.column_name}",
-            referencing=f"{fk.parent_table_name}.{fk.parent_column_name}",
+            foreign_key=(fk.table_name, fk.columns),
+            referencing=(fk.parent_table_name, fk.parent_columns),
         )
 
 

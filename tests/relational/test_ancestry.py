@@ -123,18 +123,16 @@ def test_primary_key_in_multigenerational_format(mutagenesis):
 
 def test_ancestral_foreign_key_maps(ecom):
     events_afk_maps = ancestry.get_ancestral_foreign_key_maps(ecom, "events")
-    assert events_afk_maps == [("self|user_id", "self.user_id|id")]
+    assert events_afk_maps == [(["self|user_id"], ["self.user_id|id"])]
 
     inventory_items_afk_maps = ancestry.get_ancestral_foreign_key_maps(
         ecom, "inventory_items"
     )
-    assert set(inventory_items_afk_maps) == {
-        ("self|product_id", "self.product_id|id"),
-        (
-            "self|product_distribution_center_id",
-            "self.product_distribution_center_id|id",
-        ),
-    }
+    assert (["self|product_id"], ["self.product_id|id"]) in inventory_items_afk_maps
+    assert (
+        ["self|product_distribution_center_id"],
+        ["self.product_distribution_center_id|id"],
+    ) in inventory_items_afk_maps
 
 
 def test_prepend_foreign_key_lineage(ecom):
@@ -142,7 +140,7 @@ def test_prepend_foreign_key_lineage(ecom):
         ecom, "inventory_items"
     )
     order_items_parent_data = ancestry.prepend_foreign_key_lineage(
-        multigen_inventory_items, "inventory_item_id"
+        multigen_inventory_items, ["inventory_item_id"]
     )
     assert set(order_items_parent_data.columns) == {
         "self.inventory_item_id|id",
