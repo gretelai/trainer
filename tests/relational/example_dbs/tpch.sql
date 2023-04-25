@@ -44,7 +44,7 @@ insert into part (p_partkey, p_name) values
   (4, "cream turquoise dark thistle light");
 
 insert into partsupp (ps_partkey, ps_suppkey, ps_availqty) values
-  (1, 1, 101),
+  (1, 3, 103),
   (1, 2, 102),
   (1, 4, 104),
   (2, 1, 201),
@@ -58,7 +58,7 @@ insert into partsupp (ps_partkey, ps_suppkey, ps_availqty) values
   (4, 2, 402);
 
 insert into lineitem (l_partkey, l_suppkey, l_quantity) values
-  (1, 1, 11),
+  (1, 3, 13),
   (1, 2, 12),
   (1, 4, 14),
   (2, 1, 21),

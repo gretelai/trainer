@@ -143,7 +143,39 @@ def test_prepare_training_data_with_composite_keys(tpch):
     strategy = AncestralStrategy()
     training_data = strategy.prepare_training_data(tpch)
 
-    assert set(training_data["lineitem"].columns) == {
+    l_max = len(tpch.get_table_data("lineitem")) * 50
+    ps_max = len(tpch.get_table_data("partsupp")) * 50
+    p_max = len(tpch.get_table_data("part")) * 50
+    s_max = len(tpch.get_table_data("supplier")) * 50
+
+    # partsupp table, composite PK
+    train_partsupp = training_data["partsupp"]
+    assert set(train_partsupp.columns) == {
+        "self|ps_partkey",
+        "self|ps_suppkey",
+        "self|ps_availqty",
+        "self.ps_partkey|p_partkey",
+        "self.ps_partkey|p_name",
+        "self.ps_suppkey|s_suppkey",
+        "self.ps_suppkey|s_name",
+    }
+    assert len(train_partsupp) == len(tpch.get_table_data("partsupp")) + 3
+    last_three_partsupp_keys = train_partsupp.tail(3).reset_index()[
+        ["self|ps_partkey", "self|ps_suppkey"]
+    ]
+    pdtest.assert_frame_equal(
+        last_three_partsupp_keys,
+        pd.DataFrame(
+            data={
+                "self|ps_partkey": [ps_max, 0, p_max],
+                "self|ps_suppkey": [ps_max, 0, s_max],
+            }
+        ),
+    )
+
+    # lineitem table, composite FK to partsupp
+    train_lineitem = training_data["lineitem"]
+    assert set(train_lineitem.columns) == {
         "self|l_partkey",
         "self|l_suppkey",
         "self|l_quantity",
@@ -155,6 +187,19 @@ def test_prepare_training_data_with_composite_keys(tpch):
         "self.l_partkey+l_suppkey.ps_suppkey|s_suppkey",
         "self.l_partkey+l_suppkey.ps_suppkey|s_name",
     }
+    assert len(train_lineitem) == len(tpch.get_table_data("lineitem")) + 3
+    last_three_lineitem_keys = train_lineitem.tail(3).reset_index()[
+        ["self|l_partkey", "self|l_suppkey"]
+    ]
+    pdtest.assert_frame_equal(
+        last_three_lineitem_keys,
+        pd.DataFrame(
+            data={
+                "self|l_partkey": [l_max, 0, ps_max],
+                "self|l_suppkey": [l_max, 0, ps_max],
+            }
+        ),
+    )
 
 
 def test_retraining_a_set_of_tables_forces_retraining_descendants_as_well(ecom):

@@ -339,14 +339,11 @@ def _add_artifical_rows_for_seeding(
     # On each table, add an artifical row with the max possible PK value
     max_pk_values = {}
     for table_name, data in tables.items():
-        pk = rel_data.get_primary_key(table_name)
-        if pk is None:
-            continue
-
         max_pk_values[table_name] = len(data) * 50
 
         random_record = tables[table_name].sample().copy()
-        random_record[pk] = max_pk_values[table_name]
+        for pk_col in rel_data.get_primary_key(table_name):
+            random_record[pk_col] = max_pk_values[table_name]
         tables[table_name] = pd.concat([data, random_record]).reset_index(drop=True)
 
     # On each table with foreign keys, add two more artificial rows containing the min and max FK values
@@ -355,21 +352,20 @@ def _add_artifical_rows_for_seeding(
         if len(foreign_keys) == 0:
             continue
 
-        pk = rel_data.get_primary_key(table_name)
-
         two_records = tables[table_name].sample(2)
         min_fk_record = two_records.head(1).copy()
         max_fk_record = two_records.tail(1).copy()
 
-        for foreign_key in foreign_keys:
-            min_fk_record[foreign_key.columns] = 0
-            max_fk_record[foreign_key.columns] = max_pk_values[
-                foreign_key.parent_table_name
-            ]
+        # By default, just auto-increment the primary key
+        for pk_col in rel_data.get_primary_key(table_name):
+            min_fk_record[pk_col] = max_pk_values[table_name] + 1
+            max_fk_record[pk_col] = max_pk_values[table_name] + 2
 
-        if pk is not None:
-            min_fk_record[pk] = max_pk_values[table_name] + 1
-            max_fk_record[pk] = max_pk_values[table_name] + 2
+        # This can potentially overwrite the auto-incremented primary keys above in the case of composite keys
+        for foreign_key in foreign_keys:
+            for fk_col in foreign_key.columns:
+                min_fk_record[fk_col] = 0
+                max_fk_record[fk_col] = max_pk_values[foreign_key.parent_table_name]
 
         tables[table_name] = pd.concat(
             [data, min_fk_record, max_fk_record]
