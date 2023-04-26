@@ -24,9 +24,9 @@ def get_ancestral_foreign_key_maps(
 ) -> List[Tuple[str, str]]:
     def _ancestral_fk_map(fk: ForeignKey) -> List[Tuple[str, str]]:
         maps = []
+        fk_columns = _COL_DELIMITER.join(fk.columns)
 
         for i in range(len(fk.columns)):
-            fk_columns = _COL_DELIMITER.join(fk.columns)
             fk_col = fk.columns[i]
             ref_col = fk.parent_columns[i]
 
