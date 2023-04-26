@@ -124,10 +124,16 @@ def _setup_nba(
     rel_data.add_table(name="cities", primary_key="id", data=cities)
     rel_data.add_table(name="teams", primary_key="id", data=teams)
     rel_data.add_foreign_key(
-        foreign_key=("teams", "city_id"), referencing=("cities", "id")
+        table="teams",
+        constrained_columns=["city_id"],
+        referred_table="cities",
+        referred_columns=["id"],
     )
     rel_data.add_foreign_key(
-        foreign_key=("cities", "state_id"), referencing=("states", "id")
+        table="cities",
+        constrained_columns=["state_id"],
+        referred_table="states",
+        referred_columns=["id"],
     )
 
     return rel_data, states, cities, teams

@@ -70,8 +70,10 @@ class Connector:
         for foreign_key in foreign_keys:
             table, fk = foreign_key
             relational_data.add_foreign_key(
-                foreign_key=(table, fk["constrained_columns"]),
-                referencing=(fk["referred_table"], fk["referred_columns"]),
+                table=table,
+                constrained_columns=fk["constrained_columns"],
+                referred_table=fk["referred_table"],
+                referred_columns=fk["referred_columns"],
             )
 
         return relational_data

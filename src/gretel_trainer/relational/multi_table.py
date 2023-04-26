@@ -146,7 +146,10 @@ class MultiTable:
             )
         for fk_backup in backup.relational_data.foreign_keys:
             self.relational_data.add_foreign_key(
-                foreign_key=fk_backup.foreign_key, referencing=fk_backup.referencing
+                table=fk_backup.table,
+                constrained_columns=fk_backup.constrained_columns,
+                referred_table=fk_backup.referred_table,
+                referred_columns=fk_backup.referred_columns,
             )
 
         # Debug summary
