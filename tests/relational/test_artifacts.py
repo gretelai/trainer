@@ -7,7 +7,7 @@ from gretel_trainer.relational.artifacts import ArtifactCollection, add_to_tar
 
 
 def test_makes_new_archive():
-    with tempfile.TemporaryDirectory() as tmpdir, tempfile.NamedTemporaryFile() as tf1, tempfile.NamedTemporaryFile() as tf2:
+    with tempfile.TemporaryDirectory() as tmpdir, tempfile.NamedTemporaryFile() as tf1:
         archive_path = Path(tmpdir) / "archive.tar.gz"
         add_to_tar(archive_path, Path(tf1.name), "tf1")
 

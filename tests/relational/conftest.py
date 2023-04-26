@@ -68,6 +68,11 @@ def mutagenesis() -> RelationalData:
 
 
 @pytest.fixture()
+def tpch() -> RelationalData:
+    return rel_data_from_example_db("tpch")
+
+
+@pytest.fixture()
 def art() -> RelationalData:
     return rel_data_from_example_db("art")
 
@@ -118,8 +123,18 @@ def _setup_nba(
     rel_data.add_table(name="states", primary_key="id", data=states)
     rel_data.add_table(name="cities", primary_key="id", data=cities)
     rel_data.add_table(name="teams", primary_key="id", data=teams)
-    rel_data.add_foreign_key(foreign_key="teams.city_id", referencing="cities.id")
-    rel_data.add_foreign_key(foreign_key="cities.state_id", referencing="states.id")
+    rel_data.add_foreign_key(
+        table="teams",
+        constrained_columns=["city_id"],
+        referred_table="cities",
+        referred_columns=["id"],
+    )
+    rel_data.add_foreign_key(
+        table="cities",
+        constrained_columns=["state_id"],
+        referred_table="states",
+        referred_columns=["id"],
+    )
 
     return rel_data, states, cities, teams
 

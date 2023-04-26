@@ -174,20 +174,16 @@ class AncestralStrategy:
     ) -> pd.DataFrame:
         seed_df = pd.DataFrame()
 
+        source_data = rel_data.get_table_data(table)
         for fk in rel_data.get_foreign_keys(table):
             parent_table_data = output_tables[fk.parent_table_name]
             parent_table_data = ancestry.prepend_foreign_key_lineage(
-                parent_table_data, fk.column_name
+                parent_table_data, fk.columns
             )
 
             # Get FK frequencies
-            freqs = (
-                rel_data.get_table_data(table)
-                .groupby([fk.column_name])
-                .size()
-                .reset_index()
-            )
-            freqs = sorted(list(freqs[0]), reverse=True)
+            freqs = common.get_frequencies(source_data, fk.columns)
+            freqs = sorted(freqs, reverse=True)
             f = 0
 
             # Make a list of parent_table indicies matching FK frequencies
@@ -240,6 +236,7 @@ class AncestralStrategy:
         table_name: str,
         rel_data: RelationalData,
         synthetic_table: pd.DataFrame,
+        record_size_ratio: float,
     ) -> pd.DataFrame:
         """
         Replaces primary key values with a new, contiguous set of values.
@@ -247,28 +244,47 @@ class AncestralStrategy:
         """
         processed = synthetic_table
 
-        primary_key = ancestry.get_multigenerational_primary_key(rel_data, table_name)
-        if primary_key is not None:
-            processed[primary_key] = [i for i in range(len(synthetic_table))]
+        primary_key = rel_data.get_primary_key(table_name)
+        multigenerational_primary_key = ancestry.get_multigenerational_primary_key(
+            rel_data, table_name
+        )
 
-        foreign_key_maps = ancestry.get_ancestral_foreign_key_maps(rel_data, table_name)
-        for fk, parent_pk in foreign_key_maps:
-            processed[fk] = processed[parent_pk]
+        if len(multigenerational_primary_key) == 0:
+            pass
+        elif len(multigenerational_primary_key) == 1:
+            processed[multigenerational_primary_key[0]] = [
+                i for i in range(len(synthetic_table))
+            ]
+        else:
+            synthetic_pk_columns = common.make_composite_pk_columns(
+                table_name=table_name,
+                rel_data=rel_data,
+                primary_key=primary_key,
+                synth_row_count=len(synthetic_table),
+                record_size_ratio=record_size_ratio,
+            )
+            for index, col in enumerate(multigenerational_primary_key):
+                processed[col] = synthetic_pk_columns[index]
+
+        for fk_map in ancestry.get_ancestral_foreign_key_maps(rel_data, table_name):
+            fk_col, parent_pk_col = fk_map
+            processed[fk_col] = processed[parent_pk_col]
 
         return processed
 
     def post_process_synthetic_results(
         self,
-        output_tables: Dict[str, pd.DataFrame],
+        synth_tables: Dict[str, pd.DataFrame],
         preserved: List[str],
         rel_data: RelationalData,
+        record_size_ratio: float,
     ) -> Dict[str, pd.DataFrame]:
         """
         Restores tables from multigenerational to original shape
         """
         return {
             table_name: ancestry.drop_ancestral_data(df)
-            for table_name, df in output_tables.items()
+            for table_name, df in synth_tables.items()
         }
 
     def update_evaluation_from_model(
@@ -323,14 +339,11 @@ def _add_artifical_rows_for_seeding(
     # On each table, add an artifical row with the max possible PK value
     max_pk_values = {}
     for table_name, data in tables.items():
-        pk = rel_data.get_primary_key(table_name)
-        if pk is None:
-            continue
-
         max_pk_values[table_name] = len(data) * 50
 
         random_record = tables[table_name].sample().copy()
-        random_record[pk] = max_pk_values[table_name]
+        for pk_col in rel_data.get_primary_key(table_name):
+            random_record[pk_col] = max_pk_values[table_name]
         tables[table_name] = pd.concat([data, random_record]).reset_index(drop=True)
 
     # On each table with foreign keys, add two more artificial rows containing the min and max FK values
@@ -339,21 +352,20 @@ def _add_artifical_rows_for_seeding(
         if len(foreign_keys) == 0:
             continue
 
-        pk = rel_data.get_primary_key(table_name)
-
         two_records = tables[table_name].sample(2)
         min_fk_record = two_records.head(1).copy()
         max_fk_record = two_records.tail(1).copy()
 
-        for foreign_key in foreign_keys:
-            min_fk_record[foreign_key.column_name] = 0
-            max_fk_record[foreign_key.column_name] = max_pk_values[
-                foreign_key.parent_table_name
-            ]
+        # By default, just auto-increment the primary key
+        for pk_col in rel_data.get_primary_key(table_name):
+            min_fk_record[pk_col] = max_pk_values[table_name] + 1
+            max_fk_record[pk_col] = max_pk_values[table_name] + 2
 
-        if pk is not None:
-            min_fk_record[pk] = max_pk_values[table_name] + 1
-            max_fk_record[pk] = max_pk_values[table_name] + 2
+        # This can potentially overwrite the auto-incremented primary keys above in the case of composite keys
+        for foreign_key in foreign_keys:
+            for fk_col in foreign_key.columns:
+                min_fk_record[fk_col] = 0
+                max_fk_record[fk_col] = max_pk_values[foreign_key.parent_table_name]
 
         tables[table_name] = pd.concat(
             [data, min_fk_record, max_fk_record]

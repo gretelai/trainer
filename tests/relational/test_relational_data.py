@@ -2,7 +2,6 @@ import os
 import tempfile
 
 import pandas as pd
-import pandas.testing as pdtest
 import pytest
 
 from gretel_trainer.relational.core import MultiTableException, RelationalData
@@ -40,77 +39,91 @@ def test_mutagenesis_relational_data(mutagenesis):
     assert mutagenesis.get_parents("bond") == ["atom"]
     assert mutagenesis.get_parents("atom") == ["molecule"]
 
-    assert mutagenesis.get_primary_key("bond") is None
-    assert mutagenesis.get_primary_key("atom") == "atom_id"
+    assert mutagenesis.get_primary_key("bond") == ["atom1_id", "atom2_id"]
+    assert mutagenesis.get_primary_key("atom") == ["atom_id"]
 
     assert set(mutagenesis.get_all_key_columns("bond")) == {"atom1_id", "atom2_id"}
     assert set(mutagenesis.get_all_key_columns("atom")) == {"atom_id", "molecule_id"}
 
 
-def test_add_foreign_key_checks_if_tables_exist():
-    rel_data = RelationalData()
-    rel_data.add_table(name="users", primary_key="id", data=pd.DataFrame())
-    rel_data.add_table(name="events", primary_key="id", data=pd.DataFrame())
-
-    # attempt to add a foreign key to an unrecognized table
-    rel_data.add_foreign_key(foreign_key="events.user_id", referencing="USR.id")
-    assert len(rel_data.get_foreign_keys("events")) == 0
-    assert set(rel_data.list_all_tables()) == {"users", "events"}
-
-    # again from the opposite side
-    rel_data.add_foreign_key(foreign_key="EVNT.user_id", referencing="users.id")
-    assert set(rel_data.list_all_tables()) == {"users", "events"}
-
-    # add a foreign key correctly
-    rel_data.add_foreign_key(foreign_key="events.user_id", referencing="users.id")
-    assert len(rel_data.get_foreign_keys("events")) == 1
-
-
-def test_remove_foreign_key():
+def test_adding_and_removing_foreign_keys():
     rel_data = RelationalData()
     rel_data.add_table(
-        name="users", primary_key="id", data=pd.DataFrame(data={"id": [1]})
+        name="users", primary_key="id", data=pd.DataFrame(data={"id": [1, 2, 3]})
     )
     rel_data.add_table(
         name="events",
         primary_key="id",
-        data=pd.DataFrame(data={"id": [1], "user_id": [1], "other_user_id": [1]}),
+        data=pd.DataFrame(data={"id": [1, 2, 3], "user_id": [1, 2, 3]}),
     )
 
-    # Can't remove a foreign key from a nonexistent table
+    # Cannot add to an unrecognized table
     with pytest.raises(MultiTableException):
-        rel_data.remove_foreign_key("not_a_table.user_id")
+        rel_data.add_foreign_key(
+            table="unrecognized",
+            constrained_columns=["user_id"],
+            referred_table="users",
+            referred_columns=["id"],
+        )
 
-    # Can't remove a foreign key that is not a column on the table
+    # Cannot add to an unrecognized referred table
     with pytest.raises(MultiTableException):
-        rel_data.remove_foreign_key("events.not_a_column")
+        rel_data.add_foreign_key(
+            table="events",
+            constrained_columns=["user_id"],
+            referred_table="unrecognized",
+            referred_columns=["id"],
+        )
 
-    # Can't remove a foreign key that is not a foreign key
+    # Cannot add unrecognized columns
     with pytest.raises(MultiTableException):
-        rel_data.remove_foreign_key("events.id")
+        rel_data.add_foreign_key(
+            table="events",
+            constrained_columns=["user_id"],
+            referred_table="users",
+            referred_columns=["unrecognized"],
+        )
+    with pytest.raises(MultiTableException):
+        rel_data.add_foreign_key(
+            table="events",
+            constrained_columns=["unrecognized"],
+            referred_table="users",
+            referred_columns=["id"],
+        )
 
-    rel_data.add_foreign_key(foreign_key="events.user_id", referencing="users.id")
+    # Successful add
+    rel_data.add_foreign_key(
+        table="events",
+        constrained_columns=["user_id"],
+        referred_table="users",
+        referred_columns=["id"],
+    )
     assert len(rel_data.get_foreign_keys("events")) == 1
 
-    rel_data.remove_foreign_key("events.user_id")
+    # Cannot remove from unrecognized table
+    with pytest.raises(MultiTableException):
+        rel_data.remove_foreign_key(table="unrecognized", constrained_columns=["id"])
+
+    # Cannot remove a non-existent key
+    with pytest.raises(MultiTableException):
+        rel_data.remove_foreign_key(table="events", constrained_columns=["id"])
+
+    # Successful remove
+    rel_data.remove_foreign_key(table="events", constrained_columns=["user_id"])
     assert len(rel_data.get_foreign_keys("events")) == 0
-
-    # You can remove one FK from a table without affecting another FK to the same table
-    rel_data.add_foreign_key(foreign_key="events.user_id", referencing="users.id")
-    rel_data.add_foreign_key(foreign_key="events.other_user_id", referencing="users.id")
-    assert len(rel_data.get_foreign_keys("events")) == 2
-    rel_data.remove_foreign_key("events.user_id")
-    assert len(rel_data.get_foreign_keys("events")) == 1
 
 
 def test_set_primary_key(ecom):
-    assert ecom.get_primary_key("users") == "id"
+    assert ecom.get_primary_key("users") == ["id"]
 
     ecom.set_primary_key(table="users", primary_key=None)
-    assert ecom.get_primary_key("users") is None
+    assert ecom.get_primary_key("users") == []
+
+    ecom.set_primary_key(table="users", primary_key=["first_name", "last_name"])
+    assert ecom.get_primary_key("users") == ["first_name", "last_name"]
 
     ecom.set_primary_key(table="users", primary_key="id")
-    assert ecom.get_primary_key("users") == "id"
+    assert ecom.get_primary_key("users") == ["id"]
 
     # Can't set primary key on an unknown table
     with pytest.raises(MultiTableException):
@@ -125,27 +138,59 @@ def test_relational_data_as_dict(ecom):
     as_dict = ecom.as_dict("test_out")
 
     assert as_dict["tables"] == {
-        "users": {"primary_key": "id", "csv_path": "test_out/users.csv"},
-        "events": {"primary_key": "id", "csv_path": "test_out/events.csv"},
+        "users": {"primary_key": ["id"], "csv_path": "test_out/users.csv"},
+        "events": {"primary_key": ["id"], "csv_path": "test_out/events.csv"},
         "distribution_center": {
-            "primary_key": "id",
+            "primary_key": ["id"],
             "csv_path": "test_out/distribution_center.csv",
         },
-        "products": {"primary_key": "id", "csv_path": "test_out/products.csv"},
+        "products": {"primary_key": ["id"], "csv_path": "test_out/products.csv"},
         "inventory_items": {
-            "primary_key": "id",
+            "primary_key": ["id"],
             "csv_path": "test_out/inventory_items.csv",
         },
-        "order_items": {"primary_key": "id", "csv_path": "test_out/order_items.csv"},
+        "order_items": {"primary_key": ["id"], "csv_path": "test_out/order_items.csv"},
     }
-    assert set(as_dict["foreign_keys"]) == {
-        ("events.user_id", "users.id"),
-        ("order_items.user_id", "users.id"),
-        ("order_items.inventory_item_id", "inventory_items.id"),
-        ("inventory_items.product_id", "products.id"),
-        ("inventory_items.product_distribution_center_id", "distribution_center.id"),
-        ("products.distribution_center_id", "distribution_center.id"),
-    }
+    expected_foreign_keys = [
+        {
+            "table": "events",
+            "constrained_columns": ["user_id"],
+            "referred_table": "users",
+            "referred_columns": ["id"],
+        },
+        {
+            "table": "order_items",
+            "constrained_columns": ["user_id"],
+            "referred_table": "users",
+            "referred_columns": ["id"],
+        },
+        {
+            "table": "order_items",
+            "constrained_columns": ["inventory_item_id"],
+            "referred_table": "inventory_items",
+            "referred_columns": ["id"],
+        },
+        {
+            "table": "inventory_items",
+            "constrained_columns": ["product_id"],
+            "referred_table": "products",
+            "referred_columns": ["id"],
+        },
+        {
+            "table": "inventory_items",
+            "constrained_columns": ["product_distribution_center_id"],
+            "referred_table": "distribution_center",
+            "referred_columns": ["id"],
+        },
+        {
+            "table": "products",
+            "constrained_columns": ["distribution_center_id"],
+            "referred_table": "distribution_center",
+            "referred_columns": ["id"],
+        },
+    ]
+    for expected_fk in expected_foreign_keys:
+        assert expected_fk in as_dict["foreign_keys"]
 
 
 def test_ecommerce_filesystem_serde(ecom):
@@ -174,13 +219,13 @@ def test_ecommerce_filesystem_serde(ecom):
         assert ecom.get_foreign_keys(table) == from_json.get_foreign_keys(table)
 
 
-def test_filesystem_serde_accepts_missing_primary_keys(mutagenesis):
+def test_filesystem_serde_accepts_composite_primary_keys(mutagenesis):
     with tempfile.TemporaryDirectory() as tmp:
         mutagenesis.to_filesystem(tmp)
         from_json = RelationalData.from_filesystem(f"{tmp}/metadata.json")
 
-    assert from_json.get_primary_key("bond") is None
-    assert from_json.get_primary_key("atom") == "atom_id"
+    assert from_json.get_primary_key("bond") == ["atom1_id", "atom2_id"]
+    assert from_json.get_primary_key("atom") == ["atom_id"]
 
 
 def test_debug_summary(ecom, mutagenesis):
@@ -191,71 +236,71 @@ def test_debug_summary(ecom, mutagenesis):
         "tables": {
             "users": {
                 "column_count": 3,
-                "primary_key": "id",
+                "primary_key": ["id"],
                 "foreign_key_count": 0,
                 "foreign_keys": [],
             },
             "events": {
                 "column_count": 4,
-                "primary_key": "id",
+                "primary_key": ["id"],
                 "foreign_key_count": 1,
                 "foreign_keys": [
                     {
-                        "column_name": "user_id",
-                        "parent_column_name": "id",
+                        "columns": ["user_id"],
                         "parent_table_name": "users",
+                        "parent_columns": ["id"],
                     }
                 ],
             },
             "distribution_center": {
                 "column_count": 2,
-                "primary_key": "id",
+                "primary_key": ["id"],
                 "foreign_key_count": 0,
                 "foreign_keys": [],
             },
             "products": {
                 "column_count": 4,
-                "primary_key": "id",
+                "primary_key": ["id"],
                 "foreign_key_count": 1,
                 "foreign_keys": [
                     {
-                        "column_name": "distribution_center_id",
-                        "parent_column_name": "id",
+                        "columns": ["distribution_center_id"],
                         "parent_table_name": "distribution_center",
+                        "parent_columns": ["id"],
                     }
                 ],
             },
             "inventory_items": {
                 "column_count": 5,
-                "primary_key": "id",
+                "primary_key": ["id"],
                 "foreign_key_count": 2,
                 "foreign_keys": [
                     {
-                        "column_name": "product_id",
-                        "parent_column_name": "id",
+                        "columns": ["product_id"],
                         "parent_table_name": "products",
+                        "parent_columns": ["id"],
                     },
                     {
-                        "column_name": "product_distribution_center_id",
-                        "parent_column_name": "id",
+                        "columns": ["product_distribution_center_id"],
                         "parent_table_name": "distribution_center",
+                        "parent_columns": ["id"],
                     },
                 ],
             },
             "order_items": {
                 "column_count": 5,
-                "primary_key": "id",
+                "primary_key": ["id"],
                 "foreign_key_count": 2,
                 "foreign_keys": [
                     {
-                        "column_name": "user_id",
-                        "parent_column_name": "id",
+                        "columns": ["user_id"],
                         "parent_table_name": "users",
+                        "parent_columns": ["id"],
                     },
                     {
-                        "column_name": "inventory_item_id",
-                        "parent_column_name": "id",
+                        "columns": ["inventory_item_id"],
                         "parent_table_name": "inventory_items",
+                        "parent_columns": ["id"],
                     },
                 ],
             },
@@ -269,36 +314,36 @@ def test_debug_summary(ecom, mutagenesis):
         "tables": {
             "bond": {
                 "column_count": 3,
-                "primary_key": None,
+                "primary_key": ["atom1_id", "atom2_id"],
                 "foreign_key_count": 2,
                 "foreign_keys": [
                     {
-                        "column_name": "atom1_id",
-                        "parent_column_name": "atom_id",
+                        "columns": ["atom1_id"],
                         "parent_table_name": "atom",
+                        "parent_columns": ["atom_id"],
                     },
                     {
-                        "column_name": "atom2_id",
-                        "parent_column_name": "atom_id",
+                        "columns": ["atom2_id"],
                         "parent_table_name": "atom",
+                        "parent_columns": ["atom_id"],
                     },
                 ],
             },
             "atom": {
                 "column_count": 4,
-                "primary_key": "atom_id",
+                "primary_key": ["atom_id"],
                 "foreign_key_count": 1,
                 "foreign_keys": [
                     {
-                        "column_name": "molecule_id",
-                        "parent_column_name": "molecule_id",
+                        "columns": ["molecule_id"],
                         "parent_table_name": "molecule",
+                        "parent_columns": ["molecule_id"],
                     }
                 ],
             },
             "molecule": {
                 "column_count": 2,
-                "primary_key": "molecule_id",
+                "primary_key": ["molecule_id"],
                 "foreign_key_count": 0,
                 "foreign_keys": [],
             },

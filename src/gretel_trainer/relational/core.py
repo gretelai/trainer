@@ -4,7 +4,7 @@ import json
 import logging
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Union, overload
+from typing import Any, Dict, List, Optional, Tuple, Union, overload
 
 import networkx
 import pandas as pd
@@ -121,9 +121,12 @@ class TableEvaluation:
 @dataclass
 class ForeignKey:
     table_name: str
-    column_name: str
-    parent_column_name: str
+    columns: List[str]
     parent_table_name: str
+    parent_columns: List[str]
+
+
+UserFriendlyPrimaryKeyT = Optional[Union[str, List[str]]]
 
 
 class RelationalData:
@@ -131,78 +134,131 @@ class RelationalData:
         self.graph = networkx.DiGraph()
 
     def add_table(
-        self, *, name: str, primary_key: Optional[str], data: pd.DataFrame
+        self,
+        *,
+        name: str,
+        primary_key: UserFriendlyPrimaryKeyT,
+        data: pd.DataFrame,
     ) -> None:
+        """
+        Add a table. The primary key can be None (if one is not defined on the table),
+        a string column name (most common), or a list of multiple string column names (composite key).
+        """
+        primary_key = self._format_key_column(primary_key)
         self.graph.add_node(name, primary_key=primary_key, data=data)
 
-    def set_primary_key(self, *, table: str, primary_key: Optional[str]) -> None:
+    def set_primary_key(
+        self, *, table: str, primary_key: UserFriendlyPrimaryKeyT
+    ) -> None:
+        """
+        (Re)set the primary key on an existing table.
+        If the table does not yet exist in the instance's collection, add it via `add_table`.
+        """
         if table not in self.list_all_tables():
             raise MultiTableException(f"Unrecognized table name: `{table}`")
 
-        if (
-            primary_key is not None
-            and primary_key not in self.get_table_data(table).columns
-        ):
-            raise MultiTableException(f"Unrecognized column name: `{primary_key}`")
+        primary_key = self._format_key_column(primary_key)
+
+        known_columns = self.get_table_data(table).columns
+        for col in primary_key:
+            if col not in known_columns:
+                raise MultiTableException(f"Unrecognized column name: `{primary_key}`")
 
         self.graph.nodes[table]["primary_key"] = primary_key
 
-    def add_foreign_key(self, *, foreign_key: str, referencing: str) -> None:
-        """Format of both str arguments should be `table_name.column_name`"""
+    def _format_key_column(self, key: Optional[Union[str, List[str]]]) -> List[str]:
+        if key is None:
+            return []
+        elif isinstance(key, str):
+            return [key]
+        else:
+            return key
+
+    def add_foreign_key(
+        self,
+        *,
+        table: str,
+        constrained_columns: List[str],
+        referred_table: str,
+        referred_columns: List[str],
+    ) -> None:
+        """
+        Add a foreign key relationship between two tables.
+        """
         known_tables = self.list_all_tables()
-        fk_table, fk_column = foreign_key.split(".")
-        referenced_table, referenced_column = referencing.split(".")
 
         abort = False
-        if fk_table not in known_tables:
-            logger.warning(f"Unrecognized table name: `{fk_table}`")
+        if table not in known_tables:
+            logger.warning(f"Unrecognized table name: `{table}`")
             abort = True
-        if referenced_table not in known_tables:
-            logger.warning(f"Unrecognized table name: `{referenced_table}`")
+        if referred_table not in known_tables:
+            logger.warning(f"Unrecognized table name: `{referred_table}`")
             abort = True
 
         if abort:
-            return None
+            raise MultiTableException("Unrecognized table(s) in foreign key arguments")
 
-        self.graph.add_edge(fk_table, referenced_table)
-        edge = self.graph.edges[fk_table, referenced_table]
+        if len(constrained_columns) != len(referred_columns):
+            logger.warning(
+                "Constrained and referred columns must be of the same length"
+            )
+            raise MultiTableException(
+                "Invalid column constraints in foreign key arguments"
+            )
+
+        table_all_columns = self.get_table_data(table).columns
+        for col in constrained_columns:
+            if col not in table_all_columns:
+                logger.warning(
+                    f"Constrained column `{col}` does not exist on table `{table}`"
+                )
+                abort = True
+        referred_table_all_columns = self.get_table_data(referred_table).columns
+        for col in referred_columns:
+            if col not in referred_table_all_columns:
+                logger.warning(
+                    f"Referred column `{col}` does not exist on table `{referred_table}`"
+                )
+                abort = True
+
+        if abort:
+            raise MultiTableException("Unrecognized column(s) in foreign key arguments")
+
+        self.graph.add_edge(table, referred_table)
+        edge = self.graph.edges[table, referred_table]
         via = edge.get("via", [])
         via.append(
             ForeignKey(
-                table_name=fk_table,
-                column_name=fk_column,
-                parent_column_name=referenced_column,
-                parent_table_name=referenced_table,
+                table_name=table,
+                columns=constrained_columns,
+                parent_table_name=referred_table,
+                parent_columns=referred_columns,
             )
         )
         edge["via"] = via
 
-    def remove_foreign_key(self, foreign_key: str) -> None:
-        fk_table, fk_column = foreign_key.split(".")
-
-        if fk_table not in self.list_all_tables():
-            raise MultiTableException(f"Unrecognized table name: `{fk_table}`")
-
-        if fk_column not in self.get_table_data(fk_table).columns:
-            raise MultiTableException(
-                f"Column `{fk_column}` does not exist on table `{fk_table}`"
-            )
+    def remove_foreign_key(self, table: str, constrained_columns: List[str]) -> None:
+        """
+        Remove an existing foreign key.
+        """
+        if table not in self.list_all_tables():
+            raise MultiTableException(f"Unrecognized table name: `{table}`")
 
         key_to_remove = None
-        for fk in self.get_foreign_keys(fk_table):
-            if fk.column_name == fk_column:
+        for fk in self.get_foreign_keys(table):
+            if fk.columns == constrained_columns:
                 key_to_remove = fk
 
         if key_to_remove is None:
             raise MultiTableException(
-                f"Column `{fk_column}` on table `{fk_table}` is not a foreign key"
+                f"`{table} does not have a foreign key with constrained columns {constrained_columns}`"
             )
 
-        edge = self.graph.edges[fk_table, key_to_remove.parent_table_name]
+        edge = self.graph.edges[table, key_to_remove.parent_table_name]
         via = edge.get("via")
         via.remove(key_to_remove)
         if len(via) == 0:
-            self.graph.remove_edge(fk_table, key_to_remove.parent_table_name)
+            self.graph.remove_edge(table, key_to_remove.parent_table_name)
         else:
             edge["via"] = via
 
@@ -246,7 +302,7 @@ class RelationalData:
 
         return list(descendants)
 
-    def get_primary_key(self, table: str) -> Optional[str]:
+    def get_primary_key(self, table: str) -> List[str]:
         return self.graph.nodes[table]["primary_key"]
 
     def get_table_data(self, table: str) -> pd.DataFrame:
@@ -260,11 +316,11 @@ class RelationalData:
         return foreign_keys
 
     def get_all_key_columns(self, table: str) -> List[str]:
-        key_columns = [fk.column_name for fk in self.get_foreign_keys(table)]
-        pk = self.get_primary_key(table)
-        if pk is not None:
-            key_columns.append(pk)
-        return key_columns
+        all_key_cols = []
+        all_key_cols.extend(self.get_primary_key(table))
+        for fk in self.get_foreign_keys(table):
+            all_key_cols.extend(fk.columns)
+        return all_key_cols
 
     def debug_summary(self) -> Dict[str, Any]:
         max_depth = dag_longest_path_length(self.graph)
@@ -280,9 +336,9 @@ class RelationalData:
                 this_table_foreign_key_count = this_table_foreign_key_count + 1
                 foreign_keys.append(
                     {
-                        "column_name": key.column_name,
-                        "parent_column_name": key.parent_column_name,
+                        "columns": key.columns,
                         "parent_table_name": key.parent_table_name,
+                        "parent_columns": key.parent_columns,
                     }
                 )
             tables[table] = {
@@ -306,10 +362,12 @@ class RelationalData:
                 "csv_path": f"{out_dir}/{table}.csv",
             }
             keys = [
-                (
-                    f"{table}.{key.column_name}",
-                    f"{key.parent_table_name}.{key.parent_column_name}",
-                )
+                {
+                    "table": table,
+                    "constrained_columns": key.columns,
+                    "referred_table": key.parent_table_name,
+                    "referred_columns": key.parent_columns,
+                }
                 for key in self.get_foreign_keys(table)
             ]
             d["foreign_keys"].extend(keys)
@@ -336,10 +394,12 @@ class RelationalData:
             relational_data.add_table(
                 name=table_name, primary_key=primary_key, data=data
             )
-        for foreign_key_tuple in d["foreign_keys"]:
-            foreign_key, referencing = foreign_key_tuple
+        for foreign_key in d["foreign_keys"]:
             relational_data.add_foreign_key(
-                foreign_key=foreign_key, referencing=referencing
+                table=foreign_key["table"],
+                constrained_columns=foreign_key["constrained_columns"],
+                referred_table=foreign_key["referred_table"],
+                referred_columns=foreign_key["referred_columns"],
             )
 
         return relational_data

@@ -15,12 +15,15 @@ from gretel_trainer.relational.backup import (
 def test_backup_relational_data(trips):
     expected = BackupRelationalData(
         tables={
-            "vehicle_types": BackupRelationalDataTable(primary_key="id"),
-            "trips": BackupRelationalDataTable(primary_key="id"),
+            "vehicle_types": BackupRelationalDataTable(primary_key=["id"]),
+            "trips": BackupRelationalDataTable(primary_key=["id"]),
         },
         foreign_keys=[
             BackupForeignKey(
-                foreign_key="trips.vehicle_type_id", referencing="vehicle_types.id"
+                table="trips",
+                constrained_columns=["vehicle_type_id"],
+                referred_table="vehicle_types",
+                referred_columns=["id"],
             )
         ],
     )
@@ -32,15 +35,18 @@ def test_backup():
     backup_relational = BackupRelationalData(
         tables={
             "customer": BackupRelationalDataTable(
-                primary_key="id",
+                primary_key=["id"],
             ),
             "address": BackupRelationalDataTable(
-                primary_key=None,
+                primary_key=[],
             ),
         },
         foreign_keys=[
             BackupForeignKey(
-                foreign_key="address.customer_id", referencing="customer.id"
+                table="address",
+                constrained_columns=["customer_id"],
+                referred_table="customer",
+                referred_columns=["id"],
             )
         ],
     )

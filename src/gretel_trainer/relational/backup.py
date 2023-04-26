@@ -1,8 +1,7 @@
 from __future__ import annotations
 
-import json
 from dataclasses import asdict, dataclass
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional
 
 from gretel_trainer.relational.artifacts import ArtifactCollection
 from gretel_trainer.relational.core import ForeignKey, RelationalData
@@ -10,19 +9,23 @@ from gretel_trainer.relational.core import ForeignKey, RelationalData
 
 @dataclass
 class BackupRelationalDataTable:
-    primary_key: Optional[str]
+    primary_key: List[str]
 
 
 @dataclass
 class BackupForeignKey:
-    foreign_key: str
-    referencing: str
+    table: str
+    constrained_columns: List[str]
+    referred_table: str
+    referred_columns: List[str]
 
     @classmethod
     def from_fk(cls, fk: ForeignKey) -> BackupForeignKey:
         return BackupForeignKey(
-            foreign_key=f"{fk.table_name}.{fk.column_name}",
-            referencing=f"{fk.parent_table_name}.{fk.parent_column_name}",
+            table=fk.table_name,
+            constrained_columns=fk.columns,
+            referred_table=fk.parent_table_name,
+            referred_columns=fk.parent_columns,
         )
 
 
@@ -98,8 +101,10 @@ class Backup:
             },
             foreign_keys=[
                 BackupForeignKey(
-                    foreign_key=fk["foreign_key"],
-                    referencing=fk["referencing"],
+                    table=fk["table"],
+                    constrained_columns=fk["constrained_columns"],
+                    referred_table=fk["referred_table"],
+                    referred_columns=fk["referred_columns"],
                 )
                 for fk in relational_data.get("foreign_keys", [])
             ],

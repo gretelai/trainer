@@ -7,34 +7,43 @@ from gretel_trainer.relational.core import ForeignKey, RelationalData
 
 _START_LINEAGE = "self"
 _GEN_DELIMITER = "."
+_COL_DELIMITER = "+"
 _END_LINEAGE = "|"
 
 
 def get_multigenerational_primary_key(
     rel_data: RelationalData, table: str
-) -> Optional[str]:
-    pk = rel_data.get_primary_key(table)
-    if pk is None:
-        return None
-    else:
-        return f"{_START_LINEAGE}{_END_LINEAGE}{pk}"
+) -> List[str]:
+    return [
+        f"{_START_LINEAGE}{_END_LINEAGE}{pk}" for pk in rel_data.get_primary_key(table)
+    ]
 
 
 def get_ancestral_foreign_key_maps(
     rel_data: RelationalData, table: str
 ) -> List[Tuple[str, str]]:
-    def _ancestral_fk_map(fk: ForeignKey) -> Tuple[str, str]:
-        fk_col = fk.column_name
-        ref_col = fk.parent_column_name
+    def _ancestral_fk_map(fk: ForeignKey) -> List[Tuple[str, str]]:
+        maps = []
+        fk_lineage = _COL_DELIMITER.join(fk.columns)
 
-        ancestral_foreign_key = f"{_START_LINEAGE}{_END_LINEAGE}{fk_col}"
-        ancestral_referenced_col = (
-            f"{_START_LINEAGE}{_GEN_DELIMITER}{fk_col}{_END_LINEAGE}{ref_col}"
-        )
+        for i in range(len(fk.columns)):
+            fk_col = fk.columns[i]
+            ref_col = fk.parent_columns[i]
 
-        return (ancestral_foreign_key, ancestral_referenced_col)
+            maps.append(
+                (
+                    f"{_START_LINEAGE}{_END_LINEAGE}{fk_col}",
+                    f"{_START_LINEAGE}{_GEN_DELIMITER}{fk_lineage}{_END_LINEAGE}{ref_col}",
+                )
+            )
 
-    return [_ancestral_fk_map(fk) for fk in rel_data.get_foreign_keys(table)]
+        return maps
+
+    return [
+        fkmap
+        for fk in rel_data.get_foreign_keys(table)
+        for fkmap in _ancestral_fk_map(fk)
+    ]
 
 
 def get_table_data_with_ancestors(
@@ -68,7 +77,8 @@ def _join_parents(
     tableset: Optional[Dict[str, pd.DataFrame]],
 ) -> pd.DataFrame:
     for foreign_key in rel_data.get_foreign_keys(table):
-        next_lineage = f"{lineage}{_GEN_DELIMITER}{foreign_key.column_name}"
+        fk_lineage = _COL_DELIMITER.join(foreign_key.columns)
+        next_lineage = f"{lineage}{_GEN_DELIMITER}{fk_lineage}"
 
         parent_table_name = foreign_key.parent_table_name
         if tableset is not None:
@@ -80,8 +90,11 @@ def _join_parents(
         df = df.merge(
             parent_data,
             how="left",
-            left_on=f"{lineage}{_END_LINEAGE}{foreign_key.column_name}",
-            right_on=f"{next_lineage}{_END_LINEAGE}{foreign_key.parent_column_name}",
+            left_on=[f"{lineage}{_END_LINEAGE}{col}" for col in foreign_key.columns],
+            right_on=[
+                f"{next_lineage}{_END_LINEAGE}{parent_col}"
+                for parent_col in foreign_key.parent_columns
+            ],
         )
 
         df = _join_parents(rel_data, df, parent_table_name, next_lineage, tableset)
@@ -106,33 +119,26 @@ def drop_ancestral_data(df: pd.DataFrame) -> pd.DataFrame:
         col for col in df.columns if col.startswith(f"{_START_LINEAGE}{_END_LINEAGE}")
     ]
     mapper = {
-        col: _removeprefix(col, f"{_START_LINEAGE}{_END_LINEAGE}")
-        for col in root_columns
+        col: col.removeprefix(f"{_START_LINEAGE}{_END_LINEAGE}") for col in root_columns
     }
     return df[root_columns].rename(columns=mapper)
 
 
-def prepend_foreign_key_lineage(df: pd.DataFrame, fk_col: str) -> pd.DataFrame:
+def prepend_foreign_key_lineage(df: pd.DataFrame, fk_cols: List[str]) -> pd.DataFrame:
     """
     Given a multigenerational dataframe, renames all columns such that the provided
-    foreign key acts as the lineage from some child table to the provided data.
+    foreign key columns act as the lineage from some child table to the provided data.
     The resulting column names are elder-generation ancestral column names from the
     perspective of a child table that relates to that parent via the provided foreign key.
     """
+    fk_lineage = _COL_DELIMITER.join(fk_cols)
 
     def _adjust(col: str) -> str:
         return col.replace(
             _START_LINEAGE,
-            f"{_START_LINEAGE}{_GEN_DELIMITER}{fk_col}",
+            f"{_START_LINEAGE}{_GEN_DELIMITER}{fk_lineage}",
             1,
         )
 
     mapper = {col: _adjust(col) for col in df.columns}
     return df.rename(columns=mapper)
-
-
-def _removeprefix(s: str, prefix: str) -> str:
-    if s.startswith(prefix):
-        return s[len(prefix) :]
-    else:
-        return s

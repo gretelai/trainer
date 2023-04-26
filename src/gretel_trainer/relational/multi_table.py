@@ -5,29 +5,23 @@ import logging
 import os
 import shutil
 import tarfile
-import time
 from collections import defaultdict
-from concurrent.futures import ThreadPoolExecutor, as_completed
 from contextlib import suppress
-from dataclasses import dataclass, field, replace
+from dataclasses import replace
 from datetime import datetime
-from enum import Enum
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple, Union
+from typing import Dict, List, Optional, Tuple, Union
 
 import pandas as pd
-import requests
 import smart_open
 from gretel_client.config import RunnerMode, get_session_config
 from gretel_client.projects import Project, create_project, get_project
-from gretel_client.projects.jobs import ACTIVE_STATES, END_STATES, Job, Status
-from gretel_client.projects.models import Model, read_model_config
+from gretel_client.projects.jobs import ACTIVE_STATES, END_STATES, Status
 from gretel_client.projects.records import RecordHandler
 
 from gretel_trainer.relational.artifacts import ArtifactCollection, add_to_tar
 from gretel_trainer.relational.backup import (
     Backup,
-    BackupForeignKey,
     BackupGenerate,
     BackupRelationalData,
     BackupSyntheticsTrain,
@@ -152,7 +146,10 @@ class MultiTable:
             )
         for fk_backup in backup.relational_data.foreign_keys:
             self.relational_data.add_foreign_key(
-                foreign_key=fk_backup.foreign_key, referencing=fk_backup.referencing
+                table=fk_backup.table,
+                constrained_columns=fk_backup.constrained_columns,
+                referred_table=fk_backup.referred_table,
+                referred_columns=fk_backup.referred_columns,
             )
 
         # Debug summary
@@ -714,7 +711,10 @@ class MultiTable:
         run_task(task, self._extended_sdk)
 
         output_tables = self._strategy.post_process_synthetic_results(
-            task.output_tables, self._synthetics_run.preserved, self.relational_data
+            synth_tables=task.output_tables,
+            preserved=self._synthetics_run.preserved,
+            rel_data=self.relational_data,
+            record_size_ratio=self._synthetics_run.record_size_ratio,
         )
 
         for table, synth_df in output_tables.items():
@@ -777,7 +777,7 @@ class MultiTable:
             target_dir=run_dir,
         )
 
-        archive_path = self._working_dir / f"synthetics_outputs.tar.gz"
+        archive_path = self._working_dir / "synthetics_outputs.tar.gz"
         add_to_tar(archive_path, run_dir, self._synthetics_run.identifier)
 
         self._artifact_collection.upload_synthetics_outputs_archive(

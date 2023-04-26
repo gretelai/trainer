@@ -8,11 +8,7 @@ from gretel_client.projects.models import Model
 
 import gretel_trainer.relational.ancestry as ancestry
 import gretel_trainer.relational.strategies.common as common
-from gretel_trainer.relational.core import (
-    MultiTableException,
-    RelationalData,
-    TableEvaluation,
-)
+from gretel_trainer.relational.core import RelationalData, TableEvaluation
 from gretel_trainer.relational.sdk_extras import ExtendedGretelSDK
 
 logger = logging.getLogger(__name__)
@@ -45,16 +41,12 @@ class IndependentStrategy:
         training_data = {}
 
         for table_name in rel_data.list_all_tables():
-            data = rel_data.get_table_data(table_name)
             columns_to_drop = []
+            columns_to_drop.extend(rel_data.get_primary_key(table_name))
+            for foreign_key in rel_data.get_foreign_keys(table_name):
+                columns_to_drop.extend(foreign_key.columns)
 
-            primary_key = rel_data.get_primary_key(table_name)
-            if primary_key is not None:
-                columns_to_drop.append(primary_key)
-            foreign_keys = rel_data.get_foreign_keys(table_name)
-            columns_to_drop.extend(
-                [foreign_key.column_name for foreign_key in foreign_keys]
-            )
+            data = rel_data.get_table_data(table_name)
             data = data.drop(columns=columns_to_drop)
 
             training_data[table_name] = data
@@ -127,6 +119,7 @@ class IndependentStrategy:
         table_name: str,
         rel_data: RelationalData,
         synthetic_table: pd.DataFrame,
+        record_size_ratio: float,
     ) -> pd.DataFrame:
         """
         No-op. This strategy does not apply any changes to individual table results upon record handler completion.
@@ -139,9 +132,12 @@ class IndependentStrategy:
         synth_tables: Dict[str, pd.DataFrame],
         preserved: List[str],
         rel_data: RelationalData,
+        record_size_ratio: float,
     ) -> Dict[str, pd.DataFrame]:
         "Synthesizes primary and foreign keys"
-        synth_tables = _synthesize_primary_keys(synth_tables, preserved, rel_data)
+        synth_tables = _synthesize_primary_keys(
+            synth_tables, preserved, rel_data, record_size_ratio
+        )
         synth_tables = _synthesize_foreign_keys(synth_tables, rel_data)
         return synth_tables
 
@@ -210,6 +206,7 @@ def _synthesize_primary_keys(
     synth_tables: Dict[str, pd.DataFrame],
     preserved: List[str],
     rel_data: RelationalData,
+    record_size_ratio: float,
 ) -> Dict[str, pd.DataFrame]:
     """
     Alters primary key columns on all tables *except* preserved.
@@ -217,18 +214,27 @@ def _synthesize_primary_keys(
     """
     processed = {}
     for table_name, synth_data in synth_tables.items():
-        out_df = synth_data.copy()
+        processed[table_name] = synth_data.copy()
         if table_name in preserved:
-            processed[table_name] = out_df
             continue
 
         primary_key = rel_data.get_primary_key(table_name)
-        if primary_key is None:
-            processed[table_name] = out_df
-            continue
+        synth_row_count = len(synth_data)
 
-        out_df[primary_key] = [i for i in range(len(synth_data))]
-        processed[table_name] = out_df
+        if len(primary_key) == 0:
+            continue
+        elif len(primary_key) == 1:
+            processed[table_name][primary_key[0]] = [i for i in range(synth_row_count)]
+        else:
+            synthetic_pk_columns = common.make_composite_pk_columns(
+                table_name=table_name,
+                rel_data=rel_data,
+                primary_key=primary_key,
+                synth_row_count=synth_row_count,
+                record_size_ratio=record_size_ratio,
+            )
+            for index, col in enumerate(primary_key):
+                processed[table_name][col] = synthetic_pk_columns[index]
 
     return processed
 
@@ -252,32 +258,29 @@ def _synthesize_foreign_keys(
                 # The synthetic data for this table may still be useful, but we do not have valid synthetic
                 # primary key values to set in this table's foreign key column. Instead of introducing dangling
                 # pointers, set the entire column to None.
-                synth_pk_values = [None]
+                synth_pk_values = [None] * len(foreign_key.parent_columns)
             else:
-                synth_pk_values = list(
-                    parent_synth_table[foreign_key.parent_column_name]
-                )
+                synth_pk_values = parent_synth_table[
+                    foreign_key.parent_columns
+                ].values.tolist()
 
             original_table_data = rel_data.get_table_data(table_name)
-            original_fk_frequencies = (
-                original_table_data.groupby(foreign_key.column_name)
-                .size()
-                .reset_index()
-            )
-            frequencies = list(original_fk_frequencies[0])
-
-            new_fk_values = _collect_new_foreign_key_values(
-                synth_pk_values, frequencies, len(out_df)
+            fk_frequencies = common.get_frequencies(
+                original_table_data, foreign_key.columns
             )
 
-            out_df[foreign_key.column_name] = new_fk_values
+            new_fk_values = _collect_values(
+                synth_pk_values, fk_frequencies, len(out_df)
+            )
+
+            out_df[foreign_key.columns] = new_fk_values
 
         processed[table_name] = out_df
 
     return processed
 
 
-def _collect_new_foreign_key_values(
+def _collect_values(
     values: List[Any],
     frequencies: List[int],
     total: int,
@@ -285,27 +288,27 @@ def _collect_new_foreign_key_values(
     freqs = sorted(frequencies)
 
     # Loop through frequencies in ascending order,
-    # adding "that many" of the next valid FK value
+    # adding "that many" of the next valid value
     # to the output collection
     v = 0
     f = 0
-    new_fk_values = []
-    while len(new_fk_values) < total:
+    new_values = []
+    while len(new_values) < total:
         fk_value = values[v]
 
         for _ in range(freqs[f]):
-            new_fk_values.append(fk_value)
+            new_values.append(fk_value)
 
         v = _safe_inc(v, values)
         f = _safe_inc(f, freqs)
 
     # trim potential excess
-    new_fk_values = new_fk_values[0:total]
+    new_values = new_values[0:total]
 
     # shuffle for realism
-    random.shuffle(new_fk_values)
+    random.shuffle(new_values)
 
-    return new_fk_values
+    return new_values
 
 
 def _safe_inc(i: int, col: List[Any]) -> int:

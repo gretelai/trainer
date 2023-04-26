@@ -1,7 +1,9 @@
 import json
 import logging
+import math
+import random
 from pathlib import Path
-from typing import Dict, Optional, Set, Tuple
+from typing import Dict, List, Optional, Set, Tuple
 
 import pandas as pd
 import smart_open
@@ -53,45 +55,72 @@ def label_encode_keys(
     runs all values through a LabelEncoder and updates tables' columns to use LE-transformed values.
     """
     for table_name, df in tables.items():
-        primary_key = rel_data.get_primary_key(table_name)
-        if primary_key is None:
-            continue
+        for primary_key_column in rel_data.get_primary_key(table_name):
 
-        # Get a set of the tables and columns in `tables` referencing this PK
-        fk_references: Set[Tuple[str, str]] = set()
-        for descendant in rel_data.get_descendants(table_name):
-            if tables.get(descendant) is None:
-                continue
-            fks = rel_data.get_foreign_keys(descendant)
-            for fk in fks:
-                if (
-                    fk.parent_table_name == table_name
-                    and fk.parent_column_name == primary_key
-                ):
-                    fk_references.add((descendant, fk.column_name))
+            # Get a set of the tables and columns in `tables` referencing this PK
+            fk_references: Set[Tuple[str, str]] = set()
+            for descendant in rel_data.get_descendants(table_name):
+                if tables.get(descendant) is None:
+                    continue
+                fks = rel_data.get_foreign_keys(descendant)
+                for fk in fks:
+                    if fk.parent_table_name != table_name:
+                        continue
 
-        # Collect column values from PK and FK columns into a set
-        source_values = set()
-        source_values.update(df[primary_key].to_list())
-        for fk_ref in fk_references:
-            fk_tbl, fk_col = fk_ref
-            fk_df = tables.get(fk_tbl)
-            if fk_df is None:
-                continue
-            source_values.update(fk_df[fk_col].to_list())
+                    for i in range(len(fk.columns)):
+                        if fk.parent_columns[i] == primary_key_column:
+                            fk_references.add((descendant, fk.columns[i]))
 
-        # Fit a label encoder on all values
-        le = preprocessing.LabelEncoder()
-        le.fit(list(source_values))
+            # Collect column values from PK and FK columns into a set
+            source_values = set()
+            source_values.update(df[primary_key_column].to_list())
+            for fk_ref in fk_references:
+                fk_tbl, fk_col = fk_ref
+                fk_df = tables.get(fk_tbl)
+                if fk_df is None:
+                    continue
+                source_values.update(fk_df[fk_col].to_list())
 
-        # Update PK and FK columns using the label encoder
-        df[primary_key] = le.transform(df[primary_key])
+            # Fit a label encoder on all values
+            le = preprocessing.LabelEncoder()
+            le.fit(list(source_values))
 
-        for fk_ref in fk_references:
-            fk_tbl, fk_col = fk_ref
-            fk_df = tables.get(fk_tbl)
-            if fk_df is None:
-                continue
-            fk_df[fk_col] = le.transform(fk_df[fk_col])
+            # Update PK and FK columns using the label encoder
+            df[primary_key_column] = le.transform(df[primary_key_column])
+
+            for fk_ref in fk_references:
+                fk_tbl, fk_col = fk_ref
+                fk_df = tables.get(fk_tbl)
+                if fk_df is None:
+                    continue
+                fk_df[fk_col] = le.transform(fk_df[fk_col])
 
     return tables
+
+
+def make_composite_pk_columns(
+    table_name: str,
+    rel_data: RelationalData,
+    primary_key: List[str],
+    synth_row_count: int,
+    record_size_ratio: float,
+) -> List[Tuple]:
+    source_pk_columns = rel_data.get_table_data(table_name)[primary_key]
+    unique_counts = source_pk_columns.nunique(axis=0)
+    new_key_columns_values = []
+    for col in primary_key:
+        synth_values_count = math.ceil(unique_counts[col] * record_size_ratio)
+        new_key_columns_values.append(range(synth_values_count))
+
+    results = set()
+    while len(results) < synth_row_count:
+        key_combination = tuple(
+            [random.choice(vals) for vals in new_key_columns_values]
+        )
+        results.add(key_combination)
+
+    return list(zip(*results))
+
+
+def get_frequencies(table_data: pd.DataFrame, cols: List[str]) -> List[int]:
+    return list(table_data.groupby(cols).size().reset_index()[0])

@@ -102,8 +102,10 @@ def test_runs_post_processing_when_table_completes(pets, tmpdir):
     raw_df = pd.DataFrame(data={"col1": [1, 2], "col2": [3, 4]})
 
     class MockStrategy:
-        def post_process_individual_synthetic_result(self, table, rel_data, rh_data):
-            return rh_data.head(1)
+        def post_process_individual_synthetic_result(
+            self, table_name, rel_data, synthetic_table, record_size_ratio
+        ):
+            return synthetic_table.head(1)
 
     task.multitable._strategy = MockStrategy()  # type:ignore
 

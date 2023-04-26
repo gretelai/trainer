@@ -45,7 +45,7 @@ def test_transforms_config_adds_passthrough_policy(mutagenesis):
         "rules": [
             {
                 "name": "ignore-key-columns",
-                "conditions": {"field_name": ["molecule_id", "atom_id"]},
+                "conditions": {"field_name": ["atom_id", "molecule_id"]},
                 "transforms": [
                     {
                         "type": "passthrough",
