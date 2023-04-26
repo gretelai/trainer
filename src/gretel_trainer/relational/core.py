@@ -334,8 +334,11 @@ class RelationalData:
     def get_primary_key(self, table: str) -> List[str]:
         return self.graph.nodes[table]["primary_key"]
 
-    def get_table_data(self, table: str) -> pd.DataFrame:
-        return self.graph.nodes[table]["data"]
+    def get_table_data(
+        self, table: str, usecols: Optional[set[str]] = None
+    ) -> pd.DataFrame:
+        usecols = usecols or self.get_table_columns(table)
+        return self.graph.nodes[table]["data"][list(usecols)]
 
     def get_table_columns(self, table: str) -> set[str]:
         return self.graph.nodes[table]["columns"]
