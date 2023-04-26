@@ -4,7 +4,6 @@ from typing import Any, Dict, List, Optional, Union
 
 import pandas as pd
 from gretel_client.projects.models import Model
-from pandas.api.types import is_string_dtype
 
 import gretel_trainer.relational.ancestry as ancestry
 import gretel_trainer.relational.strategies.common as common
@@ -41,11 +40,10 @@ class AncestralStrategy:
     ) -> Dict[str, pd.DataFrame]:
         """
         Returns tables with:
-        - all ancestor fields added
+        - all safe-for-seed ancestor fields added
         - columns in multigenerational format
         - all keys translated to contiguous integers
         - artificial min/max seed records added
-        - known-problematic fields removed
         """
         all_tables = rel_data.list_all_tables()
         altered_tableset = {}
@@ -64,16 +62,12 @@ class AncestralStrategy:
         # Collect all data in multigenerational format
         for table_name in all_tables:
             data = ancestry.get_table_data_with_ancestors(
-                rel_data, table_name, altered_tableset
+                rel_data=rel_data,
+                table=table_name,
+                tableset=altered_tableset,
+                ancestral_seeding=True,
             )
             training_data[table_name] = data
-
-        # Drop some columns known to be problematic
-        for table_name, data in training_data.items():
-            columns_to_drop = [
-                col for col in data.columns if _drop_from_training(col, data)
-            ]
-            training_data[table_name] = data.drop(columns=columns_to_drop)
 
         return training_data
 
@@ -372,33 +366,6 @@ def _add_artifical_rows_for_seeding(
         ).reset_index(drop=True)
 
     return tables
-
-
-def _drop_from_training(col: str, df: pd.DataFrame) -> bool:
-    return ancestry.is_ancestral_column(col) and (
-        _is_highly_unique_categorical(col, df) or _is_highly_nan(col, df)
-    )
-
-
-def _is_highly_nan(col: str, df: pd.DataFrame) -> bool:
-    missing = df[col].isnull().sum()
-    missing_perc = missing / len(df)
-    return missing_perc > 0.2
-
-
-def _is_highly_unique_categorical(col: str, df: pd.DataFrame) -> bool:
-    return is_string_dtype(df[col]) and _percent_unique(col, df) >= 0.7
-
-
-def _percent_unique(col: str, df: pd.DataFrame) -> float:
-    col_no_nan = df[col].dropna()
-    total = len(col_no_nan)
-    distinct = col_no_nan.nunique()
-
-    if total == 0:
-        return 0.0
-    else:
-        return distinct / total
 
 
 def _safe_inc(i: int, col: Union[List[Any], range]) -> int:

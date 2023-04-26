@@ -155,9 +155,7 @@ def test_prepare_training_data_with_composite_keys(tpch):
         "self|ps_suppkey",
         "self|ps_availqty",
         "self.ps_partkey|p_partkey",
-        "self.ps_partkey|p_name",
         "self.ps_suppkey|s_suppkey",
-        "self.ps_suppkey|s_name",
     }
     assert len(train_partsupp) == len(tpch.get_table_data("partsupp")) + 3
     last_three_partsupp_keys = train_partsupp.tail(3).reset_index()[
@@ -183,9 +181,7 @@ def test_prepare_training_data_with_composite_keys(tpch):
         "self.l_partkey+l_suppkey|ps_suppkey",
         "self.l_partkey+l_suppkey|ps_availqty",
         "self.l_partkey+l_suppkey.ps_partkey|p_partkey",
-        "self.l_partkey+l_suppkey.ps_partkey|p_name",
         "self.l_partkey+l_suppkey.ps_suppkey|s_suppkey",
-        "self.l_partkey+l_suppkey.ps_suppkey|s_name",
     }
     assert len(train_lineitem) == len(tpch.get_table_data("lineitem")) + 3
     last_three_lineitem_keys = train_lineitem.tail(3).reset_index()[
