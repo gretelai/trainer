@@ -4,7 +4,7 @@ import json
 import logging
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple, Union, overload
+from typing import Any, Dict, List, Optional, Union, overload
 
 import networkx
 import pandas as pd
@@ -145,7 +145,12 @@ class RelationalData:
         a string column name (most common), or a list of multiple string column names (composite key).
         """
         primary_key = self._format_key_column(primary_key)
-        self.graph.add_node(name, primary_key=primary_key, data=data)
+        self.graph.add_node(
+            name,
+            primary_key=primary_key,
+            data=data,
+            columns=set(data.columns),
+        )
 
     def set_primary_key(
         self, *, table: str, primary_key: UserFriendlyPrimaryKeyT
@@ -159,7 +164,7 @@ class RelationalData:
 
         primary_key = self._format_key_column(primary_key)
 
-        known_columns = self.get_table_data(table).columns
+        known_columns = self.get_table_columns(table)
         for col in primary_key:
             if col not in known_columns:
                 raise MultiTableException(f"Unrecognized column name: `{primary_key}`")
@@ -206,14 +211,14 @@ class RelationalData:
                 "Invalid column constraints in foreign key arguments"
             )
 
-        table_all_columns = self.get_table_data(table).columns
+        table_all_columns = self.get_table_columns(table)
         for col in constrained_columns:
             if col not in table_all_columns:
                 logger.warning(
                     f"Constrained column `{col}` does not exist on table `{table}`"
                 )
                 abort = True
-        referred_table_all_columns = self.get_table_data(referred_table).columns
+        referred_table_all_columns = self.get_table_columns(referred_table)
         for col in referred_columns:
             if col not in referred_table_all_columns:
                 logger.warning(
@@ -265,6 +270,7 @@ class RelationalData:
     def update_table_data(self, table: str, data: pd.DataFrame) -> None:
         try:
             self.graph.nodes[table]["data"] = data
+            self.graph.nodes[table]["columns"] = data.columns
         except KeyError:
             raise MultiTableException(
                 f"Unrecognized table name: {table}. If this is a new table to add, use `add_table`."
@@ -307,6 +313,9 @@ class RelationalData:
 
     def get_table_data(self, table: str) -> pd.DataFrame:
         return self.graph.nodes[table]["data"]
+
+    def get_table_columns(self, table: str) -> set[str]:
+        return self.graph.nodes[table]["columns"]
 
     def get_foreign_keys(self, table: str) -> List[ForeignKey]:
         foreign_keys = []
