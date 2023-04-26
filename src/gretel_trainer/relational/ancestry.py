@@ -24,7 +24,7 @@ def get_ancestral_foreign_key_maps(
 ) -> List[Tuple[str, str]]:
     def _ancestral_fk_map(fk: ForeignKey) -> List[Tuple[str, str]]:
         maps = []
-        fk_columns = _COL_DELIMITER.join(fk.columns)
+        fk_lineage = _COL_DELIMITER.join(fk.columns)
 
         for i in range(len(fk.columns)):
             fk_col = fk.columns[i]
@@ -33,7 +33,7 @@ def get_ancestral_foreign_key_maps(
             maps.append(
                 (
                     f"{_START_LINEAGE}{_END_LINEAGE}{fk_col}",
-                    f"{_START_LINEAGE}{_GEN_DELIMITER}{fk_columns}{_END_LINEAGE}{ref_col}",
+                    f"{_START_LINEAGE}{_GEN_DELIMITER}{fk_lineage}{_END_LINEAGE}{ref_col}",
                 )
             )
 
@@ -77,8 +77,8 @@ def _join_parents(
     tableset: Optional[Dict[str, pd.DataFrame]],
 ) -> pd.DataFrame:
     for foreign_key in rel_data.get_foreign_keys(table):
-        fk_col = _COL_DELIMITER.join(foreign_key.columns)
-        next_lineage = f"{lineage}{_GEN_DELIMITER}{fk_col}"
+        fk_lineage = _COL_DELIMITER.join(foreign_key.columns)
+        next_lineage = f"{lineage}{_GEN_DELIMITER}{fk_lineage}"
 
         parent_table_name = foreign_key.parent_table_name
         if tableset is not None:
@@ -131,12 +131,12 @@ def prepend_foreign_key_lineage(df: pd.DataFrame, fk_cols: List[str]) -> pd.Data
     The resulting column names are elder-generation ancestral column names from the
     perspective of a child table that relates to that parent via the provided foreign key.
     """
-    fk = _COL_DELIMITER.join(fk_cols)
+    fk_lineage = _COL_DELIMITER.join(fk_cols)
 
     def _adjust(col: str) -> str:
         return col.replace(
             _START_LINEAGE,
-            f"{_START_LINEAGE}{_GEN_DELIMITER}{fk}",
+            f"{_START_LINEAGE}{_GEN_DELIMITER}{fk_lineage}",
             1,
         )
 
