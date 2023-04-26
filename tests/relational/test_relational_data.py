@@ -46,6 +46,50 @@ def test_mutagenesis_relational_data(mutagenesis):
     assert set(mutagenesis.get_all_key_columns("atom")) == {"atom_id", "molecule_id"}
 
 
+def test_column_metadata(pets):
+    assert pets.get_table_columns("humans") == {"id", "name", "city"}
+
+    # Name is a highly unique categorical field, so is excluded
+    assert pets.get_safe_ancestral_seed_columns("humans") == {"id", "city"}
+
+    # Update the table data such that:
+    # - id is highly unique categorical, but still the PK
+    # - name is no longer highly unique
+    # - city is highly NaN
+    pets.update_table_data(
+        "humans",
+        pd.DataFrame(
+            data={
+                "id": ["1", "2", "3"],
+                "name": ["n", "n", "n"],
+                "city": [None, None, "Chicago"],
+            }
+        ),
+    )
+    assert pets.get_safe_ancestral_seed_columns("humans") == {"id", "name"}
+
+    # Resetting the primary key refreshes the cache state
+    # In this case, since id is no longer the PK and is highly unique, it is excluded
+    pets.set_primary_key(table="humans", primary_key=None)
+    assert pets.get_safe_ancestral_seed_columns("humans") == {"name"}
+
+    # Reset back to normal
+    pets.set_primary_key(table="humans", primary_key="id")
+
+    # Setting a column as a foreign key ensures it is included
+    pets.add_foreign_key(
+        table="humans",
+        constrained_columns=["city"],
+        referred_table="pets",
+        referred_columns=["id"],
+    )
+    assert pets.get_safe_ancestral_seed_columns("humans") == {"id", "name", "city"}
+
+    # Setting a column as a foreign key ensures it is included
+    pets.remove_foreign_key("humans", ["city"])
+    assert pets.get_safe_ancestral_seed_columns("humans") == {"id", "name"}
+
+
 def test_adding_and_removing_foreign_keys():
     rel_data = RelationalData()
     rel_data.add_table(
