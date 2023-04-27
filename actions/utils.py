@@ -25,6 +25,7 @@ class GretelSettings(BaseSettings):
     necessary variables set.
     """
 
+    gretel_action: Optional[str]
     gretel_project: Optional[str]
     gretel_project_display_name: Optional[str]
     gretel_api_key: Optional[SecretStr]

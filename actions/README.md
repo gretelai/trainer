@@ -35,6 +35,7 @@ First create a `.env` file (in this directory) with the following contents, you'
 - The password for the MySQL db
 
 ```
+GRETEL_ACTION=transform_relational
 GRETEL_CONFIG=/gretel/data/transform_config.yml
 GRETEL_API_KEY=grtuXXX
 SOURCE_DB=mysql://dynf4plkdpg6e14abhf5:PASSWORD@aws.connect.psdb.cloud:3306/relational-demo?ssl=true&charset=utf8mb4
@@ -44,5 +45,5 @@ SINK_DB=sqlite:////gretel/data/transformed.db
 Then you can launch the container:
 
 ```
-docker run -it --rm -v $PWD/data:/gretel/data --env-file .env gretelai/trainer python relational_transform.py
+docker run -it --rm -v $PWD/data:/gretel/data --env-file .env gretelai/trainer
 ```
