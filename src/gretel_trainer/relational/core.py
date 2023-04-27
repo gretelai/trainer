@@ -152,24 +152,6 @@ class RelationalData:
             data=data,
             columns=set(data.columns),
         )
-        self._set_safe_ancestral_seed_columns(name)
-
-    def _set_safe_ancestral_seed_columns(self, table: str) -> None:
-        cols = set()
-
-        # Key columns are always kept
-        cols.update(self.get_primary_key(table))
-        for fk in self.get_foreign_keys(table):
-            cols.update(fk.columns)
-
-        data = self.get_table_data(table)
-        for col in self.get_table_columns(table):
-            if col in cols:
-                continue
-            if _ok_for_train_and_seed(col, data):
-                cols.add(col)
-
-        self.graph.nodes[table]["safe_ancestral_seed_columns"] = cols
 
     def set_primary_key(
         self, *, table: str, primary_key: UserFriendlyPrimaryKeyT
@@ -189,7 +171,7 @@ class RelationalData:
                 raise MultiTableException(f"Unrecognized column name: `{primary_key}`")
 
         self.graph.nodes[table]["primary_key"] = primary_key
-        self._set_safe_ancestral_seed_columns(table)
+        self._clear_safe_ancestral_seed_columns(table)
 
     def _format_key_column(self, key: Optional[Union[str, List[str]]]) -> List[str]:
         if key is None:
@@ -261,7 +243,7 @@ class RelationalData:
             )
         )
         edge["via"] = via
-        self._set_safe_ancestral_seed_columns(table)
+        self._clear_safe_ancestral_seed_columns(table)
 
     def remove_foreign_key(self, table: str, constrained_columns: List[str]) -> None:
         """
@@ -287,13 +269,13 @@ class RelationalData:
             self.graph.remove_edge(table, key_to_remove.parent_table_name)
         else:
             edge["via"] = via
-        self._set_safe_ancestral_seed_columns(table)
+        self._clear_safe_ancestral_seed_columns(table)
 
     def update_table_data(self, table: str, data: pd.DataFrame) -> None:
         try:
             self.graph.nodes[table]["data"] = data
             self.graph.nodes[table]["columns"] = data.columns
-            self._set_safe_ancestral_seed_columns(table)
+            self._clear_safe_ancestral_seed_columns(table)
         except KeyError:
             raise MultiTableException(
                 f"Unrecognized table name: {table}. If this is a new table to add, use `add_table`."
@@ -353,7 +335,31 @@ class RelationalData:
         return self.graph.nodes[table]["columns"]
 
     def get_safe_ancestral_seed_columns(self, table: str) -> set[str]:
-        return self.graph.nodes[table]["safe_ancestral_seed_columns"]
+        safe_columns = self.graph.nodes[table].get("safe_ancestral_seed_columns")
+        if safe_columns is None:
+            safe_columns = self._set_safe_ancestral_seed_columns(table)
+        return safe_columns
+
+    def _set_safe_ancestral_seed_columns(self, table: str) -> set[str]:
+        cols = set()
+
+        # Key columns are always kept
+        cols.update(self.get_primary_key(table))
+        for fk in self.get_foreign_keys(table):
+            cols.update(fk.columns)
+
+        data = self.get_table_data(table)
+        for col in self.get_table_columns(table):
+            if col in cols:
+                continue
+            if _ok_for_train_and_seed(col, data):
+                cols.add(col)
+
+        self.graph.nodes[table]["safe_ancestral_seed_columns"] = cols
+        return cols
+
+    def _clear_safe_ancestral_seed_columns(self, table: str) -> None:
+        self.graph.nodes[table]["safe_ancestral_seed_columns"] = None
 
     def get_foreign_keys(self, table: str) -> List[ForeignKey]:
         foreign_keys = []
