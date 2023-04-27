@@ -54,7 +54,11 @@ def label_encode_keys(
     Crawls tables for all key columns (primary and foreign). For each PK (and FK columns referencing it),
     runs all values through a LabelEncoder and updates tables' columns to use LE-transformed values.
     """
-    for table_name, df in tables.items():
+    for table_name in rel_data.list_tables_parents_before_children():
+        df = tables.get(table_name)
+        if df is None:
+            continue
+
         for primary_key_column in rel_data.get_primary_key(table_name):
 
             # Get a set of the tables and columns in `tables` referencing this PK
