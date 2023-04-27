@@ -8,7 +8,7 @@ from typing import Any, Dict, List, Optional, Union, overload
 
 import networkx
 import pandas as pd
-from networkx.algorithms.dag import dag_longest_path_length
+from networkx.algorithms.dag import dag_longest_path_length, topological_sort
 from pandas.api.types import is_string_dtype
 from typing_extensions import Literal
 
@@ -330,6 +330,15 @@ class RelationalData:
         _add_children(descendants, table)
 
         return list(descendants)
+
+    def list_tables_parents_before_children(self) -> List[str]:
+        """
+        Returns a list of all tables with the guarantee that a parent table
+        appears before any of its children. No other guarantees about order
+        are made, e.g. the following (and others) are all valid outputs:
+        [p1, p2, c1, c2] or [p2, c2, p1, c1] or [p2, p1, c1, c2] etc.
+        """
+        return list(reversed(list(topological_sort(self.graph))))
 
     def get_primary_key(self, table: str) -> List[str]:
         return self.graph.nodes[table]["primary_key"]

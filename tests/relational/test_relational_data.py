@@ -185,6 +185,19 @@ def test_get_subset_of_data(pets):
     assert len(subset) == normal_length
 
 
+def test_list_tables_parents_before_children(ecom):
+    def in_order(col, t1, t2):
+        return col.index(t1) < col.index(t2)
+
+    tables = ecom.list_tables_parents_before_children()
+    assert in_order(tables, "users", "events")
+    assert in_order(tables, "distribution_center", "products")
+    assert in_order(tables, "distribution_center", "inventory_items")
+    assert in_order(tables, "products", "inventory_items")
+    assert in_order(tables, "inventory_items", "order_items")
+    assert in_order(tables, "users", "order_items")
+
+
 def test_relational_data_as_dict(ecom):
     as_dict = ecom.as_dict("test_out")
 
