@@ -85,7 +85,7 @@ def test_column_metadata(pets):
     )
     assert pets.get_safe_ancestral_seed_columns("humans") == {"id", "name", "city"}
 
-    # Setting a column as a foreign key ensures it is included
+    # Removing a foreign key refreshes the cache state
     pets.remove_foreign_key("humans", ["city"])
     assert pets.get_safe_ancestral_seed_columns("humans") == {"id", "name"}
 
