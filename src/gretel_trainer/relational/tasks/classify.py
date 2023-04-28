@@ -9,18 +9,18 @@ from gretel_client.projects.projects import Project
 from gretel_client.projects.records import RecordHandler
 
 import gretel_trainer.relational.tasks.common as common
-from gretel_trainer.relational.workflow_state import Classify
 
 
 class ClassifyTask:
     def __init__(
         self,
-        classify: Classify,
+        classify_models: Dict[str, Model],
         all_rows: bool,
         multitable: common._MultiTable,
         out_dir: Path,
     ):
-        self.classify = classify
+        self.classify_models = classify_models
+        self.classify_record_handlers: Dict[str, RecordHandler] = {}
         self.all_rows = all_rows
         self.multitable = multitable
         self.out_dir = out_dir
@@ -49,10 +49,10 @@ class ClassifyTask:
 
     @property
     def table_collection(self) -> List[str]:
-        return list(self.classify.models.keys())
+        return list(self.classify_models.keys())
 
     def more_to_do(self) -> bool:
-        total_tables = len(self.classify.models)
+        total_tables = len(self.classify_models)
         any_unfinished_models = len(self._finished_models) < total_tables
         any_unfinished_record_handlers = (
             len(self._finished_record_handlers) < total_tables
@@ -88,8 +88,8 @@ class ClassifyTask:
             return table in self._finished_models
 
     def get_job(self, table: str) -> Job:
-        record_handler = self.classify.record_handlers.get(table)
-        model = self.classify.models.get(table)
+        record_handler = self.classify_record_handlers.get(table)
+        model = self.classify_models.get(table)
         return record_handler or model
 
     def handle_completed(self, table: str, job: Job) -> None:
@@ -100,7 +100,7 @@ class ClassifyTask:
                 record_handler = job.create_record_handler_obj(
                     data_source=job.data_source
                 )
-                self.classify.record_handlers[table] = record_handler
+                self.classify_record_handlers[table] = record_handler
                 self.multitable._extended_sdk.start_job_if_possible(
                     job=record_handler,
                     table_name=table,
@@ -131,10 +131,8 @@ class ClassifyTask:
     def handle_lost_contact(self, table: str, job: Job) -> None:
         if isinstance(job, Model):
             self.failed_models.append(table)
-            self.classify.lost_models.append(table)
         elif isinstance(job, RecordHandler):
             self.failed_record_handlers.append(table)
-            self.classify.lost_record_handlers.append(table)
         common.log_lost_contact(table)
         common.cleanup(sdk=self.multitable._extended_sdk, project=self.project, job=job)
 

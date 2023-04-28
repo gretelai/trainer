@@ -6,14 +6,6 @@ from gretel_client.projects.records import RecordHandler
 
 
 @dataclass
-class Classify:
-    models: Dict[str, Model] = field(default_factory=dict)
-    lost_models: List[str] = field(default_factory=list)
-    record_handlers: Dict[str, RecordHandler] = field(default_factory=dict)
-    lost_record_handlers: List[str] = field(default_factory=list)
-
-
-@dataclass
 class TransformsTrain:
     models: Dict[str, Model] = field(default_factory=dict)
     lost_contact: List[str] = field(default_factory=list)

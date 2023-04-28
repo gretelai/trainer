@@ -54,7 +54,6 @@ from gretel_trainer.relational.tasks import (
     TransformsTrainTask,
 )
 from gretel_trainer.relational.workflow_state import (
-    Classify,
     SyntheticsRun,
     SyntheticsTrain,
     TransformsTrain,
@@ -95,7 +94,6 @@ class MultiTable:
         self._artifact_collection = ArtifactCollection(hybrid=self._hybrid)
         self._extended_sdk = ExtendedGretelSDK(hybrid=self._hybrid)
         self._latest_backup: Optional[Backup] = None
-        self._classify = Classify()
         self._transforms_train = TransformsTrain()
         self.transform_output_tables: Dict[str, pd.DataFrame] = {}
         self._synthetics_train = SyntheticsTrain()
@@ -448,6 +446,7 @@ class MultiTable:
         )
 
     def classify(self, config: GretelModelConfig, all_rows: bool = False) -> None:
+        classify_models = {}
         for table in self.relational_data.list_all_tables():
             classify_config = make_classify_config(table, config)
 
@@ -462,12 +461,12 @@ class MultiTable:
             model = self._project.create_model_obj(
                 model_config=classify_config, data_source=str(classify_data_source_path)
             )
-            self._classify.models[table] = model
+            classify_models[table] = model
 
         self._backup()
 
         task = ClassifyTask(
-            classify=self._classify,
+            classify_models=classify_models,
             all_rows=all_rows,
             multitable=self,
             out_dir=self._working_dir,
