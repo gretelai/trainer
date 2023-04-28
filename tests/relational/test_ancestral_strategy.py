@@ -7,7 +7,6 @@ from unittest.mock import Mock, patch
 import pandas as pd
 import pandas.testing as pdtest
 import pytest
-import smart_open
 
 import gretel_trainer.relational.ancestry as ancestry
 from gretel_trainer.relational.core import MultiTableException, TableEvaluation
@@ -138,6 +137,69 @@ def test_prepare_training_data_translates_alphanumeric_keys_and_adds_min_max_rec
     # FKs on last two rows (artifical FKs) are min, max
     assert last_two["self|artist_id"].to_list() == [0, 200]
     assert last_two["self.artist_id|id"].to_list() == [0, 200]
+
+
+def test_prepare_training_data_with_composite_keys(tpch):
+    strategy = AncestralStrategy()
+    training_data = strategy.prepare_training_data(tpch)
+
+    l_max = len(tpch.get_table_data("lineitem")) * 50
+    ps_max = len(tpch.get_table_data("partsupp")) * 50
+    p_max = len(tpch.get_table_data("part")) * 50
+    s_max = len(tpch.get_table_data("supplier")) * 50
+
+    # partsupp table, composite PK
+    train_partsupp = training_data["partsupp"]
+    assert set(train_partsupp.columns) == {
+        "self|ps_partkey",
+        "self|ps_suppkey",
+        "self|ps_availqty",
+        "self.ps_partkey|p_partkey",
+        "self.ps_partkey|p_name",
+        "self.ps_suppkey|s_suppkey",
+        "self.ps_suppkey|s_name",
+    }
+    assert len(train_partsupp) == len(tpch.get_table_data("partsupp")) + 3
+    last_three_partsupp_keys = train_partsupp.tail(3).reset_index()[
+        ["self|ps_partkey", "self|ps_suppkey"]
+    ]
+    pdtest.assert_frame_equal(
+        last_three_partsupp_keys,
+        pd.DataFrame(
+            data={
+                "self|ps_partkey": [ps_max, 0, p_max],
+                "self|ps_suppkey": [ps_max, 0, s_max],
+            }
+        ),
+    )
+
+    # lineitem table, composite FK to partsupp
+    train_lineitem = training_data["lineitem"]
+    assert set(train_lineitem.columns) == {
+        "self|l_partkey",
+        "self|l_suppkey",
+        "self|l_quantity",
+        "self.l_partkey+l_suppkey|ps_partkey",
+        "self.l_partkey+l_suppkey|ps_suppkey",
+        "self.l_partkey+l_suppkey|ps_availqty",
+        "self.l_partkey+l_suppkey.ps_partkey|p_partkey",
+        "self.l_partkey+l_suppkey.ps_partkey|p_name",
+        "self.l_partkey+l_suppkey.ps_suppkey|s_suppkey",
+        "self.l_partkey+l_suppkey.ps_suppkey|s_name",
+    }
+    assert len(train_lineitem) == len(tpch.get_table_data("lineitem")) + 3
+    last_three_lineitem_keys = train_lineitem.tail(3).reset_index()[
+        ["self|l_partkey", "self|l_suppkey"]
+    ]
+    pdtest.assert_frame_equal(
+        last_three_lineitem_keys,
+        pd.DataFrame(
+            data={
+                "self|l_partkey": [l_max, 0, ps_max],
+                "self|l_suppkey": [l_max, 0, ps_max],
+            }
+        ),
+    )
 
 
 def test_retraining_a_set_of_tables_forces_retraining_descendants_as_well(ecom):
@@ -430,7 +492,7 @@ def test_post_processing_individual_synthetic_result(ecom):
     )
 
     processed_events = strategy.post_process_individual_synthetic_result(
-        "events", ecom, synth_events
+        "events", ecom, synth_events, 1
     )
 
     expected_post_processing = pd.DataFrame(
@@ -442,6 +504,45 @@ def test_post_processing_individual_synthetic_result(ecom):
     )
 
     pdtest.assert_frame_equal(expected_post_processing, processed_events)
+
+
+def test_post_processing_individual_synthetic_result_composite_keys(tpch):
+    strategy = AncestralStrategy()
+    synth_lineitem = pd.DataFrame(
+        data={
+            "self|l_partkey": [10, 20, 30, 40],
+            "self|l_suppkey": [10, 20, 30, 40],
+            "self|l_quantity": [42, 42, 42, 42],
+            "self.l_partkey+l_suppkey|ps_partkey": [2, 3, 4, 5],
+            "self.l_partkey+l_suppkey|ps_suppkey": [6, 7, 8, 9],
+            "self.l_partkey+l_suppkey|ps_availqty": [80, 80, 80, 80],
+            "self.l_partkey+l_suppkey.ps_partkey|p_partkey": [2, 3, 4, 5],
+            "self.l_partkey+l_suppkey.ps_partkey|p_name": ["a", "b", "c", "d"],
+            "self.l_partkey+l_suppkey.ps_suppkey|s_suppkey": [6, 7, 8, 9],
+            "self.l_partkey+l_suppkey.ps_suppkey|s_name": ["e", "f", "g", "h"],
+        }
+    )
+
+    processed_lineitem = strategy.post_process_individual_synthetic_result(
+        "lineitem", tpch, synth_lineitem, 1
+    )
+
+    expected_post_processing = pd.DataFrame(
+        data={
+            "self|l_partkey": [2, 3, 4, 5],
+            "self|l_suppkey": [6, 7, 8, 9],
+            "self|l_quantity": [42, 42, 42, 42],
+            "self.l_partkey+l_suppkey|ps_partkey": [2, 3, 4, 5],
+            "self.l_partkey+l_suppkey|ps_suppkey": [6, 7, 8, 9],
+            "self.l_partkey+l_suppkey|ps_availqty": [80, 80, 80, 80],
+            "self.l_partkey+l_suppkey.ps_partkey|p_partkey": [2, 3, 4, 5],
+            "self.l_partkey+l_suppkey.ps_partkey|p_name": ["a", "b", "c", "d"],
+            "self.l_partkey+l_suppkey.ps_suppkey|s_suppkey": [6, 7, 8, 9],
+            "self.l_partkey+l_suppkey.ps_suppkey|s_name": ["e", "f", "g", "h"],
+        }
+    )
+
+    pdtest.assert_frame_equal(expected_post_processing, processed_lineitem)
 
 
 def test_post_process_synthetic_results(ecom):
@@ -471,7 +572,9 @@ def test_post_process_synthetic_results(ecom):
         "users": out_users,
     }
 
-    processed_tables = strategy.post_process_synthetic_results(output_tables, [], ecom)
+    processed_tables = strategy.post_process_synthetic_results(
+        output_tables, [], ecom, 1
+    )
 
     expected_events = pd.DataFrame(
         data={
@@ -494,7 +597,9 @@ def test_post_process_synthetic_results(ecom):
     pdtest.assert_frame_equal(expected_users, processed_tables["users"])
 
 
-def test_uses_trained_model_to_update_cross_table_scores(report_json_dict):
+def test_uses_trained_model_to_update_cross_table_scores(
+    report_json_dict, extended_sdk
+):
     strategy = AncestralStrategy()
     evaluations = {
         "table_1": TableEvaluation(),
@@ -512,7 +617,7 @@ def test_uses_trained_model_to_update_cross_table_scores(report_json_dict):
             f.write(json.dumps(report_json_dict))
 
         strategy.update_evaluation_from_model(
-            "table_1", evaluations, model, working_dir
+            "table_1", evaluations, model, working_dir, extended_sdk
         )
 
     evaluation = evaluations["table_1"]
@@ -525,7 +630,7 @@ def test_uses_trained_model_to_update_cross_table_scores(report_json_dict):
 
 
 def test_falls_back_to_fetching_report_json_when_download_artifacts_fails(
-    report_json_dict,
+    report_json_dict, extended_sdk
 ):
     strategy = AncestralStrategy()
     evaluations = {
@@ -544,7 +649,7 @@ def test_falls_back_to_fetching_report_json_when_download_artifacts_fails(
         get_json.return_value = report_json_dict
 
         strategy.update_evaluation_from_model(
-            "table_1", evaluations, model, working_dir
+            "table_1", evaluations, model, working_dir, extended_sdk
         )
 
     evaluation = evaluations["table_1"]

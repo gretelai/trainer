@@ -4,7 +4,7 @@ test:
 
 .PHONY: type
 type:
-	python -m pyright src/gretel_trainer/benchmark src/gretel_trainer/relational tests
+	python -m pyright src tests
 
 .PHONY: multi
 multi:

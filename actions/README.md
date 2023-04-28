@@ -24,15 +24,17 @@ contains an example Gretel Config to be used with a demo DB.
 Within the container, we have a `/gretel/data` directory that should be used to mount
 to a directory on the host.
 
-# Example
+# Actions
 
-This example will take a single Gretel Transform Config and apply it to a demo MySQL DB
-running in Planet Scale and write the transformed data out to a SQLite db on disk.
+The only requirements to run an action should be:
 
-First create a `.env` file (in this directory) with the following contents, you'll need to change:
+- A `.env` file or some other method to get env vars set on the system or within the container
+- Execution of the action's Python module. If using the Docker container, you must provide the `GRETEL_ACTION` variable, this should match the name of the Python module (action) you want to run.
 
-- Gretel API Key
-- The password for the MySQL db
+## Transform Relational
+
+This action consumes a single Gretel Config, two connections to databases (source and sink), Gretel API key and executes a full database transform
+using the provided config. An example `.env` is below.
 
 ```
 GRETEL_ACTION=transform_relational
@@ -47,3 +49,5 @@ Then you can launch the container:
 ```
 docker run -it --rm -v $PWD/data:/gretel/data --env-file .env gretelai/trainer
 ```
+
+You can add the `-d` flag to run detached, which gives you a headless execution.

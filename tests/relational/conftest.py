@@ -9,14 +9,14 @@ from sqlalchemy import create_engine
 
 from gretel_trainer.relational.connectors import Connector
 from gretel_trainer.relational.core import RelationalData
+from gretel_trainer.relational.sdk_extras import ExtendedGretelSDK
 
 EXAMPLE_DBS = Path(__file__).parent.resolve() / "example_dbs"
 
 
-@pytest.fixture(autouse=True)
-def patch_configure_session():
-    with patch("gretel_trainer.relational.multi_table.configure_session"):
-        yield
+@pytest.fixture()
+def extended_sdk():
+    return ExtendedGretelSDK(hybrid=False)
 
 
 @pytest.fixture()
@@ -65,6 +65,11 @@ def ecom() -> RelationalData:
 @pytest.fixture()
 def mutagenesis() -> RelationalData:
     return rel_data_from_example_db("mutagenesis")
+
+
+@pytest.fixture()
+def tpch() -> RelationalData:
+    return rel_data_from_example_db("tpch")
 
 
 @pytest.fixture()
@@ -118,8 +123,18 @@ def _setup_nba(
     rel_data.add_table(name="states", primary_key="id", data=states)
     rel_data.add_table(name="cities", primary_key="id", data=cities)
     rel_data.add_table(name="teams", primary_key="id", data=teams)
-    rel_data.add_foreign_key(foreign_key="teams.city_id", referencing="cities.id")
-    rel_data.add_foreign_key(foreign_key="cities.state_id", referencing="states.id")
+    rel_data.add_foreign_key(
+        table="teams",
+        constrained_columns=["city_id"],
+        referred_table="cities",
+        referred_columns=["id"],
+    )
+    rel_data.add_foreign_key(
+        table="cities",
+        constrained_columns=["state_id"],
+        referred_table="states",
+        referred_columns=["id"],
+    )
 
     return rel_data, states, cities, teams
 

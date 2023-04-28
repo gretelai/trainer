@@ -1,16 +1,13 @@
 from __future__ import annotations
 
 import datetime
-import itertools
 from dataclasses import dataclass
 from functools import cached_property
 from math import ceil
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 
-import pandas as pd
 import plotly.graph_objects as go
-from backports.cached_property import cached_property
 from jinja2 import Environment, FileSystemLoader
 
 from gretel_trainer.relational.core import ForeignKey, RelationalData, TableEvaluation
@@ -36,7 +33,7 @@ class ReportRenderer:
 @dataclass
 class ReportTableData:
     table: str
-    pk: Optional[str]
+    pk: List[str]
     fks: List[ForeignKey]
 
 

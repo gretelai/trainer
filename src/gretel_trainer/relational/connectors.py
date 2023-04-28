@@ -2,7 +2,7 @@ import logging
 from typing import Dict, List, Optional, Tuple
 
 import pandas as pd
-from sqlalchemy import MetaData, create_engine
+from sqlalchemy import create_engine, inspect
 from sqlalchemy.engine.base import Engine
 from sqlalchemy.exc import OperationalError
 
@@ -47,39 +47,33 @@ class Connector:
         if only is not None and ignore is not None:
             raise MultiTableException("Cannot specify both `only` and `ignore`.")
 
-        metadata = MetaData()
-        metadata.reflect(self.engine)
+        inspector = inspect(self.engine)
 
         relational_data = RelationalData()
-        foreign_keys: List[Tuple[str, str]] = []
+        foreign_keys: List[Tuple[str, dict]] = []
 
-        for table_name, table in metadata.tables.items():
+        for table_name in inspector.get_table_names():
             if _skip_table(table_name, only, ignore):
                 continue
 
             logger.debug(f"Extracting source data from `{table_name}`")
             df = pd.read_sql_table(table_name, self.engine)
-            primary_key = None
-            for column in table.columns:
-                if column.primary_key:
-                    primary_key = column.name
-                for f_key in column.foreign_keys:
-                    referenced_table = f_key.column.table.name
-                    referenced_column = f_key.column.name
-                    if _skip_table(referenced_table, only, ignore):
-                        continue
-                    foreign_keys.append(
-                        (
-                            f"{table_name}.{column.name}",
-                            f"{referenced_table}.{referenced_column}",
-                        )
-                    )
+            primary_key = inspector.get_pk_constraint(table_name)["constrained_columns"]
+            for fk in inspector.get_foreign_keys(table_name):
+                if _skip_table(fk["referred_table"], only, ignore):
+                    continue
+                else:
+                    foreign_keys.append((table_name, fk))
+
             relational_data.add_table(name=table_name, primary_key=primary_key, data=df)
 
-        for foreign_key_tuple in foreign_keys:
-            foreign_key, referencing = foreign_key_tuple
+        for foreign_key in foreign_keys:
+            table, fk = foreign_key
             relational_data.add_foreign_key(
-                foreign_key=foreign_key, referencing=referencing
+                table=table,
+                constrained_columns=fk["constrained_columns"],
+                referred_table=fk["referred_table"],
+                referred_columns=fk["referred_columns"],
             )
 
         return relational_data

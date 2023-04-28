@@ -82,6 +82,24 @@ def test_mutagenesis_add_and_remove_ancestor_data(mutagenesis):
     assert set(restored_bond.columns) == {"type", "atom1_id", "atom2_id"}
 
 
+def test_tpch_add_and_remove_ancestor_data(tpch):
+    lineitem_with_ancestors = ancestry.get_table_data_with_ancestors(tpch, "lineitem")
+    assert set(lineitem_with_ancestors.columns) == {
+        "self|l_partkey",
+        "self|l_suppkey",
+        "self|l_quantity",
+        "self.l_partkey+l_suppkey|ps_partkey",
+        "self.l_partkey+l_suppkey|ps_suppkey",
+        "self.l_partkey+l_suppkey|ps_availqty",
+        "self.l_partkey+l_suppkey.ps_partkey|p_partkey",
+        "self.l_partkey+l_suppkey.ps_partkey|p_name",
+        "self.l_partkey+l_suppkey.ps_suppkey|s_suppkey",
+        "self.l_partkey+l_suppkey.ps_suppkey|s_name",
+    }
+    restored_lineitem = ancestry.drop_ancestral_data(lineitem_with_ancestors)
+    assert set(restored_lineitem.columns) == {"l_partkey", "l_suppkey", "l_quantity"}
+
+
 def test_ancestral_data_from_different_tablesets(source_nba, synthetic_nba):
     source_nba, _, _, _ = source_nba
     _, custom_states, custom_cities, custom_teams = synthetic_nba
@@ -112,11 +130,13 @@ def test_whether_column_is_ancestral(mutagenesis):
 
 
 def test_primary_key_in_multigenerational_format(mutagenesis):
-    assert ancestry.get_multigenerational_primary_key(mutagenesis, "bond") is None
-    assert (
-        ancestry.get_multigenerational_primary_key(mutagenesis, "atom")
-        == "self|atom_id"
-    )
+    assert ancestry.get_multigenerational_primary_key(mutagenesis, "bond") == [
+        "self|atom1_id",
+        "self|atom2_id",
+    ]
+    assert ancestry.get_multigenerational_primary_key(mutagenesis, "atom") == [
+        "self|atom_id"
+    ]
 
 
 def test_ancestral_foreign_key_maps(ecom):
@@ -126,13 +146,23 @@ def test_ancestral_foreign_key_maps(ecom):
     inventory_items_afk_maps = ancestry.get_ancestral_foreign_key_maps(
         ecom, "inventory_items"
     )
-    assert set(inventory_items_afk_maps) == {
-        ("self|product_id", "self.product_id|id"),
-        (
-            "self|product_distribution_center_id",
-            "self.product_distribution_center_id|id",
-        ),
-    }
+    assert ("self|product_id", "self.product_id|id") in inventory_items_afk_maps
+    assert (
+        "self|product_distribution_center_id",
+        "self.product_distribution_center_id|id",
+    ) in inventory_items_afk_maps
+
+
+def test_ancestral_foreign_key_maps_composite(tpch):
+    lineitem_afk_maps = ancestry.get_ancestral_foreign_key_maps(tpch, "lineitem")
+    assert (
+        "self|l_partkey",
+        "self.l_partkey+l_suppkey|ps_partkey",
+    ) in lineitem_afk_maps
+    assert (
+        "self|l_suppkey",
+        "self.l_partkey+l_suppkey|ps_suppkey",
+    ) in lineitem_afk_maps
 
 
 def test_prepend_foreign_key_lineage(ecom):
@@ -140,7 +170,7 @@ def test_prepend_foreign_key_lineage(ecom):
         ecom, "inventory_items"
     )
     order_items_parent_data = ancestry.prepend_foreign_key_lineage(
-        multigen_inventory_items, "inventory_item_id"
+        multigen_inventory_items, ["inventory_item_id"]
     )
     assert set(order_items_parent_data.columns) == {
         "self.inventory_item_id|id",

@@ -11,6 +11,7 @@ from gretel_client.projects import Project
 
 @dataclass
 class ArtifactCollection:
+    hybrid: bool
     gretel_debug_summary: Optional[str] = None
     source_archive: Optional[str] = None
     synthetics_training_archive: Optional[str] = None
@@ -37,7 +38,15 @@ class ArtifactCollection:
         existing = self.transforms_outputs_archive
         self.transforms_outputs_archive = self._upload_file(project, path, existing)
 
-    def _upload_file(self, project: Project, path: str, existing: Optional[str]) -> str:
+    def _upload_file(
+        self, project: Project, path: str, existing: Optional[str]
+    ) -> Optional[str]:
+        # We do not upload any of these artifacts in hybrid contexts because they are intended to be
+        # "singleton" objects, but we cannot list or delete items in users' artifact endpoints, so
+        # we would end up polluting their endpoints with many nearly-duplicative copies of these files.
+        if self.hybrid:
+            return None
+
         latest = project.upload_artifact(path)
         if existing is not None:
             project.delete_artifact(existing)

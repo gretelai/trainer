@@ -1,13 +1,8 @@
 from datetime import datetime
 
-import pytest
 from lxml import html
 
-from gretel_trainer.relational.core import (
-    MultiTableException,
-    RelationalData,
-    TableEvaluation,
-)
+from gretel_trainer.relational.core import TableEvaluation
 from gretel_trainer.relational.report.report import ReportPresenter, ReportRenderer
 
 
@@ -60,11 +55,6 @@ def test_ecommerce_relational_data_report(ecom):
             + '//span[contains(@class, "label")]'
         )[0].text.strip()
         == "Excellent"
-    )
-    elts = tree.xpath(
-        '//div[contains(@class, "test-report-main-score")]'
-        + '//div[contains(@class, "score-container")]'
-        + '//span[contains(@class, "score-container-text")]'
     )
     assert (
         tree.xpath(

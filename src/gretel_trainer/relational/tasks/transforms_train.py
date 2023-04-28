@@ -1,7 +1,6 @@
-from typing import Dict, List
+from typing import List
 
 from gretel_client.projects.jobs import Job
-from gretel_client.projects.models import Model
 from gretel_client.projects.projects import Project
 
 from gretel_trainer.relational.tasks.common import _MultiTable

@@ -5,7 +5,6 @@ from gretel_client.projects.jobs import Job
 from gretel_client.projects.projects import Project
 from gretel_client.projects.records import RecordHandler
 
-from gretel_trainer.relational.sdk_extras import get_record_handler_data
 from gretel_trainer.relational.tasks.common import _MultiTable
 
 
@@ -57,7 +56,9 @@ class TransformsRunTask:
         return self.record_handlers[table]
 
     def handle_completed(self, table: str, job: Job) -> None:
-        self.working_tables[table] = get_record_handler_data(job)
+        self.working_tables[
+            table
+        ] = self.multitable._extended_sdk.get_record_handler_data(job)
 
     def handle_failed(self, table: str) -> None:
         self.working_tables[table] = None

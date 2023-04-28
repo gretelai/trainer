@@ -1,4 +1,5 @@
 import pandas as pd
+from gretel_client import configure_session
 
 from gretel_trainer import Trainer
 from gretel_trainer.models import GretelLSTM, GretelACTGAN
@@ -19,6 +20,9 @@ seed_df = pd.DataFrame(data=[
     ["asian", "chinese", "F"]
 ], columns=["RACE", "ETHNICITY", "GENDER"])
 
+
+# Configure Gretel credentials
+configure_session(api_key="prompt", cache="yes", validate=True)
 
 # Train a model and conditionally generate data
 seed_fields = seed_df.columns.values.tolist()

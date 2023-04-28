@@ -1,6 +1,8 @@
 """
 Transform a Database
 """
+import copy
+
 from gretel_trainer.relational.multi_table import MultiTable
 
 from utils import ActionUtils
@@ -20,7 +22,7 @@ def transform_db():
     # transform every table in the DB
     configs = {}
     for table_name in source_relational_data.list_all_tables():
-        configs[table_name] = gretel_config
+        configs[table_name] = copy.deepcopy(gretel_config)
 
     multi_table.train_transform_models(configs=configs)
     multi_table.run_transforms()
