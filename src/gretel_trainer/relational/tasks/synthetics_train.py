@@ -3,28 +3,25 @@ from typing import List
 from gretel_client.projects.jobs import Job
 from gretel_client.projects.projects import Project
 
-from gretel_trainer.relational.tasks.common import _MultiTable
+import gretel_trainer.relational.tasks.common as common
 from gretel_trainer.relational.workflow_state import SyntheticsTrain
+
+ACTION = "synthetics model training"
 
 
 class SyntheticsTrainTask:
     def __init__(
         self,
         synthetics_train: SyntheticsTrain,
-        multitable: _MultiTable,
+        multitable: common._MultiTable,
     ):
         self.synthetics_train = synthetics_train
         self.multitable = multitable
         self.completed = []
         self.failed = []
 
-    @property
-    def action(self) -> str:
-        return "synthetics model training"
-
-    @property
-    def refresh_interval(self) -> int:
-        return self.multitable._refresh_interval
+    def action(self, job: Job) -> str:
+        return ACTION
 
     @property
     def project(self) -> Project:
@@ -41,6 +38,9 @@ class SyntheticsTrainTask:
     def more_to_do(self) -> bool:
         return len(self.completed + self.failed) < len(self.synthetics_train.models)
 
+    def wait(self) -> None:
+        common.wait(self.multitable._refresh_interval)
+
     def is_finished(self, table: str) -> bool:
         return table in (self.completed + self.failed)
 
@@ -49,13 +49,22 @@ class SyntheticsTrainTask:
 
     def handle_completed(self, table: str, job: Job) -> None:
         self.completed.append(table)
+        common.log_success(table, ACTION)
+        common.cleanup(sdk=self.multitable._extended_sdk, project=self.project, job=job)
 
-    def handle_failed(self, table: str) -> None:
+    def handle_failed(self, table: str, job: Job) -> None:
         self.failed.append(table)
+        common.log_failed(table, ACTION)
+        common.cleanup(sdk=self.multitable._extended_sdk, project=self.project, job=job)
 
-    def handle_lost_contact(self, table: str) -> None:
+    def handle_lost_contact(self, table: str, job: Job) -> None:
         self.synthetics_train.lost_contact.append(table)
         self.failed.append(table)
+        common.log_lost_contact(table)
+        common.cleanup(sdk=self.multitable._extended_sdk, project=self.project, job=job)
+
+    def handle_in_progress(self, table: str, job: Job) -> None:
+        common.log_in_progress(table, job.status, ACTION)
 
     def each_iteration(self) -> None:
         self.multitable._backup()

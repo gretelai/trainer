@@ -7,10 +7,12 @@ from gretel_client.projects.jobs import ACTIVE_STATES, Job
 from gretel_client.projects.projects import Project
 from gretel_client.projects.records import RecordHandler
 
-from gretel_trainer.relational.tasks.common import _MultiTable
+import gretel_trainer.relational.tasks.common as common
 from gretel_trainer.relational.workflow_state import SyntheticsRun, SyntheticsTrain
 
 logger = logging.getLogger(__name__)
+
+ACTION = "synthetic data generation"
 
 
 class SyntheticsRunTask:
@@ -19,7 +21,7 @@ class SyntheticsRunTask:
         synthetics_run: SyntheticsRun,
         synthetics_train: SyntheticsTrain,
         run_dir: Path,
-        multitable: _MultiTable,
+        multitable: common._MultiTable,
     ):
         self.synthetics_run = synthetics_run
         self.synthetics_train = synthetics_train
@@ -48,13 +50,8 @@ class SyntheticsRunTask:
             if data is not None
         }
 
-    @property
-    def action(self) -> str:
-        return "synthetic data generation"
-
-    @property
-    def refresh_interval(self) -> int:
-        return self.multitable._refresh_interval
+    def action(self, job: Job) -> str:
+        return ACTION
 
     @property
     def project(self) -> Project:
@@ -70,6 +67,9 @@ class SyntheticsRunTask:
 
     def more_to_do(self) -> bool:
         return len(self.working_tables) < len(self._all_tables)
+
+    def wait(self) -> None:
+        common.wait(self.multitable._refresh_interval)
 
     def is_finished(self, table: str) -> bool:
         return table in self.working_tables
@@ -88,16 +88,25 @@ class SyntheticsRunTask:
             )
         )
         self.working_tables[table] = post_processed_data
+        common.log_success(table, ACTION)
+        common.cleanup(sdk=self.multitable._extended_sdk, project=self.project, job=job)
 
-    def handle_failed(self, table: str) -> None:
+    def handle_failed(self, table: str, job: Job) -> None:
         self.working_tables[table] = None
         self._fail_table(table)
+        common.log_failed(table, ACTION)
+        common.cleanup(sdk=self.multitable._extended_sdk, project=self.project, job=job)
         self.multitable._backup()
 
-    def handle_lost_contact(self, table: str) -> None:
+    def handle_lost_contact(self, table: str, job: Job) -> None:
         self.synthetics_run.lost_contact.append(table)
         self._fail_table(table)
+        common.log_lost_contact(table)
+        common.cleanup(sdk=self.multitable._extended_sdk, project=self.project, job=job)
         self.multitable._backup()
+
+    def handle_in_progress(self, table: str, job: Job) -> None:
+        common.log_in_progress(table, job.status, ACTION)
 
     def each_iteration(self) -> None:
         # Determine if we can start any more jobs
@@ -140,7 +149,7 @@ class SyntheticsRunTask:
             self.multitable._extended_sdk.start_job_if_possible(
                 job=record_handler,
                 table_name=table_name,
-                action=self.action,
+                action=ACTION,
                 project=self.project,
                 number_of_artifacts=self.artifacts_per_job,
             )
