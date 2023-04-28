@@ -475,8 +475,8 @@ class MultiTable:
         run_task(task, self._extended_sdk)
 
         archive_path = self._working_dir / "classify_outputs.tar.gz"
-        for table, result in task.result_filepaths.items():
-            add_to_tar(archive_path, result, f"classify_{table}.gz")
+        for arcname, path in task.result_filepaths.items():
+            add_to_tar(archive_path, path, arcname)
         self._artifact_collection.upload_classify_outputs_archive(
             self._project, str(archive_path)
         )

@@ -1,6 +1,6 @@
 import shutil
 from pathlib import Path
-from typing import List
+from typing import Dict, List
 
 import smart_open
 from gretel_client.projects.jobs import Job
@@ -28,7 +28,7 @@ class ClassifyTask:
         self.failed_models = []
         self.completed_record_handlers = []
         self.failed_record_handlers = []
-        self.result_filepaths = {}
+        self.result_filepaths: Dict[str, Path] = {}
 
     def action(self, job: Job) -> str:
         if self.all_rows:
@@ -147,9 +147,10 @@ class ClassifyTask:
         self.multitable._backup()
 
     def _write_results(self, job: Job, artifact: str, table: str) -> None:
-        destpath = str(self.out_dir / f"classify_{table}.gz")
+        filename = f"classify_{table}.gz"
+        destpath = self.out_dir / filename
         with smart_open.open(
             job.get_artifact_link(artifact), "rb"
-        ) as src, smart_open.open(destpath, "wb") as dest:
+        ) as src, smart_open.open(str(destpath), "wb") as dest:
             shutil.copyfileobj(src, dest)
-        self.result_filepaths[table] = destpath
+        self.result_filepaths[filename] = destpath
