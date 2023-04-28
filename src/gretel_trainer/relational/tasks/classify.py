@@ -145,10 +145,10 @@ class ClassifyTask:
 
     def _write_results(self, job: Job, table: str) -> None:
         if isinstance(job, Model):
-            filename = f"classify_first100_{table}.gz"
+            filename = f"classify_subset_{table}.gz"
             artifact_name = "data_preview"
         else:
-            filename = f"classify_complete_{table}.gz"
+            filename = f"classify_all_rows_{table}.gz"
             artifact_name = "data"
 
         destpath = self.out_dir / filename
