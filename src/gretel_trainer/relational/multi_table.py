@@ -453,12 +453,14 @@ class MultiTable:
 
             # Ensure consistent, friendly data source names in Console
             table_data = self.relational_data.get_table_data(table)
-            classify_train_path = self._working_dir / f"classify_train_{table}.csv"
-            table_data.to_csv(classify_train_path, index=False)
+            classify_data_source_path = (
+                self._working_dir / f"classify_data_source_{table}.csv"
+            )
+            table_data.to_csv(classify_data_source_path, index=False)
 
             # Create model
             model = self._project.create_model_obj(
-                model_config=classify_config, data_source=str(classify_train_path)
+                model_config=classify_config, data_source=str(classify_data_source_path)
             )
             self._classify.models[table] = model
 
@@ -468,12 +470,16 @@ class MultiTable:
             classify=self._classify,
             all_rows=all_rows,
             multitable=self,
+            out_dir=self._working_dir,
         )
         run_task(task, self._extended_sdk)
-        # TODO: what next?
-        # - write RH data results to working directory?
-        # - load something into memory for python/notebook review?
-        # - other?
+
+        archive_path = self._working_dir / "classify_outputs.tar.gz"
+        for table, result in task.result_filepaths.items():
+            add_to_tar(archive_path, result, f"classify_{table}.gz")
+        self._artifact_collection.upload_classify_outputs_archive(
+            self._project, str(archive_path)
+        )
 
     def train_transform_models(self, configs: Dict[str, GretelModelConfig]) -> None:
         for table, config in configs.items():

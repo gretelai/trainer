@@ -14,6 +14,7 @@ class ArtifactCollection:
     hybrid: bool
     gretel_debug_summary: Optional[str] = None
     source_archive: Optional[str] = None
+    classify_outputs_archive: Optional[str] = None
     synthetics_training_archive: Optional[str] = None
     synthetics_outputs_archive: Optional[str] = None
     transforms_outputs_archive: Optional[str] = None
@@ -25,6 +26,10 @@ class ArtifactCollection:
     def upload_source_archive(self, project: Project, path: str) -> None:
         existing = self.source_archive
         self.source_archive = self._upload_file(project, path, existing)
+
+    def upload_classify_outputs_archive(self, project: Project, path: str) -> None:
+        existing = self.classify_outputs_archive
+        self.classify_outputs_archive = self._upload_file(project, path, existing)
 
     def upload_synthetics_training_archive(self, project: Project, path: str) -> None:
         existing = self.synthetics_training_archive

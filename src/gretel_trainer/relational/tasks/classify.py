@@ -1,5 +1,8 @@
+import shutil
+from pathlib import Path
 from typing import List
 
+import smart_open
 from gretel_client.projects.jobs import Job
 from gretel_client.projects.models import Model
 from gretel_client.projects.projects import Project
@@ -15,14 +18,17 @@ class ClassifyTask:
         classify: Classify,
         all_rows: bool,
         multitable: common._MultiTable,
+        out_dir: Path,
     ):
         self.classify = classify
         self.all_rows = all_rows
         self.multitable = multitable
+        self.out_dir = out_dir
         self.completed_models = []
         self.failed_models = []
         self.completed_record_handlers = []
         self.failed_record_handlers = []
+        self.result_filepaths = {}
 
     def action(self, job: Job) -> str:
         if self.all_rows:
@@ -103,11 +109,13 @@ class ClassifyTask:
                     number_of_artifacts=self.artifacts_per_job,
                 )
             else:
+                self._write_results(job=job, artifact="data_preview", table=table)
                 common.cleanup(
                     sdk=self.multitable._extended_sdk, project=self.project, job=job
                 )
         elif isinstance(job, RecordHandler):
             self.completed_record_handlers.append(table)
+            self._write_results(job=job, artifact="data", table=table)
             common.log_success(table, self.action(job))
             common.cleanup(
                 sdk=self.multitable._extended_sdk, project=self.project, job=job
@@ -137,3 +145,11 @@ class ClassifyTask:
 
     def each_iteration(self) -> None:
         self.multitable._backup()
+
+    def _write_results(self, job: Job, artifact: str, table: str) -> None:
+        destpath = str(self.out_dir / f"classify_{table}.gz")
+        with smart_open.open(
+            job.get_artifact_link(artifact), "rb"
+        ) as src, smart_open.open(destpath, "wb") as dest:
+            shutil.copyfileobj(src, dest)
+        self.result_filepaths[table] = destpath
