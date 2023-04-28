@@ -4,11 +4,12 @@ import json
 import logging
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple, Union, overload
+from typing import Any, Dict, List, Optional, Union, overload
 
 import networkx
 import pandas as pd
-from networkx.algorithms.dag import dag_longest_path_length
+from networkx.algorithms.dag import dag_longest_path_length, topological_sort
+from pandas.api.types import is_string_dtype
 from typing_extensions import Literal
 
 logger = logging.getLogger(__name__)
@@ -145,7 +146,12 @@ class RelationalData:
         a string column name (most common), or a list of multiple string column names (composite key).
         """
         primary_key = self._format_key_column(primary_key)
-        self.graph.add_node(name, primary_key=primary_key, data=data)
+        self.graph.add_node(
+            name,
+            primary_key=primary_key,
+            data=data,
+            columns=set(data.columns),
+        )
 
     def set_primary_key(
         self, *, table: str, primary_key: UserFriendlyPrimaryKeyT
@@ -159,12 +165,13 @@ class RelationalData:
 
         primary_key = self._format_key_column(primary_key)
 
-        known_columns = self.get_table_data(table).columns
+        known_columns = self.get_table_columns(table)
         for col in primary_key:
             if col not in known_columns:
                 raise MultiTableException(f"Unrecognized column name: `{primary_key}`")
 
         self.graph.nodes[table]["primary_key"] = primary_key
+        self._clear_safe_ancestral_seed_columns(table)
 
     def _format_key_column(self, key: Optional[Union[str, List[str]]]) -> List[str]:
         if key is None:
@@ -206,14 +213,14 @@ class RelationalData:
                 "Invalid column constraints in foreign key arguments"
             )
 
-        table_all_columns = self.get_table_data(table).columns
+        table_all_columns = self.get_table_columns(table)
         for col in constrained_columns:
             if col not in table_all_columns:
                 logger.warning(
                     f"Constrained column `{col}` does not exist on table `{table}`"
                 )
                 abort = True
-        referred_table_all_columns = self.get_table_data(referred_table).columns
+        referred_table_all_columns = self.get_table_columns(referred_table)
         for col in referred_columns:
             if col not in referred_table_all_columns:
                 logger.warning(
@@ -236,6 +243,7 @@ class RelationalData:
             )
         )
         edge["via"] = via
+        self._clear_safe_ancestral_seed_columns(table)
 
     def remove_foreign_key(self, table: str, constrained_columns: List[str]) -> None:
         """
@@ -261,10 +269,13 @@ class RelationalData:
             self.graph.remove_edge(table, key_to_remove.parent_table_name)
         else:
             edge["via"] = via
+        self._clear_safe_ancestral_seed_columns(table)
 
     def update_table_data(self, table: str, data: pd.DataFrame) -> None:
         try:
             self.graph.nodes[table]["data"] = data
+            self.graph.nodes[table]["columns"] = data.columns
+            self._clear_safe_ancestral_seed_columns(table)
         except KeyError:
             raise MultiTableException(
                 f"Unrecognized table name: {table}. If this is a new table to add, use `add_table`."
@@ -302,11 +313,53 @@ class RelationalData:
 
         return list(descendants)
 
+    def list_tables_parents_before_children(self) -> List[str]:
+        """
+        Returns a list of all tables with the guarantee that a parent table
+        appears before any of its children. No other guarantees about order
+        are made, e.g. the following (and others) are all valid outputs:
+        [p1, p2, c1, c2] or [p2, c2, p1, c1] or [p2, p1, c1, c2] etc.
+        """
+        return list(reversed(list(topological_sort(self.graph))))
+
     def get_primary_key(self, table: str) -> List[str]:
         return self.graph.nodes[table]["primary_key"]
 
-    def get_table_data(self, table: str) -> pd.DataFrame:
-        return self.graph.nodes[table]["data"]
+    def get_table_data(
+        self, table: str, usecols: Optional[set[str]] = None
+    ) -> pd.DataFrame:
+        usecols = usecols or self.get_table_columns(table)
+        return self.graph.nodes[table]["data"][list(usecols)]
+
+    def get_table_columns(self, table: str) -> set[str]:
+        return self.graph.nodes[table]["columns"]
+
+    def get_safe_ancestral_seed_columns(self, table: str) -> set[str]:
+        safe_columns = self.graph.nodes[table].get("safe_ancestral_seed_columns")
+        if safe_columns is None:
+            safe_columns = self._set_safe_ancestral_seed_columns(table)
+        return safe_columns
+
+    def _set_safe_ancestral_seed_columns(self, table: str) -> set[str]:
+        cols = set()
+
+        # Key columns are always kept
+        cols.update(self.get_primary_key(table))
+        for fk in self.get_foreign_keys(table):
+            cols.update(fk.columns)
+
+        data = self.get_table_data(table)
+        for col in self.get_table_columns(table):
+            if col in cols:
+                continue
+            if _ok_for_train_and_seed(col, data):
+                cols.add(col)
+
+        self.graph.nodes[table]["safe_ancestral_seed_columns"] = cols
+        return cols
+
+    def _clear_safe_ancestral_seed_columns(self, table: str) -> None:
+        self.graph.nodes[table]["safe_ancestral_seed_columns"] = None
 
     def get_foreign_keys(self, table: str) -> List[ForeignKey]:
         foreign_keys = []
@@ -403,3 +456,38 @@ class RelationalData:
             )
 
         return relational_data
+
+
+def _ok_for_train_and_seed(col: str, df: pd.DataFrame) -> bool:
+    if _is_highly_nan(col, df):
+        return False
+
+    if _is_highly_unique_categorical(col, df):
+        return False
+
+    return True
+
+
+def _is_highly_nan(col: str, df: pd.DataFrame) -> bool:
+    total = len(df)
+    if total == 0:
+        return False
+
+    missing = df[col].isnull().sum()
+    missing_perc = missing / total
+    return missing_perc > 0.2
+
+
+def _is_highly_unique_categorical(col: str, df: pd.DataFrame) -> bool:
+    return is_string_dtype(df[col]) and _percent_unique(col, df) >= 0.7
+
+
+def _percent_unique(col: str, df: pd.DataFrame) -> float:
+    col_no_nan = df[col].dropna()
+    total = len(col_no_nan)
+    distinct = col_no_nan.nunique()
+
+    if total == 0:
+        return 0.0
+    else:
+        return distinct / total

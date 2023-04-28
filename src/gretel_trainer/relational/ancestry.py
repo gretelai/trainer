@@ -50,6 +50,7 @@ def get_table_data_with_ancestors(
     rel_data: RelationalData,
     table: str,
     tableset: Optional[Dict[str, pd.DataFrame]] = None,
+    ancestral_seeding: bool = False,
 ) -> pd.DataFrame:
     """
     Returns a data frame with all ancestral data joined to each record.
@@ -66,7 +67,7 @@ def get_table_data_with_ancestors(
     else:
         df = rel_data.get_table_data(table)
     df = df.add_prefix(f"{_START_LINEAGE}{_END_LINEAGE}")
-    return _join_parents(rel_data, df, table, lineage, tableset)
+    return _join_parents(rel_data, df, table, lineage, tableset, ancestral_seeding)
 
 
 def _join_parents(
@@ -75,16 +76,23 @@ def _join_parents(
     table: str,
     lineage: str,
     tableset: Optional[Dict[str, pd.DataFrame]],
+    ancestral_seeding: bool,
 ) -> pd.DataFrame:
     for foreign_key in rel_data.get_foreign_keys(table):
         fk_lineage = _COL_DELIMITER.join(foreign_key.columns)
         next_lineage = f"{lineage}{_GEN_DELIMITER}{fk_lineage}"
 
         parent_table_name = foreign_key.parent_table_name
-        if tableset is not None:
-            parent_data = tableset[parent_table_name]
+
+        if ancestral_seeding:
+            usecols = rel_data.get_safe_ancestral_seed_columns(parent_table_name)
         else:
-            parent_data = rel_data.get_table_data(parent_table_name)
+            usecols = rel_data.get_table_columns(parent_table_name)
+
+        if tableset is not None:
+            parent_data = tableset[parent_table_name][list(usecols)]
+        else:
+            parent_data = rel_data.get_table_data(parent_table_name, usecols=usecols)
         parent_data = parent_data.add_prefix(f"{next_lineage}{_END_LINEAGE}")
 
         df = df.merge(
@@ -97,7 +105,9 @@ def _join_parents(
             ],
         )
 
-        df = _join_parents(rel_data, df, parent_table_name, next_lineage, tableset)
+        df = _join_parents(
+            rel_data, df, parent_table_name, next_lineage, tableset, ancestral_seeding
+        )
     return df
 
 

@@ -46,6 +46,50 @@ def test_mutagenesis_relational_data(mutagenesis):
     assert set(mutagenesis.get_all_key_columns("atom")) == {"atom_id", "molecule_id"}
 
 
+def test_column_metadata(pets):
+    assert pets.get_table_columns("humans") == {"id", "name", "city"}
+
+    # Name is a highly unique categorical field, so is excluded
+    assert pets.get_safe_ancestral_seed_columns("humans") == {"id", "city"}
+
+    # Update the table data such that:
+    # - id is highly unique categorical, but still the PK
+    # - name is no longer highly unique
+    # - city is highly NaN
+    pets.update_table_data(
+        "humans",
+        pd.DataFrame(
+            data={
+                "id": ["1", "2", "3"],
+                "name": ["n", "n", "n"],
+                "city": [None, None, "Chicago"],
+            }
+        ),
+    )
+    assert pets.get_safe_ancestral_seed_columns("humans") == {"id", "name"}
+
+    # Resetting the primary key refreshes the cache state
+    # In this case, since id is no longer the PK and is highly unique, it is excluded
+    pets.set_primary_key(table="humans", primary_key=None)
+    assert pets.get_safe_ancestral_seed_columns("humans") == {"name"}
+
+    # Reset back to normal
+    pets.set_primary_key(table="humans", primary_key="id")
+
+    # Setting a column as a foreign key ensures it is included
+    pets.add_foreign_key(
+        table="humans",
+        constrained_columns=["city"],
+        referred_table="pets",
+        referred_columns=["id"],
+    )
+    assert pets.get_safe_ancestral_seed_columns("humans") == {"id", "name", "city"}
+
+    # Removing a foreign key refreshes the cache state
+    pets.remove_foreign_key("humans", ["city"])
+    assert pets.get_safe_ancestral_seed_columns("humans") == {"id", "name"}
+
+
 def test_adding_and_removing_foreign_keys():
     rel_data = RelationalData()
     rel_data.add_table(
@@ -132,6 +176,26 @@ def test_set_primary_key(ecom):
     # Can't set primary key to a non-existent column
     with pytest.raises(MultiTableException):
         ecom.set_primary_key(table="users", primary_key="not_a_column")
+
+
+def test_get_subset_of_data(pets):
+    normal_length = len(pets.get_table_data("humans"))
+    subset = pets.get_table_data("humans", ["name", "city"])
+    assert set(subset.columns) == {"name", "city"}
+    assert len(subset) == normal_length
+
+
+def test_list_tables_parents_before_children(ecom):
+    def in_order(col, t1, t2):
+        return col.index(t1) < col.index(t2)
+
+    tables = ecom.list_tables_parents_before_children()
+    assert in_order(tables, "users", "events")
+    assert in_order(tables, "distribution_center", "products")
+    assert in_order(tables, "distribution_center", "inventory_items")
+    assert in_order(tables, "products", "inventory_items")
+    assert in_order(tables, "inventory_items", "order_items")
+    assert in_order(tables, "users", "order_items")
 
 
 def test_relational_data_as_dict(ecom):
