@@ -13,9 +13,11 @@ class ClassifyTask:
     def __init__(
         self,
         classify: Classify,
+        all_rows: bool,
         multitable: common._MultiTable,
     ):
         self.classify = classify
+        self.all_rows = all_rows
         self.multitable = multitable
         self.completed_models = []
         self.failed_models = []
@@ -23,8 +25,11 @@ class ClassifyTask:
         self.failed_record_handlers = []
 
     def action(self, job: Job) -> str:
-        if isinstance(job, Model):
-            return "classify training"
+        if self.all_rows:
+            if isinstance(job, Model):
+                return "classify training"
+            else:
+                return "classification (all rows)"
         else:
             return "classification"
 
@@ -42,17 +47,21 @@ class ClassifyTask:
 
     def more_to_do(self) -> bool:
         total_tables = len(self.classify.models)
-        return (
-            len(self._finished_models) < total_tables
-            or len(self._finished_record_handlers) < total_tables
+        any_unfinished_models = len(self._finished_models) < total_tables
+        any_unfinished_record_handlers = (
+            len(self._finished_record_handlers) < total_tables
         )
 
-    def wait(self) -> None:
-        # Classify training is fast
-        if len(self._finished_models) < len(self.classify.models):
-            duration = 15
+        if self.all_rows:
+            return any_unfinished_models or any_unfinished_record_handlers
         else:
+            return any_unfinished_models
+
+    def wait(self) -> None:
+        if self.all_rows:
             duration = self.multitable._refresh_interval
+        else:
+            duration = 15
         common.wait(duration)
 
     @property
@@ -64,9 +73,13 @@ class ClassifyTask:
         return self.completed_record_handlers + self.failed_record_handlers
 
     def is_finished(self, table: str) -> bool:
-        return (
-            table in self._finished_models and table in self._finished_record_handlers
-        )
+        if self.all_rows:
+            return (
+                table in self._finished_models
+                and table in self._finished_record_handlers
+            )
+        else:
+            return table in self._finished_models
 
     def get_job(self, table: str) -> Job:
         record_handler = self.classify.record_handlers.get(table)
@@ -77,15 +90,22 @@ class ClassifyTask:
         if isinstance(job, Model):
             self.completed_models.append(table)
             common.log_success(table, self.action(job))
-            record_handler = job.create_record_handler_obj(data_source=job.data_source)
-            self.classify.record_handlers[table] = record_handler
-            self.multitable._extended_sdk.start_job_if_possible(
-                job=record_handler,
-                table_name=table,
-                action=self.action(record_handler),
-                project=self.project,
-                number_of_artifacts=self.artifacts_per_job,
-            )
+            if self.all_rows:
+                record_handler = job.create_record_handler_obj(
+                    data_source=job.data_source
+                )
+                self.classify.record_handlers[table] = record_handler
+                self.multitable._extended_sdk.start_job_if_possible(
+                    job=record_handler,
+                    table_name=table,
+                    action=self.action(record_handler),
+                    project=self.project,
+                    number_of_artifacts=self.artifacts_per_job,
+                )
+            else:
+                common.cleanup(
+                    sdk=self.multitable._extended_sdk, project=self.project, job=job
+                )
         elif isinstance(job, RecordHandler):
             self.completed_record_handlers.append(table)
             common.log_success(table, self.action(job))

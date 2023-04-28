@@ -447,7 +447,7 @@ class MultiTable:
             self._project, str(debug_summary_path)
         )
 
-    def classify(self, config: GretelModelConfig) -> None:
+    def classify(self, config: GretelModelConfig, all_rows: bool = False) -> None:
         for table in self.relational_data.list_all_tables():
             classify_config = make_classify_config(table, config)
 
@@ -466,6 +466,7 @@ class MultiTable:
 
         task = ClassifyTask(
             classify=self._classify,
+            all_rows=all_rows,
             multitable=self,
         )
         run_task(task, self._extended_sdk)
