@@ -163,6 +163,20 @@ class MultiTable:
                 self._working_dir / "_gretel_debug_summary.json",
             )
 
+        # Classify
+        classify_outputs_archive_path = (
+            self._working_dir / "classify_outputs.tar.gz"
+        )
+        if (classify_outputs_archive_id := backup.artifact_collection.classify_outputs_archive) is not None:
+            self._extended_sdk.download_tar_artifact(
+                self._project,
+                classify_outputs_archive_id,
+                classify_outputs_archive_path,
+            )
+        if classify_outputs_archive_path.exists():
+            with tarfile.open(classify_outputs_archive_path, "r:gz") as tar:
+                tar.extractall(path=self._working_dir)
+
         # Transforms Train
         backup_transforms_train = backup.transforms_train
         if backup_transforms_train is None:
