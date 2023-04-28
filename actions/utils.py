@@ -3,11 +3,15 @@ Common utils for action modules
 """
 from __future__ import annotations
 
+import uuid
+from functools import cached_property
 from pathlib import Path
 from typing import Optional
 
+import requests
 from gretel_client import configure_session
 from gretel_client.projects.models import read_model_config
+from gretel_client.users.users import get_me
 from gretel_trainer.relational.connectors import Connector
 from pydantic import BaseSettings, SecretStr
 from sqlalchemy import create_engine
@@ -36,6 +40,7 @@ class GretelSettings(BaseSettings):
     gretel_work_dir: Optional[str]
     source_db: Optional[SecretStr]
     sink_db: Optional[SecretStr]
+    webhook: Optional[SecretStr]
 
     class Config:
         env_file = ".env"
@@ -44,9 +49,11 @@ class GretelSettings(BaseSettings):
 class ActionUtils:
 
     settings: GretelSettings
+    action_id: str
 
     def __init__(self):
         self.settings = GretelSettings()
+        self.action_id = uuid.uuid4().hex[-6:]
 
     def validate_db_connections(self) -> None:
         errors = []
@@ -94,6 +101,10 @@ class ActionUtils:
             )
 
         return self.settings.gretel_work_dir
+    
+    @cached_property
+    def this_gretel_user(self) -> str:
+        return get_me()["email"]
 
     def bootstrap(self) -> ActionUtils:
         """
@@ -104,6 +115,8 @@ class ActionUtils:
         _ = self.gretel_config
         _ = self.work_dir
         self.validate_db_connections()
+        if self.settings.webhook and not self.settings.webhook.get_secret_value().startswith("https://"):
+            raise GretelSettingsError("The webhook provided is not a https:// endpoint!")
         return self
 
     def get_connector(self, conn_type: str) -> Connector:
@@ -117,3 +130,21 @@ class ActionUtils:
             )
 
         return Connector(create_engine(db_str.get_secret_value()))
+    
+    def send_webhook(self, msg: str) -> None:
+        if self.settings.webhook is None:
+            return
+        
+        msg = msg + f" (Action ID: {self.action_id})"
+        
+        webhook_url = self.settings.webhook.get_secret_value()
+        payload = {"message": msg}
+
+        if webhook_url.startswith("https://hooks.slack.com"):
+            payload = {"text": msg}
+
+        try:
+            requests.post(webhook_url, json=payload)
+        except Exception:
+            # TODO: Where to surface this error?
+            return

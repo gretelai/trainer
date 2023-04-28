@@ -28,7 +28,7 @@ to a directory on the host.
 
 The only requirements to run an action should be:
 
-- A `.env` file or some other method to get env vars set on the system or within the container
+- An `.env` file
 - Execution of the action's Python module. If using the Docker container, you must provide the `GRETEL_ACTION` variable, this should match the name of the Python module (action) you want to run.
 
 ## Transform Relational
@@ -40,8 +40,10 @@ using the provided config. An example `.env` is below.
 GRETEL_ACTION=transform_relational
 GRETEL_CONFIG=/gretel/data/transform_config.yml
 GRETEL_API_KEY=grtuXXX
+GRETEL_PROJECT_DISPLAY_NAME=transform-relational-action
 SOURCE_DB=mysql://dynf4plkdpg6e14abhf5:PASSWORD@aws.connect.psdb.cloud:3306/relational-demo?ssl=true&charset=utf8mb4
 SINK_DB=sqlite:////gretel/data/transformed.db
+WEBHOOK=https://hooks.slack.com/XXX
 ```
 
 Then you can launch the container:

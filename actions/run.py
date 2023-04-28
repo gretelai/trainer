@@ -2,12 +2,11 @@
 Generic entrypoint that can read a specific action from the
 environment and start the work.
 """
-import sys
 import logging
-
-from utils import ActionUtils
+import sys
 
 from transform_relational import transform_db
+from utils import ActionUtils
 
 logging.basicConfig()
 logger = logging.getLogger(__name__)
@@ -36,5 +35,12 @@ if __name__ == "__main__":
         sys.exit(1)
 
     _, action_fn = action_tuple
-    logger.info(f"Starting action: {action_name}")
-    action_fn()
+    action_utils.send_webhook(f"Starting Gretel Trainer Action: {action_name} for Gretel user: {action_utils.this_gretel_user}")
+    logger.info(f"Starting action: {action_name} (Action ID: {action_utils.action_id})")
+    try:
+        action_fn(action_utils=action_utils)
+    except Exception as err:
+        action_utils.send_webhook(f"The Gretel Trainer Action: {action_name} encountered an error: {str(err)}")
+        raise
+    else:
+        action_utils.send_webhook(f"Gretel Trainer Action {action_name} has completed.")
