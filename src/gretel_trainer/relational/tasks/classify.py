@@ -109,17 +109,16 @@ class ClassifyTask:
                     number_of_artifacts=self.artifacts_per_job,
                 )
             else:
-                self._write_results(job=job, artifact="data_preview", table=table)
                 common.cleanup(
                     sdk=self.multitable._extended_sdk, project=self.project, job=job
                 )
         elif isinstance(job, RecordHandler):
             self.completed_record_handlers.append(table)
-            self._write_results(job=job, artifact="data", table=table)
             common.log_success(table, self.action(job))
             common.cleanup(
                 sdk=self.multitable._extended_sdk, project=self.project, job=job
             )
+        self._write_results(job=job, table=table)
 
     def handle_failed(self, table: str, job: Job) -> None:
         if isinstance(job, Model):
@@ -146,11 +145,18 @@ class ClassifyTask:
     def each_iteration(self) -> None:
         self.multitable._backup()
 
-    def _write_results(self, job: Job, artifact: str, table: str) -> None:
-        filename = f"classify_{table}.gz"
+    def _write_results(self, job: Job, table: str) -> None:
+        if isinstance(job, Model):
+            filename = f"classify_first100_{table}.gz"
+            artifact_name = "data_preview"
+        else:
+            filename = f"classify_complete_{table}.gz"
+            artifact_name = "data"
+
         destpath = self.out_dir / filename
+
         with smart_open.open(
-            job.get_artifact_link(artifact), "rb"
+            job.get_artifact_link(artifact_name), "rb"
         ) as src, smart_open.open(str(destpath), "wb") as dest:
             shutil.copyfileobj(src, dest)
         self.result_filepaths[filename] = destpath
