@@ -71,7 +71,7 @@ def add_to_tar(targz: Path, src: Path, arcname: str) -> None:
 
                 r.extractall(tmpdir)
                 for member in r.getnames():
-                    if os.path.isfile(tmpdir / member):
+                    if os.path.isfile(tmpdir / member) and not member == arcname:
                         w.add(tmpdir / member, arcname=member)
     else:
         with tarfile.open(targz, "w:gz") as tar:

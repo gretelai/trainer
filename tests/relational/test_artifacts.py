@@ -25,6 +25,25 @@ def test_appends_to_existing_archive():
             assert len(tar.getnames()) == 2
 
 
+def test_overwrites_existing_file_in_archive():
+    with tempfile.TemporaryDirectory() as tmpdir, tempfile.NamedTemporaryFile() as tf1:
+        archive_path = Path(tmpdir) / "archive.tar.gz"
+        add_to_tar(archive_path, Path(tf1.name), "tf1")
+        add_to_tar(archive_path, Path(tf1.name), "tf1")
+
+        with tarfile.open(archive_path, "r:gz") as tar:
+            assert len(tar.getnames()) == 1
+
+    # Overwrite is based on provided arcname, not file contents
+    with tempfile.TemporaryDirectory() as tmpdir, tempfile.NamedTemporaryFile() as tf1, tempfile.NamedTemporaryFile() as tf2:
+        archive_path = Path(tmpdir) / "archive.tar.gz"
+        add_to_tar(archive_path, Path(tf1.name), "name")
+        add_to_tar(archive_path, Path(tf2.name), "name")
+
+        with tarfile.open(archive_path, "r:gz") as tar:
+            assert len(tar.getnames()) == 1
+
+
 def test_uploads_path_to_project_and_stores_artifact_key():
     ac = ArtifactCollection(hybrid=False)
     project = Mock()
