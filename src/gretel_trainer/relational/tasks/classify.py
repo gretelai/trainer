@@ -9,21 +9,24 @@ from gretel_client.projects.projects import Project
 from gretel_client.projects.records import RecordHandler
 
 import gretel_trainer.relational.tasks.common as common
+from gretel_trainer.relational.workflow_state import Classify
 
 
 class ClassifyTask:
     def __init__(
         self,
-        classify_models: Dict[str, Model],
+        classify: Classify,
+        data_sources: Dict[str, str],
         all_rows: bool,
         multitable: common._MultiTable,
         out_dir: Path,
     ):
-        self.classify_models = classify_models
-        self.classify_record_handlers: Dict[str, RecordHandler] = {}
+        self.classify = classify
+        self.data_sources = data_sources
         self.all_rows = all_rows
         self.multitable = multitable
         self.out_dir = out_dir
+        self.classify_record_handlers: Dict[str, RecordHandler] = {}
         self.completed_models = []
         self.failed_models = []
         self.completed_record_handlers = []
@@ -49,10 +52,10 @@ class ClassifyTask:
 
     @property
     def table_collection(self) -> List[str]:
-        return list(self.classify_models.keys())
+        return list(self.classify.models.keys())
 
     def more_to_do(self) -> bool:
-        total_tables = len(self.classify_models)
+        total_tables = len(self.classify.models)
         any_unfinished_models = len(self._finished_models) < total_tables
         any_unfinished_record_handlers = (
             len(self._finished_record_handlers) < total_tables
@@ -89,7 +92,7 @@ class ClassifyTask:
 
     def get_job(self, table: str) -> Job:
         record_handler = self.classify_record_handlers.get(table)
-        model = self.classify_models.get(table)
+        model = self.classify.models.get(table)
         return record_handler or model
 
     def handle_completed(self, table: str, job: Job) -> None:
@@ -98,7 +101,7 @@ class ClassifyTask:
             common.log_success(table, self.action(job))
             if self.all_rows:
                 record_handler = job.create_record_handler_obj(
-                    data_source=job.data_source
+                    data_source=self.data_sources[table]
                 )
                 self.classify_record_handlers[table] = record_handler
                 self.multitable._extended_sdk.start_job_if_possible(
@@ -108,17 +111,11 @@ class ClassifyTask:
                     project=self.project,
                     number_of_artifacts=self.artifacts_per_job,
                 )
-            else:
-                common.cleanup(
-                    sdk=self.multitable._extended_sdk, project=self.project, job=job
-                )
         elif isinstance(job, RecordHandler):
             self.completed_record_handlers.append(table)
             common.log_success(table, self.action(job))
-            common.cleanup(
-                sdk=self.multitable._extended_sdk, project=self.project, job=job
-            )
         self._write_results(job=job, table=table)
+        common.cleanup(sdk=self.multitable._extended_sdk, project=self.project, job=job)
 
     def handle_failed(self, table: str, job: Job) -> None:
         if isinstance(job, Model):

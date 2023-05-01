@@ -54,6 +54,7 @@ from gretel_trainer.relational.tasks import (
     TransformsTrainTask,
 )
 from gretel_trainer.relational.workflow_state import (
+    Classify,
     SyntheticsRun,
     SyntheticsTrain,
     TransformsTrain,
@@ -94,6 +95,7 @@ class MultiTable:
         self._artifact_collection = ArtifactCollection(hybrid=self._hybrid)
         self._extended_sdk = ExtendedGretelSDK(hybrid=self._hybrid)
         self._latest_backup: Optional[Backup] = None
+        self._classify = Classify()
         self._transforms_train = TransformsTrain()
         self.transform_output_tables: Dict[str, pd.DataFrame] = {}
         self._synthetics_train = SyntheticsTrain()
@@ -460,27 +462,34 @@ class MultiTable:
         )
 
     def classify(self, config: GretelModelConfig, all_rows: bool = False) -> None:
-        classify_models = {}
+        classify_data_sources = {}
         for table in self.relational_data.list_all_tables():
+
             classify_config = make_classify_config(table, config)
 
             # Ensure consistent, friendly data source names in Console
             table_data = self.relational_data.get_table_data(table)
-            classify_data_source_path = (
+            classify_data_source_path = str(
                 self._working_dir / f"classify_data_source_{table}.csv"
             )
             table_data.to_csv(classify_data_source_path, index=False)
 
-            # Create model
+            classify_data_sources[table] = classify_data_source_path
+
+            # Create model if necessary
+            if self._classify.models.get(table) is not None:
+                continue
+
             model = self._project.create_model_obj(
-                model_config=classify_config, data_source=str(classify_data_source_path)
+                model_config=classify_config, data_source=classify_data_source_path
             )
-            classify_models[table] = model
+            self._classify.models[table] = model
 
         self._backup()
 
         task = ClassifyTask(
-            classify_models=classify_models,
+            classify=self._classify,
+            data_sources=classify_data_sources,
             all_rows=all_rows,
             multitable=self,
             out_dir=self._working_dir,
