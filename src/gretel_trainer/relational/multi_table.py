@@ -164,10 +164,10 @@ class MultiTable:
             )
 
         # Classify
-        classify_outputs_archive_path = (
-            self._working_dir / "classify_outputs.tar.gz"
-        )
-        if (classify_outputs_archive_id := backup.artifact_collection.classify_outputs_archive) is not None:
+        classify_outputs_archive_path = self._working_dir / "classify_outputs.tar.gz"
+        if (
+            classify_outputs_archive_id := backup.artifact_collection.classify_outputs_archive
+        ) is not None:
             self._extended_sdk.download_tar_artifact(
                 self._project,
                 classify_outputs_archive_id,
