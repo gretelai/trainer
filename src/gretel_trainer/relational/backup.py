@@ -52,6 +52,11 @@ class BackupRelationalData:
 
 
 @dataclass
+class BackupClassify:
+    model_ids: Dict[str, str]
+
+
+@dataclass
 class BackupTransformsTrain:
     model_ids: Dict[str, str]
     lost_contact: List[str]
@@ -83,6 +88,7 @@ class Backup:
     refresh_interval: int
     artifact_collection: ArtifactCollection
     relational_data: BackupRelationalData
+    classify: Optional[BackupClassify] = None
     transforms_train: Optional[BackupTransformsTrain] = None
     synthetics_train: Optional[BackupSyntheticsTrain] = None
     generate: Optional[BackupGenerate] = None
@@ -119,6 +125,10 @@ class Backup:
             artifact_collection=ArtifactCollection(**b["artifact_collection"]),
             relational_data=brd,
         )
+
+        classify = b.get("classify")
+        if classify is not None:
+            backup.classify = BackupClassify(**classify)
 
         transforms_train = b.get("transforms_train")
         if transforms_train is not None:

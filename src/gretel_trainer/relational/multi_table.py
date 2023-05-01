@@ -22,6 +22,7 @@ from gretel_client.projects.records import RecordHandler
 from gretel_trainer.relational.artifacts import ArtifactCollection, add_to_tar
 from gretel_trainer.relational.backup import (
     Backup,
+    BackupClassify,
     BackupGenerate,
     BackupRelationalData,
     BackupSyntheticsTrain,
@@ -166,6 +167,7 @@ class MultiTable:
             )
 
         # Classify
+        ## First, download the outputs archive if present and extract the data.
         classify_outputs_archive_path = self._working_dir / "classify_outputs.tar.gz"
         if (
             classify_outputs_archive_id := backup.artifact_collection.classify_outputs_archive
@@ -178,6 +180,18 @@ class MultiTable:
         if classify_outputs_archive_path.exists():
             with tarfile.open(classify_outputs_archive_path, "r:gz") as tar:
                 tar.extractall(path=self._working_dir)
+
+        ## Then, restore model state if present
+        backup_classify = backup.classify
+        if backup_classify is None:
+            logger.info("No classify data found in backup.")
+        else:
+            logger.info("Restoring classify models")
+            self._classify.models = {
+                table: self._project.get_model(model_id)
+                for table, model_id in backup_classify.model_ids.items()
+            }
+            ...
 
         # Transforms Train
         backup_transforms_train = backup.transforms_train
@@ -394,6 +408,15 @@ class MultiTable:
                 self.relational_data
             ),
         )
+
+        # Classify
+        if len(self._classify.models) > 0:
+            backup.classify = BackupClassify(
+                model_ids={
+                    table: model.model_id
+                    for table, model in self._classify.models.items()
+                }
+            )
 
         # Transforms Train
         if len(self._transforms_train.models) > 0:
