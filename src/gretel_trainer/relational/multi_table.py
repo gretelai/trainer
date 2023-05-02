@@ -487,7 +487,6 @@ class MultiTable:
     def classify(self, config: GretelModelConfig, all_rows: bool = False) -> None:
         classify_data_sources = {}
         for table in self.relational_data.list_all_tables():
-
             classify_config = make_classify_config(table, config)
 
             # Ensure consistent, friendly data source names in Console
