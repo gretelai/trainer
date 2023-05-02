@@ -14,6 +14,7 @@ class ArtifactCollection:
     hybrid: bool
     gretel_debug_summary: Optional[str] = None
     source_archive: Optional[str] = None
+    classify_outputs_archive: Optional[str] = None
     synthetics_training_archive: Optional[str] = None
     synthetics_outputs_archive: Optional[str] = None
     transforms_outputs_archive: Optional[str] = None
@@ -25,6 +26,10 @@ class ArtifactCollection:
     def upload_source_archive(self, project: Project, path: str) -> None:
         existing = self.source_archive
         self.source_archive = self._upload_file(project, path, existing)
+
+    def upload_classify_outputs_archive(self, project: Project, path: str) -> None:
+        existing = self.classify_outputs_archive
+        self.classify_outputs_archive = self._upload_file(project, path, existing)
 
     def upload_synthetics_training_archive(self, project: Project, path: str) -> None:
         existing = self.synthetics_training_archive
@@ -66,7 +71,7 @@ def add_to_tar(targz: Path, src: Path, arcname: str) -> None:
 
                 r.extractall(tmpdir)
                 for member in r.getnames():
-                    if os.path.isfile(tmpdir / member):
+                    if os.path.isfile(tmpdir / member) and not member == arcname:
                         w.add(tmpdir / member, arcname=member)
     else:
         with tarfile.open(targz, "w:gz") as tar:

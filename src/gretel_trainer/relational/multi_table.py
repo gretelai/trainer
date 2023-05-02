@@ -22,6 +22,7 @@ from gretel_client.projects.records import RecordHandler
 from gretel_trainer.relational.artifacts import ArtifactCollection, add_to_tar
 from gretel_trainer.relational.backup import (
     Backup,
+    BackupClassify,
     BackupGenerate,
     BackupRelationalData,
     BackupSyntheticsTrain,
@@ -35,6 +36,7 @@ from gretel_trainer.relational.core import (
 )
 from gretel_trainer.relational.log import silent_logs
 from gretel_trainer.relational.model_config import (
+    make_classify_config,
     make_evaluate_config,
     make_synthetics_config,
     make_transform_config,
@@ -45,6 +47,7 @@ from gretel_trainer.relational.strategies.ancestral import AncestralStrategy
 from gretel_trainer.relational.strategies.independent import IndependentStrategy
 from gretel_trainer.relational.task_runner import run_task
 from gretel_trainer.relational.tasks import (
+    ClassifyTask,
     SyntheticsEvaluateTask,
     SyntheticsRunTask,
     SyntheticsTrainTask,
@@ -52,6 +55,7 @@ from gretel_trainer.relational.tasks import (
     TransformsTrainTask,
 )
 from gretel_trainer.relational.workflow_state import (
+    Classify,
     SyntheticsRun,
     SyntheticsTrain,
     TransformsTrain,
@@ -92,6 +96,7 @@ class MultiTable:
         self._artifact_collection = ArtifactCollection(hybrid=self._hybrid)
         self._extended_sdk = ExtendedGretelSDK(hybrid=self._hybrid)
         self._latest_backup: Optional[Backup] = None
+        self._classify = Classify()
         self._transforms_train = TransformsTrain()
         self.transform_output_tables: Dict[str, pd.DataFrame] = {}
         self._synthetics_train = SyntheticsTrain()
@@ -160,6 +165,33 @@ class MultiTable:
                 debug_summary_id,
                 self._working_dir / "_gretel_debug_summary.json",
             )
+
+        # Classify
+        ## First, download the outputs archive if present and extract the data.
+        classify_outputs_archive_path = self._working_dir / "classify_outputs.tar.gz"
+        if (
+            classify_outputs_archive_id := backup.artifact_collection.classify_outputs_archive
+        ) is not None:
+            self._extended_sdk.download_tar_artifact(
+                self._project,
+                classify_outputs_archive_id,
+                classify_outputs_archive_path,
+            )
+        if classify_outputs_archive_path.exists():
+            with tarfile.open(classify_outputs_archive_path, "r:gz") as tar:
+                tar.extractall(path=self._working_dir)
+
+        ## Then, restore model state if present
+        backup_classify = backup.classify
+        if backup_classify is None:
+            logger.info("No classify data found in backup.")
+        else:
+            logger.info("Restoring classify models")
+            self._classify.models = {
+                table: self._project.get_model(model_id)
+                for table, model_id in backup_classify.model_ids.items()
+            }
+            ...
 
         # Transforms Train
         backup_transforms_train = backup.transforms_train
@@ -377,6 +409,15 @@ class MultiTable:
             ),
         )
 
+        # Classify
+        if len(self._classify.models) > 0:
+            backup.classify = BackupClassify(
+                model_ids={
+                    table: model.model_id
+                    for table, model in self._classify.models.items()
+                }
+            )
+
         # Transforms Train
         if len(self._transforms_train.models) > 0:
             backup.transforms_train = BackupTransformsTrain(
@@ -441,6 +482,47 @@ class MultiTable:
             json.dump(content, dbg)
         self._artifact_collection.upload_gretel_debug_summary(
             self._project, str(debug_summary_path)
+        )
+
+    def classify(self, config: GretelModelConfig, all_rows: bool = False) -> None:
+        classify_data_sources = {}
+        for table in self.relational_data.list_all_tables():
+            classify_config = make_classify_config(table, config)
+
+            # Ensure consistent, friendly data source names in Console
+            table_data = self.relational_data.get_table_data(table)
+            classify_data_source_path = str(
+                self._working_dir / f"classify_data_source_{table}.csv"
+            )
+            table_data.to_csv(classify_data_source_path, index=False)
+
+            classify_data_sources[table] = classify_data_source_path
+
+            # Create model if necessary
+            if self._classify.models.get(table) is not None:
+                continue
+
+            model = self._project.create_model_obj(
+                model_config=classify_config, data_source=classify_data_source_path
+            )
+            self._classify.models[table] = model
+
+        self._backup()
+
+        task = ClassifyTask(
+            classify=self._classify,
+            data_sources=classify_data_sources,
+            all_rows=all_rows,
+            multitable=self,
+            out_dir=self._working_dir,
+        )
+        run_task(task, self._extended_sdk)
+
+        archive_path = self._working_dir / "classify_outputs.tar.gz"
+        for arcname, path in task.result_filepaths.items():
+            add_to_tar(archive_path, path, arcname)
+        self._artifact_collection.upload_classify_outputs_archive(
+            self._project, str(archive_path)
         )
 
     def train_transform_models(self, configs: Dict[str, GretelModelConfig]) -> None:

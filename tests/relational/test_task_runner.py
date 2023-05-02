@@ -1,5 +1,5 @@
 from typing import List
-from unittest.mock import Mock, PropertyMock, call, patch
+from unittest.mock import Mock, PropertyMock, patch
 
 import pytest
 from gretel_client.projects.jobs import Job, Status
@@ -17,17 +17,16 @@ class MockTask:
         self.failed = []
         self.lost_contact = []
 
-    @property
-    def action(self) -> str:
+    def action(self, job: Job) -> str:
         return "mock task"
-
-    @property
-    def refresh_interval(self) -> int:
-        return 0
 
     @property
     def artifacts_per_job(self) -> int:
         return 3
+
+    @property
+    def multitable(self):
+        return Mock()
 
     @property
     def table_collection(self) -> List[str]:
@@ -35,6 +34,9 @@ class MockTask:
 
     def more_to_do(self) -> bool:
         return len(self.completed + self.failed + self.lost_contact) < len(self.models)
+
+    def wait(self) -> None:
+        pass
 
     def is_finished(self, table: str) -> bool:
         return table in (self.completed + self.failed + self.lost_contact)
@@ -45,11 +47,14 @@ class MockTask:
     def handle_completed(self, table: str, job: Job) -> None:
         self.completed.append(table)
 
-    def handle_failed(self, table: str) -> None:
+    def handle_failed(self, table: str, job: Job) -> None:
         self.failed.append(table)
 
-    def handle_lost_contact(self, table: str) -> None:
+    def handle_lost_contact(self, table: str, job: Job) -> None:
         self.lost_contact.append(table)
+
+    def handle_in_progress(self, table: str, job: Job) -> None:
+        pass
 
     def each_iteration(self) -> None:
         self.iteration_count += 1
@@ -63,15 +68,7 @@ def get_job_id():
         yield _get_job_id
 
 
-@pytest.fixture(autouse=True)
-def delete_data_source():
-    with patch(
-        "gretel_trainer.relational.sdk_extras.ExtendedGretelSDK.delete_data_source"
-    ) as _delete_data_source:
-        yield _delete_data_source
-
-
-def test_one_successful_model(get_job_id, delete_data_source, extended_sdk):
+def test_one_successful_model(get_job_id, extended_sdk):
     get_job_id.side_effect = [None, "id"]
 
     project = Mock(artifacts=[])
@@ -87,10 +84,9 @@ def test_one_successful_model(get_job_id, delete_data_source, extended_sdk):
     assert task.iteration_count == 2
     assert task.completed == ["table"]
     assert task.failed == []
-    delete_data_source.assert_called_once()
 
 
-def test_one_failed_model(get_job_id, delete_data_source, extended_sdk):
+def test_one_failed_model(get_job_id, extended_sdk):
     get_job_id.side_effect = [None, "id"]
 
     project = Mock(artifacts=[])
@@ -106,10 +102,9 @@ def test_one_failed_model(get_job_id, delete_data_source, extended_sdk):
     assert task.iteration_count == 2
     assert task.completed == []
     assert task.failed == ["table"]
-    delete_data_source.assert_called_once()
 
 
-def test_model_taking_awhile(get_job_id, delete_data_source, extended_sdk):
+def test_model_taking_awhile(get_job_id, extended_sdk):
     get_job_id.side_effect = [None, "id", "id"]
 
     project = Mock(artifacts=[])
@@ -127,10 +122,9 @@ def test_model_taking_awhile(get_job_id, delete_data_source, extended_sdk):
     assert task.iteration_count == 3
     assert task.completed == ["table"]
     assert task.failed == []
-    delete_data_source.assert_called_once()
 
 
-def test_lose_contact_with_model(get_job_id, delete_data_source, extended_sdk):
+def test_lose_contact_with_model(get_job_id, extended_sdk):
     get_job_id.side_effect = [None, "id", "id", "id"]
 
     project = Mock(artifacts=[])
@@ -149,12 +143,9 @@ def test_lose_contact_with_model(get_job_id, delete_data_source, extended_sdk):
     assert task.completed == []
     assert task.failed == []
     assert task.lost_contact == ["table"]
-    delete_data_source.assert_called_once()
 
 
-def test_refresh_status_can_tolerate_blips(
-    get_job_id, delete_data_source, extended_sdk
-):
+def test_refresh_status_can_tolerate_blips(get_job_id, extended_sdk):
     get_job_id.side_effect = [None, "id", "id"]
 
     project = Mock(artifacts=[])
@@ -174,12 +165,9 @@ def test_refresh_status_can_tolerate_blips(
     assert task.completed == ["table"]
     assert task.failed == []
     assert task.lost_contact == []
-    delete_data_source.assert_called_once()
 
 
-def test_defers_submission_if_no_room_in_project(
-    get_job_id, delete_data_source, extended_sdk
-):
+def test_defers_submission_if_no_room_in_project(get_job_id, extended_sdk):
     get_job_id.side_effect = [None, None, None, "id"]
     project = Mock()
     # First time through, we're at the project limit
@@ -204,10 +192,9 @@ def test_defers_submission_if_no_room_in_project(
 
     assert task.iteration_count == 4
     assert task.completed == ["table"]
-    delete_data_source.assert_called_once()
 
 
-def test_several_models(delete_data_source, extended_sdk):
+def test_several_models(extended_sdk):
     project = Mock(artifacts=[])
 
     completed_model = Mock(status=Status.COMPLETED)
@@ -230,12 +217,3 @@ def test_several_models(delete_data_source, extended_sdk):
 
     assert task.completed == ["completed"]
     assert set(task.failed) == {"error", "cancelled", "lost"}
-    delete_data_source.assert_has_calls(
-        [
-            call(project, completed_model),
-            call(project, error_model),
-            call(project, cancelled_model),
-            call(project, lost_model),
-        ],
-        any_order=True,
-    )

@@ -60,7 +60,6 @@ def label_encode_keys(
             continue
 
         for primary_key_column in rel_data.get_primary_key(table_name):
-
             # Get a set of the tables and columns in `tables` referencing this PK
             fk_references: Set[Tuple[str, str]] = set()
             for descendant in rel_data.get_descendants(table_name):

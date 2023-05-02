@@ -3,6 +3,7 @@ import json
 from gretel_trainer.relational.artifacts import ArtifactCollection
 from gretel_trainer.relational.backup import (
     Backup,
+    BackupClassify,
     BackupForeignKey,
     BackupGenerate,
     BackupRelationalData,
@@ -50,6 +51,12 @@ def test_backup():
             )
         ],
     )
+    backup_classify = BackupClassify(
+        model_ids={
+            "customer": "aaabbbccc",
+            "address": "dddeeefff",
+        },
+    )
     backup_transforms_train = BackupTransformsTrain(
         model_ids={
             "customer": "222333444",
@@ -92,6 +99,7 @@ def test_backup():
         refresh_interval=120,
         artifact_collection=artifact_collection,
         relational_data=backup_relational,
+        classify=backup_classify,
         transforms_train=backup_transforms_train,
         synthetics_train=backup_synthetics_train,
         generate=backup_generate,

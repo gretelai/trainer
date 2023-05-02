@@ -1,3 +1,4 @@
+from copy import deepcopy
 from typing import Any, Dict, List
 
 from gretel_client.projects.models import read_model_config
@@ -9,19 +10,29 @@ from gretel_trainer.relational.core import (
 )
 
 
+def _ingest(config: GretelModelConfig) -> Dict[str, Any]:
+    return read_model_config(deepcopy(config))
+
+
 def _model_name(workflow: str, table: str) -> str:
     ok_table_name = table.replace("--", "__")
     return f"{workflow}-{ok_table_name}"
 
 
+def make_classify_config(table: str, config: GretelModelConfig) -> Dict[str, Any]:
+    tailored_config = _ingest(config)
+    tailored_config["name"] = _model_name("classify", table)
+    return tailored_config
+
+
 def make_evaluate_config(table: str) -> Dict[str, Any]:
-    tailored_config = read_model_config("evaluate/default")
+    tailored_config = _ingest("evaluate/default")
     tailored_config["name"] = _model_name("evaluate", table)
     return tailored_config
 
 
 def make_synthetics_config(table: str, config: GretelModelConfig) -> Dict[str, Any]:
-    tailored_config = read_model_config(config)
+    tailored_config = _ingest(config)
     tailored_config["name"] = _model_name("synthetics", table)
     return tailored_config
 
@@ -29,7 +40,7 @@ def make_synthetics_config(table: str, config: GretelModelConfig) -> Dict[str, A
 def make_transform_config(
     rel_data: RelationalData, table: str, config: GretelModelConfig
 ) -> Dict[str, Any]:
-    tailored_config = read_model_config(config)
+    tailored_config = _ingest(config)
     tailored_config["name"] = _model_name("transforms", table)
 
     key_columns = rel_data.get_all_key_columns(table)

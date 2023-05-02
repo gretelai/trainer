@@ -1,3 +1,4 @@
+from gretel_trainer.relational.tasks.classify import ClassifyTask
 from gretel_trainer.relational.tasks.synthetics_evaluate import SyntheticsEvaluateTask
 from gretel_trainer.relational.tasks.synthetics_run import SyntheticsRunTask
 from gretel_trainer.relational.tasks.synthetics_train import SyntheticsTrainTask
