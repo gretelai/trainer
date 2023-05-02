@@ -3,7 +3,13 @@ import time
 from typing import Any, Dict, Tuple
 
 import smart_open
-from gretel_client.projects.jobs import ACTIVE_STATES, END_STATES, Job, Status, RunnerMode
+from gretel_client.projects.jobs import (
+    ACTIVE_STATES,
+    END_STATES,
+    Job,
+    RunnerMode,
+    Status,
+)
 from gretel_client.projects.models import Model, read_model_config
 from gretel_client.projects.projects import Project
 

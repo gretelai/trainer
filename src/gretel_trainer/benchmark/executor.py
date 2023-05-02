@@ -87,12 +87,6 @@ class Executor:
         if self.status.can_proceed:
             self._evaluate()
 
-    def get_sqs_score(self) -> Optional[int]:
-        if self.evaluate_report_json is None:
-            return None
-        else:
-            return self.evaluate_report_json["synthetic_data_quality_score"]["score"]
-
     def get_report_score(self, key: str) -> Optional[int]:
         if self.evaluate_report_json is None:
             return None

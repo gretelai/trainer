@@ -1,7 +1,7 @@
 import copy
 from inspect import isclass
 from pathlib import Path
-from typing import cast, Dict, Optional, Type, Union
+from typing import Dict, Optional, Type, Union, cast
 
 from gretel_client.projects.exceptions import ModelConfigError
 from gretel_client.projects.models import read_model_config
@@ -88,19 +88,19 @@ class GretelDGAN(GretelModel):
 
 
 class _GretelModelWithOverrides(GretelModel):
-
     _delegate: GretelModel
     _name: str
-    _extra_config: Optional[dict]
+    _config_update: Optional[dict]
 
-    def __init__(self,
-                 delegate: GretelModel,
-                 name: str = "",
-                 extra_config: Optional[dict] = None,
+    def __init__(
+        self,
+        delegate: GretelModel,
+        name: str = "",
+        config_update: Optional[dict] = None,
     ):
         self._delegate = delegate
         self._name = name
-        self._extra_config = extra_config
+        self._config_update = config_update
 
     @property
     def name(self) -> str:
@@ -108,12 +108,12 @@ class _GretelModelWithOverrides(GretelModel):
 
     @property
     def config(self) -> GretelModelConfig:
-        if not self._extra_config:
+        if not self._config_update:
             return self._delegate.config
 
         cfg = copy.deepcopy(read_model_config(self._delegate.config))
         model_cfg = next(c for c in cfg["models"][0].values())
-        _recursive_dict_update(model_cfg, self._extra_config)
+        _recursive_dict_update(model_cfg, self._config_update)
         return cfg
 
     @property
@@ -129,9 +129,9 @@ class _GretelModelWithOverrides(GretelModel):
 
 
 def configure_model(
-        model: Union[Type[GretelModel], GretelModel],
-        name: str = "",
-        extra_config: Optional[dict] = None,
+    model: Union[Type[GretelModel], GretelModel],
+    name: str = "",
+    config_update: Optional[dict] = None,
 ) -> GretelModel:
     """Returns a GretelModel with an updated model configuration and/or name.
 
@@ -140,15 +140,15 @@ def configure_model(
 
     The returned GretelModel differs from the input in only two aspects:
     - the name is possibly changed, and
-    - the model config has been overridden according to `config_override`.
+    - the model config has been overridden according to `config_update`.
 
     Args:
         model:
             Model class or instance to modify.
         name:
             A custom name for the model.
-        config_override:
-            A dict that is applied as an override to the model config.
+        config_update:
+            A dict that is applied as an update to the model config.
 
     Returns:
         A GretelModel instance..
@@ -158,7 +158,7 @@ def configure_model(
     return _GretelModelWithOverrides(
         delegate=model_instance,
         name=name,
-        extra_config=extra_config,
+        config_update=config_update,
     )
 
 

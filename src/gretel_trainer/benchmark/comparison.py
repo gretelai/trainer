@@ -5,7 +5,7 @@ from concurrent.futures import Future, ThreadPoolExecutor
 from datetime import datetime
 from inspect import isclass
 from pathlib import Path
-from typing import Any, cast, Dict, List, Optional, Tuple, Type, Union
+from typing import Any, Dict, List, Optional, Tuple, Type, Union, cast
 
 import pandas as pd
 from gretel_client import configure_session
@@ -30,8 +30,6 @@ from gretel_trainer.benchmark.gretel.strategy_trainer import GretelTrainerStrate
 
 logger = logging.getLogger(__name__)
 
-RUN_IDENTIFIER_SEPARATOR = "-"
-
 ALL_REPORT_SCORES = {
     "SQS": "synthetic_data_quality_score",
     "FCS": "field_correlation_stability",
@@ -43,11 +41,38 @@ ALL_REPORT_SCORES = {
 
 DatasetTypes = Union[CustomDataset, GretelDataset]
 ModelTypes = Union[
-    CustomModel, Type[CustomModel],
-    GretelModel, Type[GretelModel],
+    CustomModel,
+    Type[CustomModel],
+    GretelModel,
+    Type[GretelModel],
 ]
 
-FutureKeyT = Union[str, Tuple[str, str]]
+
+class RunKey(Tuple[str, str]):
+    RUN_IDENTIFIER_SEPARATOR = "-"
+
+    @property
+    def model_name(self) -> str:
+        return self[0]
+
+    @property
+    def dataset_name(self) -> str:
+        return self[1]
+
+    @property
+    def identifier(self) -> str:
+        """Identifier returns a flat string identifying this run.
+
+        Returns:
+            A string identifying the run.
+        """
+        return self.RUN_IDENTIFIER_SEPARATOR.join(self)
+
+    def __repr__(self) -> str:
+        return f"({self.model_name}, {self.dataset_name})"
+
+
+FutureKeyT = Union[str, RunKey]
 
 
 def compare(
@@ -88,9 +113,7 @@ class Comparison:
             cast(Union[GretelModel, CustomModel], m() if isclass(m) else m)
             for m in models
         ]
-        self.gretel_models = [
-            m for m in model_instances if isinstance(m, GretelModel)
-        ]
+        self.gretel_models = [m for m in model_instances if isinstance(m, GretelModel)]
         self.custom_models = [
             m for m in model_instances if not isinstance(m, GretelModel)
         ]
@@ -112,20 +135,19 @@ class Comparison:
         self.datasets = [
             _make_dataset(dataset, self.config.working_dir) for dataset in datasets
         ]
-        self._gretel_executors: Dict[Tuple[str, str], Executor] = {}
-        self._custom_executors: Dict[Tuple[str, str], Executor] = {}
+        self._gretel_executors: Dict[RunKey, Executor] = {}
+        self._custom_executors: Dict[RunKey, Executor] = {}
         self.trainer_project_names: Dict[str, str] = {}
         self.thread_pool = ThreadPoolExecutor(5)
         self.futures: Dict[FutureKeyT, Future] = {}
 
-        self._extra_report_scores = {
+        self._report_scores = {
             score_name: ALL_REPORT_SCORES[score_name]
-            for score_name in (additional_report_scores or [])
-            if score_name != "SQS"
+            for score_name in ["SQS"] + (additional_report_scores or [])
         }
 
     @property
-    def executors(self) -> Dict[Tuple[str, str], Executor]:
+    def executors(self) -> Dict[RunKey, Executor]:
         return self._gretel_executors | self._custom_executors
 
     def _make_project(self) -> Project:
@@ -140,25 +162,28 @@ class Comparison:
 
         _trainer_project_index = 0
         for dataset in self.datasets:
-            if self.gretel_models:
-                artifact_key = _upload_dataset_to_project(
+            artifact_key = (
+                _upload_dataset_to_project(
                     dataset.data_source, self._project, self.config.trainer
-                ) if not dataset.public else None
-                for model in self.gretel_models:
-                    self._setup_gretel_run(
-                        dataset, model, artifact_key, _trainer_project_index
-                    )
-                    _trainer_project_index += 1
+                )
+                if not dataset.public
+                else None
+            )
+
+            for model in self.gretel_models:
+                self._setup_gretel_run(
+                    dataset, model, artifact_key, _trainer_project_index
+                )
+                _trainer_project_index += 1
+
             for model in self.custom_models:
-                self._setup_custom_run(dataset, model)
+                self._setup_custom_run(dataset, model, artifact_key)
 
         return self
 
     def execute(self) -> Comparison:
         for run_key, executor in self._gretel_executors.items():
-            self.futures[run_key] = self.thread_pool.submit(
-                _run_gretel, executor
-            )
+            self.futures[run_key] = self.thread_pool.submit(_run_gretel, executor)
 
         if len(self._custom_executors) > 0:
             self.futures["custom"] = self.thread_pool.submit(
@@ -193,7 +218,7 @@ class Comparison:
         return job.logs
 
     def _get_gretel_job(self, model: str, dataset: str, action: str) -> Job:
-        run_key = (model, dataset)
+        run_key = RunKey((model, dataset))
         executor = self.executors[run_key]
         strategy = executor.strategy
         if not isinstance(strategy, GretelSDKStrategy):
@@ -220,7 +245,7 @@ class Comparison:
             for project in search_projects(query=self.config.project_display_name):
                 project.delete()
 
-    def _result_dict(self, run_key: Tuple[str, str]) -> Dict[str, Any]:
+    def _result_dict(self, run_key: RunKey) -> Dict[str, Any]:
         executor = self.executors[run_key]
         model_name, dataset_name = run_key
 
@@ -238,10 +263,9 @@ class Comparison:
             "Rows": executor.strategy.dataset.row_count,
             "Columns": executor.strategy.dataset.column_count,
             "Status": executor.status.value,
-            "SQS": executor.get_sqs_score(),
             **{
                 score_name: executor.get_report_score(score_key)
-                for score_name, score_key in self._extra_report_scores.items()
+                for score_name, score_key in self._report_scores.items()
             },
             "Train time (sec)": train_time,
             "Generate time (sec)": generate_time,
@@ -256,7 +280,7 @@ class Comparison:
         trainer_project_index: int,
     ) -> None:
         run_key = _make_run_key(model, dataset)
-        run_identifier = _make_run_identifier(run_key)
+        run_identifier = run_key.identifier
         strategy = self._set_gretel_strategy(
             benchmark_model=model,
             dataset=dataset,
@@ -276,14 +300,16 @@ class Comparison:
         self,
         dataset: Dataset,
         model: CustomModel,
+        artifact_key: Optional[str] = None,
     ) -> None:
         run_key = _make_run_key(model, dataset)
-        run_identifier = _make_run_identifier(run_key)
+        run_identifier = run_key.identifier
         strategy = CustomStrategy(
             benchmark_model=model,
             dataset=dataset,
             run_identifier=run_identifier,
             config=self.config,
+            artifact_key=artifact_key,
         )
         executor = Executor(
             strategy=strategy,
@@ -358,14 +384,8 @@ def _make_dataset(dataset: DatasetTypes, working_dir: Path) -> Dataset:
     )
 
 
-def _make_run_key(model: Union[GretelModel, CustomModel], dataset: Dataset) -> Tuple[str, str]:
-    run_key = (_model_name(model), dataset.name)
-    return run_key
-
-
-def _make_run_identifier(run_key: Tuple[str, str]) -> str:
-    model_name, dataset_name = run_key
-    return RUN_IDENTIFIER_SEPARATOR.join((model_name, dataset_name))
+def _make_run_key(model: Union[GretelModel, CustomModel], dataset: Dataset) -> RunKey:
+    return RunKey((_model_name(model), dataset.name))
 
 
 def _validate_setup(

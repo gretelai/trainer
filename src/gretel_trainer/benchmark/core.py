@@ -31,6 +31,7 @@ class Dataset:
     column_count: int
     public: bool = field(default=False)
 
+
 @dataclass
 class BenchmarkConfig:
     project_display_name: str

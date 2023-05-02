@@ -5,7 +5,13 @@ from pathlib import Path
 from typing import Any, Dict, Optional, Tuple
 
 import requests
-from gretel_client.projects.jobs import ACTIVE_STATES, END_STATES, Job, Status, RunnerMode
+from gretel_client.projects.jobs import (
+    ACTIVE_STATES,
+    END_STATES,
+    Job,
+    RunnerMode,
+    Status,
+)
 from gretel_client.projects.models import Model, read_model_config
 from gretel_client.projects.projects import Project
 from gretel_client.projects.records import RecordHandler
@@ -95,10 +101,11 @@ class GretelSDKStrategy:
 
     @property
     def evaluate_ref_data(self) -> str:
-        if self.model is None:
-            return self.dataset.data_source
-        else:
+        if self.artifact_key is not None:
+            return self.artifact_key
+        if self.model is not None:
             return self.model.data_source
+        return self.dataset.data_source
 
     @property
     def _synthetic_data_path(self) -> Path:

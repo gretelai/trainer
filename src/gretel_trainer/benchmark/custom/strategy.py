@@ -14,11 +14,13 @@ class CustomStrategy:
         dataset: Dataset,
         run_identifier: str,
         config: BenchmarkConfig,
+        artifact_key: Optional[str] = None,
     ):
         self.benchmark_model = benchmark_model
         self.dataset = dataset
         self.run_identifier = run_identifier
         self.config = config
+        self.artifact_key = artifact_key
 
         self.train_timer: Optional[Timer] = None
         self.generate_timer: Optional[Timer] = None
@@ -38,6 +40,8 @@ class CustomStrategy:
 
     @property
     def evaluate_ref_data(self) -> str:
+        if self.artifact_key is not None:
+            return self.artifact_key
         return self.dataset.data_source
 
     @property
