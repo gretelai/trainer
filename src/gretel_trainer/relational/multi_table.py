@@ -617,7 +617,9 @@ class MultiTable:
                 self.relational_data.update_table_data(table_name, transformed_table)
             self._upload_sources_to_project()
 
-        for table, df in output_tables.items():
+        reshaped_tables = self.relational_data.restore(output_tables)
+
+        for table, df in reshaped_tables.items():
             filename = f"transformed_{table}.csv"
             out_path = run_dir / filename
             df.to_csv(out_path, index=False)
@@ -629,7 +631,7 @@ class MultiTable:
             self._project, str(archive_path)
         )
         self._backup()
-        self.transform_output_tables = output_tables
+        self.transform_output_tables = reshaped_tables
 
     def _prepare_training_data(self, tables: List[str]) -> Dict[str, Path]:
         """
