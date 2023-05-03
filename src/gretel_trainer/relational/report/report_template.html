@@ -78,7 +78,9 @@
           </td>
           <td>
             {% for fk in table_data.fks %}
-            <span class="label" data-fk-from="{{ fk.parent_table_name }}_{{ fk.parent_column_name }}">{{ fk.column_name }}</span>&nbsp;
+              {% for i in range(fk.columns | length) %}
+                <span class="label" data-fk-from="{{ fk.parent_table_name }}_{{ fk.parent_columns[i] }}">{{ fk.columns[i] }}</span>&nbsp;
+              {% endfor %}
             {% endfor %}
           </td>
         </tr>
