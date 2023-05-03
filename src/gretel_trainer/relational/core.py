@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import logging
 from dataclasses import dataclass
+from enum import Enum
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Union
 
@@ -11,7 +12,7 @@ import pandas as pd
 from networkx.algorithms.dag import dag_longest_path_length, topological_sort
 from pandas.api.types import is_string_dtype
 
-from gretel_trainer.relational.json import RelationalJson
+from gretel_trainer.relational.json import InventedTableMetadata, RelationalJson
 
 logger = logging.getLogger(__name__)
 
@@ -34,11 +35,19 @@ class ForeignKey:
 UserFriendlyPrimaryKeyT = Optional[Union[str, List[str]]]
 
 
+class Scope(str, Enum):
+    ALL = "all"
+    PUBLIC = "public"
+    MODELABLE = "modelable"
+
+
 @dataclass
 class TableMetadata:
+    name: str
     primary_key: list[str]
     data: pd.DataFrame
     columns: set[str]
+    invented_table_metadata: Optional[InventedTableMetadata] = None
     safe_ancestral_seed_columns: Optional[set[str]] = None
 
 
@@ -91,6 +100,7 @@ class RelationalData:
         the table includes nested JSON data.
         """
         primary_key = self._format_key_column(primary_key)
+        self._add_single_table(name=name, primary_key=primary_key, data=data)
         rel_json = RelationalJson(name, primary_key, data)
         if rel_json.is_applicable:
             self.relational_jsons[name] = rel_json
@@ -99,8 +109,6 @@ class RelationalData:
                 self._add_single_table(**add_table)
             for add_foreign_key in add_foreign_keys:
                 self.add_foreign_key(**add_foreign_key)
-        else:
-            self._add_single_table(name=name, primary_key=primary_key, data=data)
 
     def _add_single_table(
         self,
@@ -108,10 +116,15 @@ class RelationalData:
         name: str,
         primary_key: UserFriendlyPrimaryKeyT,
         data: pd.DataFrame,
+        invented_table_metadata: Optional[InventedTableMetadata] = None,
     ) -> None:
         primary_key = self._format_key_column(primary_key)
         metadata = TableMetadata(
-            primary_key=primary_key, data=data, columns=set(data.columns)
+            name=name,
+            primary_key=primary_key,
+            data=data,
+            columns=set(data.columns),
+            invented_table_metadata=invented_table_metadata,
         )
         self.graph.add_node(name, metadata=metadata)
 
@@ -122,7 +135,7 @@ class RelationalData:
         (Re)set the primary key on an existing table.
         If the table does not yet exist in the instance's collection, add it via `add_table`.
         """
-        if table not in self.list_all_tables():
+        if table not in self.list_all_tables(Scope.ALL):
             raise MultiTableException(f"Unrecognized table name: `{table}`")
 
         primary_key = self._format_key_column(primary_key)
@@ -173,7 +186,7 @@ class RelationalData:
         """
         Add a foreign key relationship between two tables.
         """
-        known_tables = self.list_all_tables()
+        known_tables = self.list_all_tables(Scope.ALL)
 
         abort = False
         if table not in known_tables:
@@ -245,7 +258,7 @@ class RelationalData:
         """
         Remove an existing foreign key.
         """
-        if table not in self.list_all_tables():
+        if table not in self.list_all_tables(Scope.ALL):
             raise MultiTableException(f"Unrecognized table name: `{table}`")
 
         key_to_remove = None
@@ -277,8 +290,27 @@ class RelationalData:
                 f"Unrecognized table name: {table}. If this is a new table to add, use `add_table`."
             )
 
-    def list_all_tables(self) -> List[str]:
-        return list(self.graph.nodes)
+    def list_all_tables(self, scope: Scope = Scope.PUBLIC) -> List[str]:
+        all_nodes = self.graph.nodes
+
+        if scope == Scope.ALL:
+            return all_nodes
+        elif scope == Scope.PUBLIC:
+            return [n for n in all_nodes if self._is_public(n)]
+        elif scope == Scope.MODELABLE:
+            return [n for n in all_nodes if self._is_modelable(n)]
+
+    def _is_invented(self, table: str) -> bool:
+        return self.graph.nodes[table]["metadata"].invented_table_metadata is not None
+
+    def _is_public(self, table: str) -> bool:
+        return not self._is_invented(table)
+
+    def _is_modelable(self, table: str) -> bool:
+        if self._is_invented(table):
+            return True
+        else:
+            return table not in self.relational_jsons.keys()
 
     def get_parents(self, table: str) -> List[str]:
         return list(self.graph.successors(table))
@@ -373,7 +405,7 @@ class RelationalData:
 
     def debug_summary(self) -> Dict[str, Any]:
         max_depth = dag_longest_path_length(self.graph)
-        all_tables = self.list_all_tables()
+        all_tables = self.list_all_tables(Scope.ALL)
         table_count = len(all_tables)
         total_foreign_key_count = 0
         tables = {}
@@ -405,7 +437,7 @@ class RelationalData:
 
     def as_dict(self, out_dir: str) -> Dict[str, Any]:
         d = {"tables": {}, "foreign_keys": []}
-        for table in self.list_all_tables():
+        for table in self.list_all_tables(Scope.PUBLIC):
             d["tables"][table] = {
                 "primary_key": self.get_primary_key(table),
                 "csv_path": f"{out_dir}/{table}.csv",

@@ -10,6 +10,7 @@ from gretel_trainer.relational.core import (
     ForeignKey,
     MultiTableException,
     RelationalData,
+    Scope,
 )
 
 
@@ -457,7 +458,21 @@ def test_table_with_json():
         make_suffix.return_value = "sfx"
         rel_data.add_table(name="bball", primary_key="name", data=bball_df)
 
-    assert set(rel_data.list_all_tables()) == {"bball-sfx", "bball-rings-sfx"}
+    # By default, only show user-supplied tables and hide invented tables
+    assert set(rel_data.list_all_tables()) == {"bball"}
+    # We can optionally fetch all tables with scope="all"
+    assert set(rel_data.list_all_tables(Scope.ALL)) == {
+        "bball",
+        "bball-sfx",
+        "bball-rings-sfx",
+    }
+    # When asking for modelable tables, the user-supplied source is hidden
+    # and the invented tables are included
+    assert set(rel_data.list_all_tables(Scope.MODELABLE)) == {
+        "bball-sfx",
+        "bball-rings-sfx",
+    }
+
     assert rel_data.get_foreign_keys("bball-rings-sfx") == [
         ForeignKey(
             table_name="bball-rings-sfx",
@@ -556,7 +571,7 @@ def test_table_with_json_dict_only():
         make_suffix.return_value = "sfx"
         rel_data.add_table(name="bball", primary_key="name", data=bball_df)
 
-    assert set(rel_data.list_all_tables()) == {"bball-sfx"}
+    assert set(rel_data.list_all_tables(Scope.MODELABLE)) == {"bball-sfx"}
 
     flattened_tables = {
         "bball-sfx": pd.DataFrame(
