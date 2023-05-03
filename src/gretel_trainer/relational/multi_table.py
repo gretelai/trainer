@@ -925,6 +925,7 @@ class MultiTable:
             "amplify": "synthetics/amplify",
             "actgan": "synthetics/tabular-actgan",
             "lstm": "synthetics/tabular-lstm",
+            "tabular-dp": "synthetics/tabular-differential-privacy",
         }
 
         return (gretel_model, _BLUEPRINTS[gretel_model])

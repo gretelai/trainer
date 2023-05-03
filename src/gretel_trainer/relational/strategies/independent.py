@@ -25,7 +25,7 @@ class IndependentStrategy:
 
     @property
     def supported_models(self) -> List[str]:
-        return ["amplify", "actgan", "lstm"]
+        return ["amplify", "actgan", "lstm", "tabular-dp"]
 
     def label_encode_keys(
         self, rel_data: RelationalData, tables: Dict[str, pd.DataFrame]
