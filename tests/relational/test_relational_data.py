@@ -1,10 +1,16 @@
 import os
 import tempfile
+from unittest.mock import patch
 
 import pandas as pd
+import pandas.testing as pdtest
 import pytest
 
-from gretel_trainer.relational.core import MultiTableException, RelationalData
+from gretel_trainer.relational.core import (
+    ForeignKey,
+    MultiTableException,
+    RelationalData,
+)
 
 
 def test_ecommerce_relational_data(ecom):
@@ -437,3 +443,153 @@ def test_debug_summary(ecom, mutagenesis):
             },
         },
     }
+
+
+def test_table_with_json():
+    bball_jsonl = """
+    {"name": "LeBron James", "age": 38, "draft": {"year": 2003}, "rings": [{"team": "Heat", "year": 2012}, {"team": "Heat", "year": 2013}, {"team": "Cavaliers", "year": 2016}, {"team": "Lakers", "year": 2020}]}
+    {"name": "Steph Curry", "age": 35, "draft": {"year": 2009, "college": "Davidson"}, "rings": [{"team": "Warriors", "year": 2015}, {"team": "Warriors", "year": 2017}, {"team": "Warriors", "year": 2018}, {"team": "Warriors", "year": 2022}]}
+    """
+    bball_df = pd.read_json(bball_jsonl, lines=True)
+    rel_data = RelationalData()
+
+    with patch("gretel_trainer.relational.json.make_suffix") as make_suffix:
+        make_suffix.return_value = "sfx"
+        rel_data.add_table(name="bball", primary_key="name", data=bball_df)
+
+    assert set(rel_data.list_all_tables()) == {"bball-sfx", "bball-rings-sfx"}
+    assert rel_data.get_foreign_keys("bball-rings-sfx") == [
+        ForeignKey(
+            table_name="bball-rings-sfx",
+            columns=["bball~id"],
+            parent_table_name="bball-sfx",
+            parent_columns=["~PRIMARY_KEY_ID~"],
+        )
+    ]
+
+    flattened_tables = {
+        "bball-sfx": pd.DataFrame(
+            data={
+                "name": ["LeBron James", "Steph Curry"],
+                "age": [38, 35],
+                "draft>year": [2003, 2009],
+                "draft>college": [None, "Davidson"],
+                "~PRIMARY_KEY_ID~": [0, 1],
+            }
+        ),
+        "bball-rings-sfx": pd.DataFrame(
+            data={
+                "content>team": [
+                    "Heat",
+                    "Heat",
+                    "Cavaliers",
+                    "Lakers",
+                    "Warriors",
+                    "Warriors",
+                    "Warriors",
+                    "Warriors",
+                ],
+                "content>year": [2012, 2013, 2016, 2020, 2015, 2017, 2018, 2022],
+                "~PRIMARY_KEY_ID~": [0, 1, 2, 3, 4, 5, 6, 7],
+                "bball~id": [0, 0, 0, 0, 1, 1, 1, 1],
+                "array~order": [0, 1, 2, 3, 0, 1, 2, 3],
+            }
+        ),
+    }
+
+    assert rel_data.get_table_columns("bball-sfx") == set(
+        flattened_tables["bball-sfx"].columns
+    )
+    assert rel_data.get_table_columns("bball-rings-sfx") == set(
+        flattened_tables["bball-rings-sfx"].columns
+    )
+    pdtest.assert_frame_equal(
+        rel_data.get_table_data("bball-sfx"),
+        flattened_tables["bball-sfx"],
+        check_like=True,
+    )
+    pdtest.assert_frame_equal(
+        rel_data.get_table_data("bball-rings-sfx"),
+        flattened_tables["bball-rings-sfx"],
+        check_like=True,
+    )
+
+    restored = rel_data.restore(flattened_tables)
+    assert len(restored) == 1
+    restored_bball_df = restored["bball"]
+    pdtest.assert_frame_equal(
+        restored_bball_df,
+        pd.DataFrame(
+            data={
+                "name": ["LeBron James", "Steph Curry"],
+                "age": [38, 35],
+                "draft": [{"year": 2003}, {"year": 2009, "college": "Davidson"}],
+                "rings": [
+                    [
+                        {"team": "Heat", "year": 2012},
+                        {"team": "Heat", "year": 2013},
+                        {"team": "Cavaliers", "year": 2016},
+                        {"team": "Lakers", "year": 2020},
+                    ],
+                    [
+                        {"team": "Warriors", "year": 2015},
+                        {"team": "Warriors", "year": 2017},
+                        {"team": "Warriors", "year": 2018},
+                        {"team": "Warriors", "year": 2022},
+                    ],
+                ],
+            }
+        ),
+    )
+    pdtest.assert_frame_equal(restored_bball_df, bball_df)
+
+
+def test_table_with_json_dict_only():
+    bball_jsonl = """
+    {"name": "LeBron James", "age": 38, "draft": {"year": 2003}}
+    {"name": "Steph Curry", "age": 35, "draft": {"year": 2009, "college": "Davidson"}}
+    """
+    bball_df = pd.read_json(bball_jsonl, lines=True)
+    rel_data = RelationalData()
+
+    with patch("gretel_trainer.relational.json.make_suffix") as make_suffix:
+        make_suffix.return_value = "sfx"
+        rel_data.add_table(name="bball", primary_key="name", data=bball_df)
+
+    assert set(rel_data.list_all_tables()) == {"bball-sfx"}
+
+    flattened_tables = {
+        "bball-sfx": pd.DataFrame(
+            data={
+                "name": ["LeBron James", "Steph Curry"],
+                "age": [38, 35],
+                "draft>year": [2003, 2009],
+                "draft>college": [None, "Davidson"],
+                "~PRIMARY_KEY_ID~": [0, 1],
+            }
+        )
+    }
+
+    assert rel_data.get_table_columns("bball-sfx") == set(
+        flattened_tables["bball-sfx"].columns
+    )
+    pdtest.assert_frame_equal(
+        rel_data.get_table_data("bball-sfx"),
+        flattened_tables["bball-sfx"],
+        check_like=True,
+    )
+
+    restored = rel_data.restore(flattened_tables)
+    assert len(restored) == 1
+    restored_bball_df = restored["bball"]
+    pdtest.assert_frame_equal(
+        restored_bball_df,
+        pd.DataFrame(
+            data={
+                "name": ["LeBron James", "Steph Curry"],
+                "age": [38, 35],
+                "draft": [{"year": 2003}, {"year": 2009, "college": "Davidson"}],
+            }
+        ),
+    )
+    pdtest.assert_frame_equal(restored_bball_df, bball_df)

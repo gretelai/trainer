@@ -11,6 +11,8 @@ import pandas as pd
 from networkx.algorithms.dag import dag_longest_path_length, topological_sort
 from pandas.api.types import is_string_dtype
 
+from gretel_trainer.relational.json import RelationalJson
+
 logger = logging.getLogger(__name__)
 
 
@@ -43,6 +45,36 @@ class TableMetadata:
 class RelationalData:
     def __init__(self):
         self.graph = networkx.DiGraph()
+        self.relational_jsons: dict[str, RelationalJson] = {}
+
+    def restore(self, tableset: dict[str, pd.DataFrame]) -> dict[str, pd.DataFrame]:
+        """Restores a given a tableset (presumably output from some MultiTable workflow,
+        i.e. transforms or synthetics) to its original shape (specifically, "re-nests"
+        any JSON that had been expanded out.
+
+        Users should rely on MultiTable calling this internally when appropriate and not
+        need to do so themselves.
+        """
+        restored = {}
+        discarded = set()
+
+        # Restore any invented tables to nested-JSON format
+        for table_name, rel_json in self.relational_jsons.items():
+            tables = {
+                table: data
+                for table, data in tableset.items()
+                if table in rel_json.table_names
+            }
+            data = rel_json.restore(tables)
+            restored[table_name] = data
+            discarded.update(rel_json.table_names)
+
+        # Add remaining tables
+        for table, data in tableset.items():
+            if table not in discarded:
+                restored[table] = data
+
+        return restored
 
     def add_table(
         self,
@@ -54,7 +86,29 @@ class RelationalData:
         """
         Add a table. The primary key can be None (if one is not defined on the table),
         a string column name (most common), or a list of multiple string column names (composite key).
+
+        This call MAY result in multiple tables getting "registered," specifically if
+        the table includes nested JSON data.
         """
+        primary_key = self._format_key_column(primary_key)
+        rel_json = RelationalJson(name, primary_key, data)
+        if rel_json.is_applicable:
+            self.relational_jsons[name] = rel_json
+            add_tables, add_foreign_keys = rel_json.add()
+            for add_table in add_tables:
+                self._add_single_table(**add_table)
+            for add_foreign_key in add_foreign_keys:
+                self.add_foreign_key(**add_foreign_key)
+        else:
+            self._add_single_table(name=name, primary_key=primary_key, data=data)
+
+    def _add_single_table(
+        self,
+        *,
+        name: str,
+        primary_key: UserFriendlyPrimaryKeyT,
+        data: pd.DataFrame,
+    ) -> None:
         primary_key = self._format_key_column(primary_key)
         metadata = TableMetadata(
             primary_key=primary_key, data=data, columns=set(data.columns)
