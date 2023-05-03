@@ -32,6 +32,14 @@ class ForeignKey:
 UserFriendlyPrimaryKeyT = Optional[Union[str, List[str]]]
 
 
+@dataclass
+class TableMetadata:
+    primary_key: list[str]
+    data: pd.DataFrame
+    columns: set[str]
+    safe_ancestral_seed_columns: Optional[set[str]] = None
+
+
 class RelationalData:
     def __init__(self):
         self.graph = networkx.DiGraph()
@@ -48,12 +56,10 @@ class RelationalData:
         a string column name (most common), or a list of multiple string column names (composite key).
         """
         primary_key = self._format_key_column(primary_key)
-        self.graph.add_node(
-            name,
-            primary_key=primary_key,
-            data=data,
-            columns=set(data.columns),
+        metadata = TableMetadata(
+            primary_key=primary_key, data=data, columns=set(data.columns)
         )
+        self.graph.add_node(name, metadata=metadata)
 
     def set_primary_key(
         self, *, table: str, primary_key: UserFriendlyPrimaryKeyT
@@ -72,7 +78,7 @@ class RelationalData:
             if col not in known_columns:
                 raise MultiTableException(f"Unrecognized column name: `{primary_key}`")
 
-        self.graph.nodes[table]["primary_key"] = primary_key
+        self.graph.nodes[table]["metadata"].primary_key = primary_key
         self._clear_safe_ancestral_seed_columns(table)
 
     def _format_key_column(self, key: Optional[Union[str, List[str]]]) -> List[str]:
@@ -175,8 +181,8 @@ class RelationalData:
 
     def update_table_data(self, table: str, data: pd.DataFrame) -> None:
         try:
-            self.graph.nodes[table]["data"] = data
-            self.graph.nodes[table]["columns"] = data.columns
+            self.graph.nodes[table]["metadata"].data = data
+            self.graph.nodes[table]["metadata"].columns = set(data.columns)
             self._clear_safe_ancestral_seed_columns(table)
         except KeyError:
             raise MultiTableException(
@@ -225,19 +231,19 @@ class RelationalData:
         return list(reversed(list(topological_sort(self.graph))))
 
     def get_primary_key(self, table: str) -> List[str]:
-        return self.graph.nodes[table]["primary_key"]
+        return self.graph.nodes[table]["metadata"].primary_key
 
     def get_table_data(
         self, table: str, usecols: Optional[set[str]] = None
     ) -> pd.DataFrame:
         usecols = usecols or self.get_table_columns(table)
-        return self.graph.nodes[table]["data"][list(usecols)]
+        return self.graph.nodes[table]["metadata"].data[list(usecols)]
 
     def get_table_columns(self, table: str) -> set[str]:
-        return self.graph.nodes[table]["columns"]
+        return self.graph.nodes[table]["metadata"].columns
 
     def get_safe_ancestral_seed_columns(self, table: str) -> set[str]:
-        safe_columns = self.graph.nodes[table].get("safe_ancestral_seed_columns")
+        safe_columns = self.graph.nodes[table]["metadata"].safe_ancestral_seed_columns
         if safe_columns is None:
             safe_columns = self._set_safe_ancestral_seed_columns(table)
         return safe_columns
@@ -257,11 +263,11 @@ class RelationalData:
             if _ok_for_train_and_seed(col, data):
                 cols.add(col)
 
-        self.graph.nodes[table]["safe_ancestral_seed_columns"] = cols
+        self.graph.nodes[table]["metadata"].safe_ancestral_seed_columns = cols
         return cols
 
     def _clear_safe_ancestral_seed_columns(self, table: str) -> None:
-        self.graph.nodes[table]["safe_ancestral_seed_columns"] = None
+        self.graph.nodes[table]["metadata"].safe_ancestral_seed_columns = None
 
     def get_foreign_keys(self, table: str) -> List[ForeignKey]:
         foreign_keys = []
