@@ -8,8 +8,9 @@ from gretel_client.projects.models import Model
 
 import gretel_trainer.relational.ancestry as ancestry
 import gretel_trainer.relational.strategies.common as common
-from gretel_trainer.relational.core import RelationalData, TableEvaluation
+from gretel_trainer.relational.core import RelationalData
 from gretel_trainer.relational.sdk_extras import ExtendedGretelSDK
+from gretel_trainer.relational.table_evaluation import TableEvaluation
 
 logger = logging.getLogger(__name__)
 

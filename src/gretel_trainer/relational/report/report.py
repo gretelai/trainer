@@ -10,11 +10,12 @@ from typing import Dict, List, Optional, Tuple
 import plotly.graph_objects as go
 from jinja2 import Environment, FileSystemLoader
 
-from gretel_trainer.relational.core import ForeignKey, RelationalData, TableEvaluation
+from gretel_trainer.relational.core import ForeignKey, RelationalData
 from gretel_trainer.relational.report.figures import (
     PRIVACY_LEVEL_VALUES,
     gauge_and_needle_chart,
 )
+from gretel_trainer.relational.table_evaluation import TableEvaluation
 
 _TEMPLATE_DIR = str(Path(__file__).parent)
 _TEMPLATE_FILE = "report_template.html"

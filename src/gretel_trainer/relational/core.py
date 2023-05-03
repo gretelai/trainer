@@ -2,22 +2,16 @@ from __future__ import annotations
 
 import json
 import logging
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Union, overload
+from typing import Any, Dict, List, Optional, Union
 
 import networkx
 import pandas as pd
 from networkx.algorithms.dag import dag_longest_path_length, topological_sort
 from pandas.api.types import is_string_dtype
-from typing_extensions import Literal
 
 logger = logging.getLogger(__name__)
-
-_SQS = "synthetic_data_quality_score"
-_PPL = "privacy_protection_level"
-_SCORE = "score"
-_GRADE = "grade"
 
 
 class MultiTableException(Exception):
@@ -25,98 +19,6 @@ class MultiTableException(Exception):
 
 
 GretelModelConfig = Union[str, Path, Dict]
-
-
-@dataclass
-class TableEvaluation:
-    cross_table_report_json: Optional[Dict] = field(default=None, repr=False)
-    individual_report_json: Optional[Dict] = field(default=None, repr=False)
-
-    def is_complete(self) -> bool:
-        return (
-            self.cross_table_report_json is not None
-            and self.cross_table_sqs is not None
-            and self.individual_report_json is not None
-            and self.individual_sqs is not None
-        )
-
-    @overload
-    def _field_from_json(
-        self, report_json: Optional[dict], entry: str, field: Literal["score"]
-    ) -> Optional[int]:
-        ...
-
-    @overload
-    def _field_from_json(
-        self, report_json: Optional[dict], entry: str, field: Literal["grade"]
-    ) -> Optional[str]:
-        ...
-
-    def _field_from_json(
-        self, report_json: Optional[dict], entry: str, field: str
-    ) -> Optional[Union[int, str]]:
-        if report_json is None:
-            return None
-        else:
-            return report_json.get(entry, {}).get(field)
-
-    @property
-    def cross_table_sqs(self) -> Optional[int]:
-        return self._field_from_json(self.cross_table_report_json, _SQS, _SCORE)
-
-    @property
-    def cross_table_sqs_grade(self) -> Optional[str]:
-        return self._field_from_json(self.cross_table_report_json, _SQS, _GRADE)
-
-    @property
-    def cross_table_ppl(self) -> Optional[int]:
-        return self._field_from_json(self.cross_table_report_json, _PPL, _SCORE)
-
-    @property
-    def cross_table_ppl_grade(self) -> Optional[str]:
-        return self._field_from_json(self.cross_table_report_json, _PPL, _GRADE)
-
-    @property
-    def individual_sqs(self) -> Optional[int]:
-        return self._field_from_json(self.individual_report_json, _SQS, _SCORE)
-
-    @property
-    def individual_sqs_grade(self) -> Optional[str]:
-        return self._field_from_json(self.individual_report_json, _SQS, _GRADE)
-
-    @property
-    def individual_ppl(self) -> Optional[int]:
-        return self._field_from_json(self.individual_report_json, _PPL, _SCORE)
-
-    @property
-    def individual_ppl_grade(self) -> Optional[str]:
-        return self._field_from_json(self.individual_report_json, _PPL, _GRADE)
-
-    def __repr__(self) -> str:
-        d = {}
-        if self.cross_table_report_json is not None:
-            d["cross_table"] = {
-                "sqs": {
-                    "score": self.cross_table_sqs,
-                    "grade": self.cross_table_sqs_grade,
-                },
-                "ppl": {
-                    "score": self.cross_table_ppl,
-                    "grade": self.cross_table_ppl_grade,
-                },
-            }
-        if self.individual_report_json is not None:
-            d["individual"] = {
-                "sqs": {
-                    "score": self.individual_sqs,
-                    "grade": self.individual_sqs_grade,
-                },
-                "ppl": {
-                    "score": self.individual_ppl,
-                    "grade": self.individual_ppl_grade,
-                },
-            }
-        return json.dumps(d)
 
 
 @dataclass
@@ -128,6 +30,14 @@ class ForeignKey:
 
 
 UserFriendlyPrimaryKeyT = Optional[Union[str, List[str]]]
+
+
+@dataclass
+class TableMetadata:
+    primary_key: list[str]
+    data: pd.DataFrame
+    columns: set[str]
+    safe_ancestral_seed_columns: Optional[set[str]] = None
 
 
 class RelationalData:
@@ -146,12 +56,10 @@ class RelationalData:
         a string column name (most common), or a list of multiple string column names (composite key).
         """
         primary_key = self._format_key_column(primary_key)
-        self.graph.add_node(
-            name,
-            primary_key=primary_key,
-            data=data,
-            columns=set(data.columns),
+        metadata = TableMetadata(
+            primary_key=primary_key, data=data, columns=set(data.columns)
         )
+        self.graph.add_node(name, metadata=metadata)
 
     def set_primary_key(
         self, *, table: str, primary_key: UserFriendlyPrimaryKeyT
@@ -170,7 +78,7 @@ class RelationalData:
             if col not in known_columns:
                 raise MultiTableException(f"Unrecognized column name: `{primary_key}`")
 
-        self.graph.nodes[table]["primary_key"] = primary_key
+        self.graph.nodes[table]["metadata"].primary_key = primary_key
         self._clear_safe_ancestral_seed_columns(table)
 
     def _format_key_column(self, key: Optional[Union[str, List[str]]]) -> List[str]:
@@ -273,8 +181,8 @@ class RelationalData:
 
     def update_table_data(self, table: str, data: pd.DataFrame) -> None:
         try:
-            self.graph.nodes[table]["data"] = data
-            self.graph.nodes[table]["columns"] = data.columns
+            self.graph.nodes[table]["metadata"].data = data
+            self.graph.nodes[table]["metadata"].columns = set(data.columns)
             self._clear_safe_ancestral_seed_columns(table)
         except KeyError:
             raise MultiTableException(
@@ -323,19 +231,19 @@ class RelationalData:
         return list(reversed(list(topological_sort(self.graph))))
 
     def get_primary_key(self, table: str) -> List[str]:
-        return self.graph.nodes[table]["primary_key"]
+        return self.graph.nodes[table]["metadata"].primary_key
 
     def get_table_data(
         self, table: str, usecols: Optional[set[str]] = None
     ) -> pd.DataFrame:
         usecols = usecols or self.get_table_columns(table)
-        return self.graph.nodes[table]["data"][list(usecols)]
+        return self.graph.nodes[table]["metadata"].data[list(usecols)]
 
     def get_table_columns(self, table: str) -> set[str]:
-        return self.graph.nodes[table]["columns"]
+        return self.graph.nodes[table]["metadata"].columns
 
     def get_safe_ancestral_seed_columns(self, table: str) -> set[str]:
-        safe_columns = self.graph.nodes[table].get("safe_ancestral_seed_columns")
+        safe_columns = self.graph.nodes[table]["metadata"].safe_ancestral_seed_columns
         if safe_columns is None:
             safe_columns = self._set_safe_ancestral_seed_columns(table)
         return safe_columns
@@ -355,11 +263,11 @@ class RelationalData:
             if _ok_for_train_and_seed(col, data):
                 cols.add(col)
 
-        self.graph.nodes[table]["safe_ancestral_seed_columns"] = cols
+        self.graph.nodes[table]["metadata"].safe_ancestral_seed_columns = cols
         return cols
 
     def _clear_safe_ancestral_seed_columns(self, table: str) -> None:
-        self.graph.nodes[table]["safe_ancestral_seed_columns"] = None
+        self.graph.nodes[table]["metadata"].safe_ancestral_seed_columns = None
 
     def get_foreign_keys(self, table: str) -> List[ForeignKey]:
         foreign_keys = []

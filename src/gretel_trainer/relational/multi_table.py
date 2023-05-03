@@ -32,7 +32,6 @@ from gretel_trainer.relational.core import (
     GretelModelConfig,
     MultiTableException,
     RelationalData,
-    TableEvaluation,
 )
 from gretel_trainer.relational.log import silent_logs
 from gretel_trainer.relational.model_config import (
@@ -45,6 +44,7 @@ from gretel_trainer.relational.report.report import ReportPresenter, ReportRende
 from gretel_trainer.relational.sdk_extras import ExtendedGretelSDK
 from gretel_trainer.relational.strategies.ancestral import AncestralStrategy
 from gretel_trainer.relational.strategies.independent import IndependentStrategy
+from gretel_trainer.relational.table_evaluation import TableEvaluation
 from gretel_trainer.relational.task_runner import run_task
 from gretel_trainer.relational.tasks import (
     ClassifyTask,

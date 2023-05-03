@@ -2,8 +2,8 @@ from datetime import datetime
 
 from lxml import html
 
-from gretel_trainer.relational.core import TableEvaluation
 from gretel_trainer.relational.report.report import ReportPresenter, ReportRenderer
+from gretel_trainer.relational.table_evaluation import TableEvaluation
 
 
 def _evals_from_rel_data(rel_data):
