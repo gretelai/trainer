@@ -7,8 +7,8 @@ from unittest.mock import Mock, patch
 import pandas as pd
 import pandas.testing as pdtest
 
-from gretel_trainer.relational.core import TableEvaluation
 from gretel_trainer.relational.strategies.independent import IndependentStrategy
+from gretel_trainer.relational.table_evaluation import TableEvaluation
 
 
 def test_preparing_training_data_does_not_mutate_source_data(pets, art):
