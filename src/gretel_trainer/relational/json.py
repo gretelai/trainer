@@ -1,14 +1,11 @@
-# @title Define functions for JSON to/from RDB conversion
-
 import hashlib
 import re
+from dataclasses import dataclass
 from json import JSONDecodeError, loads
 
 import numpy as np
 import pandas as pd
 from unflatten import unflatten
-
-from gretel_trainer.relational import MultiTable, RelationalData
 
 # JSON dict to multi-column and list to multi-table
 
@@ -17,7 +14,6 @@ TABLE_SEPARATOR = "^"
 ID_SUFFIX = "~id"
 ORDER_COLUMN = "array~order"
 CONTENT_COLUMN = "content"
-INPUT_TABLE = "_ROOT_"
 PRIMARY_KEY_COLUMN = "~PRIMARY_KEY_ID~"
 
 
@@ -57,7 +53,9 @@ def nulls_to_empty_lists(series):
     return series.apply(lambda x: x if isinstance(x, list) or not pd.isnull(x) else [])
 
 
-def _normalize_json(nested_dfs, flat_dfs=None):
+def _normalize_json(
+    nested_dfs: list[tuple[str, pd.DataFrame]], flat_dfs: list[tuple[str, pd.DataFrame]]
+) -> list[tuple[str, pd.DataFrame]]:
     if not nested_dfs:
         return flat_dfs
     name, df = nested_dfs.pop()
@@ -94,10 +92,6 @@ def _normalize_json(nested_dfs, flat_dfs=None):
     return _normalize_json(nested_dfs, flat_dfs)
 
 
-def normalize_json(df):
-    return _normalize_json([(INPUT_TABLE, df.copy())], [])
-
-
 # Multi-table and multi-column back to single-table with JSON
 
 
@@ -121,7 +115,7 @@ def is_child_table(df):
     return all([col in df.columns for col in (id_col, ORDER_COLUMN, CONTENT_COLUMN)])
 
 
-def denormalize_json(flat_tables):
+def denormalize_json(flat_tables, root_table: str):
     table_dict = dict(reversed(flat_tables))
     for table_name, table_df in table_dict.items():
         if table_df.empty and is_child_table(table_df):
@@ -166,97 +160,107 @@ def denormalize_json(flat_tables):
                     table_dict[parent_name][col_name]
                 )
             table_dict[table_name] = nested_df
-    return table_dict[INPUT_TABLE]
-
-
-# Create foreign to primary key mapping for Gretel Relational
+    return table_dict[root_table]
 
 
 def sanitize_str(s):
     sanitized_str = "-".join(re.findall(r"[a-zA-Z_0-9]+", s))
     # Generate suffix from original string, in case of sanitized_str collision
-    unique_suffix = hashlib.sha256(s.encode("utf-8")).hexdigest()[:10]
+    unique_suffix = make_suffix(s)
     return f"{sanitized_str}-{unique_suffix}"
 
 
-class MockMultiTable:
-    def __init__(self, flat_tables):
-        self.synthetic_output_tables = dict(flat_tables)
+def make_suffix(s):
+    return hashlib.sha256(s.encode("utf-8")).hexdigest()[:10]
 
 
-class GretelJSON:
-    def __init__(self, df, debug=False, **kwargs):
-        self.debug = debug
+@dataclass
+class InventedTableMetadata:
+    root: bool
 
-        self.columns = df.columns
-        tables = normalize_json(df)
+
+class RelationalJson:
+    def __init__(self, table_name: str, primary_key: list[str], df: pd.DataFrame):
+        self.original_columns = df.columns
+        self.original_table_name = table_name
+        self.original_primary_key = primary_key
+        tables = _normalize_json([(table_name, df.copy())], [])
         self.table_name_mappings = {name: sanitize_str(name) for name, _ in tables}
         tables = [(self.table_name_mappings[name], df) for name, df in tables]
-        self.tables = [table_name for table_name, _ in tables]
+        self.table_names = [table_name for table_name, _ in tables]
         self.empty_tables = dict([t for t in tables if t[1].empty])
-        non_empty_tables = [t for t in tables if t[0] not in self.empty_tables.keys()]
+        self.non_empty_tables = [
+            t for t in tables if t[0] not in self.empty_tables.keys()
+        ]
 
-        relational_data = RelationalData()
+    @property
+    def is_applicable(self) -> bool:
+        # If we turned the original table into multiple tables (because of lists)
+        if len(self.table_names) > 1:
+            return True
 
-        for table_name, table_df in non_empty_tables:
+        # Before peeking into non_empty_tables, ensure one exists
+        # (Guaranteed to be 0 or 1 because if 2+ we would have already returned above)
+        if len(self.non_empty_tables) > 0:
+            # If we added columns (because of dicts)
+            if set(self.non_empty_tables[0][1].columns) != set(self.original_columns):
+                return True
+
+        return False
+
+    def add(self) -> tuple[list[dict], list[dict]]:
+        """Returns lists of keyword arguments designed to be passed to a
+        RelationalData instance's add_table and add_foreign_key methods
+        """
+        tables = []
+        foreign_keys = []
+
+        for table_name, table_df in self.non_empty_tables:
             table_df.index.rename(PRIMARY_KEY_COLUMN, inplace=True)
-            relational_data.add_table(
-                name=table_name,
-                primary_key=PRIMARY_KEY_COLUMN,
-                data=table_df.reset_index(),
+            table_pk = self.original_primary_key + [PRIMARY_KEY_COLUMN]
+            is_root_table = (
+                self.inverse_table_name_mappings[table_name] == self.original_table_name
+            )
+            metadata = InventedTableMetadata(root=is_root_table)
+            tables.append(
+                {
+                    "name": table_name,
+                    "primary_key": table_pk,
+                    "data": table_df.reset_index(),
+                    "invented_table_metadata": metadata,
+                }
             )
 
-        for table_name, table_df in non_empty_tables:
+        for table_name, table_df in self.non_empty_tables:
             for column in get_id_columns(table_df):
-                fk = table_name + "." + column
-                ref = (
-                    self.table_name_mappings[
-                        get_parent_table_name_from_child_id_column(column)
-                    ]
-                    + "."
-                    + PRIMARY_KEY_COLUMN
+                referred_table = self.table_name_mappings[
+                    get_parent_table_name_from_child_id_column(column)
+                ]
+                foreign_keys.append(
+                    {
+                        "table": table_name,
+                        "constrained_columns": [column],
+                        "referred_table": referred_table,
+                        "referred_columns": [PRIMARY_KEY_COLUMN],
+                    }
                 )
-                relational_data.add_foreign_key(foreign_key=fk, referencing=ref)
+        return (tables, foreign_keys)
 
-        if self.debug:
-            self.multitable = MockMultiTable(non_empty_tables)
-        else:
-            self.multitable = MultiTable(relational_data, **kwargs)
-
-    def train(self):
-        if not self.debug:
-            self.multitable.train()
-
-    def generate(self, **kwargs):
-        if not self.debug:
-            self.multitable.generate(**kwargs)
-        return self.get_generated_tables()
-
-    def get_generated_tables(self):
+    def restore(self, tables: dict[str, pd.DataFrame]) -> pd.DataFrame:
+        """Reduces a set of tables (assumed to match the shapes created on initialization)
+        to a single table matching the shape of the original source table
+        """
         output_tables = []
-        inverse_table_name_mappings = {
-            value: key for key, value in self.table_name_mappings.items()
-        }
-        for t in self.tables:
+        for t in self.table_names:
             empty_table = self.empty_tables.get(t)
-            multitable_output = self.multitable.synthetic_output_tables.get(
-                t, empty_table
+            multitable_output = tables.get(t, empty_table)
+            output_tables.append(
+                (self.inverse_table_name_mappings[t], multitable_output)
             )
-            output_tables.append((inverse_table_name_mappings[t], multitable_output))
-        return denormalize_json(output_tables)[self.columns]
+        return denormalize_json(output_tables, self.original_table_name)[
+            self.original_columns
+        ]
 
-    def save_jsonl(self, filename):
-        return self.get_generated_tables().to_json(
-            filename, orient="records", lines=True
-        )
-
-    def display_report(self):
-        import IPython
-        from smart_open import open
-
-        report_path = str(
-            self.multitable._working_dir
-            / self.multitable._synthetics_run.identifier
-            / "relational_report.html"
-        )
-        IPython.display.display(IPython.display.HTML(data=open(report_path).read()))
+    @property
+    def inverse_table_name_mappings(self) -> dict[str, str]:
+        return {value: key for key, value in self.table_name_mappings.items()}
