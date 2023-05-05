@@ -818,7 +818,9 @@ class MultiTable:
             record_size_ratio=self._synthetics_run.record_size_ratio,
         )
 
-        for table, synth_df in output_tables.items():
+        reshaped_tables = self.relational_data.restore(output_tables)
+
+        for table, synth_df in reshaped_tables.items():
             synth_csv_path = run_dir / f"synth_{table}.csv"
             synth_df.to_csv(synth_csv_path, index=False)
 
@@ -888,7 +890,7 @@ class MultiTable:
         self._artifact_collection.upload_synthetics_outputs_archive(
             self._project, str(archive_path)
         )
-        self.synthetic_output_tables = output_tables
+        self.synthetic_output_tables = reshaped_tables
         self._backup()
 
     def create_relational_report(self, run_identifier: str, target_dir: Path) -> None:
