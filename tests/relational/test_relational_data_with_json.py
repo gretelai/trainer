@@ -104,7 +104,17 @@ def test_foreign_keys(documents):
         )
     ]
 
-    # Children of the source-with-JSON table point to the root invented table
+    # Invented children point to invented parents
+    assert documents.get_foreign_keys("purchases-data-years-sfx") == [
+        ForeignKey(
+            table_name="purchases-data-years-sfx",
+            columns=["purchases~id"],
+            parent_table_name="purchases-sfx",
+            parent_columns=["id"],
+        )
+    ]
+
+    # Source children of the source-with-JSON table point to the root invented table
     assert documents.get_foreign_keys("payments") == [
         ForeignKey(
             table_name="payments",
