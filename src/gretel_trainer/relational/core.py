@@ -47,6 +47,7 @@ class TableMetadata:
     primary_key: list[str]
     data: pd.DataFrame
     columns: set[str]
+    invented_root_table_name: Optional[str] = None
     invented_table_metadata: Optional[InventedTableMetadata] = None
     safe_ancestral_seed_columns: Optional[set[str]] = None
 
@@ -104,6 +105,7 @@ class RelationalData:
         rel_json = RelationalJson(name, primary_key, data)
         if rel_json.is_applicable:
             self.relational_jsons[name] = rel_json
+            self.graph.nodes[name]["metadata"].invented_root_table_name = rel_json.root_table_name
             add_tables, add_foreign_keys = rel_json.add()
             for add_table in add_tables:
                 self._add_single_table(**add_table)
