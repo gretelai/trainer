@@ -731,7 +731,7 @@ class MultiTable:
     def _upload_sources_to_project(self) -> None:
         archive_path = self._working_dir / "source_tables.tar.gz"
         with tarfile.open(archive_path, "w:gz") as tar:
-            for table in self.relational_data.list_all_tables():
+            for table in self.relational_data.list_all_tables(Scope.ALL):
                 filename = f"source_{table}.csv"
                 out_path = self._working_dir / filename
                 df = self.relational_data.get_table_data(table)

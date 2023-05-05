@@ -2,6 +2,7 @@ from datetime import datetime
 
 from lxml import html
 
+from gretel_trainer.relational.core import Scope
 from gretel_trainer.relational.report.report import ReportPresenter, ReportRenderer
 from gretel_trainer.relational.table_evaluation import TableEvaluation
 
@@ -12,7 +13,7 @@ def _evals_from_rel_data(rel_data):
         "privacy_protection_level": {"score": 2, "grade": "Good"},
     }
     evals = {}
-    for table in rel_data.list_all_tables():
+    for table in rel_data.list_all_tables(Scope.PUBLIC):
         eval = TableEvaluation(cross_table_report_json=d, individual_report_json=d)
         evals[table] = eval
     return evals
