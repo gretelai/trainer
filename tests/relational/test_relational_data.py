@@ -478,7 +478,7 @@ def test_table_with_json():
             table_name="bball-rings-sfx",
             columns=["bball~id"],
             parent_table_name="bball-sfx",
-            parent_columns=["~PRIMARY_KEY_ID~"],
+            parent_columns=["name"],
         )
     ]
 
@@ -489,7 +489,6 @@ def test_table_with_json():
                 "age": [38, 35],
                 "draft>year": [2003, 2009],
                 "draft>college": [None, "Davidson"],
-                "~PRIMARY_KEY_ID~": [0, 1],
             }
         ),
         "bball-rings-sfx": pd.DataFrame(
@@ -580,7 +579,6 @@ def test_table_with_json_dict_only():
                 "age": [38, 35],
                 "draft>year": [2003, 2009],
                 "draft>college": [None, "Davidson"],
-                "~PRIMARY_KEY_ID~": [0, 1],
             }
         )
     }
@@ -644,7 +642,6 @@ def test_more_json(documents):
         "data>item",
         "data>cost",
         "data>details>color",
-        "~PRIMARY_KEY_ID~",
     }
 
     assert set(documents.get_table_columns("purchases-data-years-sfx")) == {
@@ -676,7 +673,6 @@ def test_more_json(documents):
                 "data>item": ["pen", "paint", "ink", "ink"],
                 "data>cost": [18, 19, 20, 21],
                 "data>details>color": ["blue", "yellow", "pink", "orange"],
-                "~PRIMARY_KEY_ID~": [0, 1, 2, 3],
             }
         ),
         "purchases-data-years-sfx": pd.DataFrame(
