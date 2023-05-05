@@ -32,6 +32,7 @@ from gretel_trainer.relational.core import (
     GretelModelConfig,
     MultiTableException,
     RelationalData,
+    Scope,
 )
 from gretel_trainer.relational.log import silent_logs
 from gretel_trainer.relational.model_config import (
@@ -102,7 +103,7 @@ class MultiTable:
         self._synthetics_train = SyntheticsTrain()
         self._synthetics_run: Optional[SyntheticsRun] = None
         self.synthetic_output_tables: Dict[str, pd.DataFrame] = {}
-        self.evaluations = defaultdict(lambda: TableEvaluation())
+        self._evaluations = defaultdict(lambda: TableEvaluation())
 
         if backup is None:
             self._complete_fresh_init(project_display_name)
@@ -258,15 +259,16 @@ class MultiTable:
             if model.status == Status.COMPLETED
         ]
         for table in training_succeeded:
-            model = self._synthetics_train.models[table]
-            with silent_logs():
-                self._strategy.update_evaluation_from_model(
-                    table,
-                    self.evaluations,
-                    model,
-                    self._working_dir,
-                    self._extended_sdk,
-                )
+            if table in self.relational_data.list_all_tables(Scope.EVALUATABLE):
+                model = self._synthetics_train.models[table]
+                with silent_logs():
+                    self._strategy.update_evaluation_from_model(
+                        table,
+                        self._evaluations,
+                        model,
+                        self._working_dir,
+                        self._extended_sdk,
+                    )
 
         training_failed = [
             table
@@ -458,6 +460,20 @@ class MultiTable:
     @property
     def _hybrid(self) -> bool:
         return get_session_config().default_runner == RunnerMode.HYBRID
+
+    @property
+    def evaluations(self) -> dict[str, TableEvaluation]:
+        def _public_name(t: str) -> str:
+            if t in self.relational_data.relational_jsons:
+                return self.relational_data.relational_jsons[t].original_table_name
+            else:
+                return t
+
+        evaluations = defaultdict(lambda: TableEvaluation())
+        for table, evaluation in self._evaluations.items():
+            evaluations[_public_name(table)] = evaluation
+
+        return evaluations
 
     def _set_refresh_interval(self, interval: Optional[int]) -> None:
         if interval is None:
@@ -668,10 +684,15 @@ class MultiTable:
         run_task(task, self._extended_sdk)
 
         for table in task.completed:
-            model = self._synthetics_train.models[table]
-            self._strategy.update_evaluation_from_model(
-                table, self.evaluations, model, self._working_dir, self._extended_sdk
-            )
+            if table in self.relational_data.list_all_tables(Scope.EVALUATABLE):
+                model = self._synthetics_train.models[table]
+                self._strategy.update_evaluation_from_model(
+                    table,
+                    self._evaluations,
+                    model,
+                    self._working_dir,
+                    self._extended_sdk,
+                )
 
         # TODO: consider moving this to before running the task
         archive_path = self._working_dir / "synthetics_training.tar.gz"
@@ -813,6 +834,9 @@ class MultiTable:
             if table in self._synthetics_run.preserved:
                 continue
 
+            if table not in self.relational_data.list_all_tables(Scope.EVALUATABLE):
+                continue
+
             evaluate_data = self._strategy.get_evaluate_model_data(
                 rel_data=self.relational_data,
                 table_name=table,
@@ -834,11 +858,12 @@ class MultiTable:
         )
         run_task(synthetics_evaluate_task, self._extended_sdk)
 
+        # Tables passed to task were already scoped to evaluatable tables
         for table in synthetics_evaluate_task.completed:
             self._strategy.update_evaluation_from_evaluate(
                 table_name=table,
                 evaluate_model=evaluate_models[table],
-                evaluations=self.evaluations,
+                evaluations=self._evaluations,
                 working_dir=self._working_dir,
                 extended_sdk=self._extended_sdk,
             )
@@ -912,8 +937,8 @@ class MultiTable:
         individual_report_json = json.loads(smart_open.open(individual_path).read())
         cross_table_report_json = json.loads(smart_open.open(cross_table_path).read())
 
-        self.evaluations[table].individual_report_json = individual_report_json
-        self.evaluations[table].cross_table_report_json = cross_table_report_json
+        self._evaluations[table].individual_report_json = individual_report_json
+        self._evaluations[table].cross_table_report_json = cross_table_report_json
 
     def _validate_gretel_model(self, gretel_model: Optional[str]) -> Tuple[str, str]:
         gretel_model = (gretel_model or self._strategy.default_model).lower()
