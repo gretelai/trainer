@@ -176,14 +176,16 @@ def make_suffix(s):
 
 @dataclass
 class InventedTableMetadata:
-    root: bool
+    invented_root_table_name: str
+    original_table_name: str
 
 
 class RelationalJson:
     def __init__(self, table_name: str, primary_key: list[str], df: pd.DataFrame):
-        self.original_columns = df.columns
         self.original_table_name = table_name
         self.original_primary_key = primary_key
+        self.original_data = df
+        self.original_columns = df.columns
         tables = _normalize_json([(table_name, df.copy())], [])
         self.table_name_mappings = {name: sanitize_str(name) for name, _ in tables}
         tables = [(self.table_name_mappings[name], df) for name, df in tables]
@@ -222,10 +224,13 @@ class RelationalJson:
         for table_name, table_df in self.non_empty_tables:
             table_df.index.rename(PRIMARY_KEY_COLUMN, inplace=True)
             table_pk = self.original_primary_key + [PRIMARY_KEY_COLUMN]
-            is_root_table = (
-                self.inverse_table_name_mappings[table_name] == self.original_table_name
+            invented_root_table_name = self.table_name_mappings[
+                self.original_table_name
+            ]
+            metadata = InventedTableMetadata(
+                invented_root_table_name=invented_root_table_name,
+                original_table_name=self.original_table_name,
             )
-            metadata = InventedTableMetadata(root=is_root_table)
             tables.append(
                 {
                     "name": table_name,
