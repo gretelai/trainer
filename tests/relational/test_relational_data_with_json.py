@@ -96,6 +96,17 @@ def test_invented_json_column_names(documents, bball):
     }
 
 
+def test_primary_key(documents, bball):
+    # Typically, the source-with-JSON and root invented tables' primary keys are identical
+    assert documents.get_primary_key("purchases") == documents.get_primary_key(
+        "purchases-sfx"
+    )
+
+    # This is not the case if the source-with-JSON does not have a primary key
+    assert bball.get_primary_key("bball") == []
+    assert bball.get_primary_key("bball-sfx") == ["~PRIMARY_KEY_ID~"]
+
+
 def test_foreign_keys(documents):
     # Foreign keys from the source-with-JSON table are present on the root invented table
     assert documents.get_foreign_keys("purchases") == documents.get_foreign_keys(
