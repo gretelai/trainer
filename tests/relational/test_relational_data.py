@@ -458,8 +458,8 @@ def test_table_with_json():
         make_suffix.return_value = "sfx"
         rel_data.add_table(name="bball", primary_key="name", data=bball_df)
 
-    # By default, only show user-supplied tables and hide invented tables
-    assert set(rel_data.list_all_tables()) == {"bball"}
+    # Ask for user-supplied tables (omit invented tables)
+    assert set(rel_data.list_all_tables(Scope.PUBLIC)) == {"bball"}
     # We can optionally fetch all tables with scope="all"
     assert set(rel_data.list_all_tables(Scope.ALL)) == {
         "bball",
@@ -608,3 +608,119 @@ def test_table_with_json_dict_only():
         ),
     )
     pdtest.assert_frame_equal(restored_bball_df, bball_df)
+
+
+def test_more_json(documents):
+    assert set(documents.list_all_tables(Scope.PUBLIC)) == {
+        "users",
+        "purchases",
+        "payments",
+    }
+
+    assert set(documents.list_all_tables(Scope.ALL)) == {
+        "users",
+        "purchases",
+        "payments",
+        "purchases-sfx",
+        "purchases-data-years-sfx",
+    }
+
+    assert set(documents.list_all_tables(Scope.MODELABLE)) == {
+        "users",
+        "payments",
+        "purchases-sfx",
+        "purchases-data-years-sfx",
+    }
+
+    assert set(documents.get_table_columns("purchases-sfx")) == {
+        "id",
+        "user_id",
+        "data>item",
+        "data>cost",
+        "data>details>color",
+        "~PRIMARY_KEY_ID~",
+    }
+
+    assert set(documents.get_table_columns("purchases-data-years-sfx")) == {
+        "content",
+        "~PRIMARY_KEY_ID~",
+        "purchases~id",
+        "array~order",
+    }
+
+    # Output tables MultiTable transforms or synthetics
+    output_tables = {
+        "users": pd.DataFrame(
+            data={
+                "id": [1, 2, 3],
+                "name": ["Rob", "Sam", "Tim"],
+            }
+        ),
+        "payments": pd.DataFrame(
+            data={
+                "id": [1, 2, 3, 4],
+                "amount": [10, 10, 10, 10],
+                "purchase_id": [1, 2, 3, 4],
+            }
+        ),
+        "purchases-sfx": pd.DataFrame(
+            data={
+                "id": [1, 2, 3, 4],
+                "user_id": [1, 1, 2, 3],
+                "data>item": ["pen", "paint", "ink", "ink"],
+                "data>cost": [18, 19, 20, 21],
+                "data>details>color": ["blue", "yellow", "pink", "orange"],
+                "~PRIMARY_KEY_ID~": [0, 1, 2, 3],
+            }
+        ),
+        "purchases-data-years-sfx": pd.DataFrame(
+            data={
+                "content": [2000, 2001, 2002, 2003, 2004, 2005, 2006, 2007],
+                "~PRIMARY_KEY_ID~": [0, 1, 2, 3, 4, 5, 6, 7],
+                "purchases~id": [0, 0, 0, 1, 2, 2, 3, 3],
+                "array~order": [0, 1, 2, 0, 0, 1, 0, 1],
+            }
+        ),
+    }
+
+    restored_tables = documents.restore(output_tables)
+
+    expected = {
+        "users": output_tables["users"],
+        "payments": output_tables["payments"],
+        "purchases": pd.DataFrame(
+            data={
+                "id": [1, 2, 3, 4],
+                "user_id": [1, 1, 2, 3],
+                "data": [
+                    {
+                        "item": "pen",
+                        "cost": 18,
+                        "details": {"color": "blue"},
+                        "years": [2000, 2001, 2002],
+                    },
+                    {
+                        "item": "paint",
+                        "cost": 19,
+                        "details": {"color": "yellow"},
+                        "years": [2003],
+                    },
+                    {
+                        "item": "ink",
+                        "cost": 20,
+                        "details": {"color": "pink"},
+                        "years": [2004, 2005],
+                    },
+                    {
+                        "item": "ink",
+                        "cost": 21,
+                        "details": {"color": "orange"},
+                        "years": [2006, 2007],
+                    },
+                ],
+            }
+        ),
+    }
+
+    for t, df in restored_tables.items():
+        pdtest.assert_frame_equal(df, expected[t])
