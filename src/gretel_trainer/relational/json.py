@@ -194,6 +194,10 @@ class RelationalJson:
         ]
 
     @property
+    def root_table_name(self) -> str:
+        return self.table_name_mappings[self.original_table_name]
+
+    @property
     def is_applicable(self) -> bool:
         # If we turned the original table into multiple tables (because of lists)
         if len(self.table_names) > 1:
