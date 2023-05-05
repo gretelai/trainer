@@ -335,6 +335,17 @@ class RelationalData:
             and self.graph.nodes[table]["metadata"].invented_table_metadata is not None
         )
 
+    def get_public_name(self, table: str) -> Optional[str]:
+        if table in self.relational_jsons:
+            return table
+
+        if (
+            imeta := self.graph.nodes[table]["metadata"].invented_table_metadata
+        ) is not None:
+            return imeta.original_table_name
+
+        return table
+
     def get_parents(self, table: str) -> List[str]:
         return list(self.graph.successors(table))
 
@@ -431,6 +442,9 @@ class RelationalData:
         self.graph.nodes[table]["metadata"].safe_ancestral_seed_columns = None
 
     def get_foreign_keys(self, table: str) -> List[ForeignKey]:
+        if table in self.relational_jsons:
+            table = self.relational_jsons[table].root_table_name
+
         foreign_keys = []
         for parent in self.get_parents(table):
             fks = self.graph.edges[table, parent]["via"]
