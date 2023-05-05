@@ -222,7 +222,10 @@ class RelationalJson:
         foreign_keys = []
 
         for table_name, table_df in self.non_empty_tables:
-            if table_name == self.root_table_name:
+            if (
+                table_name == self.root_table_name
+                and len(self.original_primary_key) > 0
+            ):
                 table_pk = self.original_primary_key
             else:
                 table_pk = [PRIMARY_KEY_COLUMN]
@@ -249,7 +252,10 @@ class RelationalJson:
                 referred_table = self.table_name_mappings[
                     get_parent_table_name_from_child_id_column(column)
                 ]
-                if referred_table == self.root_table_name:
+                if (
+                    referred_table == self.root_table_name
+                    and len(self.original_primary_key) > 0
+                ):
                     referred_columns = self.original_primary_key
                 else:
                     referred_columns = [PRIMARY_KEY_COLUMN]
