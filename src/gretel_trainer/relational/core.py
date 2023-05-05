@@ -45,7 +45,6 @@ class Scope(str, Enum):
 
 @dataclass
 class TableMetadata:
-    name: str
     primary_key: list[str]
     data: pd.DataFrame
     columns: set[str]
@@ -123,7 +122,6 @@ class RelationalData:
     ) -> None:
         primary_key = self._format_key_column(primary_key)
         metadata = TableMetadata(
-            name=name,
             primary_key=primary_key,
             data=data,
             columns=set(data.columns),
