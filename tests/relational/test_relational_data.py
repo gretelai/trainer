@@ -327,13 +327,15 @@ def test_debug_summary(ecom, mutagenesis):
     assert ecom.debug_summary() == {
         "foreign_key_count": 6,
         "max_depth": 3,
-        "table_count": 6,
+        "public_table_count": 6,
+        "invented_table_count": 0,
         "tables": {
             "users": {
                 "column_count": 3,
                 "primary_key": ["id"],
                 "foreign_key_count": 0,
                 "foreign_keys": [],
+                "is_invented_table": False,
             },
             "events": {
                 "column_count": 4,
@@ -346,12 +348,14 @@ def test_debug_summary(ecom, mutagenesis):
                         "parent_columns": ["id"],
                     }
                 ],
+                "is_invented_table": False,
             },
             "distribution_center": {
                 "column_count": 2,
                 "primary_key": ["id"],
                 "foreign_key_count": 0,
                 "foreign_keys": [],
+                "is_invented_table": False,
             },
             "products": {
                 "column_count": 4,
@@ -364,6 +368,7 @@ def test_debug_summary(ecom, mutagenesis):
                         "parent_columns": ["id"],
                     }
                 ],
+                "is_invented_table": False,
             },
             "inventory_items": {
                 "column_count": 5,
@@ -381,6 +386,7 @@ def test_debug_summary(ecom, mutagenesis):
                         "parent_columns": ["id"],
                     },
                 ],
+                "is_invented_table": False,
             },
             "order_items": {
                 "column_count": 5,
@@ -398,6 +404,7 @@ def test_debug_summary(ecom, mutagenesis):
                         "parent_columns": ["id"],
                     },
                 ],
+                "is_invented_table": False,
             },
         },
     }
@@ -405,7 +412,8 @@ def test_debug_summary(ecom, mutagenesis):
     assert mutagenesis.debug_summary() == {
         "foreign_key_count": 3,
         "max_depth": 2,
-        "table_count": 3,
+        "public_table_count": 3,
+        "invented_table_count": 0,
         "tables": {
             "bond": {
                 "column_count": 3,
@@ -423,6 +431,7 @@ def test_debug_summary(ecom, mutagenesis):
                         "parent_columns": ["atom_id"],
                     },
                 ],
+                "is_invented_table": False,
             },
             "atom": {
                 "column_count": 4,
@@ -435,12 +444,14 @@ def test_debug_summary(ecom, mutagenesis):
                         "parent_columns": ["molecule_id"],
                     }
                 ],
+                "is_invented_table": False,
             },
             "molecule": {
                 "column_count": 2,
                 "primary_key": ["molecule_id"],
                 "foreign_key_count": 0,
                 "foreign_keys": [],
+                "is_invented_table": False,
             },
         },
     }
@@ -726,3 +737,71 @@ def test_more_json(documents):
 
     for t, df in restored_tables.items():
         pdtest.assert_frame_equal(df, expected[t])
+
+    assert documents.debug_summary() == {
+        "foreign_key_count": 4,
+        "max_depth": 2,
+        "public_table_count": 3,
+        "invented_table_count": 2,
+        "tables": {
+            "users": {
+                "column_count": 2,
+                "primary_key": ["id"],
+                "foreign_key_count": 0,
+                "foreign_keys": [],
+                "is_invented_table": False,
+            },
+            "payments": {
+                "column_count": 3,
+                "primary_key": ["id"],
+                "foreign_key_count": 1,
+                "foreign_keys": [
+                    {
+                        "columns": ["purchase_id"],
+                        "parent_table_name": "purchases-sfx",
+                        "parent_columns": ["id"],
+                    }
+                ],
+                "is_invented_table": False,
+            },
+            "purchases": {
+                "column_count": 3,
+                "primary_key": ["id"],
+                "foreign_key_count": 1,
+                "foreign_keys": [
+                    {
+                        "columns": ["user_id"],
+                        "parent_table_name": "users",
+                        "parent_columns": ["id"],
+                    }
+                ],
+                "is_invented_table": False,
+            },
+            "purchases-sfx": {
+                "column_count": 5,
+                "primary_key": ["id"],
+                "foreign_key_count": 1,
+                "foreign_keys": [
+                    {
+                        "columns": ["user_id"],
+                        "parent_table_name": "users",
+                        "parent_columns": ["id"],
+                    }
+                ],
+                "is_invented_table": True,
+            },
+            "purchases-data-years-sfx": {
+                "column_count": 4,
+                "primary_key": ["~PRIMARY_KEY_ID~"],
+                "foreign_key_count": 1,
+                "foreign_keys": [
+                    {
+                        "columns": ["purchases~id"],
+                        "parent_table_name": "purchases-sfx",
+                        "parent_columns": ["id"],
+                    }
+                ],
+                "is_invented_table": True,
+            },
+        },
+    }

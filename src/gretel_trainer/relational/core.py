@@ -40,6 +40,7 @@ class Scope(str, Enum):
     PUBLIC = "public"
     MODELABLE = "modelable"
     EVALUATABLE = "evaluatable"
+    INVENTED = "invented"
 
 
 @dataclass
@@ -307,7 +308,7 @@ class RelationalData:
         ]
 
         if scope == Scope.MODELABLE:
-            return modelable_nodes
+            return list(modelable_nodes)
         elif scope == Scope.EVALUATABLE:
             e = []
             for n in modelable_nodes:
@@ -318,6 +319,8 @@ class RelationalData:
                 ):
                     e.append(n)
             return e
+        elif scope == Scope.INVENTED:
+            return [n for n in modelable_nodes if self._is_invented(n)]
         elif scope == Scope.ALL:
             return list(modelable_nodes) + json_source_tables
         elif scope == Scope.PUBLIC:
@@ -327,7 +330,10 @@ class RelationalData:
             return json_source_tables + non_invented_nodes
 
     def _is_invented(self, table: str) -> bool:
-        return self.graph.nodes[table]["metadata"].invented_table_metadata is not None
+        return (
+            table in self.graph.nodes
+            and self.graph.nodes[table]["metadata"].invented_table_metadata is not None
+        )
 
     def get_parents(self, table: str) -> List[str]:
         return list(self.graph.successors(table))
@@ -368,7 +374,13 @@ class RelationalData:
         return list(reversed(list(topological_sort(self.graph))))
 
     def get_primary_key(self, table: str) -> List[str]:
-        return self.graph.nodes[table]["metadata"].primary_key
+        try:
+            return self.graph.nodes[table]["metadata"].primary_key
+        except KeyError:
+            if table in self.relational_jsons:
+                return self.relational_jsons[table].original_primary_key
+            else:
+                raise MultiTableException(f"Unrecognized table: `{table}`")
 
     def get_table_data(
         self, table: str, usecols: Optional[set[str]] = None
@@ -434,14 +446,19 @@ class RelationalData:
 
     def debug_summary(self) -> Dict[str, Any]:
         max_depth = dag_longest_path_length(self.graph)
+        public_table_count = len(self.list_all_tables(Scope.PUBLIC))
+        invented_table_count = len(self.list_all_tables(Scope.INVENTED))
+
         all_tables = self.list_all_tables(Scope.ALL)
-        table_count = len(all_tables)
         total_foreign_key_count = 0
         tables = {}
         for table in all_tables:
             this_table_foreign_key_count = 0
             foreign_keys = []
-            for key in self.get_foreign_keys(table):
+            fk_lookup_table_name = table
+            if table in self.relational_jsons:
+                fk_lookup_table_name = self.relational_jsons[table].root_table_name
+            for key in self.get_foreign_keys(fk_lookup_table_name):
                 total_foreign_key_count = total_foreign_key_count + 1
                 this_table_foreign_key_count = this_table_foreign_key_count + 1
                 foreign_keys.append(
@@ -452,16 +469,18 @@ class RelationalData:
                     }
                 )
             tables[table] = {
-                "column_count": len(self.get_table_data(table).columns),
+                "column_count": len(self.get_table_columns(table)),
                 "primary_key": self.get_primary_key(table),
                 "foreign_key_count": this_table_foreign_key_count,
                 "foreign_keys": foreign_keys,
+                "is_invented_table": self._is_invented(table),
             }
         return {
             "foreign_key_count": total_foreign_key_count,
             "max_depth": max_depth,
-            "table_count": table_count,
             "tables": tables,
+            "public_table_count": public_table_count,
+            "invented_table_count": invented_table_count,
         }
 
     def as_dict(self, out_dir: str) -> Dict[str, Any]:
