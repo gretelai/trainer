@@ -10,7 +10,7 @@ from typing import Dict, List, Optional, Tuple
 import plotly.graph_objects as go
 from jinja2 import Environment, FileSystemLoader
 
-from gretel_trainer.relational.core import ForeignKey, RelationalData
+from gretel_trainer.relational.core import ForeignKey, RelationalData, Scope
 from gretel_trainer.relational.report.figures import (
     PRIVACY_LEVEL_VALUES,
     gauge_and_needle_chart,
@@ -135,7 +135,7 @@ class ReportPresenter:
     @property
     def report_table_data(self) -> List[ReportTableData]:
         table_data = []
-        for table in self.rel_data.list_all_tables():
+        for table in self.rel_data.list_all_tables(Scope.PUBLIC):
             pk = self.rel_data.get_primary_key(table)
             fks = self.rel_data.get_foreign_keys(table)
             table_data.append(ReportTableData(table=table, pk=pk, fks=fks))
