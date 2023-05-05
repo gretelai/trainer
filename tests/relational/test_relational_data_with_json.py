@@ -2,8 +2,25 @@ from unittest.mock import patch
 
 import pandas as pd
 import pandas.testing as pdtest
+import pytest
 
 from gretel_trainer.relational.core import ForeignKey, RelationalData, Scope
+
+
+@pytest.fixture
+def bball():
+    bball_jsonl = """
+    {"name": "LeBron James", "age": 38, "draft": {"year": 2003}}
+    {"name": "Steph Curry", "age": 35, "draft": {"year": 2009, "college": "Davidson"}}
+    """
+    bball_df = pd.read_json(bball_jsonl, lines=True)
+
+    rel_data = RelationalData()
+    with patch("gretel_trainer.relational.json.make_suffix") as make_suffix:
+        make_suffix.return_value = "sfx"
+        rel_data.add_table(name="bball", primary_key=None, data=bball_df)
+
+    return rel_data
 
 
 def test_list_tables_accepts_various_scopes(documents):
@@ -50,7 +67,7 @@ def test_list_tables_accepts_various_scopes(documents):
     )
 
 
-def test_invented_json_column_names(documents):
+def test_invented_json_column_names(documents, bball):
     # The root invented table adds columns for dictionary properties lifted from nested JSON objects
     assert set(documents.get_table_columns("purchases-sfx")) == {
         "id",
@@ -70,16 +87,7 @@ def test_invented_json_column_names(documents):
     }
 
     # If the source table does not have a primary key defined, one is created on the root invented table
-    bball_jsonl = """
-    {"name": "LeBron James", "age": 38, "draft": {"year": 2003}}
-    {"name": "Steph Curry", "age": 35, "draft": {"year": 2009, "college": "Davidson"}}
-    """
-    bball_df = pd.read_json(bball_jsonl, lines=True)
-    rel_data = RelationalData()
-    with patch("gretel_trainer.relational.json.make_suffix") as make_suffix:
-        make_suffix.return_value = "sfx"
-        rel_data.add_table(name="bball", primary_key=None, data=bball_df)
-    assert set(rel_data.get_table_columns("bball-sfx")) == {
+    assert set(bball.get_table_columns("bball-sfx")) == {
         "name",
         "age",
         "draft>year",
