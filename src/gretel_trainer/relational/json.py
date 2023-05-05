@@ -222,8 +222,12 @@ class RelationalJson:
         foreign_keys = []
 
         for table_name, table_df in self.non_empty_tables:
-            table_df.index.rename(PRIMARY_KEY_COLUMN, inplace=True)
-            table_pk = self.original_primary_key + [PRIMARY_KEY_COLUMN]
+            if table_name == self.root_table_name:
+                table_pk = self.original_primary_key
+            else:
+                table_pk = [PRIMARY_KEY_COLUMN]
+                table_df.index.rename(PRIMARY_KEY_COLUMN, inplace=True)
+                table_df.reset_index(inplace=True)
             invented_root_table_name = self.table_name_mappings[
                 self.original_table_name
             ]
@@ -235,7 +239,7 @@ class RelationalJson:
                 {
                     "name": table_name,
                     "primary_key": table_pk,
-                    "data": table_df.reset_index(),
+                    "data": table_df,
                     "invented_table_metadata": metadata,
                 }
             )
@@ -245,12 +249,16 @@ class RelationalJson:
                 referred_table = self.table_name_mappings[
                     get_parent_table_name_from_child_id_column(column)
                 ]
+                if referred_table == self.root_table_name:
+                    referred_columns = self.original_primary_key
+                else:
+                    referred_columns = [PRIMARY_KEY_COLUMN]
                 foreign_keys.append(
                     {
                         "table": table_name,
                         "constrained_columns": [column],
                         "referred_table": referred_table,
-                        "referred_columns": [PRIMARY_KEY_COLUMN],
+                        "referred_columns": referred_columns,
                     }
                 )
         return (tables, foreign_keys)
