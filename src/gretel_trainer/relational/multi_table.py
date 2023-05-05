@@ -463,15 +463,11 @@ class MultiTable:
 
     @property
     def evaluations(self) -> dict[str, TableEvaluation]:
-        def _public_name(t: str) -> str:
-            if t in self.relational_data.relational_jsons:
-                return self.relational_data.relational_jsons[t].original_table_name
-            else:
-                return t
-
         evaluations = defaultdict(lambda: TableEvaluation())
+
         for table, evaluation in self._evaluations.items():
-            evaluations[_public_name(table)] = evaluation
+            if (public_name := self.relational_data.get_public_name(table)) is not None:
+                evaluations[public_name] = evaluation
 
         return evaluations
 
