@@ -632,6 +632,12 @@ def test_more_json(documents):
         "purchases-data-years-sfx",
     }
 
+    assert set(documents.list_all_tables(Scope.EVALUATABLE)) == {
+        "users",
+        "payments",
+        "purchases-sfx",
+    }
+
     assert set(documents.get_table_columns("purchases-sfx")) == {
         "id",
         "user_id",

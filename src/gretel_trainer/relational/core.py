@@ -39,6 +39,7 @@ class Scope(str, Enum):
     ALL = "all"
     PUBLIC = "public"
     MODELABLE = "modelable"
+    EVALUATABLE = "evaluatable"
 
 
 @dataclass
@@ -307,6 +308,16 @@ class RelationalData:
 
         if scope == Scope.MODELABLE:
             return modelable_nodes
+        elif scope == Scope.EVALUATABLE:
+            e = []
+            for n in modelable_nodes:
+                meta = self.graph.nodes[n]["metadata"]
+                if (
+                    meta.invented_table_metadata is None
+                    or meta.invented_table_metadata.invented_root_table_name == n
+                ):
+                    e.append(n)
+            return e
         elif scope == Scope.ALL:
             return list(modelable_nodes) + json_source_tables
         elif scope == Scope.PUBLIC:
