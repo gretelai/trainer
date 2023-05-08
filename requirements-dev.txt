@@ -3,5 +3,5 @@ black
 isort
 lxml
 pandas-stubs
-pyright
+pyright==1.1.305
 pytest
