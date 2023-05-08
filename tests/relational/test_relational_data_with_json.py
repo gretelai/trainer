@@ -104,6 +104,7 @@ def test_primary_key(documents, bball):
 
     # Setting an existing primary key to None puts us in the correct state
     assert len(documents.list_all_tables(Scope.ALL)) == 5
+    original_payments_fks = documents.get_foreign_keys("payments")
     documents.set_primary_key(table="purchases", primary_key=None)
     assert len(documents.list_all_tables(Scope.ALL)) == 5
     assert documents.get_primary_key("purchases") == []
@@ -116,6 +117,7 @@ def test_primary_key(documents, bball):
             parent_columns=["~PRIMARY_KEY_ID~"],
         )
     ]
+    assert documents.get_foreign_keys("payments") == original_payments_fks
 
     # Setting a None primary key to some column puts us in the correct state
     assert len(bball.list_all_tables(Scope.ALL)) == 3

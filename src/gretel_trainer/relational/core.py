@@ -151,12 +151,27 @@ class RelationalData:
 
         if (rel_json := self.relational_jsons.get(table)) is not None:
             original_data = rel_json.original_data
+            original_fks = [
+                fk
+                for child in self.graph.predecessors(rel_json.root_table_name)
+                for fk in self.get_foreign_keys(child)
+                if fk.parent_table_name == rel_json.root_table_name
+                and not self._is_invented(fk.table_name)
+            ]
+
             for invented_table_name, _ in rel_json.non_empty_tables:
                 self.graph.remove_node(invented_table_name)
             del self.relational_jsons[table]
 
             new_rel_json = RelationalJson(table, primary_key, original_data)
             self._add_rel_json_and_tables(table, new_rel_json)
+            for fk in original_fks:
+                self.add_foreign_key(
+                    table=fk.table_name,
+                    constrained_columns=fk.columns,
+                    referred_table=fk.parent_table_name,
+                    referred_columns=fk.parent_columns,
+                )
         else:
             self.graph.nodes[table]["metadata"].primary_key = primary_key
             self._clear_safe_ancestral_seed_columns(table)
