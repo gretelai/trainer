@@ -149,19 +149,8 @@ class RelationalData:
             if col not in known_columns:
                 raise MultiTableException(f"Unrecognized column name: `{col}`")
 
-        if (rel_json := self.relational_jsons.get(table)) is not None:
-            original_data = rel_json.original_data
-            original_fks = [
-                fk
-                for child in self.graph.predecessors(rel_json.root_table_name)
-                for fk in self.get_foreign_keys(child)
-                if fk.parent_table_name == rel_json.root_table_name
-                and not self._is_invented(fk.table_name)
-            ]
-
-            for invented_table_name, _ in rel_json.non_empty_tables:
-                self.graph.remove_node(invented_table_name)
-            del self.relational_jsons[table]
+        if self.relational_jsons.get(table) is not None:
+            original_data, original_fks = self._remove_relational_json(table)
 
             new_rel_json = RelationalJson(table, primary_key, original_data)
             self._add_rel_json_and_tables(table, new_rel_json)
@@ -175,6 +164,25 @@ class RelationalData:
         else:
             self.graph.nodes[table]["metadata"].primary_key = primary_key
             self._clear_safe_ancestral_seed_columns(table)
+
+    def _remove_relational_json(
+        self, table: str
+    ) -> tuple[pd.DataFrame, list[ForeignKey]]:
+        rel_json = self.relational_jsons[table]
+        original_data = rel_json.original_data
+        original_foreign_keys = [
+            fk
+            for child in self.graph.predecessors(rel_json.root_table_name)
+            for fk in self.get_foreign_keys(child)
+            if fk.parent_table_name == rel_json.root_table_name
+            and not self._is_invented(fk.table_name)
+        ]
+
+        for invented_table_name, _ in rel_json.non_empty_tables:
+            self.graph.remove_node(invented_table_name)
+        del self.relational_jsons[table]
+
+        return original_data, original_foreign_keys
 
     def _format_key_column(self, key: Optional[Union[str, List[str]]]) -> List[str]:
         if key is None:
