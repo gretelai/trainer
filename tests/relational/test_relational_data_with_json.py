@@ -24,6 +24,7 @@ def test_json_columns_produce_invented_flattened_tables(documents):
         documents.get_table_data("purchases-sfx"),
         pd.DataFrame(
             data={
+                "~PRIMARY_KEY_ID~": [0, 1, 2, 3, 4, 5],
                 "id": [1, 2, 3, 4, 5, 6],
                 "user_id": [1, 2, 2, 3, 3, 3],
                 "data>item": ["pen", "paint", "ink", "pen", "paint", "ink"],
@@ -34,19 +35,28 @@ def test_json_columns_produce_invented_flattened_tables(documents):
         check_like=True,
     )
 
-    # TODO: dtype issue
-    # pdtest.assert_frame_equal(
-    #     documents.get_table_data("purchases-data-years-sfx"),
-    #     pd.DataFrame(
-    #         data={
-    #             "content": [2023, 2023, 2022, 2020, 2019, 2021],
-    #             "array~order": [0, 0, 1, 0, 1, 0],
-    #             "~PRIMARY_KEY_ID~": [0, 1, 2, 3, 4, 5],
-    #             "purchases~id": [1, 2, 3, 4, 5, 6],
-    #         }
-    #     ),
-    #     check_like=True,
-    # )
+    pdtest.assert_frame_equal(
+        documents.get_table_data("purchases-data-years-sfx"),
+        pd.DataFrame(
+            data={
+                "content": [2023, 2023, 2022, 2020, 2019, 2021],
+                "array~order": [0, 0, 1, 0, 1, 0],
+                "~PRIMARY_KEY_ID~": [0, 1, 2, 3, 4, 5],
+                "purchases~id": [0, 1, 1, 2, 2, 4],
+            }
+        ),
+        check_like=True,
+        check_dtype=False,  # Without this, test fails asserting dtype mismatch in `content` field (object vs. int)
+    )
+
+    assert documents.get_foreign_keys("purchases-data-years-sfx") == [
+        ForeignKey(
+            table_name="purchases-data-years-sfx",
+            columns=["purchases~id"],
+            parent_table_name="purchases-sfx",
+            parent_columns=["~PRIMARY_KEY_ID~"],
+        )
+    ]
 
 
 def test_list_tables_accepts_various_scopes(documents):
@@ -96,6 +106,7 @@ def test_list_tables_accepts_various_scopes(documents):
 def test_invented_json_column_names(documents, bball):
     # The root invented table adds columns for dictionary properties lifted from nested JSON objects
     assert set(documents.get_table_columns("purchases-sfx")) == {
+        "~PRIMARY_KEY_ID~",
         "id",
         "user_id",
         "data>item",
@@ -123,12 +134,10 @@ def test_invented_json_column_names(documents, bball):
 
 
 def test_primary_key(documents, bball):
-    # Typically, the source-with-JSON and root invented tables' primary keys are identical
-    assert documents.get_primary_key("purchases") == documents.get_primary_key(
-        "purchases-sfx"
-    )
+    # The root invented table's primary key is a composite key that includes the source PK and an invented column
+    assert documents.get_primary_key("purchases") == ["id"]
+    assert documents.get_primary_key("purchases-sfx") == ["id", "~PRIMARY_KEY_ID~"]
 
-    # This is not the case if the source-with-JSON does not have a primary key
     assert bball.get_primary_key("bball") == []
     assert bball.get_primary_key("bball-sfx") == ["~PRIMARY_KEY_ID~"]
 
@@ -154,13 +163,13 @@ def test_primary_key(documents, bball):
     bball.set_primary_key(table="bball", primary_key="name")
     assert len(bball.list_all_tables(Scope.ALL)) == 3
     assert bball.get_primary_key("bball") == ["name"]
-    assert bball.get_primary_key("bball-sfx") == ["name"]
+    assert bball.get_primary_key("bball-sfx") == ["name", "~PRIMARY_KEY_ID~"]
     assert bball.get_foreign_keys("bball-teams-sfx") == [
         ForeignKey(
             table_name="bball-teams-sfx",
             columns=["bball~id"],
             parent_table_name="bball-sfx",
-            parent_columns=["name"],
+            parent_columns=["~PRIMARY_KEY_ID~"],
         )
     ]
 
@@ -187,7 +196,7 @@ def test_foreign_keys(documents):
             table_name="purchases-data-years-sfx",
             columns=["purchases~id"],
             parent_table_name="purchases-sfx",
-            parent_columns=["id"],
+            parent_columns=["~PRIMARY_KEY_ID~"],
         )
     ]
 
@@ -226,6 +235,7 @@ def test_update_data_with_existing_json_to_new_json(documents):
     expected = {
         "purchases-sfx": pd.DataFrame(
             data={
+                "~PRIMARY_KEY_ID~": [0, 1, 2, 3, 4, 5],
                 "id": [1, 2, 3, 4, 5, 6],
                 "user_id": [1, 2, 2, 3, 3, 3],
                 "data>item": [
@@ -252,7 +262,7 @@ def test_update_data_with_existing_json_to_new_json(documents):
                 "content": [1999, 1999, 1999, 1998, 1998, 1998],
                 "array~order": [0, 0, 0, 0, 0, 0],
                 "~PRIMARY_KEY_ID~": [0, 1, 2, 3, 4, 5],
-                "purchases~id": [1, 2, 3, 4, 5, 6],
+                "purchases~id": [0, 1, 2, 3, 4, 5],
             }
         ),
     }
@@ -263,13 +273,14 @@ def test_update_data_with_existing_json_to_new_json(documents):
         check_like=True,
     )
 
-    # TODO: dtype issue
-    # pdtest.assert_frame_equal(
-    #     documents.get_table_data("purchases-data-years-sfx"),
-    #     expected["purchases-data-years-sfx"],
-    #     check_like=True,
-    # )
+    pdtest.assert_frame_equal(
+        documents.get_table_data("purchases-data-years-sfx"),
+        expected["purchases-data-years-sfx"],
+        check_like=True,
+        check_dtype=False,  # Without this, test fails asserting dtype mismatch in `content` field (object vs. int)
+    )
 
+    # User-supplied child table FK still exists
     assert documents.get_foreign_keys("payments") == [
         ForeignKey(
             table_name="payments",
@@ -390,6 +401,7 @@ def test_restoring_output_tables_to_original_shape(documents):
         ),
         "purchases-sfx": pd.DataFrame(
             data={
+                "~PRIMARY_KEY_ID~": [0, 1, 2, 3],
                 "id": [1, 2, 3, 4],
                 "user_id": [1, 1, 2, 3],
                 "data>item": ["pen", "paint", "ink", "ink"],
@@ -493,8 +505,8 @@ def test_all_tables_are_present_in_debug_summary(documents):
                 "is_invented_table": False,
             },
             "purchases-sfx": {
-                "column_count": 5,
-                "primary_key": ["id"],
+                "column_count": 6,
+                "primary_key": ["id", "~PRIMARY_KEY_ID~"],
                 "foreign_key_count": 1,
                 "foreign_keys": [
                     {
@@ -513,7 +525,7 @@ def test_all_tables_are_present_in_debug_summary(documents):
                     {
                         "columns": ["purchases~id"],
                         "parent_table_name": "purchases-sfx",
-                        "parent_columns": ["id"],
+                        "parent_columns": ["~PRIMARY_KEY_ID~"],
                     }
                 ],
                 "is_invented_table": True,

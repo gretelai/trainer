@@ -186,6 +186,7 @@ class RelationalJson:
         self.original_primary_key = primary_key
         self.original_data = df
         self.original_columns = df.columns
+
         tables = _normalize_json([(table_name, df.copy())], [])
         self.table_name_mappings = {name: sanitize_str(name) for name, _ in tables}
         tables = [(self.table_name_mappings[name], df) for name, df in tables]
@@ -222,15 +223,12 @@ class RelationalJson:
         foreign_keys = []
 
         for table_name, table_df in self.non_empty_tables:
-            if (
-                table_name == self.root_table_name
-                and len(self.original_primary_key) > 0
-            ):
-                table_pk = self.original_primary_key
+            if table_name == self.root_table_name:
+                table_pk = self.original_primary_key + [PRIMARY_KEY_COLUMN]
             else:
                 table_pk = [PRIMARY_KEY_COLUMN]
-                table_df.index.rename(PRIMARY_KEY_COLUMN, inplace=True)
-                table_df.reset_index(inplace=True)
+            table_df.index.rename(PRIMARY_KEY_COLUMN, inplace=True)
+            table_df.reset_index(inplace=True)
             invented_root_table_name = self.table_name_mappings[
                 self.original_table_name
             ]
@@ -252,19 +250,12 @@ class RelationalJson:
                 referred_table = self.table_name_mappings[
                     get_parent_table_name_from_child_id_column(column)
                 ]
-                if (
-                    referred_table == self.root_table_name
-                    and len(self.original_primary_key) > 0
-                ):
-                    referred_columns = self.original_primary_key
-                else:
-                    referred_columns = [PRIMARY_KEY_COLUMN]
                 foreign_keys.append(
                     {
                         "table": table_name,
                         "constrained_columns": [column],
                         "referred_table": referred_table,
-                        "referred_columns": referred_columns,
+                        "referred_columns": [PRIMARY_KEY_COLUMN],
                     }
                 )
         return (tables, foreign_keys)
