@@ -1,5 +1,3 @@
-from unittest.mock import patch
-
 import pandas as pd
 import pandas.testing as pdtest
 import pytest
@@ -16,9 +14,7 @@ def bball():
     bball_df = pd.read_json(bball_jsonl, lines=True)
 
     rel_data = RelationalData()
-    with patch("gretel_trainer.relational.json.make_suffix") as make_suffix:
-        make_suffix.return_value = "sfx"
-        rel_data.add_table(name="bball", primary_key=None, data=bball_df)
+    rel_data.add_table(name="bball", primary_key=None, data=bball_df)
 
     return rel_data
 

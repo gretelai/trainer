@@ -19,6 +19,13 @@ def extended_sdk():
     return ExtendedGretelSDK(hybrid=False)
 
 
+@pytest.fixture(autouse=True)
+def static_suffix():
+    with patch("gretel_trainer.relational.json.make_suffix") as make_suffix:
+        make_suffix.return_value = "sfx"
+        yield
+
+
 @pytest.fixture()
 def project():
     with patch(
@@ -79,9 +86,7 @@ def art() -> RelationalData:
 
 @pytest.fixture()
 def documents() -> RelationalData:
-    with patch("gretel_trainer.relational.json.make_suffix") as make_suffix:
-        make_suffix.return_value = "sfx"
-        return rel_data_from_example_db("documents")
+    return rel_data_from_example_db("documents")
 
 
 @pytest.fixture()
