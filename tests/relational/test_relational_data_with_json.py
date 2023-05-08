@@ -8,8 +8,8 @@ from gretel_trainer.relational.core import ForeignKey, RelationalData, Scope
 @pytest.fixture
 def bball():
     bball_jsonl = """
-    {"name": "LeBron James", "age": 38, "draft": {"year": 2003}}
-    {"name": "Steph Curry", "age": 35, "draft": {"year": 2009, "college": "Davidson"}}
+    {"name": "LeBron James", "age": 38, "draft": {"year": 2003}, "teams": ["Cavaliers", "Heat", "Lakers"]}
+    {"name": "Steph Curry", "age": 35, "draft": {"year": 2009, "college": "Davidson"}, "teams": ["Warriors"]}
     """
     bball_df = pd.read_json(bball_jsonl, lines=True)
 
