@@ -25,6 +25,10 @@ class CustomDataset:
         self.row_count = rows
         self.column_count = cols
 
+    @property
+    def public(self) -> bool:
+        return False  # custom datasets can't be public, currently
+
 
 def _to_datatype(d: Union[str, Datatype]) -> Datatype:
     if isinstance(d, Datatype):

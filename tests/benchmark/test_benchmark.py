@@ -16,7 +16,6 @@ from gretel_trainer.benchmark import (
     compare,
     make_dataset,
 )
-from gretel_trainer.benchmark.core import BenchmarkException
 from tests.benchmark.mocks import (
     DoNothingModel,
     FailsToGenerate,
@@ -176,7 +175,6 @@ def test_run_happy_path_gretel_sdk(
     result = comparison.results.iloc[0]
     model_name = benchmark_model.__name__
     assert result["Model"] == model_name
-    print(comparison.executors[f"{model_name}-iris"].exception)
     assert result["Status"] == "Complete"
     assert result["SQS"] == 95
     assert result["Train time (sec)"] == 30

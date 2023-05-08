@@ -3,7 +3,13 @@ import time
 from typing import Any, Dict, Tuple
 
 import smart_open
-from gretel_client.projects.jobs import ACTIVE_STATES, END_STATES, Job, Status
+from gretel_client.projects.jobs import (
+    ACTIVE_STATES,
+    END_STATES,
+    Job,
+    RunnerMode,
+    Status,
+)
 from gretel_client.projects.models import Model, read_model_config
 from gretel_client.projects.projects import Project
 
@@ -28,7 +34,9 @@ def run_evaluate(
     run_identifier: str,
     wait: int,
 ) -> Dict[str, Any]:
-    evaluate_model.submit_cloud()
+    # Calling this in lieu of submit_cloud() is supposed to avoid
+    # artifact upload. Doesn't work for more recent client versions!
+    evaluate_model.submit(runner_mode=RunnerMode.CLOUD)
     job_status = await_job(run_identifier, evaluate_model, "evaluation", wait)
     if job_status in END_STATES and job_status != Status.COMPLETED:
         raise BenchmarkException("Evaluate failed")
