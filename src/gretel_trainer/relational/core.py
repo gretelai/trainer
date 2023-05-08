@@ -103,14 +103,17 @@ class RelationalData:
         primary_key = self._format_key_column(primary_key)
         rel_json = RelationalJson(name, primary_key, data)
         if rel_json.is_applicable:
-            self.relational_jsons[name] = rel_json
-            add_tables, add_foreign_keys = rel_json.add()
-            for add_table in add_tables:
-                self._add_single_table(**add_table)
-            for add_foreign_key in add_foreign_keys:
-                self.add_foreign_key(**add_foreign_key)
+            self._add_rel_json_and_tables(name, rel_json)
         else:
             self._add_single_table(name=name, primary_key=primary_key, data=data)
+
+    def _add_rel_json_and_tables(self, table: str, rel_json: RelationalJson) -> None:
+        self.relational_jsons[table] = rel_json
+        add_tables, add_foreign_keys = rel_json.add()
+        for add_table in add_tables:
+            self._add_single_table(**add_table)
+        for add_foreign_key in add_foreign_keys:
+            self.add_foreign_key(**add_foreign_key)
 
     def _add_single_table(
         self,
@@ -153,12 +156,7 @@ class RelationalData:
             del self.relational_jsons[table]
 
             new_rel_json = RelationalJson(table, primary_key, original_data)
-            self.relational_jsons[table] = new_rel_json
-            add_tables, add_foreign_keys = new_rel_json.add()
-            for add_table in add_tables:
-                self._add_single_table(**add_table)
-            for add_foreign_key in add_foreign_keys:
-                self.add_foreign_key(**add_foreign_key)
+            self._add_rel_json_and_tables(table, new_rel_json)
         else:
             self.graph.nodes[table]["metadata"].primary_key = primary_key
             self._clear_safe_ancestral_seed_columns(table)
