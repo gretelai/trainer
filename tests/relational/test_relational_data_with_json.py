@@ -19,6 +19,36 @@ def bball():
     return rel_data
 
 
+def test_json_columns_produce_invented_flattened_tables(documents):
+    pdtest.assert_frame_equal(
+        documents.get_table_data("purchases-sfx"),
+        pd.DataFrame(
+            data={
+                "id": [1, 2, 3, 4, 5, 6],
+                "user_id": [1, 2, 2, 3, 3, 3],
+                "data>item": ["pen", "paint", "ink", "pen", "paint", "ink"],
+                "data>cost": [100, 100, 100, 100, 100, 100],
+                "data>details>color": ["red", "red", "red", "blue", "blue", "blue"],
+            }
+        ),
+        check_like=True,
+    )
+
+    # TODO: dtype issue
+    # pdtest.assert_frame_equal(
+    #     documents.get_table_data("purchases-data-years-sfx"),
+    #     pd.DataFrame(
+    #         data={
+    #             "content": [2023, 2023, 2022, 2020, 2019, 2021],
+    #             "array~order": [0, 0, 1, 0, 1, 0],
+    #             "~PRIMARY_KEY_ID~": [0, 1, 2, 3, 4, 5],
+    #             "purchases~id": [1, 2, 3, 4, 5, 6],
+    #         }
+    #     ),
+    #     check_like=True,
+    # )
+
+
 def test_list_tables_accepts_various_scopes(documents):
     # PUBLIC reflects the user's source
     assert set(documents.list_all_tables(Scope.PUBLIC)) == {
@@ -177,46 +207,169 @@ def test_foreign_keys(documents):
     assert documents.get_foreign_keys("purchases-sfx") == []
 
 
-def test_update_data(bball):
-    new_bball_jsonl = """
-    {"name": "Jimmy Butler", "age": 33, "draft": {"year": 2011, "college": "Marquette"}, "teams": ["Bulls", "Timberwolves", "76ers", "Heat"]}
+def test_update_data_with_existing_json_to_new_json(documents):
+    new_purchases_jsonl = """
+    {"id": 1, "user_id": 1, "data": {"item": "watercolor", "cost": 200, "details": {"color": "aquamarine"}, "years": [1999]}}
+    {"id": 2, "user_id": 2, "data": {"item": "watercolor", "cost": 200, "details": {"color": "aquamarine"}, "years": [1999]}}
+    {"id": 3, "user_id": 2, "data": {"item": "watercolor", "cost": 200, "details": {"color": "aquamarine"}, "years": [1999]}}
+    {"id": 4, "user_id": 3, "data": {"item": "charcoal", "cost": 200, "details": {"color": "aquamarine"}, "years": [1998]}}
+    {"id": 5, "user_id": 3, "data": {"item": "charcoal", "cost": 200, "details": {"color": "aquamarine"}, "years": [1998]}}
+    {"id": 6, "user_id": 3, "data": {"item": "charcoal", "cost": 200, "details": {"color": "aquamarine"}, "years": [1998]}}
     """
-    new_bball_df = pd.read_json(new_bball_jsonl, lines=True)
+    new_purchases_df = pd.read_json(new_purchases_jsonl, lines=True)
 
-    bball.update_table_data("bball", data=new_bball_df)
+    documents.update_table_data("purchases", data=new_purchases_df)
 
-    assert len(bball.list_all_tables(Scope.ALL)) == 3
+    assert len(documents.list_all_tables(Scope.ALL)) == 5
+    assert len(documents.list_all_tables(Scope.MODELABLE)) == 4
 
     expected = {
-        "bball-sfx": pd.DataFrame(
+        "purchases-sfx": pd.DataFrame(
             data={
-                "name": ["Jimmy Butler"],
-                "age": [33],
-                "draft>year": [2011],
-                "draft>college": ["Marquette"],
-                "~PRIMARY_KEY_ID~": [0],
+                "id": [1, 2, 3, 4, 5, 6],
+                "user_id": [1, 2, 2, 3, 3, 3],
+                "data>item": [
+                    "watercolor",
+                    "watercolor",
+                    "watercolor",
+                    "charcoal",
+                    "charcoal",
+                    "charcoal",
+                ],
+                "data>cost": [200, 200, 200, 200, 200, 200],
+                "data>details>color": [
+                    "aquamarine",
+                    "aquamarine",
+                    "aquamarine",
+                    "aquamarine",
+                    "aquamarine",
+                    "aquamarine",
+                ],
             }
         ),
-        "bball-teams-sfx": pd.DataFrame(
+        "purchases-data-years-sfx": pd.DataFrame(
             data={
-                "content": ["Bulls", "Timberwolves", "76ers", "Heat"],
-                "array~order": [0, 1, 2, 3],
-                "~PRIMARY_KEY_ID~": [0, 1, 2, 3],
-                "bball~id": [0, 0, 0, 0],
+                "content": [1999, 1999, 1999, 1998, 1998, 1998],
+                "array~order": [0, 0, 0, 0, 0, 0],
+                "~PRIMARY_KEY_ID~": [0, 1, 2, 3, 4, 5],
+                "purchases~id": [1, 2, 3, 4, 5, 6],
             }
         ),
     }
 
     pdtest.assert_frame_equal(
-        bball.get_table_data("bball-sfx"),
-        expected["bball-sfx"],
+        documents.get_table_data("purchases-sfx"),
+        expected["purchases-sfx"],
         check_like=True,
     )
+
+    # TODO: dtype issue
+    # pdtest.assert_frame_equal(
+    #     documents.get_table_data("purchases-data-years-sfx"),
+    #     expected["purchases-data-years-sfx"],
+    #     check_like=True,
+    # )
+
+    assert documents.get_foreign_keys("payments") == [
+        ForeignKey(
+            table_name="payments",
+            columns=["purchase_id"],
+            parent_table_name="purchases-sfx",
+            parent_columns=["id"],
+        )
+    ]
+
+
+def test_update_data_existing_json_to_no_json(documents):
+    new_purchases_df = pd.DataFrame(
+        data={
+            "id": [1, 2, 3, 4, 5, 6],
+            "user_id": [1, 2, 2, 3, 3, 3],
+            "data": ["pen", "paint", "ink", "pen", "paint", "ink"],
+        }
+    )
+
+    documents.update_table_data("purchases", data=new_purchases_df)
+
+    assert len(documents.list_all_tables(Scope.ALL)) == 3
+
     pdtest.assert_frame_equal(
-        bball.get_table_data("bball-teams-sfx"),
-        expected["bball-teams-sfx"],
+        documents.get_table_data("purchases"),
+        new_purchases_df,
         check_like=True,
     )
+
+    assert documents.get_foreign_keys("payments") == [
+        ForeignKey(
+            table_name="payments",
+            columns=["purchase_id"],
+            parent_table_name="purchases",
+            parent_columns=["id"],
+        )
+    ]
+
+
+def test_update_data_existing_flat_to_json(documents):
+    # Build up a RelationalData instance that basically mirrors documents,
+    # but purchases is flat to start and thus there are no RelationalJson instances
+    flat_purchases_df = pd.DataFrame(
+        data={
+            "id": [1, 2, 3, 4, 5, 6],
+            "user_id": [1, 2, 2, 3, 3, 3],
+            "data": ["pen", "paint", "ink", "pen", "paint", "ink"],
+        }
+    )
+    rel_data = RelationalData()
+    rel_data.add_table(
+        name="users", primary_key="id", data=documents.get_table_data("users")
+    )
+    rel_data.add_table(name="purchases", primary_key="id", data=flat_purchases_df)
+    rel_data.add_table(
+        name="payments", primary_key="id", data=documents.get_table_data("payments")
+    )
+    rel_data.add_foreign_key(
+        table="purchases",
+        constrained_columns=["user_id"],
+        referred_table="users",
+        referred_columns=["id"],
+    )
+    rel_data.add_foreign_key(
+        table="payments",
+        constrained_columns=["purchase_id"],
+        referred_table="purchases",
+        referred_columns=["id"],
+    )
+    assert len(rel_data.list_all_tables(Scope.ALL)) == 3
+    assert len(rel_data.list_all_tables(Scope.MODELABLE)) == 3
+
+    rel_data.update_table_data("purchases", documents.get_table_data("purchases"))
+
+    assert set(rel_data.list_all_tables(Scope.ALL)) == {
+        "users",
+        "purchases",
+        "purchases-sfx",
+        "purchases-data-years-sfx",
+        "payments",
+    }
+    # the original purchases table is no longer flat, nor (therefore) MODELABLE
+    assert set(rel_data.list_all_tables(Scope.MODELABLE)) == {
+        "users",
+        "purchases-sfx",
+        "purchases-data-years-sfx",
+        "payments",
+    }
+    assert rel_data.get_foreign_keys("payments") == [
+        ForeignKey(
+            table_name="payments",
+            columns=["purchase_id"],
+            parent_table_name="purchases-sfx",  # The foreign key now points to the root invented table
+            parent_columns=["id"],
+        )
+    ]
+
+
+def test_to_from_filesystem(documents):
+    pass
 
 
 def test_restoring_output_tables_to_original_shape(documents):
