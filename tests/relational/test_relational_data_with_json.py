@@ -102,6 +102,36 @@ def test_primary_key(documents, bball):
     assert bball.get_primary_key("bball") == []
     assert bball.get_primary_key("bball-sfx") == ["~PRIMARY_KEY_ID~"]
 
+    # Setting an existing primary key to None puts us in the correct state
+    assert len(documents.list_all_tables(Scope.ALL)) == 5
+    documents.set_primary_key(table="purchases", primary_key=None)
+    assert len(documents.list_all_tables(Scope.ALL)) == 5
+    assert documents.get_primary_key("purchases") == []
+    assert documents.get_primary_key("purchases-sfx") == ["~PRIMARY_KEY_ID~"]
+    assert documents.get_foreign_keys("purchases-data-years-sfx") == [
+        ForeignKey(
+            table_name="purchases-data-years-sfx",
+            columns=["purchases~id"],
+            parent_table_name="purchases-sfx",
+            parent_columns=["~PRIMARY_KEY_ID~"],
+        )
+    ]
+
+    # Setting a None primary key to some column puts us in the correct state
+    assert len(bball.list_all_tables(Scope.ALL)) == 3
+    bball.set_primary_key(table="bball", primary_key="name")
+    assert len(bball.list_all_tables(Scope.ALL)) == 3
+    assert bball.get_primary_key("bball") == ["name"]
+    assert bball.get_primary_key("bball-sfx") == ["name"]
+    assert bball.get_foreign_keys("bball-teams-sfx") == [
+        ForeignKey(
+            table_name="bball-teams-sfx",
+            columns=["bball~id"],
+            parent_table_name="bball-sfx",
+            parent_columns=["name"],
+        )
+    ]
+
 
 def test_foreign_keys(documents):
     # Foreign keys from the source-with-JSON table are present on the root invented table

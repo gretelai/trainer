@@ -144,10 +144,24 @@ class RelationalData:
         known_columns = self.get_table_columns(table)
         for col in primary_key:
             if col not in known_columns:
-                raise MultiTableException(f"Unrecognized column name: `{primary_key}`")
+                raise MultiTableException(f"Unrecognized column name: `{col}`")
 
-        self.graph.nodes[table]["metadata"].primary_key = primary_key
-        self._clear_safe_ancestral_seed_columns(table)
+        if (rel_json := self.relational_jsons.get(table)) is not None:
+            original_data = rel_json.original_data
+            for invented_table_name, _ in rel_json.non_empty_tables:
+                self.graph.remove_node(invented_table_name)
+            del self.relational_jsons[table]
+
+            new_rel_json = RelationalJson(table, primary_key, original_data)
+            self.relational_jsons[table] = new_rel_json
+            add_tables, add_foreign_keys = new_rel_json.add()
+            for add_table in add_tables:
+                self._add_single_table(**add_table)
+            for add_foreign_key in add_foreign_keys:
+                self.add_foreign_key(**add_foreign_key)
+        else:
+            self.graph.nodes[table]["metadata"].primary_key = primary_key
+            self._clear_safe_ancestral_seed_columns(table)
 
     def _format_key_column(self, key: Optional[Union[str, List[str]]]) -> List[str]:
         if key is None:
