@@ -143,6 +143,11 @@ def test_foreign_keys(documents):
         )
     ]
 
+    # Removing a foreign key from the source-with-JSON table updates the root invented table
+    documents.remove_foreign_key(table="purchases", constrained_columns=["user_id"])
+    assert documents.get_foreign_keys("purchases") == []
+    assert documents.get_foreign_keys("purchases-sfx") == []
+
 
 def test_restoring_output_tables_to_original_shape(documents):
     # Output tables from MultiTable transforms or synthetics will include only the MODELABLE tables

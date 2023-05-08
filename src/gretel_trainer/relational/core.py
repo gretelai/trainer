@@ -200,11 +200,8 @@ class RelationalData:
         if abort:
             raise MultiTableException("Unrecognized table(s) in foreign key arguments")
 
-        if table in self.relational_jsons:
-            table = self.relational_jsons[table].root_table_name
-
-        if referred_table in self.relational_jsons:
-            referred_table = self.relational_jsons[referred_table].root_table_name
+        table = self._get_table_in_graph(table)
+        referred_table = self._get_table_in_graph(referred_table)
 
         if len(constrained_columns) != len(referred_columns):
             logger.warning(
@@ -267,6 +264,8 @@ class RelationalData:
         """
         if table not in self.list_all_tables(Scope.ALL):
             raise MultiTableException(f"Unrecognized table name: `{table}`")
+
+        table = self._get_table_in_graph(table)
 
         key_to_remove = None
         for fk in self.get_foreign_keys(table):
@@ -439,10 +438,13 @@ class RelationalData:
     def _clear_safe_ancestral_seed_columns(self, table: str) -> None:
         self.graph.nodes[table]["metadata"].safe_ancestral_seed_columns = None
 
-    def get_foreign_keys(self, table: str) -> List[ForeignKey]:
+    def _get_table_in_graph(self, table: str) -> str:
         if table in self.relational_jsons:
             table = self.relational_jsons[table].root_table_name
+        return table
 
+    def get_foreign_keys(self, table: str) -> List[ForeignKey]:
+        table = self._get_table_in_graph(table)
         foreign_keys = []
         for parent in self.get_parents(table):
             fks = self.graph.edges[table, parent]["via"]
@@ -467,9 +469,7 @@ class RelationalData:
         for table in all_tables:
             this_table_foreign_key_count = 0
             foreign_keys = []
-            fk_lookup_table_name = table
-            if table in self.relational_jsons:
-                fk_lookup_table_name = self.relational_jsons[table].root_table_name
+            fk_lookup_table_name = self._get_table_in_graph(table)
             for key in self.get_foreign_keys(fk_lookup_table_name):
                 total_foreign_key_count = total_foreign_key_count + 1
                 this_table_foreign_key_count = this_table_foreign_key_count + 1
