@@ -162,12 +162,11 @@ class Comparison:
 
         _trainer_project_index = 0
         for dataset in self.datasets:
-            artifact_key = (
-                _upload_dataset_to_project(
-                    dataset.data_source, self._project, self.config.trainer
-                )
-                if not dataset.public
-                else None
+            # TODO: avoid upload for public datasets, when possible
+            artifact_key = _upload_dataset_to_project(
+                dataset.data_source,
+                self._project,
+                self.config.trainer,
             )
 
             for model in self.gretel_models:
