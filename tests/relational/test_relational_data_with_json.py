@@ -177,6 +177,48 @@ def test_foreign_keys(documents):
     assert documents.get_foreign_keys("purchases-sfx") == []
 
 
+def test_update_data(bball):
+    new_bball_jsonl = """
+    {"name": "Jimmy Butler", "age": 33, "draft": {"year": 2011, "college": "Marquette"}, "teams": ["Bulls", "Timberwolves", "76ers", "Heat"]}
+    """
+    new_bball_df = pd.read_json(new_bball_jsonl, lines=True)
+
+    bball.update_table_data("bball", data=new_bball_df)
+
+    assert len(bball.list_all_tables(Scope.ALL)) == 3
+
+    expected = {
+        "bball-sfx": pd.DataFrame(
+            data={
+                "name": ["Jimmy Butler"],
+                "age": [33],
+                "draft>year": [2011],
+                "draft>college": ["Marquette"],
+                "~PRIMARY_KEY_ID~": [0],
+            }
+        ),
+        "bball-teams-sfx": pd.DataFrame(
+            data={
+                "content": ["Bulls", "Timberwolves", "76ers", "Heat"],
+                "array~order": [0, 1, 2, 3],
+                "~PRIMARY_KEY_ID~": [0, 1, 2, 3],
+                "bball~id": [0, 0, 0, 0],
+            }
+        ),
+    }
+
+    pdtest.assert_frame_equal(
+        bball.get_table_data("bball-sfx"),
+        expected["bball-sfx"],
+        check_like=True,
+    )
+    pdtest.assert_frame_equal(
+        bball.get_table_data("bball-teams-sfx"),
+        expected["bball-teams-sfx"],
+        check_like=True,
+    )
+
+
 def test_restoring_output_tables_to_original_shape(documents):
     # Output tables from MultiTable transforms or synthetics will include only the MODELABLE tables
     output_tables = {
