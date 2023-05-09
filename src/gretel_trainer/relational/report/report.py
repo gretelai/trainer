@@ -137,7 +137,7 @@ class ReportPresenter:
         table_data = []
         for table in self.rel_data.list_all_tables(Scope.PUBLIC):
             pk = self.rel_data.get_primary_key(table)
-            fks = self.rel_data.get_foreign_keys(table)
+            fks = self.rel_data.get_foreign_keys(table, rename_invented_tables=True)
             table_data.append(ReportTableData(table=table, pk=pk, fks=fks))
 
         # Sort tables alphabetically because that's nice.

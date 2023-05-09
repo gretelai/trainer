@@ -241,3 +241,35 @@ def test_mutagenesis_relational_data_report(mutagenesis):
         )[0]
         == "synthetics_individual_evaluation_atom.html"
     )
+
+
+def test_source_data_including_json(documents):
+    # Fake these
+    evaluations = _evals_from_rel_data(documents)
+
+    presenter = ReportPresenter(
+        rel_data=documents,
+        evaluations=evaluations,
+        now=datetime.utcnow(),
+        run_identifier="run_identifier",
+    )
+
+    html_content = ReportRenderer().render(presenter)
+
+    # DEV ONLY if you want to save a local copy to look at
+    # with open("report.html", 'w') as f:
+    #     f.write(html_content)
+
+    tree = html.fromstring(html_content)
+
+    relations_data_rows = tree.xpath(
+        '//section[contains(@class, "test-table-relationships")]' + "//tr"
+    )[1:]
+
+    # Ensure public names, not invented table names, are displayed
+    table_names = [
+        # Row, Table name td, bold tag wrapping table name
+        row.getchildren()[0].getchildren()[0].text
+        for row in relations_data_rows
+    ]
+    assert table_names == ["payments", "purchases", "users"]
