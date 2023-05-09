@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import json
 import logging
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from enum import Enum
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Union
@@ -524,13 +524,34 @@ class RelationalData:
             table = self.relational_jsons[table].root_table_name
         return table
 
-    def get_foreign_keys(self, table: str) -> List[ForeignKey]:
+    def get_foreign_keys(
+        self, table: str, rename_invented_tables: bool = False
+    ) -> List[ForeignKey]:
+        def _rename_invented(fk: ForeignKey) -> ForeignKey:
+            table_name = fk.table_name
+            parent_table_name = fk.parent_table_name
+            if self._is_invented(table_name):
+                table_name = self.graph.nodes[table_name][
+                    "metadata"
+                ].invented_table_metadata.original_table_name
+            if self._is_invented(parent_table_name):
+                parent_table_name = self.graph.nodes[parent_table_name][
+                    "metadata"
+                ].invented_table_metadata.original_table_name
+            return replace(
+                fk, table_name=table_name, parent_table_name=parent_table_name
+            )
+
         table = self._get_table_in_graph(table)
         foreign_keys = []
         for parent in self.get_parents(table):
             fks = self.graph.edges[table, parent]["via"]
             foreign_keys.extend(fks)
-        return foreign_keys
+
+        if rename_invented_tables:
+            return [_rename_invented(fk) for fk in foreign_keys]
+        else:
+            return foreign_keys
 
     def get_all_key_columns(self, table: str) -> List[str]:
         all_key_cols = []

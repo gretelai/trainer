@@ -210,6 +210,24 @@ def test_foreign_keys(documents):
         )
     ]
 
+    # You can request public/user-supplied names instead of the default invented table names
+    assert documents.get_foreign_keys("payments", rename_invented_tables=True) == [
+        ForeignKey(
+            table_name="payments",
+            columns=["purchase_id"],
+            parent_table_name="purchases",
+            parent_columns=["id"],
+        )
+    ]
+    assert documents.get_foreign_keys("purchases", rename_invented_tables=True) == [
+        ForeignKey(
+            table_name="purchases",
+            columns=["user_id"],
+            parent_table_name="users",
+            parent_columns=["id"],
+        )
+    ]
+
     # Removing a foreign key from the source-with-JSON table updates the root invented table
     documents.remove_foreign_key(table="purchases", constrained_columns=["user_id"])
     assert documents.get_foreign_keys("purchases") == []
