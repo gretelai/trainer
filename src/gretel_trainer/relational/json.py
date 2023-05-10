@@ -191,32 +191,30 @@ class RelationalJson:
         original_columns: list[str],
         original_data: Optional[pd.DataFrame],
         table_name_mappings: dict[str, str],
-        invented_tables: list[tuple[str, pd.DataFrame]],
     ):
         self.original_table_name = original_table_name
         self.original_primary_key = original_primary_key
         self.original_columns = original_columns
         self.original_data = original_data
         self.table_name_mappings = table_name_mappings
-        self.tables = invented_tables
 
     @classmethod
     def ingest(
         cls, table_name: str, primary_key: list[str], df: pd.DataFrame
-    ) -> Optional[RelationalJson]:
+    ) -> Optional[IngestResponseT]:
         tables = _normalize_json([(table_name, df.copy())], [])
         # If we created additional tables (from JSON lists) or added columns (from JSON dicts)
         if len(tables) > 1 or len(tables[0][1].columns) > len(df.columns):
             mappings = {name: sanitize_str(name) for name, _ in tables}
-            invented_tables = [(mappings[name], df) for name, df in tables]
-            return RelationalJson(
+            rel_json = RelationalJson(
                 original_table_name=table_name,
                 original_primary_key=primary_key,
                 original_data=df,
                 original_columns=list(df.columns),
                 table_name_mappings=mappings,
-                invented_tables=invented_tables,
             )
+            commands = _generate_commands(rel_json, tables)
+            return (rel_json, commands)
 
     @property
     def root_table_name(self) -> str:
@@ -225,53 +223,6 @@ class RelationalJson:
     @property
     def table_names(self) -> list[str]:
         return list(self.table_name_mappings.values())
-
-    def add(self) -> tuple[list[dict], list[dict]]:
-        """Returns lists of keyword arguments designed to be passed to a
-        RelationalData instance's add_table and add_foreign_key methods
-        """
-        non_empty_tables = [t for t in self.tables if not t[1].empty]
-
-        tables = []
-        foreign_keys = []
-
-        for table_name, table_df in non_empty_tables:
-            if table_name == self.root_table_name:
-                table_pk = self.original_primary_key + [PRIMARY_KEY_COLUMN]
-            else:
-                table_pk = [PRIMARY_KEY_COLUMN]
-            table_df.index.rename(PRIMARY_KEY_COLUMN, inplace=True)
-            table_df.reset_index(inplace=True)
-            invented_root_table_name = self.table_name_mappings[
-                self.original_table_name
-            ]
-            metadata = InventedTableMetadata(
-                invented_root_table_name=invented_root_table_name,
-                original_table_name=self.original_table_name,
-            )
-            tables.append(
-                {
-                    "name": table_name,
-                    "primary_key": table_pk,
-                    "data": table_df,
-                    "invented_table_metadata": metadata,
-                }
-            )
-
-        for table_name, table_df in non_empty_tables:
-            for column in get_id_columns(table_df):
-                referred_table = self.table_name_mappings[
-                    get_parent_table_name_from_child_id_column(column)
-                ]
-                foreign_keys.append(
-                    {
-                        "table": table_name,
-                        "constrained_columns": [column],
-                        "referred_table": referred_table,
-                        "referred_columns": [PRIMARY_KEY_COLUMN],
-                    }
-                )
-        return (tables, foreign_keys)
 
     def restore(self, tables: dict[str, pd.DataFrame]) -> pd.DataFrame:
         """Reduces a set of tables (assumed to match the shapes created on initialization)
@@ -290,3 +241,59 @@ class RelationalJson:
     @property
     def inverse_table_name_mappings(self) -> dict[str, str]:
         return {value: key for key, value in self.table_name_mappings.items()}
+
+
+def _generate_commands(
+    rel_json: RelationalJson, tables: list[tuple[str, pd.DataFrame]]
+) -> CommandsT:
+    """
+    Returns lists of keyword arguments designed to be passed to a
+    RelationalData instance's _add_single_table and add_foreign_key methods
+    """
+    tables = [(rel_json.table_name_mappings[name], df) for name, df in tables]
+    non_empty_tables = [t for t in tables if not t[1].empty]
+
+    _add_single_table = []
+    add_foreign_key = []
+
+    for table_name, table_df in non_empty_tables:
+        if table_name == rel_json.root_table_name:
+            table_pk = rel_json.original_primary_key + [PRIMARY_KEY_COLUMN]
+        else:
+            table_pk = [PRIMARY_KEY_COLUMN]
+        table_df.index.rename(PRIMARY_KEY_COLUMN, inplace=True)
+        table_df.reset_index(inplace=True)
+        invented_root_table_name = rel_json.table_name_mappings[
+            rel_json.original_table_name
+        ]
+        metadata = InventedTableMetadata(
+            invented_root_table_name=invented_root_table_name,
+            original_table_name=rel_json.original_table_name,
+        )
+        _add_single_table.append(
+            {
+                "name": table_name,
+                "primary_key": table_pk,
+                "data": table_df,
+                "invented_table_metadata": metadata,
+            }
+        )
+
+    for table_name, table_df in non_empty_tables:
+        for column in get_id_columns(table_df):
+            referred_table = rel_json.table_name_mappings[
+                get_parent_table_name_from_child_id_column(column)
+            ]
+            add_foreign_key.append(
+                {
+                    "table": table_name,
+                    "constrained_columns": [column],
+                    "referred_table": referred_table,
+                    "referred_columns": [PRIMARY_KEY_COLUMN],
+                }
+            )
+    return (_add_single_table, add_foreign_key)
+
+
+CommandsT = tuple[list[dict], list[dict]]
+IngestResponseT = tuple[RelationalJson, CommandsT]

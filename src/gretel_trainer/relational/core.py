@@ -13,7 +13,11 @@ import pandas as pd
 from networkx.algorithms.dag import dag_longest_path_length, topological_sort
 from pandas.api.types import is_string_dtype
 
-from gretel_trainer.relational.json import InventedTableMetadata, RelationalJson
+from gretel_trainer.relational.json import (
+    IngestResponseT,
+    InventedTableMetadata,
+    RelationalJson,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -102,15 +106,18 @@ class RelationalData:
         the table includes nested JSON data.
         """
         primary_key = self._format_key_column(primary_key)
-        rel_json = RelationalJson.ingest(name, primary_key, data)
-        if rel_json is not None:
-            self._add_rel_json_and_tables(name, rel_json)
+        rj_ingest = RelationalJson.ingest(name, primary_key, data)
+        if rj_ingest is not None:
+            self._add_rel_json_and_tables(name, rj_ingest)
         else:
             self._add_single_table(name=name, primary_key=primary_key, data=data)
 
-    def _add_rel_json_and_tables(self, table: str, rel_json: RelationalJson) -> None:
+    def _add_rel_json_and_tables(self, table: str, rj_ingest: IngestResponseT) -> None:
+        rel_json, commands = rj_ingest
+        add_tables, add_foreign_keys = commands
+
         self.relational_jsons[table] = rel_json
-        add_tables, add_foreign_keys = rel_json.add()
+
         for add_table in add_tables:
             self._add_single_table(**add_table)
         for add_foreign_key in add_foreign_keys:
@@ -155,13 +162,13 @@ class RelationalData:
             if original_data is None:
                 raise MultiTableException("Original data with JSON is lost.")
 
-            new_rel_json = RelationalJson.ingest(table, primary_key, original_data)
-            if new_rel_json is None:
+            new_rj_ingest = RelationalJson.ingest(table, primary_key, original_data)
+            if new_rj_ingest is None:
                 raise MultiTableException(
                     "Failed to change primary key on tables invented from JSON data"
                 )
 
-            self._add_rel_json_and_tables(table, new_rel_json)
+            self._add_rel_json_and_tables(table, new_rj_ingest)
             for fk in original_fks:
                 self.add_foreign_key(
                     table=fk.table_name,
@@ -344,10 +351,10 @@ class RelationalData:
     def update_table_data(self, table: str, data: pd.DataFrame) -> None:
         if table in self.relational_jsons:
             _, original_pk, original_fks = self._remove_relational_json(table)
-            new_rel_json = RelationalJson.ingest(table, original_pk, data)
-            if new_rel_json is not None:
-                self._add_rel_json_and_tables(table, new_rel_json)
-                parent_table_name = new_rel_json.root_table_name
+            new_rj_ingest = RelationalJson.ingest(table, original_pk, data)
+            if new_rj_ingest is not None:
+                self._add_rel_json_and_tables(table, new_rj_ingest)
+                parent_table_name = new_rj_ingest[0].root_table_name
             else:
                 self._add_single_table(
                     name=table,
@@ -365,16 +372,16 @@ class RelationalData:
         else:
             try:
                 metadata = self.graph.nodes[table]["metadata"]
-                new_rel_json = RelationalJson.ingest(table, metadata.primary_key, data)
-                if new_rel_json is not None:
+                new_rj_ingest = RelationalJson.ingest(table, metadata.primary_key, data)
+                if new_rj_ingest is not None:
                     original_foreign_keys = self._get_user_defined_fks_to_table(table)
                     self.graph.remove_node(table)
-                    self._add_rel_json_and_tables(table, new_rel_json)
+                    self._add_rel_json_and_tables(table, new_rj_ingest)
                     for fk in original_foreign_keys:
                         self.add_foreign_key(
                             table=fk.table_name,
                             constrained_columns=fk.columns,
-                            referred_table=new_rel_json.root_table_name,
+                            referred_table=new_rj_ingest[0].root_table_name,
                             referred_columns=fk.parent_columns,
                         )
                 else:
