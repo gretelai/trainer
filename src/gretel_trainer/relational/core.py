@@ -101,8 +101,8 @@ class RelationalData:
         the table includes nested JSON data.
         """
         primary_key = self._format_key_column(primary_key)
-        rel_json = RelationalJson(name, primary_key, data)
-        if rel_json.is_applicable:
+        rel_json = RelationalJson.ingest(name, primary_key, data)
+        if rel_json is not None:
             self._add_rel_json_and_tables(name, rel_json)
         else:
             self._add_single_table(name=name, primary_key=primary_key, data=data)
@@ -151,8 +151,15 @@ class RelationalData:
 
         if self.relational_jsons.get(table) is not None:
             original_data, _, original_fks = self._remove_relational_json(table)
+            if original_data is None:
+                raise MultiTableException("Original data with JSON is lost.")
 
-            new_rel_json = RelationalJson(table, primary_key, original_data)
+            new_rel_json = RelationalJson.ingest(table, primary_key, original_data)
+            if new_rel_json is None:
+                raise MultiTableException(
+                    "Failed to change primary key on tables invented from JSON data"
+                )
+
             self._add_rel_json_and_tables(table, new_rel_json)
             for fk in original_fks:
                 self.add_foreign_key(
@@ -175,7 +182,7 @@ class RelationalData:
 
     def _remove_relational_json(
         self, table: str
-    ) -> tuple[pd.DataFrame, list[str], list[ForeignKey]]:
+    ) -> tuple[Optional[pd.DataFrame], list[str], list[ForeignKey]]:
         """
         Removes the RelationalJson instance and removes all invented tables from the graph.
 
@@ -335,8 +342,8 @@ class RelationalData:
     def update_table_data(self, table: str, data: pd.DataFrame) -> None:
         if table in self.relational_jsons:
             _, original_pk, original_fks = self._remove_relational_json(table)
-            new_rel_json = RelationalJson(table, original_pk, data)
-            if new_rel_json.is_applicable:
+            new_rel_json = RelationalJson.ingest(table, original_pk, data)
+            if new_rel_json is not None:
                 self._add_rel_json_and_tables(table, new_rel_json)
                 parent_table_name = new_rel_json.root_table_name
             else:
@@ -356,8 +363,8 @@ class RelationalData:
         else:
             try:
                 metadata = self.graph.nodes[table]["metadata"]
-                new_rel_json = RelationalJson(table, metadata.primary_key, data)
-                if new_rel_json.is_applicable:
+                new_rel_json = RelationalJson.ingest(table, metadata.primary_key, data)
+                if new_rel_json is not None:
                     original_foreign_keys = self._get_user_defined_fks_to_table(table)
                     self.graph.remove_node(table)
                     self._add_rel_json_and_tables(table, new_rel_json)
@@ -424,6 +431,14 @@ class RelationalData:
 
         return table
 
+    def get_invented_table_metadata(
+        self, table: str
+    ) -> Optional[InventedTableMetadata]:
+        if table in self.relational_jsons:
+            return None
+
+        return self.graph.nodes[table]["metadata"].invented_table_metadata
+
     def get_parents(self, table: str) -> List[str]:
         return list(self.graph.successors(table))
 
@@ -479,7 +494,9 @@ class RelationalData:
             return self.graph.nodes[table]["metadata"].data[list(usecols)]
         except KeyError:
             if table in self.relational_jsons:
-                return self.relational_jsons[table].original_data
+                if (df := self.relational_jsons[table].original_data) is None:
+                    raise MultiTableException("Original data with JSON is lost.")
+                return df
             else:
                 raise MultiTableException(f"Unrecognized table: `{table}`")
 

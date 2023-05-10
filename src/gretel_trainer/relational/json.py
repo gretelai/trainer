@@ -1,7 +1,10 @@
+from __future__ import annotations
+
 import hashlib
 import re
 from dataclasses import dataclass
 from json import JSONDecodeError, loads
+from typing import Optional
 
 import numpy as np
 import pandas as pd
@@ -181,39 +184,51 @@ class InventedTableMetadata:
 
 
 class RelationalJson:
-    def __init__(self, table_name: str, primary_key: list[str], df: pd.DataFrame):
-        self.original_table_name = table_name
-        self.original_primary_key = primary_key
-        self.original_data = df
-        self.original_columns = df.columns
+    def __init__(
+        self,
+        original_table_name: str,
+        original_primary_key: list[str],
+        original_columns: list[str],
+        original_data: Optional[pd.DataFrame],
+        table_name_mappings: dict[str, str],
+        invented_tables: list[tuple[str, pd.DataFrame]],
+    ):
+        self.original_table_name = original_table_name
+        self.original_primary_key = original_primary_key
+        self.original_columns = original_columns
+        self.original_data = original_data
+        self.table_name_mappings = table_name_mappings
+        self.tables = invented_tables
 
+    @classmethod
+    def ingest(
+        cls, table_name: str, primary_key: list[str], df: pd.DataFrame
+    ) -> Optional[RelationalJson]:
         tables = _normalize_json([(table_name, df.copy())], [])
-        self.table_name_mappings = {name: sanitize_str(name) for name, _ in tables}
-        tables = [(self.table_name_mappings[name], df) for name, df in tables]
-        self.table_names = [table_name for table_name, _ in tables]
-        self.empty_tables = dict([t for t in tables if t[1].empty])
-        self.non_empty_tables = [
-            t for t in tables if t[0] not in self.empty_tables.keys()
-        ]
+        # If we created additional tables (from JSON lists) or added columns (from JSON dicts)
+        if len(tables) > 1 or len(tables[0][1].columns) > len(df.columns):
+            mappings = {name: sanitize_str(name) for name, _ in tables}
+            invented_tables = [(mappings[name], df) for name, df in tables]
+            return RelationalJson(
+                original_table_name=table_name,
+                original_primary_key=primary_key,
+                original_data=df,
+                original_columns=list(df.columns),
+                table_name_mappings=mappings,
+                invented_tables=invented_tables,
+            )
 
     @property
     def root_table_name(self) -> str:
         return self.table_name_mappings[self.original_table_name]
 
     @property
-    def is_applicable(self) -> bool:
-        # If we turned the original table into multiple tables (because of lists)
-        if len(self.table_names) > 1:
-            return True
+    def non_empty_tables(self) -> list[tuple[str, pd.DataFrame]]:
+        return [t for t in self.tables if not t[1].empty]
 
-        # Before peeking into non_empty_tables, ensure one exists
-        # (Guaranteed to be 0 or 1 because if 2+ we would have already returned above)
-        if len(self.non_empty_tables) > 0:
-            # If we added columns (because of dicts)
-            if set(self.non_empty_tables[0][1].columns) != set(self.original_columns):
-                return True
-
-        return False
+    @property
+    def table_names(self) -> list[str]:
+        return [table_name for table_name, _ in self.tables]
 
     def add(self) -> tuple[list[dict], list[dict]]:
         """Returns lists of keyword arguments designed to be passed to a
@@ -266,8 +281,7 @@ class RelationalJson:
         """
         output_tables = []
         for t in self.table_names:
-            empty_table = self.empty_tables.get(t)
-            multitable_output = tables.get(t, empty_table)
+            multitable_output = tables[t]
             output_tables.append(
                 (self.inverse_table_name_mappings[t], multitable_output)
             )
