@@ -223,10 +223,6 @@ class RelationalJson:
         return self.table_name_mappings[self.original_table_name]
 
     @property
-    def non_empty_tables(self) -> list[tuple[str, pd.DataFrame]]:
-        return [t for t in self.tables if not t[1].empty]
-
-    @property
     def table_names(self) -> list[str]:
         return [table_name for table_name, _ in self.tables]
 
@@ -234,10 +230,12 @@ class RelationalJson:
         """Returns lists of keyword arguments designed to be passed to a
         RelationalData instance's add_table and add_foreign_key methods
         """
+        non_empty_tables = [t for t in self.tables if not t[1].empty]
+
         tables = []
         foreign_keys = []
 
-        for table_name, table_df in self.non_empty_tables:
+        for table_name, table_df in non_empty_tables:
             if table_name == self.root_table_name:
                 table_pk = self.original_primary_key + [PRIMARY_KEY_COLUMN]
             else:
@@ -260,7 +258,7 @@ class RelationalJson:
                 }
             )
 
-        for table_name, table_df in self.non_empty_tables:
+        for table_name, table_df in non_empty_tables:
             for column in get_id_columns(table_df):
                 referred_table = self.table_name_mappings[
                     get_parent_table_name_from_child_id_column(column)

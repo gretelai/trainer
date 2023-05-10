@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import logging
+from contextlib import suppress
 from dataclasses import dataclass, replace
 from enum import Enum
 from pathlib import Path
@@ -196,8 +197,9 @@ class RelationalData:
             rel_json.root_table_name
         )
 
-        for invented_table_name, _ in rel_json.non_empty_tables:
-            self.graph.remove_node(invented_table_name)
+        for invented_table_name in rel_json.table_names:
+            with suppress(KeyError):
+                self.graph.remove_node(invented_table_name)
         del self.relational_jsons[table]
 
         return original_data, original_primary_key, original_foreign_keys
