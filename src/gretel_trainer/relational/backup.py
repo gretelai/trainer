@@ -5,11 +5,13 @@ from typing import Any, Dict, List, Optional
 
 from gretel_trainer.relational.artifacts import ArtifactCollection
 from gretel_trainer.relational.core import ForeignKey, RelationalData
+from gretel_trainer.relational.json import InventedTableMetadata
 
 
 @dataclass
 class BackupRelationalDataTable:
     primary_key: List[str]
+    invented_table_metadata: Optional[InventedTableMetadata] = None
 
 
 @dataclass
@@ -30,25 +32,51 @@ class BackupForeignKey:
 
 
 @dataclass
+class BackupRelationalJson:
+    original_table_name: str
+    original_primary_key: list[str]
+    original_columns: list[str]
+    table_name_mappings: dict[str, str]
+    invented_table_names: list[str]
+
+
+@dataclass
 class BackupRelationalData:
     tables: Dict[str, BackupRelationalDataTable]
     foreign_keys: List[BackupForeignKey]
+    relational_jsons: Dict[str, BackupRelationalJson]
 
     @classmethod
     def from_relational_data(cls, rel_data: RelationalData) -> BackupRelationalData:
         tables = {}
         foreign_keys = []
+        relational_jsons = {}
         for table in rel_data.list_all_tables():
-            tables[table] = BackupRelationalDataTable(
+            backup_table = BackupRelationalDataTable(
                 primary_key=rel_data.get_primary_key(table),
             )
+            if (
+                invented_table_metadata := rel_data.get_invented_table_metadata(table)
+            ) is not None:
+                backup_table.invented_table_metadata = invented_table_metadata
+            tables[table] = backup_table
             foreign_keys.extend(
                 [
                     BackupForeignKey.from_fk(key)
                     for key in rel_data.get_foreign_keys(table)
                 ]
             )
-        return BackupRelationalData(tables=tables, foreign_keys=foreign_keys)
+        for key, rel_json in rel_data.relational_jsons.items():
+            relational_jsons[key] = BackupRelationalJson(
+                original_table_name=rel_json.original_table_name,
+                original_primary_key=rel_json.original_primary_key,
+                original_columns=rel_json.original_columns,
+                table_name_mappings=rel_json.table_name_mappings,
+                invented_table_names=rel_json.table_names,
+            )
+        return BackupRelationalData(
+            tables=tables, foreign_keys=foreign_keys, relational_jsons=relational_jsons
+        )
 
 
 @dataclass
@@ -114,6 +142,10 @@ class Backup:
                 )
                 for fk in relational_data.get("foreign_keys", [])
             ],
+            relational_jsons={
+                k: BackupRelationalJson(**v)
+                for k, v in relational_data.get("relational_jsons", {}).items()
+            },
         )
 
         backup = Backup(

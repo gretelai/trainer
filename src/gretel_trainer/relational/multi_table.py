@@ -34,6 +34,7 @@ from gretel_trainer.relational.core import (
     RelationalData,
     Scope,
 )
+from gretel_trainer.relational.json import InventedTableMetadata, RelationalJson
 from gretel_trainer.relational.log import silent_logs
 from gretel_trainer.relational.model_config import (
     make_classify_config,
@@ -147,8 +148,17 @@ class MultiTable:
             tar.extractall(path=self._working_dir)
         for table_name, table_backup in backup.relational_data.tables.items():
             source_data = pd.read_csv(self._working_dir / f"source_{table_name}.csv")
-            self.relational_data.add_table(
-                name=table_name, primary_key=table_backup.primary_key, data=source_data
+            invented_table_metadata = None
+            if (imeta := table_backup.invented_table_metadata) is not None:
+                invented_table_metadata = InventedTableMetadata(
+                    invented_root_table_name=imeta.invented_root_table_name,
+                    original_table_name=imeta.original_table_name,
+                )
+            self.relational_data._add_single_table(
+                name=table_name,
+                primary_key=table_backup.primary_key,
+                data=source_data,
+                invented_table_metadata=invented_table_metadata,
             )
         for fk_backup in backup.relational_data.foreign_keys:
             self.relational_data.add_foreign_key_constraint(
@@ -157,6 +167,15 @@ class MultiTable:
                 referred_table=fk_backup.referred_table,
                 referred_columns=fk_backup.referred_columns,
             )
+        for key, rel_json_backup in backup.relational_data.relational_jsons.items():
+            relational_json = RelationalJson(
+                original_table_name=rel_json_backup.original_table_name,
+                original_primary_key=rel_json_backup.original_primary_key,
+                original_columns=rel_json_backup.original_columns,
+                original_data=None,
+                table_name_mappings=rel_json_backup.table_name_mappings,
+            )
+            self.relational_data.relational_jsons[key] = relational_json
 
         # Debug summary
         debug_summary_id = backup.artifact_collection.gretel_debug_summary

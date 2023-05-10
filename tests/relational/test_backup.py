@@ -8,9 +8,11 @@ from gretel_trainer.relational.backup import (
     BackupGenerate,
     BackupRelationalData,
     BackupRelationalDataTable,
+    BackupRelationalJson,
     BackupSyntheticsTrain,
     BackupTransformsTrain,
 )
+from gretel_trainer.relational.json import InventedTableMetadata
 
 
 def test_backup_relational_data(trips):
@@ -27,9 +29,67 @@ def test_backup_relational_data(trips):
                 referred_columns=["id"],
             )
         ],
+        relational_jsons={},
     )
 
     assert BackupRelationalData.from_relational_data(trips) == expected
+
+
+def test_backup_relational_data_with_json(documents):
+    expected = BackupRelationalData(
+        tables={
+            "users": BackupRelationalDataTable(primary_key=["id"]),
+            "purchases-sfx": BackupRelationalDataTable(
+                primary_key=["id", "~PRIMARY_KEY_ID~"],
+                invented_table_metadata=InventedTableMetadata(
+                    invented_root_table_name="purchases-sfx",
+                    original_table_name="purchases",
+                ),
+            ),
+            "purchases-data-years-sfx": BackupRelationalDataTable(
+                primary_key=["~PRIMARY_KEY_ID~"],
+                invented_table_metadata=InventedTableMetadata(
+                    invented_root_table_name="purchases-sfx",
+                    original_table_name="purchases",
+                ),
+            ),
+            "payments": BackupRelationalDataTable(primary_key=["id"]),
+        },
+        foreign_keys=[
+            BackupForeignKey(
+                table="payments",
+                constrained_columns=["purchase_id"],
+                referred_table="purchases-sfx",
+                referred_columns=["id"],
+            ),
+            BackupForeignKey(
+                table="purchases-sfx",
+                constrained_columns=["user_id"],
+                referred_table="users",
+                referred_columns=["id"],
+            ),
+            BackupForeignKey(
+                table="purchases-data-years-sfx",
+                constrained_columns=["purchases~id"],
+                referred_table="purchases-sfx",
+                referred_columns=["~PRIMARY_KEY_ID~"],
+            ),
+        ],
+        relational_jsons={
+            "purchases": BackupRelationalJson(
+                original_table_name="purchases",
+                original_primary_key=["id"],
+                original_columns=["id", "user_id", "data"],
+                table_name_mappings={
+                    "purchases": "purchases-sfx",
+                    "purchases^data>years": "purchases-data-years-sfx",
+                },
+                invented_table_names=["purchases-sfx", "purchases-data-years-sfx"],
+            ),
+        },
+    )
+
+    assert BackupRelationalData.from_relational_data(documents) == expected
 
 
 def test_backup():
@@ -50,6 +110,7 @@ def test_backup():
                 referred_columns=["id"],
             )
         ],
+        relational_jsons={},
     )
     backup_classify = BackupClassify(
         model_ids={
