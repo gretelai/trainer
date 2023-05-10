@@ -151,8 +151,8 @@ class MultiTable:
             invented_table_metadata = None
             if (imeta := table_backup.invented_table_metadata) is not None:
                 invented_table_metadata = InventedTableMetadata(
-                    invented_root_table_name=imeta.invented_root_table_name,
-                    original_table_name=imeta.original_table_name,
+                    invented_root_table_name=imeta["invented_root_table_name"],
+                    original_table_name=imeta["original_table_name"],
                 )
             self.relational_data._add_single_table(
                 name=table_name,

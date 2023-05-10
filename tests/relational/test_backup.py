@@ -41,17 +41,17 @@ def test_backup_relational_data_with_json(documents):
             "users": BackupRelationalDataTable(primary_key=["id"]),
             "purchases-sfx": BackupRelationalDataTable(
                 primary_key=["id", "~PRIMARY_KEY_ID~"],
-                invented_table_metadata=InventedTableMetadata(
-                    invented_root_table_name="purchases-sfx",
-                    original_table_name="purchases",
-                ),
+                invented_table_metadata={
+                    "invented_root_table_name": "purchases-sfx",
+                    "original_table_name": "purchases",
+                },
             ),
             "purchases-data-years-sfx": BackupRelationalDataTable(
                 primary_key=["~PRIMARY_KEY_ID~"],
-                invented_table_metadata=InventedTableMetadata(
-                    invented_root_table_name="purchases-sfx",
-                    original_table_name="purchases",
-                ),
+                invented_table_metadata={
+                    "invented_root_table_name": "purchases-sfx",
+                    "original_table_name": "purchases",
+                },
             ),
             "payments": BackupRelationalDataTable(primary_key=["id"]),
         },

@@ -5,13 +5,12 @@ from typing import Any, Dict, List, Optional
 
 from gretel_trainer.relational.artifacts import ArtifactCollection
 from gretel_trainer.relational.core import ForeignKey, RelationalData
-from gretel_trainer.relational.json import InventedTableMetadata
 
 
 @dataclass
 class BackupRelationalDataTable:
     primary_key: List[str]
-    invented_table_metadata: Optional[InventedTableMetadata] = None
+    invented_table_metadata: Optional[dict[str, str]] = None
 
 
 @dataclass
@@ -58,7 +57,7 @@ class BackupRelationalData:
             if (
                 invented_table_metadata := rel_data.get_invented_table_metadata(table)
             ) is not None:
-                backup_table.invented_table_metadata = invented_table_metadata
+                backup_table.invented_table_metadata = asdict(invented_table_metadata)
             tables[table] = backup_table
             foreign_keys.extend(
                 [
