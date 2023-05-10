@@ -623,56 +623,6 @@ class RelationalData:
             "invented_table_count": invented_table_count,
         }
 
-    def as_dict(self, out_dir: str) -> Dict[str, Any]:
-        d = {"tables": {}, "foreign_keys": []}
-        for table in self.list_all_tables(Scope.PUBLIC):
-            d["tables"][table] = {
-                "primary_key": self.get_primary_key(table),
-                "csv_path": f"{out_dir}/{table}.csv",
-            }
-            keys = [
-                {
-                    "table": table,
-                    "constrained_columns": key.columns,
-                    "referred_table": key.parent_table_name,
-                    "referred_columns": key.parent_columns,
-                }
-                for key in self.get_foreign_keys(table)
-            ]
-            d["foreign_keys"].extend(keys)
-        return d
-
-    def to_filesystem(self, out_dir: str) -> str:
-        d = self.as_dict(out_dir)
-        for table_name, details in d["tables"].items():
-            self.get_table_data(table_name).to_csv(details["csv_path"], index=False)
-        metadata_path = f"{out_dir}/metadata.json"
-        with open(metadata_path, "w") as metadata_file:
-            json.dump(d, metadata_file)
-        return metadata_path
-
-    @classmethod
-    def from_filesystem(cls, metadata_filepath: str) -> RelationalData:
-        with open(metadata_filepath, "r") as metadata_file:
-            d = json.load(metadata_file)
-        relational_data = RelationalData()
-
-        for table_name, details in d["tables"].items():
-            primary_key = details["primary_key"]
-            data = pd.read_csv(details["csv_path"])
-            relational_data.add_table(
-                name=table_name, primary_key=primary_key, data=data
-            )
-        for foreign_key in d["foreign_keys"]:
-            relational_data.add_foreign_key_constraint(
-                table=foreign_key["table"],
-                constrained_columns=foreign_key["constrained_columns"],
-                referred_table=foreign_key["referred_table"],
-                referred_columns=foreign_key["referred_columns"],
-            )
-
-        return relational_data
-
 
 def _ok_for_train_and_seed(col: str, df: pd.DataFrame) -> bool:
     if _is_highly_nan(col, df):

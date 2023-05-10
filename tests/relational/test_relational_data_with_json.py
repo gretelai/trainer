@@ -397,10 +397,6 @@ def test_update_data_existing_flat_to_json(documents):
     ]
 
 
-def test_to_from_filesystem(documents):
-    pass
-
-
 def test_restoring_output_tables_to_original_shape(documents):
     # Output tables from MultiTable transforms or synthetics will include only the MODELABLE tables
     output_tables = {
