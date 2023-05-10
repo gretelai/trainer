@@ -224,7 +224,7 @@ class RelationalJson:
 
     @property
     def table_names(self) -> list[str]:
-        return [table_name for table_name, _ in self.tables]
+        return list(self.table_name_mappings.values())
 
     def add(self) -> tuple[list[dict], list[dict]]:
         """Returns lists of keyword arguments designed to be passed to a
