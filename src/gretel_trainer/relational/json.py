@@ -41,7 +41,7 @@ def is_dict(obj):
 
 
 def is_list(obj):
-    return is_json(obj, list)
+    return isinstance(obj, np.ndarray) or is_json(obj, list)
 
 
 def pandas_json_normalize(df):
