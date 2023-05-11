@@ -4,7 +4,7 @@ import hashlib
 import re
 from dataclasses import dataclass
 from json import JSONDecodeError, loads
-from typing import Optional
+from typing import Any, Optional, Union
 
 import numpy as np
 import pandas as pd
@@ -20,14 +20,14 @@ CONTENT_COLUMN = "content"
 PRIMARY_KEY_COLUMN = "~PRIMARY_KEY_ID~"
 
 
-def load_json(obj):
+def load_json(obj: Any) -> Union[dict, list]:
     if isinstance(obj, (dict, list)):
         return obj
     else:
         return loads(obj)
 
 
-def is_json(obj, json_type=(dict, list)):
+def is_json(obj: Any, json_type=(dict, list)) -> bool:
     try:
         obj = load_json(obj)
     except (ValueError, TypeError, JSONDecodeError):
@@ -36,23 +36,23 @@ def is_json(obj, json_type=(dict, list)):
         return isinstance(obj, json_type)
 
 
-def is_dict(obj):
+def is_dict(obj: Any) -> bool:
     return is_json(obj, dict)
 
 
-def is_list(obj):
+def is_list(obj: Any) -> bool:
     return isinstance(obj, np.ndarray) or is_json(obj, list)
 
 
-def pandas_json_normalize(df):
-    return pd.json_normalize(df.apply(load_json).to_list(), sep=FIELD_SEPARATOR)
+def pandas_json_normalize(series: pd.Series) -> pd.DataFrame:
+    return pd.json_normalize(series.apply(load_json).to_list(), sep=FIELD_SEPARATOR)
 
 
-def nulls_to_empty_dicts(df):
+def nulls_to_empty_dicts(df: pd.DataFrame) -> pd.DataFrame:
     return df.applymap(lambda x: {} if pd.isnull(x) else x)
 
 
-def nulls_to_empty_lists(series):
+def nulls_to_empty_lists(series: pd.Series) -> pd.Series:
     return series.apply(lambda x: x if isinstance(x, list) or not pd.isnull(x) else [])
 
 
@@ -98,19 +98,19 @@ def _normalize_json(
 # Multi-table and multi-column back to single-table with JSON
 
 
-def get_id_columns(df):
+def get_id_columns(df: pd.DataFrame) -> list[str]:
     return [col for col in df.columns if col.endswith(ID_SUFFIX)]
 
 
-def get_parent_table_name_from_child_id_column(id_column_name):
+def get_parent_table_name_from_child_id_column(id_column_name: str) -> str:
     return id_column_name[: -len(ID_SUFFIX)]
 
 
-def get_parent_column_name_from_child_table_name(table_name):
+def get_parent_column_name_from_child_table_name(table_name: str) -> str:
     return table_name.split(TABLE_SEPARATOR)[-1]
 
 
-def is_child_table(df):
+def is_child_table(df: pd.DataFrame) -> bool:
     id_columns = get_id_columns(df)
     if len(id_columns) != 1:
         return False
@@ -118,7 +118,9 @@ def is_child_table(df):
     return all([col in df.columns for col in (id_col, ORDER_COLUMN, CONTENT_COLUMN)])
 
 
-def denormalize_json(flat_tables, root_table: str):
+def denormalize_json(
+    flat_tables: list[tuple[str, pd.DataFrame]], root_table: str
+) -> pd.DataFrame:
     table_dict = dict(reversed(flat_tables))
     for table_name, table_df in table_dict.items():
         if table_df.empty and is_child_table(table_df):
