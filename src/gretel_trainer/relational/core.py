@@ -73,6 +73,12 @@ class RelationalData:
         restored = {}
         discarded = set()
 
+        invented_table_cols = {
+            t: self.get_table_columns(t)
+            for t in self.list_all_tables()
+            if self._is_invented(t)
+        }
+
         # Restore any invented tables to nested-JSON format
         for table_name, rel_json in self.relational_jsons.items():
             tables = {
@@ -80,8 +86,9 @@ class RelationalData:
                 for table, data in tableset.items()
                 if table in rel_json.table_names
             }
-            data = rel_json.restore(tables)
-            restored[table_name] = data
+            data = rel_json.restore(tables, invented_table_cols)
+            if data is not None:
+                restored[table_name] = data
             discarded.update(rel_json.table_names)
 
         # Add remaining tables

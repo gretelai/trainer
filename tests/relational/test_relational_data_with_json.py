@@ -397,9 +397,10 @@ def test_update_data_existing_flat_to_json(documents):
     ]
 
 
-def test_restoring_output_tables_to_original_shape(documents):
-    # Output tables from MultiTable transforms or synthetics will include only the MODELABLE tables
-    output_tables = {
+# Simulates output tables from MultiTable transforms or synthetics, which will only include the MODELABLE tables
+@pytest.fixture()
+def mt_output_tables():
+    return {
         "users": pd.DataFrame(
             data={
                 "id": [1, 2, 3],
@@ -433,13 +434,15 @@ def test_restoring_output_tables_to_original_shape(documents):
         ),
     }
 
-    restored_tables = documents.restore(output_tables)
+
+def test_restoring_output_tables_to_original_shape(documents, mt_output_tables):
+    restored_tables = documents.restore(mt_output_tables)
 
     # We expect our restored tables to match the PUBLIC tables
     assert len(restored_tables) == 3
     expected = {
-        "users": output_tables["users"],
-        "payments": output_tables["payments"],
+        "users": mt_output_tables["users"],
+        "payments": mt_output_tables["payments"],
         "purchases": pd.DataFrame(
             data={
                 "id": [1, 2, 3, 4],
@@ -476,6 +479,73 @@ def test_restoring_output_tables_to_original_shape(documents):
 
     for t, df in restored_tables.items():
         pdtest.assert_frame_equal(df, expected[t])
+
+
+def test_restore_with_incomplete_tableset(documents, mt_output_tables):
+    without_invented_root = {
+        k: v for k, v in mt_output_tables.items() if k != "purchases-sfx"
+    }
+
+    without_invented_child = {
+        k: v for k, v in mt_output_tables.items() if k != "purchases-data-years-sfx"
+    }
+
+    restored_without_invented_root = documents.restore(without_invented_root)
+    restored_without_invented_child = documents.restore(without_invented_child)
+
+    # non-JSON-related tables are fine/unaffected
+    pdtest.assert_frame_equal(
+        restored_without_invented_child["users"], mt_output_tables["users"]
+    )
+    pdtest.assert_frame_equal(
+        restored_without_invented_child["payments"], mt_output_tables["payments"]
+    )
+    pdtest.assert_frame_equal(
+        restored_without_invented_root["users"], mt_output_tables["users"]
+    )
+    pdtest.assert_frame_equal(
+        restored_without_invented_root["payments"], mt_output_tables["payments"]
+    )
+
+    # If the invented root is missing, the table is omitted from the result dict entirely
+    assert "purchases" not in restored_without_invented_root
+
+    # If an invented child is missing, we restore the shape but populate the list column with empty lists
+    pdtest.assert_frame_equal(
+        restored_without_invented_child["purchases"],
+        pd.DataFrame(
+            data={
+                "id": [1, 2, 3, 4],
+                "user_id": [1, 1, 2, 3],
+                "data": [
+                    {
+                        "item": "pen",
+                        "cost": 18,
+                        "details": {"color": "blue"},
+                        "years": [],
+                    },
+                    {
+                        "item": "paint",
+                        "cost": 19,
+                        "details": {"color": "yellow"},
+                        "years": [],
+                    },
+                    {
+                        "item": "ink",
+                        "cost": 20,
+                        "details": {"color": "pink"},
+                        "years": [],
+                    },
+                    {
+                        "item": "ink",
+                        "cost": 21,
+                        "details": {"color": "orange"},
+                        "years": [],
+                    },
+                ],
+            }
+        ),
+    )
 
 
 def test_all_tables_are_present_in_debug_summary(documents):

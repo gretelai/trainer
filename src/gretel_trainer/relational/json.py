@@ -224,13 +224,22 @@ class RelationalJson:
     def table_names(self) -> list[str]:
         return list(self.table_name_mappings.values())
 
-    def restore(self, tables: dict[str, pd.DataFrame]) -> pd.DataFrame:
+    def restore(
+        self, tables: dict[str, pd.DataFrame], cols: dict[str, set[str]]
+    ) -> Optional[pd.DataFrame]:
         """Reduces a set of tables (assumed to match the shapes created on initialization)
         to a single table matching the shape of the original source table
         """
         output_tables = []
         for t in self.table_names:
-            multitable_output = tables[t]
+            empty_fallback = pd.DataFrame(data={col: [] for col in cols[t]})
+            multitable_output = tables.get(t, empty_fallback)
+
+            # If the root invented table failed, we are completely out of luck
+            # (Missing invented child tables can be replaced with empty lists so we at least provide _something_)
+            if multitable_output.empty and t == self.root_table_name:
+                return None
+
             output_tables.append(
                 (self.inverse_table_name_mappings[t], multitable_output)
             )
