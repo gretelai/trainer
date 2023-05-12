@@ -2,7 +2,12 @@ import pandas as pd
 import pandas.testing as pdtest
 import pytest
 
-from gretel_trainer.relational.core import ForeignKey, RelationalData, Scope
+from gretel_trainer.relational.core import (
+    ForeignKey,
+    MultiTableException,
+    RelationalData,
+    Scope,
+)
 
 
 @pytest.fixture
@@ -543,6 +548,185 @@ def test_restore_with_incomplete_tableset(documents, mt_output_tables):
                         "years": [],
                     },
                 ],
+            }
+        ),
+    )
+
+
+def test_flatten_and_restore_all_sorts_of_json():
+    json = """
+[
+    {
+        "a": 1,
+        "b": {"bb": 1},
+        "c": {"cc": {"ccc": 1}},
+        "d": [1, 2, 3],
+        "e": [
+            {"ee": 1},
+            {"ee": 2}
+        ],
+        "f": [
+            {
+                "ff": [
+                    {"fff": 1},
+                    {"fff": 2}
+                ]
+            }
+        ],
+    }
+]
+"""
+    json_df = pd.read_json(json, orient="records")
+    rel_data = RelationalData()
+    rel_data.add_table(name="demo", primary_key=None, data=json_df)
+
+    assert set(rel_data.list_all_tables(Scope.ALL)) == {
+        "demo",
+        "demo-sfx",
+        "demo-d-sfx",
+        "demo-e-sfx",
+        "demo-f-sfx",
+        "demo-f-content-ff-sfx",
+    }
+
+    assert rel_data.get_table_columns("demo-sfx") == {
+        "a",
+        "b>bb",
+        "c>cc>ccc",
+        "~PRIMARY_KEY_ID~",
+    }
+    assert rel_data.get_table_columns("demo-d-sfx") == {
+        "content",
+        "~PRIMARY_KEY_ID~",
+        "demo~id",
+        "array~order",
+    }
+    assert rel_data.get_table_columns("demo-e-sfx") == {
+        "content>ee",
+        "~PRIMARY_KEY_ID~",
+        "demo~id",
+        "array~order",
+    }
+    assert rel_data.get_table_columns("demo-f-sfx") == {
+        "~PRIMARY_KEY_ID~",
+        "demo~id",
+        "array~order",
+    }
+    assert rel_data.get_table_columns("demo-f-content-ff-sfx") == {
+        "content>fff",
+        "~PRIMARY_KEY_ID~",
+        "demo^f~id",
+        "array~order",
+    }
+
+    output_tables = {
+        "demo-sfx": pd.DataFrame(
+            data={
+                "a": [1, 2],
+                "b>bb": [3, 4],
+                "c>cc>ccc": [5, 6],
+                "~PRIMARY_KEY_ID~": [0, 1],
+            }
+        ),
+        "demo-d-sfx": pd.DataFrame(
+            data={
+                "content": [10, 11, 12, 13],
+                "~PRIMARY_KEY_ID~": [0, 1, 2, 3],
+                "demo~id": [0, 0, 0, 1],
+                "array~order": [0, 1, 2, 0],
+            }
+        ),
+        "demo-e-sfx": pd.DataFrame(
+            data={
+                "content>ee": [100, 200, 300],
+                "~PRIMARY_KEY_ID~": [0, 1, 2],
+                "demo~id": [0, 1, 1],
+                "array~order": [0, 0, 1],
+            }
+        ),
+        "demo-f-sfx": pd.DataFrame(
+            data={"~PRIMARY_KEY_ID~": [0, 1], "demo~id": [0, 1], "array~order": [0, 0]}
+        ),
+        "demo-f-content-ff-sfx": pd.DataFrame(
+            data={
+                "content>fff": [10, 11, 12],
+                "~PRIMARY_KEY_ID~": [0, 1, 2],
+                "demo^f~id": [0, 0, 0],
+                "array~order": [0, 1, 2],
+            }
+        ),
+    }
+
+    restored = rel_data.restore(output_tables)
+
+    expected = pd.DataFrame(
+        data={
+            "a": [1, 2],
+            "b": [{"bb": 3}, {"bb": 4}],
+            "c": [{"cc": {"ccc": 5}}, {"cc": {"ccc": 6}}],
+            "d": [[10, 11, 12], [13]],
+            "e": [[{"ee": 100}], [{"ee": 200}, {"ee": 300}]],
+            "f": [[{"ff": [{"fff": 10}, {"fff": 11}, {"fff": 12}]}], [{"ff": []}]],
+        }
+    )
+
+    assert len(restored) == 1
+    pdtest.assert_frame_equal(restored["demo"], expected)
+
+
+def test_only_lists_edge_case():
+    # Smallest reproduction: a dataframe with just one row and one column, and the value is a list
+    list_df = pd.DataFrame(data={"l": [[1, 2, 3, 4]]})
+    rel_data = RelationalData()
+
+    # Since there are no flat fields on the source, we cannot create an invented root table.
+    # Internally, the call below fails when trying to create a foreign key from the invented child table up to a nonexistent root.
+    with pytest.raises(MultiTableException):
+        rel_data.add_table(name="list", primary_key=None, data=list_df)
+
+    # TODO: Ideally we should "roll back the transaction" and the call below should return an empty set,
+    # but instead we currently get left in a nonsensical state.
+    assert set(rel_data.list_all_tables(Scope.ALL)) == {"list", "list-l-sfx"}
+
+
+def test_lists_of_lists():
+    # Enough flat data in the source to create a root invented table.
+    # Upping the complexity by making the special value a list of lists,
+    # but not to fear: we can handle this correctly.
+    lol_df = pd.DataFrame(data={"a": [1], "l": [[[1, 2], [3, 4]]]})
+    rel_data = RelationalData()
+    rel_data.add_table(name="lol", primary_key=None, data=lol_df)
+
+    assert set(rel_data.list_all_tables(Scope.ALL)) == {
+        "lol",
+        "lol-sfx",
+        "lol-l-sfx",
+        "lol-l-content-sfx",
+    }
+
+    output = {
+        "lol-sfx": pd.DataFrame(data={"a": [1, 2], "~PRIMARY_KEY_ID~": [0, 1]}),
+        "lol-l-sfx": pd.DataFrame(
+            data={"~PRIMARY_KEY_ID~": [0, 1], "lol~id": [0, 0], "array~order": [0, 1]}
+        ),
+        "lol-l-content-sfx": pd.DataFrame(
+            data={
+                "content": [10, 20, 30, 40],
+                "~PRIMARY_KEY_ID~": [0, 1, 2, 3],
+                "lol^l~id": [0, 0, 1, 1],
+                "array~order": [0, 1, 0, 1],
+            }
+        ),
+    }
+    restored = rel_data.restore(output)
+
+    assert len(restored) == 1
+    pdtest.assert_frame_equal(
+        restored["lol"],
+        pd.DataFrame(
+            data={
+                "a": [1, 2],
+                "l": [[[10, 20], [30, 40]], []],
             }
         ),
     )
