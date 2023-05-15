@@ -378,7 +378,11 @@ class RelationalData:
                     f"Unrecognized table name: {table}. If this is a new table to add, use `add_table`."
                 )
 
-            if (new_rj_ingest := RelationalJson.ingest(table, metadata.primary_key, data)) is not None:
+            if (
+                new_rj_ingest := RelationalJson.ingest(
+                    table, metadata.primary_key, data
+                )
+            ) is not None:
                 original_foreign_keys = self._get_user_defined_fks_to_table(table)
                 self.graph.remove_node(table)
                 self._add_rel_json_and_tables(table, new_rj_ingest)
