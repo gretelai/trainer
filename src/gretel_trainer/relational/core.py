@@ -40,11 +40,34 @@ UserFriendlyPrimaryKeyT = Optional[Union[str, List[str]]]
 
 
 class Scope(str, Enum):
+    """
+    Various non-mutually-exclusive sets of tables known to the system
+    """
+
     ALL = "all"
+    """
+    Every known table (all user-supplied tables, all invented tables)
+    """
+
     PUBLIC = "public"
+    """
+    Includes all user-supplied tables, omits invented tables
+    """
+
     MODELABLE = "modelable"
+    """
+    Includes flat source tables and all invented tables, omits source tables that led to invented tables
+    """
+
     EVALUATABLE = "evaluatable"
+    """
+    A subset of MODELABLE that additionally omits invented child tables (but includes invented root tables)
+    """
+
     INVENTED = "invented"
+    """
+    Includes all tables invented from un-modelable user source tables
+    """
 
 
 @dataclass
