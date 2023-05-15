@@ -373,26 +373,26 @@ class RelationalData:
         else:
             try:
                 metadata = self.graph.nodes[table]["metadata"]
-                new_rj_ingest = RelationalJson.ingest(table, metadata.primary_key, data)
-                if new_rj_ingest is not None:
-                    original_foreign_keys = self._get_user_defined_fks_to_table(table)
-                    self.graph.remove_node(table)
-                    self._add_rel_json_and_tables(table, new_rj_ingest)
-                    for fk in original_foreign_keys:
-                        self.add_foreign_key(
-                            table=fk.table_name,
-                            constrained_columns=fk.columns,
-                            referred_table=new_rj_ingest[0].root_table_name,
-                            referred_columns=fk.parent_columns,
-                        )
-                else:
-                    metadata.data = data
-                    metadata.columns = set(data.columns)
-                    self._clear_safe_ancestral_seed_columns(table)
             except KeyError:
                 raise MultiTableException(
                     f"Unrecognized table name: {table}. If this is a new table to add, use `add_table`."
                 )
+
+            if (new_rj_ingest := RelationalJson.ingest(table, metadata.primary_key, data)) is not None:
+                original_foreign_keys = self._get_user_defined_fks_to_table(table)
+                self.graph.remove_node(table)
+                self._add_rel_json_and_tables(table, new_rj_ingest)
+                for fk in original_foreign_keys:
+                    self.add_foreign_key(
+                        table=fk.table_name,
+                        constrained_columns=fk.columns,
+                        referred_table=new_rj_ingest[0].root_table_name,
+                        referred_columns=fk.parent_columns,
+                    )
+            else:
+                metadata.data = data
+                metadata.columns = set(data.columns)
+                self._clear_safe_ancestral_seed_columns(table)
 
     def list_all_tables(self, scope: Scope = Scope.MODELABLE) -> List[str]:
         modelable_nodes = self.graph.nodes
