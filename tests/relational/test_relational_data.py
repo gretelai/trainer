@@ -77,7 +77,7 @@ def test_column_metadata(pets):
     pets.set_primary_key(table="humans", primary_key="id")
 
     # Setting a column as a foreign key ensures it is included
-    pets.add_foreign_key(
+    pets.add_foreign_key_constraint(
         table="humans",
         constrained_columns=["city"],
         referred_table="pets",
@@ -86,7 +86,7 @@ def test_column_metadata(pets):
     assert pets.get_safe_ancestral_seed_columns("humans") == {"id", "name", "city"}
 
     # Removing a foreign key refreshes the cache state
-    pets.remove_foreign_key("humans", ["city"])
+    pets.remove_foreign_key_constraint("humans", ["city"])
     assert pets.get_safe_ancestral_seed_columns("humans") == {"id", "name"}
 
 
@@ -103,7 +103,7 @@ def test_adding_and_removing_foreign_keys():
 
     # Cannot add to an unrecognized table
     with pytest.raises(MultiTableException):
-        rel_data.add_foreign_key(
+        rel_data.add_foreign_key_constraint(
             table="unrecognized",
             constrained_columns=["user_id"],
             referred_table="users",
@@ -112,7 +112,7 @@ def test_adding_and_removing_foreign_keys():
 
     # Cannot add to an unrecognized referred table
     with pytest.raises(MultiTableException):
-        rel_data.add_foreign_key(
+        rel_data.add_foreign_key_constraint(
             table="events",
             constrained_columns=["user_id"],
             referred_table="unrecognized",
@@ -121,14 +121,14 @@ def test_adding_and_removing_foreign_keys():
 
     # Cannot add unrecognized columns
     with pytest.raises(MultiTableException):
-        rel_data.add_foreign_key(
+        rel_data.add_foreign_key_constraint(
             table="events",
             constrained_columns=["user_id"],
             referred_table="users",
             referred_columns=["unrecognized"],
         )
     with pytest.raises(MultiTableException):
-        rel_data.add_foreign_key(
+        rel_data.add_foreign_key_constraint(
             table="events",
             constrained_columns=["unrecognized"],
             referred_table="users",
@@ -136,7 +136,7 @@ def test_adding_and_removing_foreign_keys():
         )
 
     # Successful add
-    rel_data.add_foreign_key(
+    rel_data.add_foreign_key_constraint(
         table="events",
         constrained_columns=["user_id"],
         referred_table="users",
@@ -146,14 +146,38 @@ def test_adding_and_removing_foreign_keys():
 
     # Cannot remove from unrecognized table
     with pytest.raises(MultiTableException):
-        rel_data.remove_foreign_key(table="unrecognized", constrained_columns=["id"])
+        rel_data.remove_foreign_key_constraint(
+            table="unrecognized", constrained_columns=["id"]
+        )
 
     # Cannot remove a non-existent key
     with pytest.raises(MultiTableException):
-        rel_data.remove_foreign_key(table="events", constrained_columns=["id"])
+        rel_data.remove_foreign_key_constraint(
+            table="events", constrained_columns=["id"]
+        )
 
     # Successful remove
-    rel_data.remove_foreign_key(table="events", constrained_columns=["user_id"])
+    rel_data.remove_foreign_key_constraint(
+        table="events", constrained_columns=["user_id"]
+    )
+    assert len(rel_data.get_foreign_keys("events")) == 0
+
+
+def test_add_remove_foreign_key_shorthand():
+    rel_data = RelationalData()
+    rel_data.add_table(
+        name="users", primary_key="id", data=pd.DataFrame(data={"id": [1, 2, 3]})
+    )
+    rel_data.add_table(
+        name="events",
+        primary_key="id",
+        data=pd.DataFrame(data={"id": [1, 2, 3], "user_id": [1, 2, 3]}),
+    )
+
+    rel_data.add_foreign_key(foreign_key="events.user_id", referencing="users.id")
+    assert len(rel_data.get_foreign_keys("events")) == 1
+
+    rel_data.remove_foreign_key("events.user_id")
     assert len(rel_data.get_foreign_keys("events")) == 0
 
 
