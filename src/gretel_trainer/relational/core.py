@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import json
 import logging
 from contextlib import suppress
 from dataclasses import dataclass, replace
