@@ -63,7 +63,7 @@ class RelationalData:
         self.relational_jsons: dict[str, RelationalJson] = {}
 
     def restore(self, tableset: dict[str, pd.DataFrame]) -> dict[str, pd.DataFrame]:
-        """Restores a given a tableset (presumably output from some MultiTable workflow,
+        """Restores a given tableset (presumably output from some MultiTable workflow,
         i.e. transforms or synthetics) to its original shape (specifically, "re-nests"
         any JSON that had been expanded out.
 
