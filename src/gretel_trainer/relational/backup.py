@@ -35,7 +35,7 @@ class BackupRelationalJson:
     original_table_name: str
     original_primary_key: list[str]
     original_columns: list[str]
-    table_name_mappings: list[tuple[str, str]]
+    table_name_mappings: dict[str, str]
     invented_table_names: list[str]
 
 

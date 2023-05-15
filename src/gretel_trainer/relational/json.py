@@ -154,7 +154,7 @@ class RelationalJson:
         original_primary_key: list[str],
         original_columns: list[str],
         original_data: Optional[pd.DataFrame],
-        table_name_mappings: list[tuple[str, str]],
+        table_name_mappings: dict[str, str],
     ):
         self.original_table_name = original_table_name
         self.original_primary_key = original_primary_key
@@ -169,7 +169,7 @@ class RelationalJson:
         tables = _normalize_json([(table_name, df.copy())], [])
         # If we created additional tables (from JSON lists) or added columns (from JSON dicts)
         if len(tables) > 1 or len(tables[0][1].columns) > len(df.columns):
-            mappings = [(name, sanitize_str(name)) for name, _ in tables]
+            mappings = {name: sanitize_str(name) for name, _ in tables}
             rel_json = RelationalJson(
                 original_table_name=table_name,
                 original_primary_key=primary_key,
@@ -182,25 +182,17 @@ class RelationalJson:
 
     @property
     def root_table_name(self) -> str:
-        return self._mapping_dict[self.original_table_name]
+        return self.table_name_mappings[self.original_table_name]
 
     @property
     def table_names(self) -> list[str]:
-        # We need to keep the order intact for restoring
-        return [m[1] for m in self.table_name_mappings]
-
-    def get_sanitized_name(self, t: str) -> str:
-        return self._mapping_dict[t]
-
-    @property
-    def _mapping_dict(self) -> dict[str, str]:
-        return dict(self.table_name_mappings)
+        return list(self.table_name_mappings.values())
 
     @property
     def inverse_table_name_mappings(self) -> dict[str, str]:
         # Keys are sanitized, model-friendly names
         # Values are "provenance" names (a^b>c) or the original table name
-        return {value: key for key, value in self._mapping_dict.items()}
+        return {value: key for key, value in self.table_name_mappings.items()}
 
     def restore(
         self, tables: dict[str, pd.DataFrame], rel_data: _RelationalData
@@ -288,7 +280,7 @@ def _generate_commands(
     Returns lists of keyword arguments designed to be passed to a
     RelationalData instance's _add_single_table and add_foreign_key methods
     """
-    tables = [(rel_json.get_sanitized_name(name), df) for name, df in tables]
+    tables = [(rel_json.table_name_mappings[name], df) for name, df in tables]
     non_empty_tables = [t for t in tables if not t[1].empty]
 
     _add_single_table = []
@@ -301,9 +293,9 @@ def _generate_commands(
             table_pk = [PRIMARY_KEY_COLUMN]
         table_df.index.rename(PRIMARY_KEY_COLUMN, inplace=True)
         table_df.reset_index(inplace=True)
-        invented_root_table_name = rel_json.get_sanitized_name(
+        invented_root_table_name = rel_json.table_name_mappings[
             rel_json.original_table_name
-        )
+        ]
         metadata = InventedTableMetadata(
             invented_root_table_name=invented_root_table_name,
             original_table_name=rel_json.original_table_name,
@@ -319,9 +311,9 @@ def _generate_commands(
 
     for table_name, table_df in non_empty_tables:
         for column in get_id_columns(table_df):
-            referred_table = rel_json.get_sanitized_name(
+            referred_table = rel_json.table_name_mappings[
                 get_parent_table_name_from_child_id_column(column)
-            )
+            ]
             add_foreign_key.append(
                 {
                     "table": table_name,

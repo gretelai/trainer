@@ -80,10 +80,10 @@ def test_backup_relational_data_with_json(documents):
                 original_table_name="purchases",
                 original_primary_key=["id"],
                 original_columns=["id", "user_id", "data"],
-                table_name_mappings=[
-                    ("purchases", "purchases-sfx"),
-                    ("purchases^data>years", "purchases-data-years-sfx"),
-                ],
+                table_name_mappings={
+                    "purchases": "purchases-sfx",
+                    "purchases^data>years": "purchases-data-years-sfx",
+                },
                 invented_table_names=["purchases-sfx", "purchases-data-years-sfx"],
             ),
         },
