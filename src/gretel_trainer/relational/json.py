@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import hashlib
+import logging
 import re
 from dataclasses import dataclass
 from json import JSONDecodeError, loads
@@ -9,6 +10,8 @@ from typing import Any, Optional, Protocol, Union
 import numpy as np
 import pandas as pd
 from unflatten import unflatten
+
+logger = logging.getLogger(__name__)
 
 # JSON dict to multi-column and list to multi-table
 
@@ -166,10 +169,15 @@ class RelationalJson:
     def ingest(
         cls, table_name: str, primary_key: list[str], df: pd.DataFrame
     ) -> Optional[IngestResponseT]:
+        logger.debug(f"Checking table `{table_name}` for JSON columns")
         tables = _normalize_json([(table_name, df.copy())], [])
         # If we created additional tables (from JSON lists) or added columns (from JSON dicts)
         if len(tables) > 1 or len(tables[0][1].columns) > len(df.columns):
             mappings = {name: sanitize_str(name) for name, _ in tables}
+            logger.info(
+                f"Found JSON data in table `{table_name}`, transformed into {len(mappings)} tables for modeling."
+            )
+            logger.debug(f"Invented table names: {list(mappings.values())}")
             rel_json = RelationalJson(
                 original_table_name=table_name,
                 original_primary_key=primary_key,
@@ -203,6 +211,9 @@ class RelationalJson:
         # If the root invented table failed, we are completely out of luck
         # (Missing invented child tables can be replaced with empty lists so we at least provide _something_)
         if self.root_table_name not in tables:
+            logger.warning(
+                f"Cannot restore nested JSON data: root invented table `{self.root_table_name}` is missing from output tables."
+            )
             return None
 
         return self._denormalize_json(tables, rel_data)[self.original_columns]
