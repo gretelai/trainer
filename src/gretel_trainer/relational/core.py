@@ -1,8 +1,9 @@
 from __future__ import annotations
 
-import json
 import logging
-from dataclasses import dataclass
+from contextlib import suppress
+from dataclasses import dataclass, replace
+from enum import Enum
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Union
 
@@ -10,6 +11,12 @@ import networkx
 import pandas as pd
 from networkx.algorithms.dag import dag_longest_path_length, topological_sort
 from pandas.api.types import is_string_dtype
+
+from gretel_trainer.relational.json import (
+    IngestResponseT,
+    InventedTableMetadata,
+    RelationalJson,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -32,17 +39,80 @@ class ForeignKey:
 UserFriendlyPrimaryKeyT = Optional[Union[str, List[str]]]
 
 
+class Scope(str, Enum):
+    """
+    Various non-mutually-exclusive sets of tables known to the system
+    """
+
+    ALL = "all"
+    """
+    Every known table (all user-supplied tables, all invented tables)
+    """
+
+    PUBLIC = "public"
+    """
+    Includes all user-supplied tables, omits invented tables
+    """
+
+    MODELABLE = "modelable"
+    """
+    Includes flat source tables and all invented tables, omits source tables that led to invented tables
+    """
+
+    EVALUATABLE = "evaluatable"
+    """
+    A subset of MODELABLE that additionally omits invented child tables (but includes invented root tables)
+    """
+
+    INVENTED = "invented"
+    """
+    Includes all tables invented from un-modelable user source tables
+    """
+
+
 @dataclass
 class TableMetadata:
     primary_key: list[str]
     data: pd.DataFrame
     columns: set[str]
+    invented_table_metadata: Optional[InventedTableMetadata] = None
     safe_ancestral_seed_columns: Optional[set[str]] = None
 
 
 class RelationalData:
     def __init__(self):
         self.graph = networkx.DiGraph()
+        self.relational_jsons: dict[str, RelationalJson] = {}
+
+    def restore(self, tableset: dict[str, pd.DataFrame]) -> dict[str, pd.DataFrame]:
+        """Restores a given tableset (presumably output from some MultiTable workflow,
+        i.e. transforms or synthetics) to its original shape (specifically, "re-nests"
+        any JSON that had been expanded out.
+
+        Users should rely on MultiTable calling this internally when appropriate and not
+        need to do so themselves.
+        """
+        restored = {}
+        discarded = set()
+
+        # Restore any invented tables to nested-JSON format
+        for table_name, rel_json in self.relational_jsons.items():
+            tables = {
+                table: data
+                for table, data in tableset.items()
+                if table in rel_json.table_names
+            }
+            data = rel_json.restore(tables, self)
+            if data is not None:
+                restored[table_name] = data
+            discarded.update(rel_json.table_names)
+
+        # Add remaining tables
+        for table, data in tableset.items():
+            if table not in discarded:
+                restored[table] = data
+
+        return restored
 
     def add_table(
         self,
@@ -54,10 +124,42 @@ class RelationalData:
         """
         Add a table. The primary key can be None (if one is not defined on the table),
         a string column name (most common), or a list of multiple string column names (composite key).
+
+        This call MAY result in multiple tables getting "registered," specifically if
+        the table includes nested JSON data.
         """
         primary_key = self._format_key_column(primary_key)
+        rj_ingest = RelationalJson.ingest(name, primary_key, data)
+        if rj_ingest is not None:
+            self._add_rel_json_and_tables(name, rj_ingest)
+        else:
+            self._add_single_table(name=name, primary_key=primary_key, data=data)
+
+    def _add_rel_json_and_tables(self, table: str, rj_ingest: IngestResponseT) -> None:
+        rel_json, commands = rj_ingest
+        tables, foreign_keys = commands
+
+        self.relational_jsons[table] = rel_json
+
+        for tbl in tables:
+            self._add_single_table(**tbl)
+        for foreign_key in foreign_keys:
+            self.add_foreign_key_constraint(**foreign_key)
+
+    def _add_single_table(
+        self,
+        *,
+        name: str,
+        primary_key: UserFriendlyPrimaryKeyT,
+        data: pd.DataFrame,
+        invented_table_metadata: Optional[InventedTableMetadata] = None,
+    ) -> None:
+        primary_key = self._format_key_column(primary_key)
         metadata = TableMetadata(
-            primary_key=primary_key, data=data, columns=set(data.columns)
+            primary_key=primary_key,
+            data=data,
+            columns=set(data.columns),
+            invented_table_metadata=invented_table_metadata,
         )
         self.graph.add_node(name, metadata=metadata)
 
@@ -68,7 +170,7 @@ class RelationalData:
         (Re)set the primary key on an existing table.
         If the table does not yet exist in the instance's collection, add it via `add_table`.
         """
-        if table not in self.list_all_tables():
+        if table not in self.list_all_tables(Scope.ALL):
             raise MultiTableException(f"Unrecognized table name: `{table}`")
 
         primary_key = self._format_key_column(primary_key)
@@ -76,10 +178,61 @@ class RelationalData:
         known_columns = self.get_table_columns(table)
         for col in primary_key:
             if col not in known_columns:
-                raise MultiTableException(f"Unrecognized column name: `{primary_key}`")
+                raise MultiTableException(f"Unrecognized column name: `{col}`")
 
-        self.graph.nodes[table]["metadata"].primary_key = primary_key
-        self._clear_safe_ancestral_seed_columns(table)
+        if self.relational_jsons.get(table) is not None:
+            original_data, _, original_fks = self._remove_relational_json(table)
+            if original_data is None:
+                raise MultiTableException("Original data with JSON is lost.")
+
+            new_rj_ingest = RelationalJson.ingest(table, primary_key, original_data)
+            if new_rj_ingest is None:
+                raise MultiTableException(
+                    "Failed to change primary key on tables invented from JSON data"
+                )
+
+            self._add_rel_json_and_tables(table, new_rj_ingest)
+            for fk in original_fks:
+                self.add_foreign_key_constraint(
+                    table=fk.table_name,
+                    constrained_columns=fk.columns,
+                    referred_table=fk.parent_table_name,
+                    referred_columns=fk.parent_columns,
+                )
+        else:
+            self.graph.nodes[table]["metadata"].primary_key = primary_key
+            self._clear_safe_ancestral_seed_columns(table)
+
+    def _get_user_defined_fks_to_table(self, table: str) -> list[ForeignKey]:
+        return [
+            fk
+            for child in self.graph.predecessors(table)
+            for fk in self.get_foreign_keys(child)
+            if fk.parent_table_name == table and not self._is_invented(fk.table_name)
+        ]
+
+    def _remove_relational_json(
+        self, table: str
+    ) -> tuple[Optional[pd.DataFrame], list[str], list[ForeignKey]]:
+        """
+        Removes the RelationalJson instance and removes all invented tables from the graph.
+
+        Returns the original data, primary key, and foreign keys.
+        """
+        rel_json = self.relational_jsons[table]
+
+        original_data = rel_json.original_data
+        original_primary_key = rel_json.original_primary_key
+        original_foreign_keys = self._get_user_defined_fks_to_table(
+            rel_json.root_table_name
+        )
+
+        for invented_table_name in rel_json.table_names:
+            with suppress(KeyError):
+                self.graph.remove_node(invented_table_name)
+        del self.relational_jsons[table]
+
+        return original_data, original_primary_key, original_foreign_keys
 
     def _format_key_column(self, key: Optional[Union[str, List[str]]]) -> List[str]:
         if key is None:
@@ -119,7 +272,7 @@ class RelationalData:
         """
         Add a foreign key relationship between two tables.
         """
-        known_tables = self.list_all_tables()
+        known_tables = self.list_all_tables(Scope.ALL)
 
         abort = False
         if table not in known_tables:
@@ -131,6 +284,9 @@ class RelationalData:
 
         if abort:
             raise MultiTableException("Unrecognized table(s) in foreign key arguments")
+
+        table = self._get_table_in_graph(table)
+        referred_table = self._get_table_in_graph(referred_table)
 
         if len(constrained_columns) != len(referred_columns):
             logger.warning(
@@ -191,8 +347,10 @@ class RelationalData:
         """
         Remove an existing foreign key.
         """
-        if table not in self.list_all_tables():
+        if table not in self.list_all_tables(Scope.ALL):
             raise MultiTableException(f"Unrecognized table name: `{table}`")
+
+        table = self._get_table_in_graph(table)
 
         key_to_remove = None
         for fk in self.get_foreign_keys(table):
@@ -214,17 +372,108 @@ class RelationalData:
         self._clear_safe_ancestral_seed_columns(table)
 
     def update_table_data(self, table: str, data: pd.DataFrame) -> None:
-        try:
-            self.graph.nodes[table]["metadata"].data = data
-            self.graph.nodes[table]["metadata"].columns = set(data.columns)
-            self._clear_safe_ancestral_seed_columns(table)
-        except KeyError:
-            raise MultiTableException(
-                f"Unrecognized table name: {table}. If this is a new table to add, use `add_table`."
-            )
+        if table in self.relational_jsons:
+            _, original_pk, original_fks = self._remove_relational_json(table)
+            new_rj_ingest = RelationalJson.ingest(table, original_pk, data)
+            if new_rj_ingest is not None:
+                self._add_rel_json_and_tables(table, new_rj_ingest)
+                parent_table_name = new_rj_ingest[0].root_table_name
+            else:
+                self._add_single_table(
+                    name=table,
+                    primary_key=original_pk,
+                    data=data,
+                )
+                parent_table_name = table
+            for fk in original_fks:
+                self.add_foreign_key_constraint(
+                    table=fk.table_name,
+                    constrained_columns=fk.columns,
+                    referred_table=parent_table_name,
+                    referred_columns=fk.parent_columns,
+                )
+        else:
+            try:
+                metadata = self.graph.nodes[table]["metadata"]
+            except KeyError:
+                raise MultiTableException(
+                    f"Unrecognized table name: {table}. If this is a new table to add, use `add_table`."
+                )
 
-    def list_all_tables(self) -> List[str]:
-        return list(self.graph.nodes)
+            if (
+                new_rj_ingest := RelationalJson.ingest(
+                    table, metadata.primary_key, data
+                )
+            ) is not None:
+                original_foreign_keys = self._get_user_defined_fks_to_table(table)
+                self.graph.remove_node(table)
+                self._add_rel_json_and_tables(table, new_rj_ingest)
+                for fk in original_foreign_keys:
+                    self.add_foreign_key_constraint(
+                        table=fk.table_name,
+                        constrained_columns=fk.columns,
+                        referred_table=new_rj_ingest[0].root_table_name,
+                        referred_columns=fk.parent_columns,
+                    )
+            else:
+                metadata.data = data
+                metadata.columns = set(data.columns)
+                self._clear_safe_ancestral_seed_columns(table)
+
+    def list_all_tables(self, scope: Scope = Scope.MODELABLE) -> List[str]:
+        modelable_nodes = self.graph.nodes
+
+        json_source_tables = [
+            rel_json.original_table_name
+            for _, rel_json in self.relational_jsons.items()
+        ]
+
+        if scope == Scope.MODELABLE:
+            return list(modelable_nodes)
+        elif scope == Scope.EVALUATABLE:
+            e = []
+            for n in modelable_nodes:
+                meta = self.graph.nodes[n]["metadata"]
+                if (
+                    meta.invented_table_metadata is None
+                    or meta.invented_table_metadata.invented_root_table_name == n
+                ):
+                    e.append(n)
+            return e
+        elif scope == Scope.INVENTED:
+            return [n for n in modelable_nodes if self._is_invented(n)]
+        elif scope == Scope.ALL:
+            return list(modelable_nodes) + json_source_tables
+        elif scope == Scope.PUBLIC:
+            non_invented_nodes = [
+                n for n in modelable_nodes if not self._is_invented(n)
+            ]
+            return json_source_tables + non_invented_nodes
+
+    def _is_invented(self, table: str) -> bool:
+        return (
+            table in self.graph.nodes
+            and self.graph.nodes[table]["metadata"].invented_table_metadata is not None
+        )
+
+    def get_public_name(self, table: str) -> Optional[str]:
+        if table in self.relational_jsons:
+            return table
+
+        if (
+            imeta := self.graph.nodes[table]["metadata"].invented_table_metadata
+        ) is not None:
+            return imeta.original_table_name
+
+        return table
+
+    def get_invented_table_metadata(
+        self, table: str
+    ) -> Optional[InventedTableMetadata]:
+        if table in self.relational_jsons:
+            return None
+
+        return self.graph.nodes[table]["metadata"].invented_table_metadata
 
     def get_parents(self, table: str) -> List[str]:
         return list(self.graph.successors(table))
@@ -265,16 +514,36 @@ class RelationalData:
         return list(reversed(list(topological_sort(self.graph))))
 
     def get_primary_key(self, table: str) -> List[str]:
-        return self.graph.nodes[table]["metadata"].primary_key
+        try:
+            return self.graph.nodes[table]["metadata"].primary_key
+        except KeyError:
+            if table in self.relational_jsons:
+                return self.relational_jsons[table].original_primary_key
+            else:
+                raise MultiTableException(f"Unrecognized table: `{table}`")
 
     def get_table_data(
         self, table: str, usecols: Optional[set[str]] = None
     ) -> pd.DataFrame:
         usecols = usecols or self.get_table_columns(table)
-        return self.graph.nodes[table]["metadata"].data[list(usecols)]
+        try:
+            return self.graph.nodes[table]["metadata"].data[list(usecols)]
+        except KeyError:
+            if table in self.relational_jsons:
+                if (df := self.relational_jsons[table].original_data) is None:
+                    raise MultiTableException("Original data with JSON is lost.")
+                return df
+            else:
+                raise MultiTableException(f"Unrecognized table: `{table}`")
 
     def get_table_columns(self, table: str) -> set[str]:
-        return self.graph.nodes[table]["metadata"].columns
+        try:
+            return self.graph.nodes[table]["metadata"].columns
+        except KeyError:
+            if table in self.relational_jsons:
+                return set(self.relational_jsons[table].original_columns)
+            else:
+                raise MultiTableException(f"Unrecognized table: `{table}`")
 
     def get_safe_ancestral_seed_columns(self, table: str) -> set[str]:
         safe_columns = self.graph.nodes[table]["metadata"].safe_ancestral_seed_columns
@@ -303,12 +572,39 @@ class RelationalData:
     def _clear_safe_ancestral_seed_columns(self, table: str) -> None:
         self.graph.nodes[table]["metadata"].safe_ancestral_seed_columns = None
 
-    def get_foreign_keys(self, table: str) -> List[ForeignKey]:
+    def _get_table_in_graph(self, table: str) -> str:
+        if table in self.relational_jsons:
+            table = self.relational_jsons[table].root_table_name
+        return table
+
+    def get_foreign_keys(
+        self, table: str, rename_invented_tables: bool = False
+    ) -> List[ForeignKey]:
+        def _rename_invented(fk: ForeignKey) -> ForeignKey:
+            table_name = fk.table_name
+            parent_table_name = fk.parent_table_name
+            if self._is_invented(table_name):
+                table_name = self.graph.nodes[table_name][
+                    "metadata"
+                ].invented_table_metadata.original_table_name
+            if self._is_invented(parent_table_name):
+                parent_table_name = self.graph.nodes[parent_table_name][
+                    "metadata"
+                ].invented_table_metadata.original_table_name
+            return replace(
+                fk, table_name=table_name, parent_table_name=parent_table_name
+            )
+
+        table = self._get_table_in_graph(table)
         foreign_keys = []
         for parent in self.get_parents(table):
             fks = self.graph.edges[table, parent]["via"]
             foreign_keys.extend(fks)
-        return foreign_keys
+
+        if rename_invented_tables:
+            return [_rename_invented(fk) for fk in foreign_keys]
+        else:
+            return foreign_keys
 
     def get_all_key_columns(self, table: str) -> List[str]:
         all_key_cols = []
@@ -319,14 +615,17 @@ class RelationalData:
 
     def debug_summary(self) -> Dict[str, Any]:
         max_depth = dag_longest_path_length(self.graph)
-        all_tables = self.list_all_tables()
-        table_count = len(all_tables)
+        public_table_count = len(self.list_all_tables(Scope.PUBLIC))
+        invented_table_count = len(self.list_all_tables(Scope.INVENTED))
+
+        all_tables = self.list_all_tables(Scope.ALL)
         total_foreign_key_count = 0
         tables = {}
         for table in all_tables:
             this_table_foreign_key_count = 0
             foreign_keys = []
-            for key in self.get_foreign_keys(table):
+            fk_lookup_table_name = self._get_table_in_graph(table)
+            for key in self.get_foreign_keys(fk_lookup_table_name):
                 total_foreign_key_count = total_foreign_key_count + 1
                 this_table_foreign_key_count = this_table_foreign_key_count + 1
                 foreign_keys.append(
@@ -337,67 +636,19 @@ class RelationalData:
                     }
                 )
             tables[table] = {
-                "column_count": len(self.get_table_data(table).columns),
+                "column_count": len(self.get_table_columns(table)),
                 "primary_key": self.get_primary_key(table),
                 "foreign_key_count": this_table_foreign_key_count,
                 "foreign_keys": foreign_keys,
+                "is_invented_table": self._is_invented(table),
             }
         return {
             "foreign_key_count": total_foreign_key_count,
             "max_depth": max_depth,
-            "table_count": table_count,
             "tables": tables,
+            "public_table_count": public_table_count,
+            "invented_table_count": invented_table_count,
         }
-
-    def as_dict(self, out_dir: str) -> Dict[str, Any]:
-        d = {"tables": {}, "foreign_keys": []}
-        for table in self.list_all_tables():
-            d["tables"][table] = {
-                "primary_key": self.get_primary_key(table),
-                "csv_path": f"{out_dir}/{table}.csv",
-            }
-            keys = [
-                {
-                    "table": table,
-                    "constrained_columns": key.columns,
-                    "referred_table": key.parent_table_name,
-                    "referred_columns": key.parent_columns,
-                }
-                for key in self.get_foreign_keys(table)
-            ]
-            d["foreign_keys"].extend(keys)
-        return d
-
-    def to_filesystem(self, out_dir: str) -> str:
-        d = self.as_dict(out_dir)
-        for table_name, details in d["tables"].items():
-            self.get_table_data(table_name).to_csv(details["csv_path"], index=False)
-        metadata_path = f"{out_dir}/metadata.json"
-        with open(metadata_path, "w") as metadata_file:
-            json.dump(d, metadata_file)
-        return metadata_path
-
-    @classmethod
-    def from_filesystem(cls, metadata_filepath: str) -> RelationalData:
-        with open(metadata_filepath, "r") as metadata_file:
-            d = json.load(metadata_file)
-        relational_data = RelationalData()
-
-        for table_name, details in d["tables"].items():
-            primary_key = details["primary_key"]
-            data = pd.read_csv(details["csv_path"])
-            relational_data.add_table(
-                name=table_name, primary_key=primary_key, data=data
-            )
-        for foreign_key in d["foreign_keys"]:
-            relational_data.add_foreign_key_constraint(
-                table=foreign_key["table"],
-                constrained_columns=foreign_key["constrained_columns"],
-                referred_table=foreign_key["referred_table"],
-                referred_columns=foreign_key["referred_columns"],
-            )
-
-        return relational_data
 
 
 def _ok_for_train_and_seed(col: str, df: pd.DataFrame) -> bool:

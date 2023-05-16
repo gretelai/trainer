@@ -32,7 +32,9 @@ from gretel_trainer.relational.core import (
     GretelModelConfig,
     MultiTableException,
     RelationalData,
+    Scope,
 )
+from gretel_trainer.relational.json import InventedTableMetadata, RelationalJson
 from gretel_trainer.relational.log import silent_logs
 from gretel_trainer.relational.model_config import (
     make_classify_config,
@@ -102,7 +104,7 @@ class MultiTable:
         self._synthetics_train = SyntheticsTrain()
         self._synthetics_run: Optional[SyntheticsRun] = None
         self.synthetic_output_tables: Dict[str, pd.DataFrame] = {}
-        self.evaluations = defaultdict(lambda: TableEvaluation())
+        self._evaluations = defaultdict(lambda: TableEvaluation())
 
         if backup is None:
             self._complete_fresh_init(project_display_name)
@@ -146,8 +148,17 @@ class MultiTable:
             tar.extractall(path=self._working_dir)
         for table_name, table_backup in backup.relational_data.tables.items():
             source_data = pd.read_csv(self._working_dir / f"source_{table_name}.csv")
-            self.relational_data.add_table(
-                name=table_name, primary_key=table_backup.primary_key, data=source_data
+            invented_table_metadata = None
+            if (imeta := table_backup.invented_table_metadata) is not None:
+                invented_table_metadata = InventedTableMetadata(
+                    invented_root_table_name=imeta["invented_root_table_name"],
+                    original_table_name=imeta["original_table_name"],
+                )
+            self.relational_data._add_single_table(
+                name=table_name,
+                primary_key=table_backup.primary_key,
+                data=source_data,
+                invented_table_metadata=invented_table_metadata,
             )
         for fk_backup in backup.relational_data.foreign_keys:
             self.relational_data.add_foreign_key_constraint(
@@ -156,6 +167,15 @@ class MultiTable:
                 referred_table=fk_backup.referred_table,
                 referred_columns=fk_backup.referred_columns,
             )
+        for key, rel_json_backup in backup.relational_data.relational_jsons.items():
+            relational_json = RelationalJson(
+                original_table_name=rel_json_backup.original_table_name,
+                original_primary_key=rel_json_backup.original_primary_key,
+                original_columns=rel_json_backup.original_columns,
+                original_data=None,
+                table_name_mappings=rel_json_backup.table_name_mappings,
+            )
+            self.relational_data.relational_jsons[key] = relational_json
 
         # Debug summary
         debug_summary_id = backup.artifact_collection.gretel_debug_summary
@@ -258,15 +278,16 @@ class MultiTable:
             if model.status == Status.COMPLETED
         ]
         for table in training_succeeded:
-            model = self._synthetics_train.models[table]
-            with silent_logs():
-                self._strategy.update_evaluation_from_model(
-                    table,
-                    self.evaluations,
-                    model,
-                    self._working_dir,
-                    self._extended_sdk,
-                )
+            if table in self.relational_data.list_all_tables(Scope.EVALUATABLE):
+                model = self._synthetics_train.models[table]
+                with silent_logs():
+                    self._strategy.update_evaluation_from_model(
+                        table,
+                        self._evaluations,
+                        model,
+                        self._working_dir,
+                        self._extended_sdk,
+                    )
 
         training_failed = [
             table
@@ -459,6 +480,16 @@ class MultiTable:
     def _hybrid(self) -> bool:
         return get_session_config().default_runner == RunnerMode.HYBRID
 
+    @property
+    def evaluations(self) -> dict[str, TableEvaluation]:
+        evaluations = defaultdict(lambda: TableEvaluation())
+
+        for table, evaluation in self._evaluations.items():
+            if (public_name := self.relational_data.get_public_name(table)) is not None:
+                evaluations[public_name] = evaluation
+
+        return evaluations
+
     def _set_refresh_interval(self, interval: Optional[int]) -> None:
         if interval is None:
             self._refresh_interval = 60
@@ -617,7 +648,9 @@ class MultiTable:
                 self.relational_data.update_table_data(table_name, transformed_table)
             self._upload_sources_to_project()
 
-        for table, df in output_tables.items():
+        reshaped_tables = self.relational_data.restore(output_tables)
+
+        for table, df in reshaped_tables.items():
             filename = f"transformed_{table}.csv"
             out_path = run_dir / filename
             df.to_csv(out_path, index=False)
@@ -629,7 +662,7 @@ class MultiTable:
             self._project, str(archive_path)
         )
         self._backup()
-        self.transform_output_tables = output_tables
+        self.transform_output_tables = reshaped_tables
 
     def _prepare_training_data(self, tables: List[str]) -> Dict[str, Path]:
         """
@@ -666,10 +699,15 @@ class MultiTable:
         run_task(task, self._extended_sdk)
 
         for table in task.completed:
-            model = self._synthetics_train.models[table]
-            self._strategy.update_evaluation_from_model(
-                table, self.evaluations, model, self._working_dir, self._extended_sdk
-            )
+            if table in self.relational_data.list_all_tables(Scope.EVALUATABLE):
+                model = self._synthetics_train.models[table]
+                self._strategy.update_evaluation_from_model(
+                    table,
+                    self._evaluations,
+                    model,
+                    self._working_dir,
+                    self._extended_sdk,
+                )
 
         # TODO: consider moving this to before running the task
         archive_path = self._working_dir / "synthetics_training.tar.gz"
@@ -712,7 +750,7 @@ class MultiTable:
     def _upload_sources_to_project(self) -> None:
         archive_path = self._working_dir / "source_tables.tar.gz"
         with tarfile.open(archive_path, "w:gz") as tar:
-            for table in self.relational_data.list_all_tables():
+            for table in self.relational_data.list_all_tables(Scope.ALL):
                 filename = f"source_{table}.csv"
                 out_path = self._working_dir / filename
                 df = self.relational_data.get_table_data(table)
@@ -799,7 +837,9 @@ class MultiTable:
             record_size_ratio=self._synthetics_run.record_size_ratio,
         )
 
-        for table, synth_df in output_tables.items():
+        reshaped_tables = self.relational_data.restore(output_tables)
+
+        for table, synth_df in reshaped_tables.items():
             synth_csv_path = run_dir / f"synth_{table}.csv"
             synth_df.to_csv(synth_csv_path, index=False)
 
@@ -809,6 +849,9 @@ class MultiTable:
         evaluate_models = {}
         for table, synth_df in output_tables.items():
             if table in self._synthetics_run.preserved:
+                continue
+
+            if table not in self.relational_data.list_all_tables(Scope.EVALUATABLE):
                 continue
 
             evaluate_data = self._strategy.get_evaluate_model_data(
@@ -832,11 +875,12 @@ class MultiTable:
         )
         run_task(synthetics_evaluate_task, self._extended_sdk)
 
+        # Tables passed to task were already scoped to evaluatable tables
         for table in synthetics_evaluate_task.completed:
             self._strategy.update_evaluation_from_evaluate(
                 table_name=table,
                 evaluate_model=evaluate_models[table],
-                evaluations=self.evaluations,
+                evaluations=self._evaluations,
                 working_dir=self._working_dir,
                 extended_sdk=self._extended_sdk,
             )
@@ -865,7 +909,7 @@ class MultiTable:
         self._artifact_collection.upload_synthetics_outputs_archive(
             self._project, str(archive_path)
         )
-        self.synthetic_output_tables = output_tables
+        self.synthetic_output_tables = reshaped_tables
         self._backup()
 
     def create_relational_report(self, run_identifier: str, target_dir: Path) -> None:
@@ -910,8 +954,8 @@ class MultiTable:
         individual_report_json = json.loads(smart_open.open(individual_path).read())
         cross_table_report_json = json.loads(smart_open.open(cross_table_path).read())
 
-        self.evaluations[table].individual_report_json = individual_report_json
-        self.evaluations[table].cross_table_report_json = cross_table_report_json
+        self._evaluations[table].individual_report_json = individual_report_json
+        self._evaluations[table].cross_table_report_json = cross_table_report_json
 
     def _validate_gretel_model(self, gretel_model: Optional[str]) -> Tuple[str, str]:
         gretel_model = (gretel_model or self._strategy.default_model).lower()

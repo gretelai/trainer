@@ -20,6 +20,11 @@ for root_handler in logging.root.handlers:
     logging.root.removeHandler(root_handler)
 
 
+def set_log_level(level: str):
+    logger = logging.getLogger(RELATIONAL)
+    logger.setLevel(level)
+
+
 @contextmanager
 def silent_logs():
     logger = logging.getLogger(RELATIONAL)
