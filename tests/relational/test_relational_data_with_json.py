@@ -234,7 +234,9 @@ def test_foreign_keys(documents):
     ]
 
     # Removing a foreign key from the source-with-JSON table updates the root invented table
-    documents.remove_foreign_key(table="purchases", constrained_columns=["user_id"])
+    documents.remove_foreign_key_constraint(
+        table="purchases", constrained_columns=["user_id"]
+    )
     assert documents.get_foreign_keys("purchases") == []
     assert documents.get_foreign_keys("purchases-sfx") == []
 
@@ -361,13 +363,13 @@ def test_update_data_existing_flat_to_json(documents):
     rel_data.add_table(
         name="payments", primary_key="id", data=documents.get_table_data("payments")
     )
-    rel_data.add_foreign_key(
+    rel_data.add_foreign_key_constraint(
         table="purchases",
         constrained_columns=["user_id"],
         referred_table="users",
         referred_columns=["id"],
     )
-    rel_data.add_foreign_key(
+    rel_data.add_foreign_key_constraint(
         table="payments",
         constrained_columns=["purchase_id"],
         referred_table="purchases",

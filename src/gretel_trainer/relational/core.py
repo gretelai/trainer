@@ -137,14 +137,14 @@ class RelationalData:
 
     def _add_rel_json_and_tables(self, table: str, rj_ingest: IngestResponseT) -> None:
         rel_json, commands = rj_ingest
-        add_tables, add_foreign_keys = commands
+        tables, foreign_keys = commands
 
         self.relational_jsons[table] = rel_json
 
-        for add_table in add_tables:
-            self._add_single_table(**add_table)
-        for add_foreign_key in add_foreign_keys:
-            self.add_foreign_key(**add_foreign_key)
+        for tbl in tables:
+            self._add_single_table(**tbl)
+        for foreign_key in foreign_keys:
+            self.add_foreign_key_constraint(**foreign_key)
 
     def _add_single_table(
         self,
@@ -193,7 +193,7 @@ class RelationalData:
 
             self._add_rel_json_and_tables(table, new_rj_ingest)
             for fk in original_fks:
-                self.add_foreign_key(
+                self.add_foreign_key_constraint(
                     table=fk.table_name,
                     constrained_columns=fk.columns,
                     referred_table=fk.parent_table_name,
@@ -386,7 +386,7 @@ class RelationalData:
                 )
                 parent_table_name = table
             for fk in original_fks:
-                self.add_foreign_key(
+                self.add_foreign_key_constraint(
                     table=fk.table_name,
                     constrained_columns=fk.columns,
                     referred_table=parent_table_name,
@@ -409,7 +409,7 @@ class RelationalData:
                 self.graph.remove_node(table)
                 self._add_rel_json_and_tables(table, new_rj_ingest)
                 for fk in original_foreign_keys:
-                    self.add_foreign_key(
+                    self.add_foreign_key_constraint(
                         table=fk.table_name,
                         constrained_columns=fk.columns,
                         referred_table=new_rj_ingest[0].root_table_name,
