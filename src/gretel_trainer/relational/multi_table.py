@@ -33,6 +33,7 @@ from gretel_trainer.relational.core import (
     MultiTableException,
     RelationalData,
     Scope,
+    skip_table,
 )
 from gretel_trainer.relational.json import InventedTableMetadata, RelationalJson
 from gretel_trainer.relational.log import silent_logs
@@ -557,7 +558,73 @@ class MultiTable:
         )
 
     def train_transform_models(self, configs: Dict[str, GretelModelConfig]) -> None:
+        """
+        DEPRECATED: Please use `train_transforms` instead.
+        """
+        logger.warning(
+            "This method is deprecated and will be removed in a future release. "
+            "Please use `train_transforms` instead."
+        )
+        use_configs = {}
         for table, config in configs.items():
+            for m_table in self.relational_data.get_modelable_table_names(table):
+                use_configs[m_table] = config
+
+        for table, config in use_configs.items():
+            transform_config = make_transform_config(
+                self.relational_data, table, config
+            )
+
+            # Ensure consistent, friendly data source names in Console
+            table_data = self.relational_data.get_table_data(table)
+            transforms_train_path = self._working_dir / f"transforms_train_{table}.csv"
+            table_data.to_csv(transforms_train_path, index=False)
+
+            # Create model
+            model = self._project.create_model_obj(
+                model_config=transform_config, data_source=str(transforms_train_path)
+            )
+            self._transforms_train.models[table] = model
+
+        self._backup()
+
+        task = TransformsTrainTask(
+            transforms_train=self._transforms_train,
+            multitable=self,
+        )
+        run_task(task, self._extended_sdk)
+
+    def train_transforms(
+        self,
+        config: GretelModelConfig,
+        *,
+        only: Optional[list[str]] = None,
+        ignore: Optional[list[str]] = None,
+    ) -> None:
+        if only is not None and ignore is not None:
+            raise MultiTableException("Cannot specify both `only` and `ignore`.")
+
+        if only is not None:
+            only = [
+                modelable_name
+                for table in only
+                for modelable_name in self.relational_data.get_modelable_table_names(
+                    table
+                )
+            ]
+        if ignore is not None:
+            ignore = [
+                modelable_name
+                for table in ignore
+                for modelable_name in self.relational_data.get_modelable_table_names(
+                    table
+                )
+            ]
+
+        for table in self.relational_data.list_all_tables():
+            if skip_table(table, only, ignore):
+                continue
+
             transform_config = make_transform_config(
                 self.relational_data, table, config
             )
