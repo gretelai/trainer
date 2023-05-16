@@ -456,6 +456,16 @@ class RelationalData:
             and self.graph.nodes[table]["metadata"].invented_table_metadata is not None
         )
 
+    def get_modelable_table_names(self, table: str) -> list[str]:
+        """Returns a list of MODELABLE table names connected to the provided table.
+        If the provided table is already modelable, returns [table].
+        If the provided table is not modelable (e.g. source with JSON) returns invented tables from that source.
+        """
+        if (rel_json := self.relational_jsons.get(table)) is not None:
+            return rel_json.table_names
+        else:
+            return [table]
+
     def get_public_name(self, table: str) -> Optional[str]:
         if table in self.relational_jsons:
             return table
