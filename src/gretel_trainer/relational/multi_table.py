@@ -605,31 +605,12 @@ class MultiTable:
         only: Optional[list[str]] = None,
         ignore: Optional[list[str]] = None,
     ) -> None:
-        if only is not None and ignore is not None:
-            raise MultiTableException("Cannot specify both `only` and `ignore`.")
-
-        m_only = None
-        if only is not None:
-            m_only = []
-            for table in only:
-                m_names = self.relational_data.get_modelable_table_names(table)
-                if len(m_names) == 0:
-                    raise MultiTableException(f"Unrecognized table name: `{table}`")
-                m_only.extend(m_names)
-
-        m_ignore = None
-        if ignore is not None:
-            m_ignore = []
-            for table in ignore:
-                m_names = self.relational_data.get_modelable_table_names(table)
-                if len(m_names) == 0:
-                    raise MultiTableException(f"Unrecognized table name: `{table}`")
-                m_ignore.extend(m_names)
+        only, ignore = self._get_only_and_ignore(only, ignore)
 
         configs = {
             table: config
             for table in self.relational_data.list_all_tables()
-            if not skip_table(table, m_only, m_ignore)
+            if not skip_table(table, only, ignore)
         }
 
         self._setup_transforms_train_state(configs)
@@ -722,6 +703,30 @@ class MultiTable:
         self._backup()
         self.transform_output_tables = reshaped_tables
 
+    def _get_only_and_ignore(
+        self, only: Optional[list[str]], ignore: Optional[list[str]]
+    ) -> tuple[Optional[list[str]], Optional[list[str]]]:
+        if only is not None and ignore is not None:
+            raise MultiTableException("Cannot specify both `only` and `ignore`.")
+
+        only_and_ignore = []
+
+        for given_tables in [only, ignore]:
+            if given_tables is None:
+                only_and_ignore.append(None)
+                continue
+
+            modelable_tables = []
+            for table in given_tables:
+                m_names = self.relational_data.get_modelable_table_names(table)
+                if len(m_names) == 0:
+                    raise MultiTableException(f"Unrecognized table name: `{table}`")
+                modelable_tables.extend(m_names)
+
+            only_and_ignore.append(modelable_tables)
+
+        return tuple(only_and_ignore)
+
     def _prepare_training_data(self, tables: list[str]) -> dict[str, Path]:
         """
         Exports a copy of each table prepared for training by the configured strategy
@@ -780,6 +785,22 @@ class MultiTable:
         tables = self.relational_data.list_all_tables()
         self._synthetics_train = SyntheticsTrain()
 
+        training_data = self._prepare_training_data(tables)
+        self._train_synthetics_models(training_data)
+
+    def train_synthetics(
+        self,
+        *,
+        only: Optional[list[str]] = None,
+        ignore: Optional[list[str]] = None,
+    ) -> None:
+        """Train synthetic data models on each table in the relational dataset"""
+        only, ignore = self._get_only_and_ignore(only, ignore)
+        tables = [
+            table
+            for table in self.relational_data.list_all_tables()
+            if not skip_table(table, only, ignore)
+        ]
         training_data = self._prepare_training_data(tables)
         self._train_synthetics_models(training_data)
 
