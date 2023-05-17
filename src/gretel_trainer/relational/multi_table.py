@@ -557,20 +557,10 @@ class MultiTable:
             self._project, str(archive_path)
         )
 
-    def train_transform_models(self, configs: Dict[str, GretelModelConfig]) -> None:
-        """
-        DEPRECATED: Please use `train_transforms` instead.
-        """
-        logger.warning(
-            "This method is deprecated and will be removed in a future release. "
-            "Please use `train_transforms` instead."
-        )
-        use_configs = {}
+    def _setup_transforms_train_state(
+        self, configs: dict[str, GretelModelConfig]
+    ) -> None:
         for table, config in configs.items():
-            for m_table in self.relational_data.get_modelable_table_names(table):
-                use_configs[m_table] = config
-
-        for table, config in use_configs.items():
             transform_config = make_transform_config(
                 self.relational_data, table, config
             )
@@ -588,6 +578,20 @@ class MultiTable:
 
         self._backup()
 
+    def train_transform_models(self, configs: dict[str, GretelModelConfig]) -> None:
+        """
+        DEPRECATED: Please use `train_transforms` instead.
+        """
+        logger.warning(
+            "This method is deprecated and will be removed in a future release. "
+            "Please use `train_transforms` instead."
+        )
+        use_configs = {}
+        for table, config in configs.items():
+            for m_table in self.relational_data.get_modelable_table_names(table):
+                use_configs[m_table] = config
+
+        self._setup_transforms_train_state(use_configs)
         task = TransformsTrainTask(
             transforms_train=self._transforms_train,
             multitable=self,
@@ -621,27 +625,13 @@ class MultiTable:
                 )
             ]
 
-        for table in self.relational_data.list_all_tables():
-            if skip_table(table, only, ignore):
-                continue
+        configs = {
+            table: config
+            for table in self.relational_data.list_all_tables()
+            if not skip_table(table, only, ignore)
+        }
 
-            transform_config = make_transform_config(
-                self.relational_data, table, config
-            )
-
-            # Ensure consistent, friendly data source names in Console
-            table_data = self.relational_data.get_table_data(table)
-            transforms_train_path = self._working_dir / f"transforms_train_{table}.csv"
-            table_data.to_csv(transforms_train_path, index=False)
-
-            # Create model
-            model = self._project.create_model_obj(
-                model_config=transform_config, data_source=str(transforms_train_path)
-            )
-            self._transforms_train.models[table] = model
-
-        self._backup()
-
+        self._setup_transforms_train_state(configs)
         task = TransformsTrainTask(
             transforms_train=self._transforms_train,
             multitable=self,
