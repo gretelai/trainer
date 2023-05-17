@@ -1,5 +1,5 @@
 import tempfile
-from unittest.mock import patch
+from unittest.mock import ANY, patch
 
 import pytest
 
@@ -35,12 +35,16 @@ def test_train_transforms_defaults_to_transforming_all_tables(ecom, tmpdir):
     assert set(transforms_train.models.keys()) == set(ecom.list_all_tables())
 
 
-def test_train_transforms_only_includes_specified_tables(ecom, tmpdir):
+def test_train_transforms_only_includes_specified_tables(ecom, tmpdir, project):
     mt = MultiTable(ecom, project_display_name=tmpdir)
-    mt.train_transforms("transform/default", only=["events", "users"])
+    mt.train_transforms("transform/default", only=["users"])
     transforms_train = mt._transforms_train
 
-    assert set(transforms_train.models.keys()) == {"events", "users"}
+    assert set(transforms_train.models.keys()) == {"users"}
+    project.create_model_obj.assert_called_with(
+        model_config=ANY,  # a tailored transforms config, in dict form
+        data_source=f"{tmpdir}/transforms_train_users.csv",
+    )
 
 
 def test_train_transforms_ignore_excludes_specified_tables(ecom, tmpdir):
