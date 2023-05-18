@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import asdict, dataclass
-from typing import Any, Dict, List, Optional
+from typing import Any, Optional
 
 from gretel_trainer.relational.artifacts import ArtifactCollection
 from gretel_trainer.relational.core import ForeignKey, RelationalData
@@ -9,16 +9,16 @@ from gretel_trainer.relational.core import ForeignKey, RelationalData
 
 @dataclass
 class BackupRelationalDataTable:
-    primary_key: List[str]
+    primary_key: list[str]
     invented_table_metadata: Optional[dict[str, str]] = None
 
 
 @dataclass
 class BackupForeignKey:
     table: str
-    constrained_columns: List[str]
+    constrained_columns: list[str]
     referred_table: str
-    referred_columns: List[str]
+    referred_columns: list[str]
 
     @classmethod
     def from_fk(cls, fk: ForeignKey) -> BackupForeignKey:
@@ -41,9 +41,9 @@ class BackupRelationalJson:
 
 @dataclass
 class BackupRelationalData:
-    tables: Dict[str, BackupRelationalDataTable]
-    foreign_keys: List[BackupForeignKey]
-    relational_jsons: Dict[str, BackupRelationalJson]
+    tables: dict[str, BackupRelationalDataTable]
+    foreign_keys: list[BackupForeignKey]
+    relational_jsons: dict[str, BackupRelationalJson]
 
     @classmethod
     def from_relational_data(cls, rel_data: RelationalData) -> BackupRelationalData:
@@ -80,30 +80,30 @@ class BackupRelationalData:
 
 @dataclass
 class BackupClassify:
-    model_ids: Dict[str, str]
+    model_ids: dict[str, str]
 
 
 @dataclass
 class BackupTransformsTrain:
-    model_ids: Dict[str, str]
-    lost_contact: List[str]
+    model_ids: dict[str, str]
+    lost_contact: list[str]
 
 
 @dataclass
 class BackupSyntheticsTrain:
-    model_ids: Dict[str, str]
-    lost_contact: List[str]
-    training_columns: Dict[str, List[str]]
+    model_ids: dict[str, str]
+    lost_contact: list[str]
+    training_columns: dict[str, list[str]]
 
 
 @dataclass
 class BackupGenerate:
     identifier: str
-    preserved: List[str]
+    preserved: list[str]
     record_size_ratio: float
-    record_handler_ids: Dict[str, str]
-    lost_contact: List[str]
-    missing_model: List[str]
+    record_handler_ids: dict[str, str]
+    lost_contact: list[str]
+    missing_model: list[str]
 
 
 @dataclass
@@ -125,7 +125,7 @@ class Backup:
         return asdict(self)
 
     @classmethod
-    def from_dict(cls, b: Dict[str, Any]):
+    def from_dict(cls, b: dict[str, Any]):
         relational_data = b["relational_data"]
         brd = BackupRelationalData(
             tables={

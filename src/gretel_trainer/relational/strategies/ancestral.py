@@ -1,6 +1,6 @@
 import logging
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Optional, Union
 
 import pandas as pd
 from gretel_client.projects.models import Model
@@ -24,17 +24,17 @@ class AncestralStrategy:
         return "amplify"
 
     @property
-    def supported_models(self) -> List[str]:
+    def supported_models(self) -> list[str]:
         return ["amplify"]
 
     def label_encode_keys(
-        self, rel_data: RelationalData, tables: Dict[str, pd.DataFrame]
-    ) -> Dict[str, pd.DataFrame]:
+        self, rel_data: RelationalData, tables: dict[str, pd.DataFrame]
+    ) -> dict[str, pd.DataFrame]:
         return common.label_encode_keys(rel_data, tables)
 
     def prepare_training_data(
         self, rel_data: RelationalData
-    ) -> Dict[str, pd.DataFrame]:
+    ) -> dict[str, pd.DataFrame]:
         """
         Returns tables with:
         - all safe-for-seed ancestor fields added
@@ -69,8 +69,8 @@ class AncestralStrategy:
         return training_data
 
     def tables_to_retrain(
-        self, tables: List[str], rel_data: RelationalData
-    ) -> List[str]:
+        self, tables: list[str], rel_data: RelationalData
+    ) -> list[str]:
         """
         Given a set of tables requested to retrain, returns those tables with all their
         descendants, because those descendant tables were trained with data from their
@@ -82,7 +82,7 @@ class AncestralStrategy:
         return list(retrain)
 
     def validate_preserved_tables(
-        self, tables: List[str], rel_data: RelationalData
+        self, tables: list[str], rel_data: RelationalData
     ) -> None:
         """
         Ensures that for every table marked as preserved, all its ancestors are also preserved.
@@ -104,9 +104,9 @@ class AncestralStrategy:
     def ready_to_generate(
         self,
         rel_data: RelationalData,
-        in_progress: List[str],
-        finished: List[str],
-    ) -> List[str]:
+        in_progress: list[str],
+        finished: list[str],
+    ) -> list[str]:
         """
         Tables with no parents are immediately ready for generation.
         Tables with parents are ready once their parents are finished.
@@ -131,10 +131,10 @@ class AncestralStrategy:
         table: str,
         rel_data: RelationalData,
         record_size_ratio: float,
-        output_tables: Dict[str, pd.DataFrame],
+        output_tables: dict[str, pd.DataFrame],
         target_dir: Path,
-        training_columns: List[str],
-    ) -> Dict[str, Any]:
+        training_columns: list[str],
+    ) -> dict[str, Any]:
         """
         Returns kwargs for creating a record handler job via the Gretel SDK.
 
@@ -158,10 +158,10 @@ class AncestralStrategy:
     def _build_seed_data_for_table(
         self,
         table: str,
-        output_tables: Dict[str, pd.DataFrame],
+        output_tables: dict[str, pd.DataFrame],
         rel_data: RelationalData,
         synth_size: int,
-        training_columns: List[str],
+        training_columns: list[str],
     ) -> pd.DataFrame:
         seed_df = pd.DataFrame()
 
@@ -219,7 +219,7 @@ class AncestralStrategy:
 
     def tables_to_skip_when_failed(
         self, table: str, rel_data: RelationalData
-    ) -> List[str]:
+    ) -> list[str]:
         return rel_data.get_descendants(table)
 
     def post_process_individual_synthetic_result(
@@ -265,11 +265,11 @@ class AncestralStrategy:
 
     def post_process_synthetic_results(
         self,
-        synth_tables: Dict[str, pd.DataFrame],
-        preserved: List[str],
+        synth_tables: dict[str, pd.DataFrame],
+        preserved: list[str],
         rel_data: RelationalData,
         record_size_ratio: float,
-    ) -> Dict[str, pd.DataFrame]:
+    ) -> dict[str, pd.DataFrame]:
         """
         Restores tables from multigenerational to original shape
         """
@@ -281,7 +281,7 @@ class AncestralStrategy:
     def update_evaluation_from_model(
         self,
         table_name: str,
-        evaluations: Dict[str, TableEvaluation],
+        evaluations: dict[str, TableEvaluation],
         model: Model,
         working_dir: Path,
         extended_sdk: ExtendedGretelSDK,
@@ -299,8 +299,8 @@ class AncestralStrategy:
         self,
         table_name: str,
         rel_data: RelationalData,
-        synthetic_tables: Dict[str, pd.DataFrame],
-    ) -> Optional[Dict[str, pd.DataFrame]]:
+        synthetic_tables: dict[str, pd.DataFrame],
+    ) -> Optional[dict[str, pd.DataFrame]]:
         return {
             "source": rel_data.get_table_data(table_name),
             "synthetic": synthetic_tables[table_name],
@@ -309,7 +309,7 @@ class AncestralStrategy:
     def update_evaluation_from_evaluate(
         self,
         table_name: str,
-        evaluations: Dict[str, TableEvaluation],
+        evaluations: dict[str, TableEvaluation],
         evaluate_model: Model,
         working_dir: Path,
         extended_sdk: ExtendedGretelSDK,
@@ -325,8 +325,8 @@ class AncestralStrategy:
 
 
 def _add_artifical_rows_for_seeding(
-    rel_data: RelationalData, tables: Dict[str, pd.DataFrame]
-) -> Dict[str, pd.DataFrame]:
+    rel_data: RelationalData, tables: dict[str, pd.DataFrame]
+) -> dict[str, pd.DataFrame]:
     # On each table, add an artifical row with the max possible PK value
     max_pk_values = {}
     for table_name, data in tables.items():
@@ -365,7 +365,7 @@ def _add_artifical_rows_for_seeding(
     return tables
 
 
-def _safe_inc(i: int, col: Union[List[Any], range]) -> int:
+def _safe_inc(i: int, col: Union[list, range]) -> int:
     i = i + 1
     if i == len(col):
         i = 0

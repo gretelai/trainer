@@ -1,7 +1,7 @@
 import logging
 import random
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Optional
 
 import pandas as pd
 from gretel_client.projects.models import Model
@@ -25,17 +25,17 @@ class IndependentStrategy:
         return "amplify"
 
     @property
-    def supported_models(self) -> List[str]:
+    def supported_models(self) -> list[str]:
         return ["amplify", "actgan", "lstm", "tabular-dp"]
 
     def label_encode_keys(
-        self, rel_data: RelationalData, tables: Dict[str, pd.DataFrame]
-    ) -> Dict[str, pd.DataFrame]:
+        self, rel_data: RelationalData, tables: dict[str, pd.DataFrame]
+    ) -> dict[str, pd.DataFrame]:
         return common.label_encode_keys(rel_data, tables)
 
     def prepare_training_data(
         self, rel_data: RelationalData
-    ) -> Dict[str, pd.DataFrame]:
+    ) -> dict[str, pd.DataFrame]:
         """
         Returns source tables with primary and foreign keys removed
         """
@@ -55,15 +55,15 @@ class IndependentStrategy:
         return training_data
 
     def tables_to_retrain(
-        self, tables: List[str], rel_data: RelationalData
-    ) -> List[str]:
+        self, tables: list[str], rel_data: RelationalData
+    ) -> list[str]:
         """
         Returns the provided tables requested to retrain, unaltered.
         """
         return tables
 
     def validate_preserved_tables(
-        self, tables: List[str], rel_data: RelationalData
+        self, tables: list[str], rel_data: RelationalData
     ) -> None:
         """
         No-op. Under this strategy, any collection of tables can be preserved.
@@ -80,9 +80,9 @@ class IndependentStrategy:
     def ready_to_generate(
         self,
         rel_data: RelationalData,
-        in_progress: List[str],
-        finished: List[str],
-    ) -> List[str]:
+        in_progress: list[str],
+        finished: list[str],
+    ) -> list[str]:
         """
         All tables are immediately ready for generation. Once they are
         at least in progress, they are no longer ready.
@@ -98,10 +98,10 @@ class IndependentStrategy:
         table: str,
         rel_data: RelationalData,
         record_size_ratio: float,
-        output_tables: Dict[str, pd.DataFrame],
+        output_tables: dict[str, pd.DataFrame],
         target_dir: Path,
-        training_columns: List[str],
-    ) -> Dict[str, Any]:
+        training_columns: list[str],
+    ) -> dict[str, Any]:
         """
         Returns kwargs for a record handler job requesting an output record
         count based on the initial table data size and the record size ratio.
@@ -112,7 +112,7 @@ class IndependentStrategy:
 
     def tables_to_skip_when_failed(
         self, table: str, rel_data: RelationalData
-    ) -> List[str]:
+    ) -> list[str]:
         return []
 
     def post_process_individual_synthetic_result(
@@ -130,11 +130,11 @@ class IndependentStrategy:
 
     def post_process_synthetic_results(
         self,
-        synth_tables: Dict[str, pd.DataFrame],
-        preserved: List[str],
+        synth_tables: dict[str, pd.DataFrame],
+        preserved: list[str],
         rel_data: RelationalData,
         record_size_ratio: float,
-    ) -> Dict[str, pd.DataFrame]:
+    ) -> dict[str, pd.DataFrame]:
         "Synthesizes primary and foreign keys"
         synth_tables = _synthesize_primary_keys(
             synth_tables, preserved, rel_data, record_size_ratio
@@ -145,7 +145,7 @@ class IndependentStrategy:
     def update_evaluation_from_model(
         self,
         table_name: str,
-        evaluations: Dict[str, TableEvaluation],
+        evaluations: dict[str, TableEvaluation],
         model: Model,
         working_dir: Path,
         extended_sdk: ExtendedGretelSDK,
@@ -163,8 +163,8 @@ class IndependentStrategy:
         self,
         table_name: str,
         rel_data: RelationalData,
-        synthetic_tables: Dict[str, pd.DataFrame],
-    ) -> Optional[Dict[str, pd.DataFrame]]:
+        synthetic_tables: dict[str, pd.DataFrame],
+    ) -> Optional[dict[str, pd.DataFrame]]:
         missing_ancestors = [
             ancestor
             for ancestor in rel_data.get_ancestors(table_name)
@@ -188,7 +188,7 @@ class IndependentStrategy:
     def update_evaluation_from_evaluate(
         self,
         table_name: str,
-        evaluations: Dict[str, TableEvaluation],
+        evaluations: dict[str, TableEvaluation],
         evaluate_model: Model,
         working_dir: Path,
         extended_sdk: ExtendedGretelSDK,
@@ -204,11 +204,11 @@ class IndependentStrategy:
 
 
 def _synthesize_primary_keys(
-    synth_tables: Dict[str, pd.DataFrame],
-    preserved: List[str],
+    synth_tables: dict[str, pd.DataFrame],
+    preserved: list[str],
     rel_data: RelationalData,
     record_size_ratio: float,
-) -> Dict[str, pd.DataFrame]:
+) -> dict[str, pd.DataFrame]:
     """
     Alters primary key columns on all tables *except* preserved.
     Assumes the primary key column is of type integer.
@@ -241,8 +241,8 @@ def _synthesize_primary_keys(
 
 
 def _synthesize_foreign_keys(
-    synth_tables: Dict[str, pd.DataFrame], rel_data: RelationalData
-) -> Dict[str, pd.DataFrame]:
+    synth_tables: dict[str, pd.DataFrame], rel_data: RelationalData
+) -> dict[str, pd.DataFrame]:
     """
     Alters foreign key columns on all tables (*including* those flagged as not to
     be synthesized to ensure joining to a synthesized parent table continues to work)
@@ -282,10 +282,10 @@ def _synthesize_foreign_keys(
 
 
 def _collect_values(
-    values: List[Any],
-    frequencies: List[int],
+    values: list,
+    frequencies: list[int],
     total: int,
-) -> List[Any]:
+) -> list:
     freqs = sorted(frequencies)
 
     # Loop through frequencies in ascending order,
@@ -312,7 +312,7 @@ def _collect_values(
     return new_values
 
 
-def _safe_inc(i: int, col: List[Any]) -> int:
+def _safe_inc(i: int, col: list) -> int:
     i = i + 1
     if i == len(col):
         i = 0

@@ -1,4 +1,3 @@
-from typing import List
 from unittest.mock import Mock, PropertyMock, patch
 
 import pytest
@@ -29,7 +28,7 @@ class MockTask:
         return Mock()
 
     @property
-    def table_collection(self) -> List[str]:
+    def table_collection(self) -> list[str]:
         return list(self.models.keys())
 
     def more_to_do(self) -> bool:

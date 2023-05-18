@@ -4,7 +4,7 @@ import shutil
 import tarfile
 import tempfile
 from pathlib import Path
-from typing import Dict, Optional
+from typing import Optional
 from unittest.mock import Mock, patch
 
 import pytest
@@ -64,9 +64,9 @@ def make_backup(
     rel_data: RelationalData,
     working_dir: Path,
     artifact_collection: ArtifactCollection,
-    transforms_models: Dict[str, Mock] = {},
-    synthetics_models: Dict[str, Mock] = {},
-    synthetics_record_handlers: Dict[str, Mock] = {},
+    transforms_models: dict[str, Mock] = {},
+    synthetics_models: dict[str, Mock] = {},
+    synthetics_record_handlers: dict[str, Mock] = {},
 ) -> b.Backup:
     backup = b.Backup(
         project_name="project_name",
@@ -117,11 +117,11 @@ def write_backup(backup: b.Backup, out_dir: Path) -> str:
 def create_backup(
     rel_data: RelationalData,
     working_dir: Path,
-    synthetics_models: Dict[str, Mock] = {},
-    synthetics_record_handlers: Dict[str, Mock] = {},
+    synthetics_models: dict[str, Mock] = {},
+    synthetics_record_handlers: dict[str, Mock] = {},
     training_archive_present: bool = False,
     output_archive_present: bool = False,
-    transforms_models: Dict[str, Mock] = {},
+    transforms_models: dict[str, Mock] = {},
 ) -> str:
     artifact_collection = ArtifactCollection(
         gretel_debug_summary=ARTIFACTS["debug_summary"]["artifact_id"],
@@ -176,7 +176,7 @@ def make_mock_download_tar_artifact(setup_path: Path, working_path: Path):
     return download_tar_artifact
 
 
-def make_mock_get_model(models: Dict[str, Mock]):
+def make_mock_get_model(models: dict[str, Mock]):
     def get_model(model_id):
         return models[model_id]
 
@@ -308,7 +308,7 @@ def configure_mocks(
     download_tar_artifact: Mock,
     setup_path: Path,
     working_path: Path,
-    models: Dict[str, Mock] = {},
+    models: dict[str, Mock] = {},
 ) -> None:
     project.get_artifact_link = make_mock_get_artifact_link(setup_path)
     project.get_model = make_mock_get_model(models)

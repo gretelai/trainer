@@ -1,6 +1,5 @@
 import logging
 from collections import defaultdict
-from typing import Dict, List
 
 from gretel_client.projects.jobs import END_STATES, Job, Status
 from gretel_client.projects.projects import Project
@@ -18,7 +17,7 @@ class Task(Protocol):
         ...
 
     @property
-    def table_collection(self) -> List[str]:
+    def table_collection(self) -> list[str]:
         ...
 
     @property
@@ -58,7 +57,7 @@ class Task(Protocol):
 
 
 def run_task(task: Task, extended_sdk: ExtendedGretelSDK) -> None:
-    refresh_attempts: Dict[str, int] = defaultdict(int)
+    refresh_attempts: dict[str, int] = defaultdict(int)
     first_pass = True
 
     while task.more_to_do():

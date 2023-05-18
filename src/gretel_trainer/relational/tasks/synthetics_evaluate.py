@@ -1,5 +1,3 @@
-from typing import Dict, List
-
 from gretel_client.projects.jobs import Job
 from gretel_client.projects.models import Model
 from gretel_client.projects.projects import Project
@@ -12,7 +10,7 @@ ACTION = "synthetic data evaluation"
 class SyntheticsEvaluateTask:
     def __init__(
         self,
-        evaluate_models: Dict[str, Model],
+        evaluate_models: dict[str, Model],
         project: Project,
         multitable: common._MultiTable,
     ):
@@ -26,7 +24,7 @@ class SyntheticsEvaluateTask:
         return ACTION
 
     @property
-    def table_collection(self) -> List[str]:
+    def table_collection(self) -> list[str]:
         return list(self.evaluate_models.keys())
 
     @property

@@ -1,7 +1,7 @@
 import tempfile
 from dataclasses import dataclass
 from pathlib import Path
-from typing import List, Optional, Union
+from typing import Optional, Union
 from unittest.mock import Mock, patch
 
 import pandas as pd
@@ -41,8 +41,8 @@ def tmpdir():
 def make_task(
     rel_data: RelationalData,
     run_dir: Path,
-    preserved: Optional[List[str]] = None,
-    missing_model: Optional[List[str]] = None,
+    preserved: Optional[list[str]] = None,
+    missing_model: Optional[list[str]] = None,
 ) -> SyntheticsRunTask:
     multitable = MockMultiTable(relational_data=rel_data)
     return SyntheticsRunTask(
