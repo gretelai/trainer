@@ -1,4 +1,4 @@
-from typing import Dict, List, Optional
+from typing import Optional
 
 import pandas as pd
 from gretel_client.projects.jobs import Job
@@ -13,15 +13,15 @@ ACTION = "transforms run"
 class TransformsRunTask:
     def __init__(
         self,
-        record_handlers: Dict[str, RecordHandler],
+        record_handlers: dict[str, RecordHandler],
         multitable: common._MultiTable,
     ):
         self.record_handlers = record_handlers
         self.multitable = multitable
-        self.working_tables: Dict[str, Optional[pd.DataFrame]] = {}
+        self.working_tables: dict[str, Optional[pd.DataFrame]] = {}
 
     @property
-    def output_tables(self) -> Dict[str, pd.DataFrame]:
+    def output_tables(self) -> dict[str, pd.DataFrame]:
         return {
             table: data
             for table, data in self.working_tables.items()
@@ -36,7 +36,7 @@ class TransformsRunTask:
         return self.multitable._project
 
     @property
-    def table_collection(self) -> List[str]:
+    def table_collection(self) -> list[str]:
         return list(self.record_handlers.keys())
 
     @property

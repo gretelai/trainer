@@ -1,5 +1,5 @@
 import re
-from typing import Dict, List, Optional, Tuple
+from typing import Optional
 
 import pandas as pd
 
@@ -13,7 +13,7 @@ _END_LINEAGE = "|"
 
 def get_multigenerational_primary_key(
     rel_data: RelationalData, table: str
-) -> List[str]:
+) -> list[str]:
     return [
         f"{_START_LINEAGE}{_END_LINEAGE}{pk}" for pk in rel_data.get_primary_key(table)
     ]
@@ -21,8 +21,8 @@ def get_multigenerational_primary_key(
 
 def get_ancestral_foreign_key_maps(
     rel_data: RelationalData, table: str
-) -> List[Tuple[str, str]]:
-    def _ancestral_fk_map(fk: ForeignKey) -> List[Tuple[str, str]]:
+) -> list[tuple[str, str]]:
+    def _ancestral_fk_map(fk: ForeignKey) -> list[tuple[str, str]]:
         maps = []
         fk_lineage = _COL_DELIMITER.join(fk.columns)
 
@@ -49,7 +49,7 @@ def get_ancestral_foreign_key_maps(
 def get_table_data_with_ancestors(
     rel_data: RelationalData,
     table: str,
-    tableset: Optional[Dict[str, pd.DataFrame]] = None,
+    tableset: Optional[dict[str, pd.DataFrame]] = None,
     ancestral_seeding: bool = False,
 ) -> pd.DataFrame:
     """
@@ -75,7 +75,7 @@ def _join_parents(
     df: pd.DataFrame,
     table: str,
     lineage: str,
-    tableset: Optional[Dict[str, pd.DataFrame]],
+    tableset: Optional[dict[str, pd.DataFrame]],
     ancestral_seeding: bool,
 ) -> pd.DataFrame:
     for foreign_key in rel_data.get_foreign_keys(table):
@@ -134,7 +134,7 @@ def drop_ancestral_data(df: pd.DataFrame) -> pd.DataFrame:
     return df[root_columns].rename(columns=mapper)
 
 
-def prepend_foreign_key_lineage(df: pd.DataFrame, fk_cols: List[str]) -> pd.DataFrame:
+def prepend_foreign_key_lineage(df: pd.DataFrame, fk_cols: list[str]) -> pd.DataFrame:
     """
     Given a multigenerational dataframe, renames all columns such that the provided
     foreign key columns act as the lineage from some child table to the provided data.

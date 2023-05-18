@@ -5,7 +5,7 @@ from contextlib import suppress
 from dataclasses import dataclass, replace
 from enum import Enum
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Optional, Union
 
 import networkx
 import pandas as pd
@@ -25,18 +25,18 @@ class MultiTableException(Exception):
     pass
 
 
-GretelModelConfig = Union[str, Path, Dict]
+GretelModelConfig = Union[str, Path, dict]
 
 
 @dataclass
 class ForeignKey:
     table_name: str
-    columns: List[str]
+    columns: list[str]
     parent_table_name: str
-    parent_columns: List[str]
+    parent_columns: list[str]
 
 
-UserFriendlyPrimaryKeyT = Optional[Union[str, List[str]]]
+UserFriendlyPrimaryKeyT = Optional[Union[str, list[str]]]
 
 
 class Scope(str, Enum):
@@ -234,7 +234,7 @@ class RelationalData:
 
         return original_data, original_primary_key, original_foreign_keys
 
-    def _format_key_column(self, key: Optional[Union[str, List[str]]]) -> List[str]:
+    def _format_key_column(self, key: Optional[Union[str, list[str]]]) -> list[str]:
         if key is None:
             return []
         elif isinstance(key, str):
@@ -265,9 +265,9 @@ class RelationalData:
         self,
         *,
         table: str,
-        constrained_columns: List[str],
+        constrained_columns: list[str],
         referred_table: str,
-        referred_columns: List[str],
+        referred_columns: list[str],
     ) -> None:
         """
         Add a foreign key relationship between two tables.
@@ -342,7 +342,7 @@ class RelationalData:
         )
 
     def remove_foreign_key_constraint(
-        self, table: str, constrained_columns: List[str]
+        self, table: str, constrained_columns: list[str]
     ) -> None:
         """
         Remove an existing foreign key.
@@ -420,7 +420,7 @@ class RelationalData:
                 metadata.columns = set(data.columns)
                 self._clear_safe_ancestral_seed_columns(table)
 
-    def list_all_tables(self, scope: Scope = Scope.MODELABLE) -> List[str]:
+    def list_all_tables(self, scope: Scope = Scope.MODELABLE) -> list[str]:
         modelable_nodes = self.graph.nodes
 
         json_source_tables = [
@@ -488,10 +488,10 @@ class RelationalData:
 
         return self.graph.nodes[table]["metadata"].invented_table_metadata
 
-    def get_parents(self, table: str) -> List[str]:
+    def get_parents(self, table: str) -> list[str]:
         return list(self.graph.successors(table))
 
-    def get_ancestors(self, table: str) -> List[str]:
+    def get_ancestors(self, table: str) -> list[str]:
         def _add_parents(ancestors, table):
             parents = self.get_parents(table)
             if len(parents) > 0:
@@ -504,7 +504,7 @@ class RelationalData:
 
         return list(ancestors)
 
-    def get_descendants(self, table: str) -> List[str]:
+    def get_descendants(self, table: str) -> list[str]:
         def _add_children(descendants, table):
             children = list(self.graph.predecessors(table))
             if len(children) > 0:
@@ -517,7 +517,7 @@ class RelationalData:
 
         return list(descendants)
 
-    def list_tables_parents_before_children(self) -> List[str]:
+    def list_tables_parents_before_children(self) -> list[str]:
         """
         Returns a list of all tables with the guarantee that a parent table
         appears before any of its children. No other guarantees about order
@@ -526,7 +526,7 @@ class RelationalData:
         """
         return list(reversed(list(topological_sort(self.graph))))
 
-    def get_primary_key(self, table: str) -> List[str]:
+    def get_primary_key(self, table: str) -> list[str]:
         try:
             return self.graph.nodes[table]["metadata"].primary_key
         except KeyError:
@@ -592,7 +592,7 @@ class RelationalData:
 
     def get_foreign_keys(
         self, table: str, rename_invented_tables: bool = False
-    ) -> List[ForeignKey]:
+    ) -> list[ForeignKey]:
         def _rename_invented(fk: ForeignKey) -> ForeignKey:
             table_name = fk.table_name
             parent_table_name = fk.parent_table_name
@@ -619,14 +619,14 @@ class RelationalData:
         else:
             return foreign_keys
 
-    def get_all_key_columns(self, table: str) -> List[str]:
+    def get_all_key_columns(self, table: str) -> list[str]:
         all_key_cols = []
         all_key_cols.extend(self.get_primary_key(table))
         for fk in self.get_foreign_keys(table):
             all_key_cols.extend(fk.columns)
         return all_key_cols
 
-    def debug_summary(self) -> Dict[str, Any]:
+    def debug_summary(self) -> dict[str, Any]:
         max_depth = dag_longest_path_length(self.graph)
         public_table_count = len(self.list_all_tables(Scope.PUBLIC))
         invented_table_count = len(self.list_all_tables(Scope.INVENTED))

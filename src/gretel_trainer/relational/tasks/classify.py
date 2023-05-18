@@ -1,6 +1,5 @@
 import shutil
 from pathlib import Path
-from typing import Dict, List
 
 import smart_open
 from gretel_client.projects.jobs import Job
@@ -16,7 +15,7 @@ class ClassifyTask:
     def __init__(
         self,
         classify: Classify,
-        data_sources: Dict[str, str],
+        data_sources: dict[str, str],
         all_rows: bool,
         multitable: common._MultiTable,
         out_dir: Path,
@@ -26,12 +25,12 @@ class ClassifyTask:
         self.all_rows = all_rows
         self.multitable = multitable
         self.out_dir = out_dir
-        self.classify_record_handlers: Dict[str, RecordHandler] = {}
+        self.classify_record_handlers: dict[str, RecordHandler] = {}
         self.completed_models = []
         self.failed_models = []
         self.completed_record_handlers = []
         self.failed_record_handlers = []
-        self.result_filepaths: Dict[str, Path] = {}
+        self.result_filepaths: dict[str, Path] = {}
 
     def action(self, job: Job) -> str:
         if self.all_rows:
@@ -51,7 +50,7 @@ class ClassifyTask:
         return 1
 
     @property
-    def table_collection(self) -> List[str]:
+    def table_collection(self) -> list[str]:
         return list(self.classify.models.keys())
 
     def more_to_do(self) -> bool:
@@ -74,11 +73,11 @@ class ClassifyTask:
         common.wait(duration)
 
     @property
-    def _finished_models(self) -> List[str]:
+    def _finished_models(self) -> list[str]:
         return self.completed_models + self.failed_models
 
     @property
-    def _finished_record_handlers(self) -> List[str]:
+    def _finished_record_handlers(self) -> list[str]:
         return self.completed_record_handlers + self.failed_record_handlers
 
     def is_finished(self, table: str) -> bool:

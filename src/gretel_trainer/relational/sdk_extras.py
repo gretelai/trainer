@@ -2,7 +2,7 @@ import logging
 import shutil
 from contextlib import suppress
 from pathlib import Path
-from typing import Any, Dict, Optional, Union
+from typing import Any, Optional, Union
 
 import pandas as pd
 import requests
@@ -36,7 +36,7 @@ class ExtendedGretelSDK:
             project.delete_artifact(job.data_source)
 
     def cautiously_refresh_status(
-        self, job: Job, key: str, refresh_attempts: Dict[str, int]
+        self, job: Job, key: str, refresh_attempts: dict[str, int]
     ) -> Status:
         try:
             job.refresh()
@@ -73,7 +73,7 @@ class ExtendedGretelSDK:
         except:
             logger.warning(f"Failed to download `{artifact_name}`")
 
-    def sqs_score_from_full_report(self, report: Dict[str, Any]) -> Optional[int]:
+    def sqs_score_from_full_report(self, report: dict[str, Any]) -> Optional[int]:
         with suppress(KeyError):
             for field_dict in report["summary"]:
                 if field_dict["field"] == "synthetic_data_quality_score":

@@ -10,7 +10,7 @@ from contextlib import suppress
 from dataclasses import replace
 from datetime import datetime
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple, Union
+from typing import Optional, Union
 
 import pandas as pd
 import smart_open
@@ -101,10 +101,10 @@ class MultiTable:
         self._latest_backup: Optional[Backup] = None
         self._classify = Classify()
         self._transforms_train = TransformsTrain()
-        self.transform_output_tables: Dict[str, pd.DataFrame] = {}
+        self.transform_output_tables: dict[str, pd.DataFrame] = {}
         self._synthetics_train = SyntheticsTrain()
         self._synthetics_run: Optional[SyntheticsRun] = None
-        self.synthetic_output_tables: Dict[str, pd.DataFrame] = {}
+        self.synthetic_output_tables: dict[str, pd.DataFrame] = {}
         self._evaluations = defaultdict(lambda: TableEvaluation())
 
         if backup is None:
@@ -643,7 +643,7 @@ class MultiTable:
         self,
         identifier: Optional[str] = None,
         in_place: bool = False,
-        data: Optional[Dict[str, pd.DataFrame]] = None,
+        data: Optional[dict[str, pd.DataFrame]] = None,
     ) -> None:
         """
         identifier: (str, optional): Unique string identifying a specific call to this method. Defaults to "transforms_" + current timestamp
@@ -682,7 +682,7 @@ class MultiTable:
             df.to_csv(transforms_run_path, index=False)
             transforms_run_paths[table] = transforms_run_path
 
-        transforms_record_handlers: Dict[str, RecordHandler] = {}
+        transforms_record_handlers: dict[str, RecordHandler] = {}
 
         for table_name, transforms_run_path in transforms_run_paths.items():
             model = self._transforms_train.models[table_name]
@@ -722,7 +722,7 @@ class MultiTable:
         self._backup()
         self.transform_output_tables = reshaped_tables
 
-    def _prepare_training_data(self, tables: List[str]) -> Dict[str, Path]:
+    def _prepare_training_data(self, tables: list[str]) -> dict[str, Path]:
         """
         Exports a copy of each table prepared for training by the configured strategy
         to the working directory. Returns a dict with table names as keys and Paths
@@ -740,7 +740,7 @@ class MultiTable:
 
         return training_paths
 
-    def _train_synthetics_models(self, training_data: Dict[str, Path]) -> None:
+    def _train_synthetics_models(self, training_data: dict[str, Path]) -> None:
         for table_name, training_csv in training_data.items():
             synthetics_config = make_synthetics_config(table_name, self._model_config)
             model = self._project.create_model_obj(
@@ -783,7 +783,7 @@ class MultiTable:
         training_data = self._prepare_training_data(tables)
         self._train_synthetics_models(training_data)
 
-    def retrain_tables(self, tables: Dict[str, pd.DataFrame]) -> None:
+    def retrain_tables(self, tables: dict[str, pd.DataFrame]) -> None:
         """
         Provide updated table data and retrain. This method overwrites the table data in the
         `RelationalData` instance. It should be used when initial training fails and source data
@@ -822,7 +822,7 @@ class MultiTable:
     def generate(
         self,
         record_size_ratio: float = 1.0,
-        preserve_tables: Optional[List[str]] = None,
+        preserve_tables: Optional[list[str]] = None,
         identifier: Optional[str] = None,
         resume: bool = False,
     ) -> None:
@@ -982,7 +982,7 @@ class MultiTable:
             html_content = ReportRenderer().render(presenter)
             report.write(html_content)
 
-    def _list_tables_with_missing_models(self) -> List[str]:
+    def _list_tables_with_missing_models(self) -> list[str]:
         missing_model = set()
         for table in self.relational_data.list_all_tables():
             if not _table_trained_successfully(self._synthetics_train, table):
@@ -1015,7 +1015,7 @@ class MultiTable:
         self._evaluations[table].individual_report_json = individual_report_json
         self._evaluations[table].cross_table_report_json = cross_table_report_json
 
-    def _validate_gretel_model(self, gretel_model: Optional[str]) -> Tuple[str, str]:
+    def _validate_gretel_model(self, gretel_model: Optional[str]) -> tuple[str, str]:
         gretel_model = (gretel_model or self._strategy.default_model).lower()
         supported_models = self._strategy.supported_models
         if gretel_model not in supported_models:

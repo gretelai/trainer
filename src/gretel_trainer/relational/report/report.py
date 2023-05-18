@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from functools import cached_property
 from math import ceil
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple
+from typing import Optional
 
 import plotly.graph_objects as go
 from jinja2 import Environment, FileSystemLoader
@@ -34,8 +34,8 @@ class ReportRenderer:
 @dataclass
 class ReportTableData:
     table: str
-    pk: List[str]
-    fks: List[ForeignKey]
+    pk: list[str]
+    fks: list[ForeignKey]
 
 
 @dataclass
@@ -43,7 +43,7 @@ class ReportPresenter:
     rel_data: RelationalData
     now: datetime.datetime
     run_identifier: str
-    evaluations: Dict[str, TableEvaluation]
+    evaluations: dict[str, TableEvaluation]
 
     @property
     def generated_at(self) -> str:
@@ -54,7 +54,7 @@ class ReportPresenter:
         return self.now.strftime("%Y")
 
     @cached_property
-    def composite_sqs_score_and_grade(self) -> Tuple[Optional[int], str]:
+    def composite_sqs_score_and_grade(self) -> tuple[Optional[int], str]:
         # Add up all the non-None SQS scores and track how many there are.
         _total_score = 0
         _num_scores = 0
@@ -85,7 +85,7 @@ class ReportPresenter:
         return gauge_and_needle_chart(score)
 
     @cached_property
-    def composite_ppl_score_and_grade(self) -> Tuple[Optional[int], str]:
+    def composite_ppl_score_and_grade(self) -> tuple[Optional[int], str]:
         # Collect all the non-None PPLs, individual and cross-table.
         scores = [
             eval.individual_ppl
@@ -133,7 +133,7 @@ class ReportPresenter:
         )
 
     @property
-    def report_table_data(self) -> List[ReportTableData]:
+    def report_table_data(self) -> list[ReportTableData]:
         table_data = []
         for table in self.rel_data.list_all_tables(Scope.PUBLIC):
             pk = self.rel_data.get_primary_key(table)

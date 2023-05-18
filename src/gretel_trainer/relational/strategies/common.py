@@ -3,7 +3,7 @@ import logging
 import math
 import random
 from pathlib import Path
-from typing import Dict, List, Optional, Set, Tuple
+from typing import Optional
 
 import pandas as pd
 import smart_open
@@ -29,7 +29,7 @@ def download_artifacts(
         extended_sdk.download_file_artifact(model, artifact_name, out_path)
 
 
-def read_report_json_data(model: Model, report_path: Path) -> Optional[Dict]:
+def read_report_json_data(model: Model, report_path: Path) -> Optional[dict]:
     full_path = f"{report_path}.json"
     try:
         return json.loads(smart_open.open(full_path).read())
@@ -37,7 +37,7 @@ def read_report_json_data(model: Model, report_path: Path) -> Optional[Dict]:
         return _get_report_json(model)
 
 
-def _get_report_json(model: Model) -> Optional[Dict]:
+def _get_report_json(model: Model) -> Optional[dict]:
     try:
         return json.loads(
             smart_open.open(model.get_artifact_link("report_json")).read()
@@ -48,8 +48,8 @@ def _get_report_json(model: Model) -> Optional[Dict]:
 
 
 def label_encode_keys(
-    rel_data: RelationalData, tables: Dict[str, pd.DataFrame]
-) -> Dict[str, pd.DataFrame]:
+    rel_data: RelationalData, tables: dict[str, pd.DataFrame]
+) -> dict[str, pd.DataFrame]:
     """
     Crawls tables for all key columns (primary and foreign). For each PK (and FK columns referencing it),
     runs all values through a LabelEncoder and updates tables' columns to use LE-transformed values.
@@ -61,7 +61,7 @@ def label_encode_keys(
 
         for primary_key_column in rel_data.get_primary_key(table_name):
             # Get a set of the tables and columns in `tables` referencing this PK
-            fk_references: Set[Tuple[str, str]] = set()
+            fk_references: set[tuple[str, str]] = set()
             for descendant in rel_data.get_descendants(table_name):
                 if tables.get(descendant) is None:
                     continue
@@ -104,10 +104,10 @@ def label_encode_keys(
 def make_composite_pk_columns(
     table_name: str,
     rel_data: RelationalData,
-    primary_key: List[str],
+    primary_key: list[str],
     synth_row_count: int,
     record_size_ratio: float,
-) -> List[Tuple]:
+) -> list[tuple]:
     source_pk_columns = rel_data.get_table_data(table_name)[primary_key]
     unique_counts = source_pk_columns.nunique(axis=0)
     new_key_columns_values = []
@@ -125,5 +125,5 @@ def make_composite_pk_columns(
     return list(zip(*results))
 
 
-def get_frequencies(table_data: pd.DataFrame, cols: List[str]) -> List[int]:
+def get_frequencies(table_data: pd.DataFrame, cols: list[str]) -> list[int]:
     return list(table_data.groupby(cols).size().reset_index()[0])

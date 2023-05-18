@@ -1,5 +1,3 @@
-from typing import List
-
 from gretel_client.projects.jobs import Job
 from gretel_client.projects.projects import Project
 
@@ -28,7 +26,7 @@ class TransformsTrainTask:
         return self.multitable._project
 
     @property
-    def table_collection(self) -> List[str]:
+    def table_collection(self) -> list[str]:
         return list(self.transforms_train.models.keys())
 
     @property

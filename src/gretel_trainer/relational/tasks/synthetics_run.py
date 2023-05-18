@@ -1,6 +1,6 @@
 import logging
 from pathlib import Path
-from typing import Dict, List, Optional
+from typing import Optional
 
 import pandas as pd
 from gretel_client.projects.jobs import ACTIVE_STATES, Job
@@ -29,7 +29,7 @@ class SyntheticsRunTask:
         self.multitable = multitable
         self.working_tables = self._setup_working_tables()
 
-    def _setup_working_tables(self) -> Dict[str, Optional[pd.DataFrame]]:
+    def _setup_working_tables(self) -> dict[str, Optional[pd.DataFrame]]:
         working_tables = {}
 
         for table in self.synthetics_run.missing_model:
@@ -43,7 +43,7 @@ class SyntheticsRunTask:
         return working_tables
 
     @property
-    def output_tables(self) -> Dict[str, pd.DataFrame]:
+    def output_tables(self) -> dict[str, pd.DataFrame]:
         return {
             table: data
             for table, data in self.working_tables.items()
@@ -58,7 +58,7 @@ class SyntheticsRunTask:
         return self.multitable._project
 
     @property
-    def table_collection(self) -> List[str]:
+    def table_collection(self) -> list[str]:
         return list(self.synthetics_run.record_handlers.keys())
 
     @property
@@ -157,7 +157,7 @@ class SyntheticsRunTask:
         self.multitable._backup()
 
     @property
-    def _all_tables(self) -> List[str]:
+    def _all_tables(self) -> list[str]:
         return self.multitable.relational_data.list_all_tables()
 
     def _fail_table(self, table: str) -> None:
@@ -176,7 +176,7 @@ def _log_skipping(skip: str, failed_parent: str) -> None:
 
 
 def _table_is_in_progress(
-    record_handlers: Dict[str, RecordHandler], table: str
+    record_handlers: dict[str, RecordHandler], table: str
 ) -> bool:
     in_progress = False
 

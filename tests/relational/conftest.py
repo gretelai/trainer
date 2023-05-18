@@ -1,6 +1,5 @@
 import sqlite3
 from pathlib import Path
-from typing import Tuple
 from unittest.mock import Mock, patch
 
 import pandas as pd
@@ -106,18 +105,18 @@ def trips() -> RelationalData:
 
 
 @pytest.fixture()
-def source_nba() -> Tuple[RelationalData, pd.DataFrame, pd.DataFrame, pd.DataFrame]:
+def source_nba() -> tuple[RelationalData, pd.DataFrame, pd.DataFrame, pd.DataFrame]:
     return _setup_nba(synthetic=False)
 
 
 @pytest.fixture()
-def synthetic_nba() -> Tuple[RelationalData, pd.DataFrame, pd.DataFrame, pd.DataFrame]:
+def synthetic_nba() -> tuple[RelationalData, pd.DataFrame, pd.DataFrame, pd.DataFrame]:
     return _setup_nba(synthetic=True)
 
 
 def _setup_nba(
     synthetic: bool,
-) -> Tuple[RelationalData, pd.DataFrame, pd.DataFrame, pd.DataFrame]:
+) -> tuple[RelationalData, pd.DataFrame, pd.DataFrame, pd.DataFrame]:
     if synthetic:
         states = ["PA", "FL"]
         cities = ["Philadelphia", "Miami"]

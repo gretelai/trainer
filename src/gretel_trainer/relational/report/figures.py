@@ -1,5 +1,5 @@
 import math
-from typing import List, Optional
+from typing import Optional
 
 import plotly.graph_objects as go
 
@@ -55,7 +55,7 @@ def _generate_pointer_path(score: int):
 def gauge_and_needle_chart(
     score: Optional[int],
     display_score: bool = True,
-    marker_colors: Optional[List[str]] = None,
+    marker_colors: Optional[list[str]] = None,
 ) -> go.Figure:
     """
     The 'fancy' gauge and needle chart to go with the overall score of the report.  Has colored segments for
