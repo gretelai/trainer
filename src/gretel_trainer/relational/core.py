@@ -456,6 +456,19 @@ class RelationalData:
             and self.graph.nodes[table]["metadata"].invented_table_metadata is not None
         )
 
+    def get_modelable_table_names(self, table: str) -> list[str]:
+        """Returns a list of MODELABLE table names connected to the provided table.
+        If the provided table is already modelable, returns [table].
+        If the provided table is not modelable (e.g. source with JSON), returns tables invented from that source.
+        If the provided table does not exist, returns empty list.
+        """
+        if (rel_json := self.relational_jsons.get(table)) is not None:
+            return rel_json.table_names
+        elif table not in self.list_all_tables(Scope.ALL):
+            return []
+        else:
+            return [table]
+
     def get_public_name(self, table: str) -> Optional[str]:
         if table in self.relational_jsons:
             return table
@@ -649,6 +662,18 @@ class RelationalData:
             "public_table_count": public_table_count,
             "invented_table_count": invented_table_count,
         }
+
+
+def skip_table(
+    table: str, only: Optional[list[str]], ignore: Optional[list[str]]
+) -> bool:
+    skip = False
+    if only is not None and table not in only:
+        skip = True
+    if ignore is not None and table in ignore:
+        skip = True
+
+    return skip
 
 
 def _ok_for_train_and_seed(col: str, df: pd.DataFrame) -> bool:

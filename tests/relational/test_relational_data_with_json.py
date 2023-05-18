@@ -108,6 +108,23 @@ def test_list_tables_accepts_various_scopes(documents):
     )
 
 
+def test_get_modelable_table_names(documents):
+    # Given a source-with-JSON name, returns the tables invented from that source
+    assert set(documents.get_modelable_table_names("purchases")) == {
+        "purchases-sfx",
+        "purchases-data-years-sfx",
+    }
+
+    # Invented tables are modelable
+    assert documents.get_modelable_table_names("purchases-sfx") == ["purchases-sfx"]
+    assert documents.get_modelable_table_names("purchases-data-years-sfx") == [
+        "purchases-data-years-sfx"
+    ]
+
+    # Unknown tables return empty list
+    assert documents.get_modelable_table_names("nonsense") == []
+
+
 def test_invented_json_column_names(documents, bball):
     # The root invented table adds columns for dictionary properties lifted from nested JSON objects
     assert set(documents.get_table_columns("purchases-sfx")) == {

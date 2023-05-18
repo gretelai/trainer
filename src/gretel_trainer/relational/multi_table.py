@@ -33,6 +33,7 @@ from gretel_trainer.relational.core import (
     MultiTableException,
     RelationalData,
     Scope,
+    skip_table,
 )
 from gretel_trainer.relational.json import InventedTableMetadata, RelationalJson
 from gretel_trainer.relational.log import silent_logs
@@ -556,7 +557,9 @@ class MultiTable:
             self._project, str(archive_path)
         )
 
-    def train_transform_models(self, configs: Dict[str, GretelModelConfig]) -> None:
+    def _setup_transforms_train_state(
+        self, configs: dict[str, GretelModelConfig]
+    ) -> None:
         for table, config in configs.items():
             transform_config = make_transform_config(
                 self.relational_data, table, config
@@ -575,6 +578,61 @@ class MultiTable:
 
         self._backup()
 
+    def train_transform_models(self, configs: dict[str, GretelModelConfig]) -> None:
+        """
+        DEPRECATED: Please use `train_transforms` instead.
+        """
+        logger.warning(
+            "This method is deprecated and will be removed in a future release. "
+            "Please use `train_transforms` instead."
+        )
+        use_configs = {}
+        for table, config in configs.items():
+            for m_table in self.relational_data.get_modelable_table_names(table):
+                use_configs[m_table] = config
+
+        self._setup_transforms_train_state(use_configs)
+        task = TransformsTrainTask(
+            transforms_train=self._transforms_train,
+            multitable=self,
+        )
+        run_task(task, self._extended_sdk)
+
+    def train_transforms(
+        self,
+        config: GretelModelConfig,
+        *,
+        only: Optional[list[str]] = None,
+        ignore: Optional[list[str]] = None,
+    ) -> None:
+        if only is not None and ignore is not None:
+            raise MultiTableException("Cannot specify both `only` and `ignore`.")
+
+        m_only = None
+        if only is not None:
+            m_only = []
+            for table in only:
+                m_names = self.relational_data.get_modelable_table_names(table)
+                if len(m_names) == 0:
+                    raise MultiTableException(f"Unrecognized table name: `{table}`")
+                m_only.extend(m_names)
+
+        m_ignore = None
+        if ignore is not None:
+            m_ignore = []
+            for table in ignore:
+                m_names = self.relational_data.get_modelable_table_names(table)
+                if len(m_names) == 0:
+                    raise MultiTableException(f"Unrecognized table name: `{table}`")
+                m_ignore.extend(m_names)
+
+        configs = {
+            table: config
+            for table in self.relational_data.list_all_tables()
+            if not skip_table(table, m_only, m_ignore)
+        }
+
+        self._setup_transforms_train_state(configs)
         task = TransformsTrainTask(
             transforms_train=self._transforms_train,
             multitable=self,

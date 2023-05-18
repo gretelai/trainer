@@ -1,12 +1,16 @@
 import logging
-from typing import Dict, List, Optional, Tuple
+from typing import Optional
 
 import pandas as pd
 from sqlalchemy import create_engine, inspect
 from sqlalchemy.engine.base import Engine
 from sqlalchemy.exc import OperationalError
 
-from gretel_trainer.relational.core import MultiTableException, RelationalData
+from gretel_trainer.relational.core import (
+    MultiTableException,
+    RelationalData,
+    skip_table,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -38,7 +42,7 @@ class Connector:
         logger.info("Successfully connected to db")
 
     def extract(
-        self, only: Optional[List[str]] = None, ignore: Optional[List[str]] = None
+        self, only: Optional[list[str]] = None, ignore: Optional[list[str]] = None
     ) -> RelationalData:
         """
         Extracts table data and relationships from the database.
@@ -50,17 +54,17 @@ class Connector:
         inspector = inspect(self.engine)
 
         relational_data = RelationalData()
-        foreign_keys: List[Tuple[str, dict]] = []
+        foreign_keys: list[tuple[str, dict]] = []
 
         for table_name in inspector.get_table_names():
-            if _skip_table(table_name, only, ignore):
+            if skip_table(table_name, only, ignore):
                 continue
 
             logger.debug(f"Extracting source data from `{table_name}`")
             df = pd.read_sql_table(table_name, self.engine)
             primary_key = inspector.get_pk_constraint(table_name)["constrained_columns"]
             for fk in inspector.get_foreign_keys(table_name):
-                if _skip_table(fk["referred_table"], only, ignore):
+                if skip_table(fk["referred_table"], only, ignore):
                     continue
                 else:
                     foreign_keys.append((table_name, fk))
@@ -78,23 +82,11 @@ class Connector:
 
         return relational_data
 
-    def save(self, tables: Dict[str, pd.DataFrame], prefix: str = "") -> None:
+    def save(self, tables: dict[str, pd.DataFrame], prefix: str = "") -> None:
         for name, data in tables.items():
             data.to_sql(
                 f"{prefix}{name}", con=self.engine, if_exists="replace", index=False
             )
-
-
-def _skip_table(
-    table: str, only: Optional[List[str]], ignore: Optional[List[str]]
-) -> bool:
-    skip = False
-    if only is not None and table not in only:
-        skip = True
-    if ignore is not None and table in ignore:
-        skip = True
-
-    return skip
 
 
 def sqlite_conn(path: str) -> Connector:
