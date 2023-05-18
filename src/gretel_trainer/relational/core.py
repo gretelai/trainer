@@ -465,7 +465,6 @@ class RelationalData:
         if (rel_json := self.relational_jsons.get(table)) is not None:
             return rel_json.table_names
         elif table not in self.list_all_tables(Scope.ALL):
-            logger.warning(f"Unrecognized table name: `{table}`")
             return []
         else:
             return [table]

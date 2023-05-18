@@ -3,6 +3,7 @@ from unittest.mock import ANY, patch
 
 import pytest
 
+from gretel_trainer.relational.core import MultiTableException
 from gretel_trainer.relational.multi_table import MultiTable
 
 
@@ -58,6 +59,16 @@ def test_train_transforms_ignore_excludes_specified_tables(ecom, tmpdir):
         "order_items",
         "inventory_items",
     }
+
+
+def test_train_transforms_exits_early_if_unrecognized_tables(ecom, tmpdir, project):
+    mt = MultiTable(ecom, project_display_name=tmpdir)
+    with pytest.raises(MultiTableException):
+        mt.train_transforms("transform/default", ignore=["nonsense"])
+    transforms_train = mt._transforms_train
+
+    assert len(transforms_train.models) == 0
+    project.create_model_obj.assert_not_called()
 
 
 # The public method under test here is deprecated

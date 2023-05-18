@@ -608,27 +608,28 @@ class MultiTable:
         if only is not None and ignore is not None:
             raise MultiTableException("Cannot specify both `only` and `ignore`.")
 
+        m_only = None
         if only is not None:
-            only = [
-                modelable_name
-                for table in only
-                for modelable_name in self.relational_data.get_modelable_table_names(
-                    table
-                )
-            ]
+            m_only = []
+            for table in only:
+                m_names = self.relational_data.get_modelable_table_names(table)
+                if len(m_names) == 0:
+                    raise MultiTableException(f"Unrecognized table name: `{table}`")
+                m_only.extend(m_names)
+
+        m_ignore = None
         if ignore is not None:
-            ignore = [
-                modelable_name
-                for table in ignore
-                for modelable_name in self.relational_data.get_modelable_table_names(
-                    table
-                )
-            ]
+            m_ignore = []
+            for table in ignore:
+                m_names = self.relational_data.get_modelable_table_names(table)
+                if len(m_names) == 0:
+                    raise MultiTableException(f"Unrecognized table name: `{table}`")
+                m_ignore.extend(m_names)
 
         configs = {
             table: config
             for table in self.relational_data.list_all_tables()
-            if not skip_table(table, only, ignore)
+            if not skip_table(table, m_only, m_ignore)
         }
 
         self._setup_transforms_train_state(configs)
