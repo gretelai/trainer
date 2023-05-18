@@ -460,9 +460,13 @@ class RelationalData:
         """Returns a list of MODELABLE table names connected to the provided table.
         If the provided table is already modelable, returns [table].
         If the provided table is not modelable (e.g. source with JSON), returns tables invented from that source.
+        If the provided table does not exist, returns empty list.
         """
         if (rel_json := self.relational_jsons.get(table)) is not None:
             return rel_json.table_names
+        elif table not in self.list_all_tables(Scope.ALL):
+            logger.warning(f"Unrecognized table name: `{table}`")
+            return []
         else:
             return [table]
 

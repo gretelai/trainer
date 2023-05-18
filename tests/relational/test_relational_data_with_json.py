@@ -121,6 +121,9 @@ def test_get_modelable_table_names(documents):
         "purchases-data-years-sfx"
     ]
 
+    # Unknown tables return empty list
+    assert documents.get_modelable_table_names("nonsense") == []
+
 
 def test_invented_json_column_names(documents, bball):
     # The root invented table adds columns for dictionary properties lifted from nested JSON objects
