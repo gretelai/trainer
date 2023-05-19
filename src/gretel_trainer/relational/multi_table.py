@@ -776,6 +776,13 @@ class MultiTable:
             )
             self._synthetics_train.models[table_name] = model
 
+        archive_path = self._working_dir / "synthetics_training.tar.gz"
+        for table_name, csv_path in training_data.items():
+            add_to_tar(archive_path, csv_path, csv_path.name)
+        self._artifact_collection.upload_synthetics_training_archive(
+            self._project, str(archive_path)
+        )
+
         self._backup()
 
         task = SyntheticsTrainTask(
@@ -794,14 +801,6 @@ class MultiTable:
                     self._working_dir,
                     self._extended_sdk,
                 )
-
-        # TODO: consider moving this to before running the task
-        archive_path = self._working_dir / "synthetics_training.tar.gz"
-        for table_name, csv_path in training_data.items():
-            add_to_tar(archive_path, csv_path, csv_path.name)
-        self._artifact_collection.upload_synthetics_training_archive(
-            self._project, str(archive_path)
-        )
 
     def train(self) -> None:
         """Train synthetic data models on each table in the relational dataset"""
