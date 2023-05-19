@@ -43,6 +43,7 @@ class AncestralStrategy:
         - artificial min/max seed records added
         """
         all_tables = rel_data.list_all_tables()
+        omitted_tables = [t for t in all_tables if t not in tables]
         altered_tableset = {}
         training_data = {}
 
@@ -51,10 +52,10 @@ class AncestralStrategy:
             altered_tableset[table_name] = rel_data.get_table_data(table_name).copy()
 
         # Translate all keys to a contiguous list of integers
-        altered_tableset = common.label_encode_keys(rel_data, altered_tableset)
+        altered_tableset = common.label_encode_keys(rel_data, altered_tableset, omit=omitted_tables)
 
         # Add artificial rows to support seeding
-        altered_tableset = _add_artifical_rows_for_seeding(rel_data, altered_tableset)
+        altered_tableset = _add_artifical_rows_for_seeding(rel_data, altered_tableset, omitted_tables)
 
         # Collect all data in multigenerational format
         for table_name in tables:
@@ -326,11 +327,14 @@ class AncestralStrategy:
 
 
 def _add_artifical_rows_for_seeding(
-    rel_data: RelationalData, tables: dict[str, pd.DataFrame]
+    rel_data: RelationalData, tables: dict[str, pd.DataFrame], omitted: list[str]
 ) -> dict[str, pd.DataFrame]:
     # On each table, add an artifical row with the max possible PK value
+    # unless the table is omitted from synthetics
     max_pk_values = {}
     for table_name, data in tables.items():
+        if table_name in omitted:
+            continue
         max_pk_values[table_name] = len(data) * 50
 
         random_record = tables[table_name].sample().copy()
@@ -344,6 +348,10 @@ def _add_artifical_rows_for_seeding(
         if len(foreign_keys) == 0:
             continue
 
+        # Skip if the parent table is omitted and is the only parent
+        if len(foreign_keys) == 1 and foreign_keys[0].parent_table_name in omitted:
+            continue
+
         two_records = tables[table_name].sample(2)
         min_fk_record = two_records.head(1).copy()
         max_fk_record = two_records.tail(1).copy()
@@ -355,6 +363,9 @@ def _add_artifical_rows_for_seeding(
 
         # This can potentially overwrite the auto-incremented primary keys above in the case of composite keys
         for foreign_key in foreign_keys:
+            # Treat FK columns to omitted parents as normal columns
+            if foreign_key.parent_table_name in omitted:
+                continue
             for fk_col in foreign_key.columns:
                 min_fk_record[fk_col] = 0
                 max_fk_record[fk_col] = max_pk_values[foreign_key.parent_table_name]

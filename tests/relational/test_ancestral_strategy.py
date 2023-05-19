@@ -33,9 +33,13 @@ def test_preparing_training_data_does_not_mutate_source_data(pets, art):
 def test_prepare_training_data_subset_of_tables(pets):
     strategy = AncestralStrategy()
 
-    training_data = strategy.prepare_training_data(pets, ["humans"])
+    # We aren't synthesizing the "humans" table, so it is not in the list argument
+    training_data = strategy.prepare_training_data(pets, ["pets"])
 
-    assert set(training_data.keys()) == {"humans"}
+    assert set(training_data.keys()) == {"pets"}
+    assert set(training_data["pets"]["self|human_id"].values) == {
+        1, 2, 3, 4, 5
+    }
 
 
 def test_prepare_training_data_returns_multigenerational_data(pets):
