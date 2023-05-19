@@ -130,10 +130,6 @@ def test_backup():
             "customer": "1234567890",
             "address": "0987654321",
         },
-        training_columns={
-            "customer": ["id", "first", "last"],
-            "address": ["customer_id", "street", "city"],
-        },
         lost_contact=[],
     )
     backup_generate = BackupGenerate(

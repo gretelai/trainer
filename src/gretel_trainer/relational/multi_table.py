@@ -251,9 +251,6 @@ class MultiTable:
             with tarfile.open(synthetics_training_archive_path, "r:gz") as tar:
                 tar.extractall(path=self._working_dir)
 
-        self._synthetics_train.training_columns = (
-            backup_synthetics_train.training_columns
-        )
         self._synthetics_train.lost_contact = backup_synthetics_train.lost_contact
         self._synthetics_train.models = {
             table: self._project.get_model(model_id)
@@ -458,7 +455,6 @@ class MultiTable:
                     for table, model in self._synthetics_train.models.items()
                 },
                 lost_contact=self._synthetics_train.lost_contact,
-                training_columns=self._synthetics_train.training_columns,
             )
 
         # Generate
@@ -544,8 +540,6 @@ class MultiTable:
             if (model := state.models.get(table)) is not None:
                 model.delete()
                 del state.models[table]
-                if isinstance(state, SyntheticsTrain):
-                    del state.training_columns[table]
 
     def classify(self, config: GretelModelConfig, all_rows: bool = False) -> None:
         classify_data_sources = {}
@@ -765,8 +759,6 @@ class MultiTable:
         to the CSVs as values.
         """
         training_data = self._strategy.prepare_training_data(self.relational_data)
-        for table, df in training_data.items():
-            self._synthetics_train.training_columns[table] = list(df.columns)
         training_paths = {}
 
         for table_name in tables:
@@ -853,7 +845,6 @@ class MultiTable:
         for table in tables_to_retrain:
             with suppress(KeyError):
                 del self._synthetics_train.models[table]
-                del self._synthetics_train.training_columns[table]
         training_data = self._prepare_training_data(tables_to_retrain)
         self._train_synthetics_models(training_data)
 

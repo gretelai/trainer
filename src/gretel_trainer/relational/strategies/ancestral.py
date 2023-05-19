@@ -133,7 +133,6 @@ class AncestralStrategy:
         record_size_ratio: float,
         output_tables: dict[str, pd.DataFrame],
         target_dir: Path,
-        training_columns: list[str],
     ) -> dict[str, Any]:
         """
         Returns kwargs for creating a record handler job via the Gretel SDK.
@@ -149,7 +148,7 @@ class AncestralStrategy:
             return {"params": {"num_records": synth_size}}
         else:
             seed_df = self._build_seed_data_for_table(
-                table, output_tables, rel_data, synth_size, training_columns
+                table, output_tables, rel_data, synth_size
             )
             seed_path = target_dir / f"synthetics_seed_{table}.csv"
             seed_df.to_csv(seed_path, index=False)
@@ -161,8 +160,8 @@ class AncestralStrategy:
         output_tables: dict[str, pd.DataFrame],
         rel_data: RelationalData,
         synth_size: int,
-        training_columns: list[str],
     ) -> pd.DataFrame:
+        column_legend = ancestry.get_seed_safe_multigenerational_columns(rel_data)
         seed_df = pd.DataFrame()
 
         source_data = rel_data.get_table_data(table)
@@ -202,7 +201,9 @@ class AncestralStrategy:
 
             # Drop any columns that weren't used in training, as well as the temporary merge column
             columns_to_drop = [
-                col for col in this_fk_seed_df.columns if col not in training_columns
+                col
+                for col in this_fk_seed_df.columns
+                if col not in column_legend[table]
             ]
             columns_to_drop.append(tmp_column_name)
             this_fk_seed_df = this_fk_seed_df.drop(columns=columns_to_drop)

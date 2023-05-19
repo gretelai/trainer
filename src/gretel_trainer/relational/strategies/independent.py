@@ -100,7 +100,6 @@ class IndependentStrategy:
         record_size_ratio: float,
         output_tables: dict[str, pd.DataFrame],
         target_dir: Path,
-        training_columns: list[str],
     ) -> dict[str, Any]:
         """
         Returns kwargs for a record handler job requesting an output record

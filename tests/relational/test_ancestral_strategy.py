@@ -339,28 +339,11 @@ def test_table_generation_readiness(ecom):
 def test_generation_job(pets):
     strategy = AncestralStrategy()
 
-    training_columns = {
-        "humans": [
-            "self|id",
-            "self|name",
-            "self|city",
-        ],
-        "pets": [
-            "self|id",
-            "self|name",
-            "self|age",
-            "self|human_id",
-            "self.human_id|id",
-            # "self.human_id|name", # highly unique categorical
-            "self.human_id|city",
-        ],
-    }
-
     # Table with no ancestors
     with tempfile.TemporaryDirectory() as tmp:
         working_dir = Path(tmp)
         parent_table_job = strategy.get_generation_job(
-            "humans", pets, 2.0, {}, working_dir, training_columns["humans"]
+            "humans", pets, 2.0, {}, working_dir
         )
         assert len(os.listdir(working_dir)) == 0
         assert parent_table_job == {"params": {"num_records": 10}}
@@ -389,7 +372,7 @@ def test_generation_job(pets):
     with tempfile.TemporaryDirectory() as tmp:
         working_dir = Path(tmp)
         child_table_job = strategy.get_generation_job(
-            "pets", pets, 2.0, output_tables, working_dir, training_columns["pets"]
+            "pets", pets, 2.0, output_tables, working_dir
         )
 
         assert len(os.listdir(working_dir)) == 1
@@ -429,29 +412,6 @@ def test_generation_job_seeds_go_back_multiple_generations(source_nba, synthetic
         "cities": ancestry.get_table_data_with_ancestors(synthetic_nba, "cities"),
         "states": ancestry.get_table_data_with_ancestors(synthetic_nba, "states"),
     }
-    training_columns = {
-        "teams": [
-            "self|name",
-            "self|id",
-            "self|city_id",
-            "self.city_id|id",
-            "self.city_id|state_id",
-            # "self.city_id|name", # highly unique categorical
-            "self.city_id.state_id|id",
-            # "self.city_id.state_id|name", # highly unique categorical
-        ],
-        "cities": [
-            "self|id",
-            "self|state_id",
-            # "self|name", # highly unique categorical
-            "self.state_id|id",
-            # "self.state_id|name", # highly unique categorical
-        ],
-        "states": [
-            "self|id",
-            "self|name",
-        ],
-    }
 
     strategy = AncestralStrategy()
 
@@ -463,7 +423,6 @@ def test_generation_job_seeds_go_back_multiple_generations(source_nba, synthetic
             1.0,
             output_tables,
             working_dir,
-            training_columns["teams"],
         )
         seed_df = pd.read_csv(job["data_source"])
 

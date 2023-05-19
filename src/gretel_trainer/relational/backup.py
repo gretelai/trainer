@@ -93,7 +93,6 @@ class BackupTransformsTrain:
 class BackupSyntheticsTrain:
     model_ids: dict[str, str]
     lost_contact: list[str]
-    training_columns: dict[str, list[str]]
 
 
 @dataclass

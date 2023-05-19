@@ -46,6 +46,23 @@ def get_ancestral_foreign_key_maps(
     ]
 
 
+def get_seed_safe_multigenerational_columns(
+    rel_data: RelationalData,
+) -> dict[str, list[str]]:
+    tableset = {
+        table: pd.DataFrame(columns=list(rel_data.get_table_columns(table)))
+        for table in rel_data.list_all_tables()
+    }
+    return {
+        table: list(
+            get_table_data_with_ancestors(
+                rel_data, table, tableset, ancestral_seeding=True
+            ).columns
+        )
+        for table in rel_data.list_all_tables()
+    }
+
+
 def get_table_data_with_ancestors(
     rel_data: RelationalData,
     table: str,
@@ -93,10 +110,9 @@ def _join_parents(
             parent_data = tableset[parent_table_name][list(usecols)]
         else:
             parent_data = rel_data.get_table_data(parent_table_name, usecols=usecols)
-        parent_data = parent_data.add_prefix(f"{next_lineage}{_END_LINEAGE}")
 
         df = df.merge(
-            parent_data,
+            parent_data.add_prefix(f"{next_lineage}{_END_LINEAGE}"),
             how="left",
             left_on=[f"{lineage}{_END_LINEAGE}{col}" for col in foreign_key.columns],
             right_on=[

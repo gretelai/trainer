@@ -139,7 +139,6 @@ class SyntheticsRunTask:
                 self.synthetics_run.record_size_ratio,
                 present_working_tables,
                 self.run_dir,
-                self.synthetics_train.training_columns[table_name],
             )
             model = self.synthetics_train.models[table_name]
             record_handler = model.create_record_handler_obj(**table_job)

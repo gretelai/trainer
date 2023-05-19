@@ -187,3 +187,57 @@ def test_prepend_foreign_key_lineage(ecom):
         "self.inventory_item_id.product_id.distribution_center_id|id",
         "self.inventory_item_id.product_id.distribution_center_id|name",
     }
+
+
+def test_get_seed_safe_multigenerational_columns_1(pets):
+    table_cols = ancestry.get_seed_safe_multigenerational_columns(pets)
+
+    expected = {
+        "humans": {"self|id", "self|name", "self|city"},
+        "pets": {
+            "self|id",
+            "self|name",
+            "self|age",
+            "self|human_id",
+            "self.human_id|id",
+            # "self.human_id|name", # highly unique categorical
+            "self.human_id|city",
+        },
+    }
+
+    assert set(table_cols.keys()) == set(expected.keys())
+    for table, expected_cols in expected.items():
+        assert set(table_cols[table]) == expected_cols
+
+
+def test_get_seed_safe_multigenerational_columns_2(source_nba):
+    source_nba = source_nba[0]
+    table_cols = ancestry.get_seed_safe_multigenerational_columns(source_nba)
+
+    expected = {
+        "teams": {
+            "self|name",
+            "self|id",
+            "self|city_id",
+            "self.city_id|id",
+            "self.city_id|state_id",
+            # "self.city_id|name", # highly unique categorical
+            "self.city_id.state_id|id",
+            # "self.city_id.state_id|name", # highly unique categorical
+        },
+        "cities": {
+            "self|id",
+            "self|state_id",
+            "self|name",
+            "self.state_id|id",
+            # "self.state_id|name", # highly unique categorical
+        },
+        "states": {
+            "self|id",
+            "self|name",
+        },
+    }
+
+    assert set(table_cols.keys()) == set(expected.keys())
+    for table, expected_cols in expected.items():
+        assert set(table_cols[table]) == expected_cols

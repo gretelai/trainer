@@ -55,10 +55,6 @@ def make_task(
             record_size_ratio=1.0,
         ),
         synthetics_train=SyntheticsTrain(
-            training_columns={
-                table: list(rel_data.get_table_data(table).columns)
-                for table in rel_data.list_all_tables()
-            },
             models={
                 table: Mock(create_record_handler=Mock())
                 for table in rel_data.list_all_tables()
