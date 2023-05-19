@@ -33,7 +33,7 @@ class AncestralStrategy:
         return common.label_encode_keys(rel_data, tables)
 
     def prepare_training_data(
-        self, rel_data: RelationalData
+        self, rel_data: RelationalData, tables: list[str]
     ) -> dict[str, pd.DataFrame]:
         """
         Returns tables with:
@@ -57,7 +57,7 @@ class AncestralStrategy:
         altered_tableset = _add_artifical_rows_for_seeding(rel_data, altered_tableset)
 
         # Collect all data in multigenerational format
-        for table_name in all_tables:
+        for table_name in tables:
             data = ancestry.get_table_data_with_ancestors(
                 rel_data=rel_data,
                 table=table_name,

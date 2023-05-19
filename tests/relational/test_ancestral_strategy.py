@@ -22,7 +22,7 @@ def test_preparing_training_data_does_not_mutate_source_data(pets, art):
         }
 
         strategy = AncestralStrategy()
-        strategy.prepare_training_data(rel_data)
+        strategy.prepare_training_data(rel_data, rel_data.list_all_tables())
 
         for table in rel_data.list_all_tables():
             pdtest.assert_frame_equal(
@@ -30,10 +30,18 @@ def test_preparing_training_data_does_not_mutate_source_data(pets, art):
             )
 
 
+def test_prepare_training_data_subset_of_tables(pets):
+    strategy = AncestralStrategy()
+
+    training_data = strategy.prepare_training_data(pets, ["humans"])
+
+    assert set(training_data.keys()) == {"humans"}
+
+
 def test_prepare_training_data_returns_multigenerational_data(pets):
     strategy = AncestralStrategy()
 
-    training_data = strategy.prepare_training_data(pets)
+    training_data = strategy.prepare_training_data(pets, pets.list_all_tables())
 
     for expected_column in ["self|id", "self|name", "self.human_id|id"]:
         assert expected_column in training_data["pets"]
@@ -61,7 +69,7 @@ def test_prepare_training_data_drops_highly_unique_categorical_ancestor_fields(a
     )
 
     strategy = AncestralStrategy()
-    training_data = strategy.prepare_training_data(art)
+    training_data = strategy.prepare_training_data(art, art.list_all_tables())
 
     # Does not contain `self.artist_id|name` because it is highly unique categorical
     assert set(training_data["paintings"].columns) == {
@@ -100,7 +108,7 @@ def test_prepare_training_data_drops_highly_nan_ancestor_fields(art):
     )
 
     strategy = AncestralStrategy()
-    training_data = strategy.prepare_training_data(art)
+    training_data = strategy.prepare_training_data(art, art.list_all_tables())
 
     # Does not contain `self.artist_id|name` because it is highly NaN
     assert set(training_data["paintings"].columns) == {
@@ -115,7 +123,7 @@ def test_prepare_training_data_translates_alphanumeric_keys_and_adds_min_max_rec
     art,
 ):
     strategy = AncestralStrategy()
-    training_data = strategy.prepare_training_data(art)
+    training_data = strategy.prepare_training_data(art, art.list_all_tables())
 
     # Artists, a parent table, should have 1 additional row
     assert len(training_data["artists"]) == len(art.get_table_data("artists")) + 1
@@ -142,7 +150,7 @@ def test_prepare_training_data_translates_alphanumeric_keys_and_adds_min_max_rec
 
 def test_prepare_training_data_with_composite_keys(tpch):
     strategy = AncestralStrategy()
-    training_data = strategy.prepare_training_data(tpch)
+    training_data = strategy.prepare_training_data(tpch, tpch.list_all_tables())
 
     l_max = len(tpch.get_table_data("lineitem")) * 50
     ps_max = len(tpch.get_table_data("partsupp")) * 50

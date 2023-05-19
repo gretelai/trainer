@@ -19,7 +19,7 @@ def test_preparing_training_data_does_not_mutate_source_data(pets, art):
         }
 
         strategy = IndependentStrategy()
-        strategy.prepare_training_data(rel_data)
+        strategy.prepare_training_data(rel_data, rel_data.list_all_tables())
 
         for table in rel_data.list_all_tables():
             pdtest.assert_frame_equal(
@@ -30,9 +30,17 @@ def test_preparing_training_data_does_not_mutate_source_data(pets, art):
 def test_prepare_training_data_removes_primary_and_foreign_keys(pets):
     strategy = IndependentStrategy()
 
-    training_data = strategy.prepare_training_data(pets)
+    training_data = strategy.prepare_training_data(pets, pets.list_all_tables())
 
     assert set(training_data["pets"].columns) == {"name", "age"}
+
+
+def test_prepare_training_data_subset_of_tables(pets):
+    strategy = IndependentStrategy()
+
+    training_data = strategy.prepare_training_data(pets, ["humans"])
+
+    assert set(training_data.keys()) == {"humans"}
 
 
 def test_retraining_a_set_of_tables_only_retrains_those_tables(ecom):
