@@ -3,7 +3,7 @@ from pathlib import Path
 from typing import Optional
 
 import pandas as pd
-from gretel_client.projects.jobs import ACTIVE_STATES, Job
+from gretel_client.projects.jobs import ACTIVE_STATES, Job, Status
 from gretel_client.projects.projects import Project
 from gretel_client.projects.records import RecordHandler
 
@@ -31,14 +31,19 @@ class SyntheticsRunTask:
 
     def _setup_working_tables(self) -> dict[str, Optional[pd.DataFrame]]:
         working_tables = {}
+        all_tables = self.multitable.relational_data.list_all_tables()
 
-        for table in self.synthetics_run.missing_model:
-            working_tables[table] = None
+        for table in all_tables:
+            model = self.synthetics_train.models.get(table)
 
-        for table in self.synthetics_run.preserved:
-            working_tables[table] = self.multitable._strategy.get_preserved_data(
-                table, self.multitable.relational_data
-            )
+            if model is None or table in self.synthetics_run.preserved:
+                working_tables[table] = self.multitable._strategy.get_preserved_data(
+                    table, self.multitable.relational_data
+                )
+
+            elif model.status != Status.COMPLETED:
+                # model failed to train
+                working_tables[table] = None
 
         return working_tables
 

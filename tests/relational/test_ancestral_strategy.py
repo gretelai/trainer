@@ -33,13 +33,17 @@ def test_preparing_training_data_does_not_mutate_source_data(pets, art):
 def test_prepare_training_data_subset_of_tables(pets):
     strategy = AncestralStrategy()
 
-    # We aren't synthesizing the "humans" table, so it is not in the list argument
+    # We aren't synthesizing the "humans" table, so it is not in this list argument...
     training_data = strategy.prepare_training_data(pets, ["pets"])
-
+    # ...nor do we create training data for it
     assert set(training_data.keys()) == {"pets"}
-    assert set(training_data["pets"]["self|human_id"].values) == {
-        1, 2, 3, 4, 5
-    }
+
+    # Since the humans table is omitted from synthetics, we leave the FK values alone; specifically:
+    # - they are not label-encoded (which would effectively zero-index them)
+    # - we do not add artificial min/max values
+    assert set(training_data["pets"]["self|human_id"].values) == {1, 2, 3, 4, 5}
+    # We do add the artificial max PK row, though, since this table is being synthesized
+    assert len(training_data["pets"]) == 6
 
 
 def test_prepare_training_data_returns_multigenerational_data(pets):

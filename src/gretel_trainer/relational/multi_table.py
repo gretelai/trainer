@@ -336,7 +336,6 @@ class MultiTable:
             identifier=backup_generate.identifier,
             record_size_ratio=backup_generate.record_size_ratio,
             preserved=backup_generate.preserved,
-            missing_model=backup_generate.missing_model,
             lost_contact=backup_generate.lost_contact,
             record_handlers=record_handlers,
         )
@@ -463,7 +462,6 @@ class MultiTable:
                 identifier=self._synthetics_run.identifier,
                 record_size_ratio=self._synthetics_run.record_size_ratio,
                 preserved=self._synthetics_run.preserved,
-                missing_model=self._synthetics_run.missing_model,
                 lost_contact=self._synthetics_run.lost_contact,
                 record_handler_ids={
                     table: rh.record_id
@@ -820,12 +818,24 @@ class MultiTable:
     ) -> None:
         """Train synthetic data models on each table in the relational dataset"""
         only, ignore = self._get_only_and_ignore(only, ignore)
-        tables = [
-            table
-            for table in self.relational_data.list_all_tables()
-            if not skip_table(table, only, ignore)
-        ]
-        training_data = self._prepare_training_data(tables)
+
+        all_tables = self.relational_data.list_all_tables()
+        include_tables = []
+        omit_tables = []
+        for table in all_tables:
+            if skip_table(table, only, ignore):
+                omit_tables.append(table)
+            else:
+                include_tables.append(table)
+
+        # TODO: Ancestral strategy requires that for each table omitted from synthetics ("preserved"),
+        # all its ancestors must also be omitted. In the future, it'd be nice to either find a way to
+        # eliminate this requirement completely, or (less ideal) allow incremental training of tables,
+        # e.g. train a few in one "batch", then a few more before generating (perhaps with some logs
+        # here informing the user of which required tables are missing).
+        self._strategy.validate_preserved_tables(omit_tables, self.relational_data)
+
+        training_data = self._prepare_training_data(include_tables)
         self._train_synthetics_models(training_data)
 
     def retrain_tables(self, tables: dict[str, pd.DataFrame]) -> None:
@@ -905,18 +915,23 @@ class MultiTable:
             logger.info(f"Resuming synthetics run `{self._synthetics_run.identifier}`")
         else:
             preserve_tables = preserve_tables or []
+            preserve_tables.extend(
+                [
+                    table
+                    for table in self.relational_data.list_all_tables()
+                    if table not in self._synthetics_train.models
+                ]
+            )
             self._strategy.validate_preserved_tables(
                 preserve_tables, self.relational_data
             )
 
             identifier = identifier or f"synthetics_{_timestamp()}"
-            missing_model = self._list_tables_with_missing_models()
 
             self._synthetics_run = SyntheticsRun(
                 identifier=identifier,
                 record_size_ratio=record_size_ratio,
                 preserved=preserve_tables,
-                missing_model=missing_model,
                 record_handlers={},
                 lost_contact=[],
             )
@@ -951,6 +966,9 @@ class MultiTable:
         evaluate_models = {}
         for table, synth_df in output_tables.items():
             if table in self._synthetics_run.preserved:
+                continue
+
+            if table not in self._synthetics_train.models:
                 continue
 
             if table not in self.relational_data.list_all_tables(Scope.EVALUATABLE):
@@ -1026,21 +1044,6 @@ class MultiTable:
             html_content = ReportRenderer().render(presenter)
             report.write(html_content)
 
-    def _list_tables_with_missing_models(self) -> list[str]:
-        missing_model = set()
-        for table in self.relational_data.list_all_tables():
-            if not _table_trained_successfully(self._synthetics_train, table):
-                logger.info(
-                    f"Skipping synthetic data generation for `{table}` because it does not have a trained model"
-                )
-                missing_model.add(table)
-                for descendant in self.relational_data.get_descendants(table):
-                    logger.info(
-                        f"Skipping synthetic data generation for `{descendant}` because it depends on `{table}`"
-                    )
-                    missing_model.add(table)
-        return list(missing_model)
-
     def _attach_existing_reports(self, run_id: str, table: str) -> None:
         individual_path = (
             self._working_dir
@@ -1090,9 +1093,7 @@ def _validate_strategy(strategy: str) -> Union[IndependentStrategy, AncestralStr
         raise MultiTableException(msg)
 
 
-def _table_trained_successfully(
-    train_state: Union[TransformsTrain, SyntheticsTrain], table: str
-) -> bool:
+def _table_trained_successfully(train_state: TransformsTrain, table: str) -> bool:
     model = train_state.models.get(table)
     if model is None:
         return False

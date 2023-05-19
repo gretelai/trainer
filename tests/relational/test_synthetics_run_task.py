@@ -7,6 +7,7 @@ from unittest.mock import Mock, patch
 import pandas as pd
 import pandas.testing as pdtest
 import pytest
+from gretel_client.projects.jobs import Status
 from gretel_client.projects.projects import Project
 
 from gretel_trainer.relational.core import RelationalData
@@ -42,8 +43,15 @@ def make_task(
     rel_data: RelationalData,
     run_dir: Path,
     preserved: Optional[list[str]] = None,
-    missing_model: Optional[list[str]] = None,
+    failed: Optional[list[str]] = None,
+    omitted: Optional[list[str]] = None,
 ) -> SyntheticsRunTask:
+    def _status_for_table(table: str, failed: list[str]) -> Status:
+        if table in failed:
+            return Status.ERROR
+        else:
+            return Status.COMPLETED
+
     multitable = MockMultiTable(relational_data=rel_data)
     return SyntheticsRunTask(
         synthetics_run=SyntheticsRun(
@@ -51,13 +59,16 @@ def make_task(
             record_handlers={},
             lost_contact=[],
             preserved=preserved or [],
-            missing_model=missing_model or [],
             record_size_ratio=1.0,
         ),
         synthetics_train=SyntheticsTrain(
             models={
-                table: Mock(create_record_handler=Mock())
+                table: Mock(
+                    create_record_handler=Mock(),
+                    status=_status_for_table(table, failed or []),
+                )
                 for table in rel_data.list_all_tables()
+                if table not in (omitted or [])
             },
         ),
         run_dir=run_dir,
@@ -68,26 +79,29 @@ def make_task(
 def test_ignores_preserved_tables(pets, tmpdir):
     task = make_task(pets, tmpdir, preserved=["pets"])
 
+    # Source data is used
     assert task.working_tables["pets"] is not None
     assert "pets" in task.output_tables
     task.each_iteration()
     assert "pets" not in task.synthetics_run.record_handlers
 
 
-def test_ignores_tables_that_failed_to_train(pets, tmpdir):
-    task = make_task(pets, tmpdir, missing_model=["pets"])
+def test_ignores_tables_that_were_omitted_from_training(pets, tmpdir):
+    task = make_task(pets, tmpdir, omitted=["pets"])
 
+    # Source data is used
+    assert task.working_tables["pets"] is not None
+    assert "pets" in task.output_tables
+    task.each_iteration()
+    assert "pets" not in task.synthetics_run.record_handlers
+
+
+def test_ignores_tables_that_failed_during_training(pets, tmpdir):
+    task = make_task(pets, tmpdir, failed=["pets"])
+
+    # We set tables that failed to explicit None
     assert task.working_tables["pets"] is None
     assert "pets" not in task.output_tables
-    task.each_iteration()
-    assert "pets" not in task.synthetics_run.record_handlers
-
-
-def test_preserve_takes_precedence_over_missing_model(pets, tmpdir):
-    task = make_task(pets, tmpdir, preserved=["pets"], missing_model=["pets"])
-
-    assert task.working_tables["pets"] is not None
-    assert "pets" in task.output_tables
     task.each_iteration()
     assert "pets" not in task.synthetics_run.record_handlers
 

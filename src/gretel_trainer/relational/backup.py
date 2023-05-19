@@ -102,7 +102,6 @@ class BackupGenerate:
     record_size_ratio: float
     record_handler_ids: dict[str, str]
     lost_contact: list[str]
-    missing_model: list[str]
 
 
 @dataclass

@@ -97,7 +97,6 @@ def make_backup(
             preserved=[],
             record_size_ratio=1.0,
             lost_contact=[],
-            missing_model=[],
             record_handler_ids={
                 table: mock.record_id
                 for table, mock in synthetics_record_handlers.items()
@@ -671,7 +670,6 @@ def test_restore_generate_in_progress(
         preserved=[],
         record_size_ratio=1.0,
         lost_contact=[],
-        missing_model=[],
         record_handlers=synthetics_record_handlers,
     )
     assert len(mt.synthetic_output_tables) == 0

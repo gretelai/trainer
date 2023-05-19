@@ -28,4 +28,3 @@ class SyntheticsRun:
     preserved: list[str]
     record_handlers: dict[str, RecordHandler]
     lost_contact: list[str]
-    missing_model: list[str]

@@ -52,10 +52,14 @@ class AncestralStrategy:
             altered_tableset[table_name] = rel_data.get_table_data(table_name).copy()
 
         # Translate all keys to a contiguous list of integers
-        altered_tableset = common.label_encode_keys(rel_data, altered_tableset, omit=omitted_tables)
+        altered_tableset = common.label_encode_keys(
+            rel_data, altered_tableset, omit=omitted_tables
+        )
 
         # Add artificial rows to support seeding
-        altered_tableset = _add_artifical_rows_for_seeding(rel_data, altered_tableset, omitted_tables)
+        altered_tableset = _add_artifical_rows_for_seeding(
+            rel_data, altered_tableset, omitted_tables
+        )
 
         # Collect all data in multigenerational format
         for table_name in tables:

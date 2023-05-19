@@ -137,7 +137,6 @@ def test_backup():
         preserved=[],
         record_size_ratio=1.0,
         lost_contact=[],
-        missing_model=[],
         record_handler_ids={
             "customer": "555444666",
             "address": "333111222",
