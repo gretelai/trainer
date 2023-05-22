@@ -15,6 +15,9 @@ Please see the specific docs for the "RelationalData" class on how to do this.
 from __future__ import annotations
 
 import logging
+import os
+import shutil
+import tempfile
 from dataclasses import dataclass, replace
 from enum import Enum
 from pathlib import Path
@@ -34,6 +37,9 @@ from gretel_trainer.relational.json import (
 
 logger = logging.getLogger(__name__)
 
+DEFAULT_RELATIONAL_SOURCE_DIR = "relational_source"
+PREVIEW_ROW_COUNT = 5
+
 
 class MultiTableException(Exception):
     pass
@@ -50,6 +56,7 @@ class ForeignKey:
     parent_columns: list[str]
 
 
+UserFriendlyDataT = Union[pd.DataFrame, str, Path]
 UserFriendlyPrimaryKeyT = Optional[Union[str, list[str]]]
 
 
@@ -87,7 +94,7 @@ class Scope(str, Enum):
 @dataclass
 class TableMetadata:
     primary_key: list[str]
-    data: pd.DataFrame
+    source: Path
     columns: list[str]
     invented_table_metadata: Optional[InventedTableMetadata] = None
     producer_metadata: Optional[ProducerMetadata] = None
@@ -96,7 +103,7 @@ class TableMetadata:
 
 @dataclass
 class _RemovedTableMetadata:
-    data: pd.DataFrame
+    source: Path
     primary_key: list[str]
     fks_to_parents: list[ForeignKey]
     fks_from_children: list[ForeignKey]
@@ -118,7 +125,9 @@ class RelationalData:
     See the specific method docstrings for details on each method.
     """
 
-    def __init__(self):
+    def __init__(self, directory: Optional[Union[str, Path]] = None):
+        self.dir = Path(directory or DEFAULT_RELATIONAL_SOURCE_DIR)
+        os.makedirs(self.dir, exist_ok=True)
         self.graph = networkx.DiGraph()
 
     @property
@@ -176,7 +185,7 @@ class RelationalData:
         *,
         name: str,
         primary_key: UserFriendlyPrimaryKeyT,
-        data: pd.DataFrame,
+        data: UserFriendlyDataT,
     ) -> None:
         """
         Add a table. The primary key can be None (if one is not defined on the table),
@@ -186,45 +195,80 @@ class RelationalData:
         the table includes nested JSON data.
         """
         primary_key = self._format_key_column(primary_key)
-        if (rj_ingest := self._check_for_json(name, primary_key, data)) is not None:
-            self._add_rel_json_and_tables(name, primary_key, data, rj_ingest)
-        else:
-            self._add_single_table(name=name, primary_key=primary_key, data=data)
+        source_path = Path(f"{self.dir}/{name}.csv")
 
-    def _check_for_json(
-        self,
-        table: str,
-        primary_key: list[str],
-        data: pd.DataFrame,
-    ) -> Optional[IngestResponseT]:
-        json_cols = relational_json.get_json_columns(data)
+        # Preview data to get list of columns and determine if there is any JSON
+        if isinstance(data, pd.DataFrame):
+            preview_df = data.head(PREVIEW_ROW_COUNT)
+        elif isinstance(data, (str, Path)):
+            preview_df = pd.read_csv(data, nrows=PREVIEW_ROW_COUNT)
+        columns = list(preview_df.columns)
+        json_cols = relational_json.get_json_columns(preview_df)
+
+        # Write/copy source to preferred internal location
+        if isinstance(data, pd.DataFrame):
+            relational_json.jsonencode(data, json_cols).to_csv(source_path, index=False)
+        elif isinstance(data, (str, Path)):
+            shutil.copyfile(data, source_path)
+
+        # If we found JSON in preview above, run JSON ingestion on full data
+        rj_ingest = None
         if len(json_cols) > 0:
             logger.info(
-                f"Detected JSON data in table `{table}`. Running JSON normalization."
+                f"Detected JSON data in table `{name}`. Running JSON normalization."
             )
-            return relational_json.ingest(table, primary_key, data, json_cols)
+            if isinstance(data, pd.DataFrame):
+                df = data
+            elif isinstance(data, (str, Path)):
+                df = pd.read_csv(data)
+            rj_ingest = relational_json.ingest(name, primary_key, df, json_cols)
 
-    def _add_rel_json_and_tables(
+        # Add the table(s)
+        if rj_ingest is not None:
+            self._add_producer_and_invented_tables(
+                name, primary_key, source_path, columns, rj_ingest
+            )
+        else:
+            self._add_single_table(
+                name=name,
+                primary_key=primary_key,
+                source=source_path,
+                columns=columns,
+            )
+
+    def _add_producer_and_invented_tables(
         self,
         table: str,
         primary_key: list[str],
-        data: pd.DataFrame,
+        source: Path,
+        columns: list[str],
         rj_ingest: IngestResponseT,
     ) -> None:
         commands, producer_metadata = rj_ingest
         tables, foreign_keys = commands
 
-        # Add this table as a standalone node
+        # Add the producer table
         self._add_single_table(
             name=table,
             primary_key=primary_key,
-            data=data,
+            source=source,
+            columns=columns,
             producer_metadata=producer_metadata,
         )
 
         # Add the invented tables
         for tbl in tables:
-            self._add_single_table(**tbl)
+            name = tbl["name"]
+            source_path = Path(f"{self.dir}/{name}.csv")
+            df = tbl["data"]
+            df.to_csv(source_path, index=False)
+            self._add_single_table(
+                name=name,
+                primary_key=tbl["primary_key"],
+                source=source_path,
+                columns=list(df.columns),
+                invented_table_metadata=tbl["invented_table_metadata"],
+            )
         for foreign_key in foreign_keys:
             self.add_foreign_key_constraint(**foreign_key)
 
@@ -233,15 +277,17 @@ class RelationalData:
         *,
         name: str,
         primary_key: UserFriendlyPrimaryKeyT,
-        data: pd.DataFrame,
+        source: Path,
+        columns: Optional[list[str]] = None,
         invented_table_metadata: Optional[InventedTableMetadata] = None,
         producer_metadata: Optional[ProducerMetadata] = None,
     ) -> None:
         primary_key = self._format_key_column(primary_key)
+        columns = columns or list(pd.read_csv(source, nrows=1).columns)
         metadata = TableMetadata(
             primary_key=primary_key,
-            data=data,
-            columns=list(data.columns),
+            source=source,
+            columns=columns,
             invented_table_metadata=invented_table_metadata,
             producer_metadata=producer_metadata,
         )
@@ -277,17 +323,12 @@ class RelationalData:
         # If `table` is a producer of invented tables, we redo JSON ingestion
         # to ensure primary keys are set properly on invented tables
         elif self.is_producer_of_invented_tables(table):
-            removal_metadata = self._remove_producer(table)
-            original_data = removal_metadata.data
-            new_rj_ingest = relational_json.ingest(table, primary_key, original_data)
-            if new_rj_ingest is None:
-                raise MultiTableException(
-                    "Failed to change primary key on tables invented from JSON data"
-                )
-
-            self._add_rel_json_and_tables(
-                table, primary_key, original_data, new_rj_ingest
-            )
+            source = self.get_table_source(table)
+            with tempfile.TemporaryDirectory() as tmpdir:
+                tmpfile = Path(tmpdir) / f"{table}.csv"
+                shutil.move(source, tmpfile)
+                removal_metadata = self._remove_producer(table)
+                self.add_table(name=table, primary_key=primary_key, data=tmpfile)
             self._restore_fks_in_both_directions(table, removal_metadata)
 
         # At this point we are working with a "normal" table
@@ -338,7 +379,7 @@ class RelationalData:
             )
 
         removal_metadata = _RemovedTableMetadata(
-            data=table_metadata.data,
+            source=table_metadata.source,
             primary_key=table_metadata.primary_key,
             fks_to_parents=self.get_foreign_keys(table),
             fks_from_children=self._get_user_defined_fks_to_table(
@@ -348,10 +389,13 @@ class RelationalData:
 
         for invented_table_name in producer_metadata.table_names:
             if invented_table_name in self.graph.nodes:
-                self.graph.remove_node(invented_table_name)
-        self.graph.remove_node(table)
+                self._remove_node(invented_table_name)
+        self._remove_node(table)
 
         return removal_metadata
+
+    def _remove_node(self, table: str) -> None:
+        self.graph.remove_node(table)
 
     def _format_key_column(self, key: Optional[Union[str, list[str]]]) -> list[str]:
         if key is None:
@@ -498,7 +542,7 @@ class RelationalData:
         self._clear_safe_ancestral_seed_columns(fk_delegate_table)
         self._clear_safe_ancestral_seed_columns(table)
 
-    def update_table_data(self, table: str, data: pd.DataFrame) -> None:
+    def update_table_data(self, table: str, data: UserFriendlyDataT) -> None:
         """
         Set a DataFrame as the table data for a given table name.
         """
@@ -508,12 +552,12 @@ class RelationalData:
             removal_metadata = self._remove_producer(table)
         else:
             removal_metadata = _RemovedTableMetadata(
-                data=pd.DataFrame(),  # we don't care about the old data
+                source=Path(),  # we don't care about the old data
                 primary_key=self.get_primary_key(table),
                 fks_to_parents=self.get_foreign_keys(table),
                 fks_from_children=self._get_user_defined_fks_to_table(table),
             )
-            self.graph.remove_node(table)
+            self._remove_node(table)
 
         self.add_table(name=table, primary_key=removal_metadata.primary_key, data=data)
         self._restore_fks_in_both_directions(table, removal_metadata)
@@ -662,14 +706,18 @@ class RelationalData:
         """
         return self._get_table_metadata(table).primary_key
 
+    def get_table_source(self, table: str) -> Path:
+        return self._get_table_metadata(table).source
+
     def get_table_data(
         self, table: str, usecols: Optional[list[str]] = None
     ) -> pd.DataFrame:
         """
         Return the table contents for a given table name as a DataFrame.
         """
+        source = self.get_table_source(table)
         usecols = usecols or self.get_table_columns(table)
-        return self._get_table_metadata(table).data[usecols]
+        return pd.read_csv(source, usecols=usecols)
 
     def get_table_columns(self, table: str) -> list[str]:
         """

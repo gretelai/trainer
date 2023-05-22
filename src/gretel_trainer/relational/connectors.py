@@ -9,7 +9,7 @@ Gretel Transforms, Classify, Synthetics, or a combination of both.
 from __future__ import annotations
 
 import logging
-import tempfile
+import os
 from pathlib import Path
 from typing import Optional
 
@@ -18,7 +18,11 @@ from sqlalchemy import create_engine
 from sqlalchemy.engine.base import Engine
 from sqlalchemy.exc import OperationalError
 
-from gretel_trainer.relational.core import MultiTableException, RelationalData
+from gretel_trainer.relational.core import (
+    DEFAULT_RELATIONAL_SOURCE_DIR,
+    MultiTableException,
+    RelationalData,
+)
 from gretel_trainer.relational.extractor import ExtractorConfig, TableExtractor
 
 logger = logging.getLogger(__name__)
@@ -68,6 +72,7 @@ class Connector:
         ignore: Optional[set[str]] = None,
         schema: Optional[str] = None,
         config: Optional[ExtractorConfig] = None,
+        storage_dir: str = DEFAULT_RELATIONAL_SOURCE_DIR,
     ) -> RelationalData:
         """
         Extracts table data and relationships from the database. Optional args include:
@@ -80,6 +85,7 @@ class Connector:
             config: An optional extraction config. This config can be used to only include
                 specific tables, ignore specific tables, and configure subsetting. Please
                 see the `ExtractorConfig` docs for more details.
+            storage_dir: The output directory where extracted data is stored.
         """
         if only is not None and ignore is not None:
             raise MultiTableException("Cannot specify both `only` and `ignore`.")
@@ -89,19 +95,21 @@ class Connector:
                 only=only, ignore=ignore, schema=schema  # pyright: ignore
             )
 
-        with tempfile.TemporaryDirectory() as tmpdir:
-            extractor = TableExtractor(
-                config=config, connector=self, storage_dir=Path(tmpdir)
-            )
-            extractor.sample_tables()
+        storage_dir_path = Path(storage_dir)
+        os.makedirs(storage_dir_path, exist_ok=True)
 
-            # We ensure to re-create RelationalData after extraction so
-            # we can account for any embedded JSON. This also loads
-            # each table as a DF in the object which is currently
-            # the expected behavior for later operations.
-            extractor._relational_data = extractor._create_rel_data(
-                extracted_tables=extractor.table_order
-            )
+        extractor = TableExtractor(
+            config=config, connector=self, storage_dir=storage_dir_path
+        )
+        extractor.sample_tables()
+
+        # We ensure to re-create RelationalData after extraction so
+        # we can account for any embedded JSON. This also loads
+        # each table as a DF in the object which is currently
+        # the expected behavior for later operations.
+        extractor._relational_data = extractor._create_rel_data(
+            extracted_tables=extractor.table_order
+        )
 
         return extractor.relational_data
 

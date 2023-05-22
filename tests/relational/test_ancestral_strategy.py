@@ -67,25 +67,23 @@ def test_prepare_training_data_returns_multigenerational_data(pets):
 
 
 def test_prepare_training_data_drops_highly_unique_categorical_ancestor_fields(art):
-    art.update_table_data(
-        table="artists",
-        data=pd.DataFrame(
+    with tempfile.NamedTemporaryFile() as artists_csv, tempfile.NamedTemporaryFile() as paintings_csv:
+        pd.DataFrame(
             data={
                 "id": [f"A{i}" for i in range(100)],
-                "name": [str(i) for i in range(100)],
+                "name": [f"artist_name_{i}" for i in range(100)],
             }
-        ),
-    )
-    art.update_table_data(
-        table="paintings",
-        data=pd.DataFrame(
+        ).to_csv(artists_csv.name, index=False)
+        art.update_table_data(table="artists", data=artists_csv.name)
+
+        pd.DataFrame(
             data={
                 "id": [f"P{i}" for i in range(100)],
                 "artist_id": [f"A{i}" for i in range(100)],
-                "name": [str(i) for i in range(100)],
+                "name": [f"painting_name_{i}" for i in range(100)],
             }
-        ),
-    )
+        ).to_csv(paintings_csv.name, index=False)
+        art.update_table_data(table="paintings", data=paintings_csv.name)
 
     strategy = AncestralStrategy()
 
@@ -115,25 +113,24 @@ def test_prepare_training_data_drops_highly_nan_ancestor_fields(art):
             highly_nan_names.append(None)
         else:
             highly_nan_names.append("some name")
-    art.update_table_data(
-        table="artists",
-        data=pd.DataFrame(
+
+    with tempfile.NamedTemporaryFile() as artists_csv, tempfile.NamedTemporaryFile() as paintings_csv:
+        pd.DataFrame(
             data={
                 "id": [f"A{i}" for i in range(100)],
                 "name": highly_nan_names,
             }
-        ),
-    )
-    art.update_table_data(
-        table="paintings",
-        data=pd.DataFrame(
+        ).to_csv(artists_csv.name, index=False)
+        art.update_table_data(table="artists", data=artists_csv.name)
+
+        pd.DataFrame(
             data={
                 "id": [f"P{i}" for i in range(100)],
                 "artist_id": [f"A{i}" for i in range(100)],
                 "name": [str(i) for i in range(100)],
             }
-        ),
-    )
+        ).to_csv(paintings_csv.name, index=False)
+        art.update_table_data(table="paintings", data=paintings_csv.name)
 
     strategy = AncestralStrategy()
 
@@ -471,8 +468,8 @@ def test_generation_job(pets):
 
 
 def test_generation_job_seeds_go_back_multiple_generations(source_nba, synthetic_nba):
-    source_nba = source_nba[0]
-    synthetic_nba = synthetic_nba[0]
+    source_nba = next(source_nba)[0]
+    synthetic_nba = next(synthetic_nba)[0]
     output_tables = {
         "cities": ancestry.get_table_data_with_ancestors(synthetic_nba, "cities"),
         "states": ancestry.get_table_data_with_ancestors(synthetic_nba, "states"),

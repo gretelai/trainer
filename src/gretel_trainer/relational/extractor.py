@@ -40,7 +40,7 @@ class ExtractorConfig:
 
     target_row_count: float = -1.0
     """
-    The target number of rows (or ratio of rows) to sample. This will be used as the sample target for "leaf" tables, 
+    The target number of rows (or ratio of rows) to sample. This will be used as the sample target for "leaf" tables,
     or tables that do not have any references to their primary keys. If this number is >= 1 then
     that number of rows will be used, if the value is between 0..1 then it is considered to be a percetange
     of the total number of rows. A 0 value will just extract headers and -1 will extract entire tables.
@@ -236,7 +236,7 @@ class TableExtractor:
 
         self._storage_dir = storage_dir
 
-        self._relational_data = RelationalData()
+        self._relational_data = RelationalData(directory=self._storage_dir)
         self.table_order = []
         self._chunk_size = 50_000
 
@@ -268,7 +268,7 @@ class TableExtractor:
         if extracted_tables is None:
             extracted_tables = []
 
-        rel_data = RelationalData()
+        rel_data = RelationalData(directory=self._storage_dir)
         inspector = inspect(self._connector.engine)
         foreign_keys: list[tuple[str, dict]] = []
 

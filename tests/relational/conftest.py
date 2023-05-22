@@ -1,4 +1,5 @@
 import sqlite3
+import tempfile
 from pathlib import Path
 from unittest.mock import Mock, patch
 
@@ -42,15 +43,14 @@ def project():
         yield project
 
 
-def rel_data_from_example_db(name) -> RelationalData:
+def _rel_data_connector(name) -> Connector:
     con = sqlite3.connect(f"file:{name}?mode=memory&cache=shared")
     cur = con.cursor()
     with open(EXAMPLE_DBS / f"{name}.sql") as f:
         cur.executescript(f.read())
-    connector = Connector(
+    return Connector(
         create_engine(f"sqlite:///file:{name}?mode=memory&cache=shared&uri=true")
     )
-    return connector.extract()
 
 
 @pytest.fixture()
@@ -59,64 +59,78 @@ def example_dbs():
 
 
 @pytest.fixture()
-def pets() -> RelationalData:
-    return rel_data_from_example_db("pets")
+def tmpdir():
+    with tempfile.TemporaryDirectory() as tmpdir:
+        yield tmpdir
 
 
 @pytest.fixture()
-def ecom() -> RelationalData:
-    return rel_data_from_example_db("ecom")
+def tmpfile():
+    with tempfile.NamedTemporaryFile() as tmpfile:
+        yield tmpfile
 
 
 @pytest.fixture()
-def mutagenesis() -> RelationalData:
-    return rel_data_from_example_db("mutagenesis")
+def pets(tmpdir):
+    yield _rel_data_connector("pets").extract(storage_dir=tmpdir)
 
 
 @pytest.fixture()
-def tpch() -> RelationalData:
-    return rel_data_from_example_db("tpch")
+def ecom(tmpdir):
+    yield _rel_data_connector("ecom").extract(storage_dir=tmpdir)
 
 
 @pytest.fixture()
-def art() -> RelationalData:
-    return rel_data_from_example_db("art")
+def mutagenesis(tmpdir):
+    yield _rel_data_connector("mutagenesis").extract(storage_dir=tmpdir)
 
 
 @pytest.fixture()
-def documents() -> RelationalData:
-    return rel_data_from_example_db("documents")
+def tpch(tmpdir):
+    yield _rel_data_connector("tpch").extract(storage_dir=tmpdir)
 
 
 @pytest.fixture()
-def trips() -> RelationalData:
-    rel_data = rel_data_from_example_db("trips")
-    rel_data.update_table_data(
-        table="trips",
-        data=pd.DataFrame(
+def art(tmpdir):
+    yield _rel_data_connector("art").extract(storage_dir=tmpdir)
+
+
+@pytest.fixture()
+def documents(tmpdir):
+    yield _rel_data_connector("documents").extract(storage_dir=tmpdir)
+
+
+@pytest.fixture()
+def trips(tmpdir):
+    with tempfile.NamedTemporaryFile() as tmpfile:
+        data = pd.DataFrame(
             data={
                 "id": list(range(100)),
                 "purpose": ["work"] * 100,
                 "vehicle_type_id": [1] * 60 + [2] * 30 + [3] * 5 + [4] * 5,
             }
-        ),
-    )
-    return rel_data
+        )
+        data.to_csv(tmpfile.name, index=False)
+        rel_data = _rel_data_connector("trips").extract(storage_dir=tmpdir)
+        rel_data.update_table_data(table="trips", data=tmpfile.name)
+        yield rel_data
+
+
+# These two NBA fixtures need their own temporary directories instead of
+# using the tmpdir fixture because otherwise they stomp on each other
+@pytest.fixture()
+def source_nba():
+    with tempfile.TemporaryDirectory() as tmpdir:
+        yield _setup_nba(tmpdir, synthetic=False)
 
 
 @pytest.fixture()
-def source_nba() -> tuple[RelationalData, pd.DataFrame, pd.DataFrame, pd.DataFrame]:
-    return _setup_nba(synthetic=False)
+def synthetic_nba():
+    with tempfile.TemporaryDirectory() as tmpdir:
+        yield _setup_nba(tmpdir, synthetic=True)
 
 
-@pytest.fixture()
-def synthetic_nba() -> tuple[RelationalData, pd.DataFrame, pd.DataFrame, pd.DataFrame]:
-    return _setup_nba(synthetic=True)
-
-
-def _setup_nba(
-    synthetic: bool,
-) -> tuple[RelationalData, pd.DataFrame, pd.DataFrame, pd.DataFrame]:
+def _setup_nba(directory: str, synthetic: bool):
     if synthetic:
         states = ["PA", "FL"]
         cities = ["Philadelphia", "Miami"]
@@ -130,7 +144,7 @@ def _setup_nba(
     cities = pd.DataFrame(data={"name": cities, "id": [1, 2], "state_id": [1, 2]})
     teams = pd.DataFrame(data={"name": teams, "id": [1, 2], "city_id": [1, 2]})
 
-    rel_data = RelationalData()
+    rel_data = RelationalData(directory=directory)
     rel_data.add_table(name="states", primary_key="id", data=states)
     rel_data.add_table(name="cities", primary_key="id", data=cities)
     rel_data.add_table(name="teams", primary_key="id", data=teams)
@@ -147,7 +161,7 @@ def _setup_nba(
         referred_columns=["id"],
     )
 
-    return rel_data, states, cities, teams
+    yield rel_data, states, cities, teams
 
 
 @pytest.fixture()

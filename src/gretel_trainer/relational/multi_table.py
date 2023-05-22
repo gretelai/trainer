@@ -43,6 +43,7 @@ from gretel_trainer.relational.core import (
     MultiTableException,
     RelationalData,
     Scope,
+    UserFriendlyDataT,
     skip_table,
 )
 from gretel_trainer.relational.json import InventedTableMetadata, ProducerMetadata
@@ -171,7 +172,7 @@ class MultiTable:
         with tarfile.open(source_archive_path, "r:gz") as tar:
             tar.extractall(path=self._working_dir)
         for table_name, table_backup in backup.relational_data.tables.items():
-            source_data = pd.read_csv(self._working_dir / f"source_{table_name}.csv")
+            source_data = self._working_dir / f"source_{table_name}.csv"
             invented_table_metadata = None
             producer_metadata = None
             if (imeta := table_backup.invented_table_metadata) is not None:
@@ -181,7 +182,7 @@ class MultiTable:
             self.relational_data._add_single_table(
                 name=table_name,
                 primary_key=table_backup.primary_key,
-                data=source_data,
+                source=source_data,
                 invented_table_metadata=invented_table_metadata,
                 producer_metadata=producer_metadata,
             )
@@ -384,7 +385,7 @@ class MultiTable:
                         f"Could not find report data for table `{table}` in run outputs."
                     )
             logger.info(
-                f"All tasks for generation run `{latest_run_id}` finished prior to backup. From here, you can access your synthetic data as Pandas DataFrames via `synthetic_output_tables`, or review them in CSV format along with the relational report in the local working directory."
+                f"All tasks for generation run `{latest_run_id}` finished prior to backup. From here, you can review your synthetic data in CSV format along with the relational report in the local working directory."
             )
             return None
         else:
@@ -419,7 +420,7 @@ class MultiTable:
             backup = Backup.from_dict(json.load(b))
 
         return MultiTable(
-            relational_data=RelationalData(),
+            relational_data=RelationalData(directory=backup.working_dir),
             strategy=backup.strategy,
             gretel_model=backup.gretel_model,
             refresh_interval=backup.refresh_interval,
@@ -541,22 +542,15 @@ class MultiTable:
         classify_data_sources = {}
         for table in self.relational_data.list_all_tables():
             classify_config = make_classify_config(table, config)
-
-            # Ensure consistent, friendly data source names in Console
-            table_data = self.relational_data.get_table_data(table)
-            classify_data_source_path = str(
-                self._working_dir / f"classify_data_source_{table}.csv"
-            )
-            table_data.to_csv(classify_data_source_path, index=False)
-
-            classify_data_sources[table] = classify_data_source_path
+            data_source = str(self.relational_data.get_table_source(table))
+            classify_data_sources[table] = data_source
 
             # Create model if necessary
             if self._classify.models.get(table) is not None:
                 continue
 
             model = self._project.create_model_obj(
-                model_config=classify_config, data_source=classify_data_source_path
+                model_config=classify_config, data_source=data_source
             )
             self._classify.models[table] = model
 
@@ -644,7 +638,7 @@ class MultiTable:
         self,
         identifier: Optional[str] = None,
         in_place: bool = False,
-        data: Optional[dict[str, pd.DataFrame]] = None,
+        data: Optional[dict[str, UserFriendlyDataT]] = None,
         encode_keys: bool = False,
     ) -> None:
         """
@@ -677,15 +671,18 @@ class MultiTable:
         run_dir = _mkdir(str(self._working_dir / identifier))
         transforms_run_paths = {}
 
-        data = data or {
-            table: self.relational_data.get_table_data(table)
+        data_sources = data or {
+            table: str(self.relational_data.get_table_source(table))
             for table in self._transforms_train.models
             if _table_trained_successfully(self._transforms_train, table)
         }
 
-        for table, df in data.items():
+        for table, data_source in data_sources.items():
             transforms_run_path = run_dir / f"transforms_input_{table}.csv"
-            df.to_csv(transforms_run_path, index=False)
+            if isinstance(data_source, pd.DataFrame):
+                data_source.to_csv(transforms_run_path, index=False)
+            else:
+                shutil.copyfile(data_source, transforms_run_path)
             transforms_run_paths[table] = transforms_run_path
 
         transforms_record_handlers: dict[str, RecordHandler] = {}
@@ -906,7 +903,7 @@ class MultiTable:
 
         self._train_synthetics_models(configs)
 
-    def retrain_tables(self, tables: dict[str, pd.DataFrame]) -> None:
+    def retrain_tables(self, tables: dict[str, UserFriendlyDataT]) -> None:
         """
         Provide updated table data and retrain. This method overwrites the table data in the
         `RelationalData` instance. It should be used when initial training fails and source data
@@ -934,15 +931,9 @@ class MultiTable:
         archive_path = self._working_dir / "source_tables.tar.gz"
         with tarfile.open(archive_path, "w:gz") as tar:
             for table in self.relational_data.list_all_tables(Scope.ALL):
-                filename = f"source_{table}.csv"
-                out_path = self._working_dir / filename
-                df = self.relational_data.get_table_data(table)
-                df.to_csv(
-                    out_path,
-                    index=False,
-                    columns=self.relational_data.get_table_columns(table),
-                )
-                tar.add(out_path, arcname=filename)
+                source_path = Path(self.relational_data.get_table_source(table))
+                filename = source_path.name
+                tar.add(source_path, arcname=filename)
         self._artifact_collection.upload_source_archive(
             self._project, str(archive_path)
         )
@@ -966,9 +957,6 @@ class MultiTable:
             preserve_tables (list[str], optional): List of tables to skip sampling and leave (mostly) identical to source.
             identifier (str, optional): Unique string identifying a specific call to this method. Defaults to `synthetics_` + current timestamp.
             resume (bool, optional): Set to True when restoring from a backup to complete a previous, interrupted run.
-
-        Returns:
-            dict[str, pd.DataFrame]: Return a dictionary of table names and output data.
         """
         if resume:
             if identifier is not None:
