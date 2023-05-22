@@ -36,13 +36,14 @@ class SyntheticsRunTask:
         for table in all_tables:
             model = self.synthetics_train.models.get(table)
 
+            # Table was either omitted from training or marked as to-be-preserved during generation
             if model is None or table in self.synthetics_run.preserved:
                 working_tables[table] = self.multitable._strategy.get_preserved_data(
                     table, self.multitable.relational_data
                 )
 
+            # Table was included in training, but failed at that step
             elif model.status != Status.COMPLETED:
-                # model failed to train
                 working_tables[table] = None
 
         return working_tables

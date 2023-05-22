@@ -816,7 +816,10 @@ class MultiTable:
         only: Optional[list[str]] = None,
         ignore: Optional[list[str]] = None,
     ) -> None:
-        """Train synthetic data models on each table in the relational dataset"""
+        """
+        Train synthetic data models for the tables in the tableset,
+        optionally scoped by either `only` or `ignore`.
+        """
         only, ignore = self._get_only_and_ignore(only, ignore)
 
         all_tables = self.relational_data.list_all_tables()
@@ -832,7 +835,7 @@ class MultiTable:
         # all its ancestors must also be omitted. In the future, it'd be nice to either find a way to
         # eliminate this requirement completely, or (less ideal) allow incremental training of tables,
         # e.g. train a few in one "batch", then a few more before generating (perhaps with some logs
-        # here informing the user of which required tables are missing).
+        # along the way informing the user of which required tables are missing).
         self._strategy.validate_preserved_tables(omit_tables, self.relational_data)
 
         training_data = self._prepare_training_data(include_tables)

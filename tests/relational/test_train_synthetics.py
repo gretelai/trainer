@@ -7,7 +7,7 @@ from gretel_trainer.relational.core import MultiTableException
 from gretel_trainer.relational.multi_table import MultiTable
 
 
-# The assertions in this file are concerned with setting up the transforms train
+# The assertions in this file are concerned with setting up the synthetics train
 # workflow state properly, and stop short of kicking off the task.
 @pytest.fixture(autouse=True)
 def run_task():
@@ -41,7 +41,7 @@ def test_train_synthetics_only_includes_specified_tables(ecom, tmpdir, project):
 
     assert set(mt._synthetics_train.models.keys()) == {"users"}
     project.create_model_obj.assert_called_with(
-        model_config=ANY,  # a tailored transforms config, in dict form
+        model_config=ANY,  # a tailored synthetics config, in dict form
         data_source=f"{tmpdir}/synthetics_train_users.csv",
     )
 
