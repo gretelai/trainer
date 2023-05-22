@@ -803,7 +803,13 @@ class MultiTable:
                 )
 
     def train(self) -> None:
-        """Train synthetic data models on each table in the relational dataset"""
+        """
+        DEPRECATED: Please use `train_synthetics` instead.
+        """
+        logger.warning(
+            "This method is deprecated and will be removed in a future release. "
+            "Please use `train_synthetics` instead."
+        )
         tables = self.relational_data.list_all_tables()
         self._synthetics_train = SyntheticsTrain()
 
