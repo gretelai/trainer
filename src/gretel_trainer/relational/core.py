@@ -16,6 +16,7 @@ from gretel_trainer.relational.json import (
     IngestResponseT,
     InventedTableMetadata,
     RelationalJson,
+    get_json_columns,
 )
 
 logger = logging.getLogger(__name__)
@@ -129,8 +130,12 @@ class RelationalData:
         the table includes nested JSON data.
         """
         primary_key = self._format_key_column(primary_key)
-        rj_ingest = RelationalJson.ingest(name, primary_key, data)
-        if rj_ingest is not None:
+        json_cols = get_json_columns(data)
+        if (
+            len(json_cols) > 0
+            and (rj_ingest := RelationalJson.ingest(name, primary_key, data, json_cols))
+            is not None
+        ):
             self._add_rel_json_and_tables(name, rj_ingest)
         else:
             self._add_single_table(name=name, primary_key=primary_key, data=data)

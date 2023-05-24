@@ -8,6 +8,7 @@ from gretel_trainer.relational.core import (
     RelationalData,
     Scope,
 )
+from gretel_trainer.relational.json import get_json_columns
 
 
 @pytest.fixture
@@ -22,6 +23,13 @@ def bball():
     rel_data.add_table(name="bball", primary_key=None, data=bball_df)
 
     return rel_data
+
+
+def test_list_json_cols(documents, bball):
+    assert get_json_columns(documents.get_table_data("users")) == []
+    assert get_json_columns(documents.get_table_data("purchases")) == ["data"]
+
+    assert set(get_json_columns(bball.get_table_data("bball"))) == {"draft", "teams"}
 
 
 def test_json_columns_produce_invented_flattened_tables(documents):
