@@ -14,8 +14,8 @@ from gretel_trainer.relational.json import get_json_columns
 @pytest.fixture
 def bball():
     bball_jsonl = """
-    {"name": "LeBron James", "age": 38, "draft": {"year": 2003}, "teams": ["Cavaliers", "Heat", "Lakers"]}
-    {"name": "Steph Curry", "age": 35, "draft": {"year": 2009, "college": "Davidson"}, "teams": ["Warriors"]}
+    {"name": "LeBron James", "age": 38, "draft": {"year": 2003}, "teams": ["Cavaliers", "Heat", "Lakers"], "suspensions": []}
+    {"name": "Steph Curry", "age": 35, "draft": {"year": 2009, "college": "Davidson"}, "teams": ["Warriors"], "suspensions": []}
     """
     bball_df = pd.read_json(bball_jsonl, lines=True)
 
@@ -29,7 +29,11 @@ def test_list_json_cols(documents, bball):
     assert get_json_columns(documents.get_table_data("users")) == []
     assert get_json_columns(documents.get_table_data("purchases")) == ["data"]
 
-    assert set(get_json_columns(bball.get_table_data("bball"))) == {"draft", "teams"}
+    assert set(get_json_columns(bball.get_table_data("bball"))) == {
+        "draft",
+        "teams",
+        "suspensions",
+    }
 
 
 def test_json_columns_produce_invented_flattened_tables(documents):
@@ -131,6 +135,25 @@ def test_get_modelable_table_names(documents):
 
     # Unknown tables return empty list
     assert documents.get_modelable_table_names("nonsense") == []
+
+
+def test_get_modelable_names_ignores_empty_mapped_tables(bball):
+    # The `suspensions` column in the source data contained empty lists for all records.
+    # We need to hold onto that table name on the RelationalJson instance to support
+    # denormalizing back to the original source data shape. It is therefore exposed
+    # in the `table_names` attribute on RelationalJson...
+    assert set(bball.relational_jsons["bball"].table_names) == {
+        "bball-sfx",
+        "bball-teams-sfx",
+        "bball-suspensions-sfx",
+    }
+
+    # ...BUT clients of RelationalData only care about invented tables that were added
+    # to the graph (i.e. that contain data), so that class does not expose the empty table.
+    assert set(bball.get_modelable_table_names("bball")) == {
+        "bball-sfx",
+        "bball-teams-sfx",
+    }
 
 
 def test_invented_json_column_names(documents, bball):

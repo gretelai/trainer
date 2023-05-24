@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import logging
-from contextlib import suppress
 from dataclasses import dataclass, replace
 from enum import Enum
 from pathlib import Path
@@ -238,7 +237,7 @@ class RelationalData:
         )
 
         for invented_table_name in rel_json.table_names:
-            with suppress(KeyError):
+            if invented_table_name in self.graph.nodes:
                 self.graph.remove_node(invented_table_name)
         del self.relational_jsons[table]
 
@@ -472,7 +471,9 @@ class RelationalData:
         If the provided table does not exist, returns empty list.
         """
         if (rel_json := self.relational_jsons.get(table)) is not None:
-            return rel_json.table_names
+            # Exclude tables that JSON is tracking for denormalization but that weren't added to the graph
+            # (i.e. because they were empty)
+            return [t for t in rel_json.table_names if t in self.graph.nodes]
         elif table not in self.list_all_tables(Scope.ALL):
             return []
         else:

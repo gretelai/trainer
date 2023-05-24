@@ -12,7 +12,6 @@ from gretel_trainer.relational.backup import (
     BackupSyntheticsTrain,
     BackupTransformsTrain,
 )
-from gretel_trainer.relational.json import InventedTableMetadata
 
 
 def test_backup_relational_data(trips):
@@ -84,7 +83,6 @@ def test_backup_relational_data_with_json(documents):
                     "purchases": "purchases-sfx",
                     "purchases^data>years": "purchases-data-years-sfx",
                 },
-                invented_table_names=["purchases-sfx", "purchases-data-years-sfx"],
             ),
         },
     )

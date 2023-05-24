@@ -198,6 +198,7 @@ class RelationalJson:
 
     @property
     def table_names(self) -> list[str]:
+        """Returns sanitized, model-friendly table names, *including* those of empty invented tables."""
         return list(self.table_name_mappings.values())
 
     @property
@@ -295,13 +296,14 @@ def _generate_commands(
     Returns lists of keyword arguments designed to be passed to a
     RelationalData instance's _add_single_table and add_foreign_key methods
     """
-    tables = [(rel_json.table_name_mappings[name], df) for name, df in tables]
-    non_empty_tables = [t for t in tables if not t[1].empty]
+    tables_to_add = {
+        rel_json.table_name_mappings[name]: df for name, df in tables if not df.empty
+    }
 
     _add_single_table = []
     add_foreign_key = []
 
-    for table_name, table_df in non_empty_tables:
+    for table_name, table_df in tables_to_add.items():
         if table_name == rel_json.root_table_name:
             table_pk = rel_json.original_primary_key + [PRIMARY_KEY_COLUMN]
         else:
@@ -324,7 +326,7 @@ def _generate_commands(
             }
         )
 
-    for table_name, table_df in non_empty_tables:
+    for table_name, table_df in tables_to_add.items():
         for column in get_id_columns(table_df):
             referred_table = rel_json.table_name_mappings[
                 get_parent_table_name_from_child_id_column(column)
