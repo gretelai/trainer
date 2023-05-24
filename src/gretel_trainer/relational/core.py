@@ -377,10 +377,18 @@ class RelationalData:
         self._clear_safe_ancestral_seed_columns(table)
 
     def update_table_data(self, table: str, data: pd.DataFrame) -> None:
+        json_cols = get_json_columns(data)
         if table in self.relational_jsons:
             _, original_pk, original_fks = self._remove_relational_json(table)
-            new_rj_ingest = RelationalJson.ingest(table, original_pk, data)
-            if new_rj_ingest is not None:
+            if (
+                len(json_cols) > 0
+                and (
+                    new_rj_ingest := RelationalJson.ingest(
+                        table, original_pk, data, json_cols
+                    )
+                )
+                is not None
+            ):
                 self._add_rel_json_and_tables(table, new_rj_ingest)
                 parent_table_name = new_rj_ingest[0].root_table_name
             else:
@@ -406,10 +414,14 @@ class RelationalData:
                 )
 
             if (
-                new_rj_ingest := RelationalJson.ingest(
-                    table, metadata.primary_key, data
+                len(json_cols) > 0
+                and (
+                    new_rj_ingest := RelationalJson.ingest(
+                        table, metadata.primary_key, data, json_cols
+                    )
                 )
-            ) is not None:
+                is not None
+            ):
                 original_foreign_keys = self._get_user_defined_fks_to_table(table)
                 self.graph.remove_node(table)
                 self._add_rel_json_and_tables(table, new_rj_ingest)
