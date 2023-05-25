@@ -10,7 +10,7 @@ from gretel_trainer.relational.core import ForeignKey, RelationalData
 @dataclass
 class BackupRelationalDataTable:
     primary_key: list[str]
-    invented_table_metadata: Optional[dict[str, str]] = None
+    invented_table_metadata: Optional[dict] = None
 
 
 @dataclass

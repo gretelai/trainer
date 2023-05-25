@@ -43,6 +43,7 @@ def test_backup_relational_data_with_json(documents):
                 invented_table_metadata={
                     "invented_root_table_name": "purchases-sfx",
                     "original_table_name": "purchases",
+                    "empty": False,
                 },
             ),
             "purchases-data-years-sfx": BackupRelationalDataTable(
@@ -50,6 +51,7 @@ def test_backup_relational_data_with_json(documents):
                 invented_table_metadata={
                     "invented_root_table_name": "purchases-sfx",
                     "original_table_name": "purchases",
+                    "empty": False,
                 },
             ),
             "payments": BackupRelationalDataTable(primary_key=["id"]),

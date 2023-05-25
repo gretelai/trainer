@@ -154,6 +154,7 @@ class MultiTable:
                 invented_table_metadata = InventedTableMetadata(
                     invented_root_table_name=imeta["invented_root_table_name"],
                     original_table_name=imeta["original_table_name"],
+                    empty=imeta["empty"],
                 )
             self.relational_data._add_single_table(
                 name=table_name,
