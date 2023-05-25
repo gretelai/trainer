@@ -16,6 +16,7 @@ from gretel_trainer.relational.json import (
     IngestResponseT,
     InventedTableMetadata,
     RelationalJson,
+    get_json_columns,
 )
 
 logger = logging.getLogger(__name__)
@@ -129,11 +130,20 @@ class RelationalData:
         the table includes nested JSON data.
         """
         primary_key = self._format_key_column(primary_key)
-        rj_ingest = RelationalJson.ingest(name, primary_key, data)
-        if rj_ingest is not None:
+        if (rj_ingest := self._check_for_json(name, primary_key, data)) is not None:
             self._add_rel_json_and_tables(name, rj_ingest)
         else:
             self._add_single_table(name=name, primary_key=primary_key, data=data)
+
+    def _check_for_json(
+        self,
+        table: str,
+        primary_key: list[str],
+        data: pd.DataFrame,
+    ) -> Optional[IngestResponseT]:
+        json_cols = get_json_columns(data)
+        if len(json_cols) > 0:
+            return RelationalJson.ingest(table, primary_key, data, json_cols)
 
     def _add_rel_json_and_tables(self, table: str, rj_ingest: IngestResponseT) -> None:
         rel_json, commands = rj_ingest
@@ -374,8 +384,9 @@ class RelationalData:
     def update_table_data(self, table: str, data: pd.DataFrame) -> None:
         if table in self.relational_jsons:
             _, original_pk, original_fks = self._remove_relational_json(table)
-            new_rj_ingest = RelationalJson.ingest(table, original_pk, data)
-            if new_rj_ingest is not None:
+            if (
+                new_rj_ingest := self._check_for_json(table, original_pk, data)
+            ) is not None:
                 self._add_rel_json_and_tables(table, new_rj_ingest)
                 parent_table_name = new_rj_ingest[0].root_table_name
             else:
@@ -401,9 +412,7 @@ class RelationalData:
                 )
 
             if (
-                new_rj_ingest := RelationalJson.ingest(
-                    table, metadata.primary_key, data
-                )
+                new_rj_ingest := self._check_for_json(table, metadata.primary_key, data)
             ) is not None:
                 original_foreign_keys = self._get_user_defined_fks_to_table(table)
                 self.graph.remove_node(table)

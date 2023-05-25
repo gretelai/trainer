@@ -13,6 +13,8 @@ from unflatten import unflatten
 
 logger = logging.getLogger(__name__)
 
+PREVIEW_ROW_COUNT = 5
+
 # JSON dict to multi-column and list to multi-table
 
 FIELD_SEPARATOR = ">"
@@ -60,21 +62,15 @@ def nulls_to_empty_lists(series: pd.Series) -> pd.Series:
 
 
 def _normalize_json(
-    nested_dfs: list[tuple[str, pd.DataFrame]], flat_dfs: list[tuple[str, pd.DataFrame]]
+    nested_dfs: list[tuple[str, pd.DataFrame]],
+    flat_dfs: list[tuple[str, pd.DataFrame]],
+    columns: Optional[list[str]] = None,
 ) -> list[tuple[str, pd.DataFrame]]:
     if not nested_dfs:
         return flat_dfs
     name, df = nested_dfs.pop()
-    dict_cols = [
-        col
-        for col in df.columns
-        if df[col].apply(is_dict).any() and df[col].dropna().apply(is_dict).all()
-    ]
-    list_cols = [
-        col
-        for col in df.columns
-        if df[col].apply(is_list).any() and df[col].dropna().apply(is_list).all()
-    ]
+    cols_to_scan = columns or [col for col in df.columns if df.dtypes[col] == "object"]
+    dict_cols = [col for col in cols_to_scan if df[col].dropna().apply(is_dict).all()]
     if dict_cols:
         df[dict_cols] = nulls_to_empty_dicts(df[dict_cols])
         for col in dict_cols:
@@ -82,19 +78,23 @@ def _normalize_json(
             df = pd.concat([df, new_cols], axis="columns")
             df = df.drop(columns=new_cols.columns[new_cols.isnull().all()])
         nested_dfs.append((name, df.drop(columns=dict_cols)))
-    elif list_cols:
-        for col in list_cols:
-            new_table = df[col].explode().dropna().rename(CONTENT_COLUMN).to_frame()
-            new_table[ORDER_COLUMN] = new_table.groupby(level=0).cumcount()
-            nested_dfs.append(
-                (
-                    name + TABLE_SEPARATOR + col,
-                    new_table.reset_index(names=name + ID_SUFFIX),
-                )
-            )
-        nested_dfs.append((name, df.drop(columns=list_cols)))
     else:
-        flat_dfs.append((name, df))
+        list_cols = [
+            col for col in cols_to_scan if df[col].dropna().apply(is_list).all()
+        ]
+        if list_cols:
+            for col in list_cols:
+                new_table = df[col].explode().dropna().rename(CONTENT_COLUMN).to_frame()
+                new_table[ORDER_COLUMN] = new_table.groupby(level=0).cumcount()
+                nested_dfs.append(
+                    (
+                        name + TABLE_SEPARATOR + col,
+                        new_table.reset_index(names=name + ID_SUFFIX),
+                    )
+                )
+            nested_dfs.append((name, df.drop(columns=list_cols)))
+        else:
+            flat_dfs.append((name, df))
     return _normalize_json(nested_dfs, flat_dfs)
 
 
@@ -167,10 +167,14 @@ class RelationalJson:
 
     @classmethod
     def ingest(
-        cls, table_name: str, primary_key: list[str], df: pd.DataFrame
+        cls,
+        table_name: str,
+        primary_key: list[str],
+        df: pd.DataFrame,
+        json_columns: Optional[list[str]] = None,
     ) -> Optional[IngestResponseT]:
         logger.debug(f"Checking table `{table_name}` for JSON columns")
-        tables = _normalize_json([(table_name, df.copy())], [])
+        tables = _normalize_json([(table_name, df.copy())], [], json_columns)
         # If we created additional tables (from JSON lists) or added columns (from JSON dicts)
         if len(tables) > 1 or len(tables[0][1].columns) > len(df.columns):
             mappings = {name: sanitize_str(name) for name, _ in tables}
@@ -334,6 +338,20 @@ def _generate_commands(
                 }
             )
     return (_add_single_table, add_foreign_key)
+
+
+def get_json_columns(df: pd.DataFrame) -> list[str]:
+    column_previews = {
+        col: df[col].dropna().head(PREVIEW_ROW_COUNT)
+        for col in df.columns
+        if df.dtypes[col] == "object"
+    }
+
+    return [
+        col
+        for col, series in column_previews.items()
+        if series.apply(is_dict).all() or series.apply(is_list).all()
+    ]
 
 
 CommandsT = tuple[list[dict], list[dict]]

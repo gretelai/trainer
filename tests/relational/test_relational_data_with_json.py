@@ -8,6 +8,7 @@ from gretel_trainer.relational.core import (
     RelationalData,
     Scope,
 )
+from gretel_trainer.relational.json import get_json_columns
 
 
 @pytest.fixture
@@ -22,6 +23,13 @@ def bball():
     rel_data.add_table(name="bball", primary_key=None, data=bball_df)
 
     return rel_data
+
+
+def test_list_json_cols(documents, bball):
+    assert get_json_columns(documents.get_table_data("users")) == []
+    assert get_json_columns(documents.get_table_data("purchases")) == ["data"]
+
+    assert set(get_json_columns(bball.get_table_data("bball"))) == {"draft", "teams"}
 
 
 def test_json_columns_produce_invented_flattened_tables(documents):
@@ -749,6 +757,33 @@ def test_lists_of_lists():
             }
         ),
     )
+
+
+def test_mix_of_dict_and_list_cols():
+    df = pd.DataFrame(
+        data={
+            "id": [1, 2],
+            "dcol": [{"language": "english"}, {"language": "spanish"}],
+            "lcol": [["a", "b"], ["c", "d"]],
+        }
+    )
+    rel_data = RelationalData()
+    rel_data.add_table(name="mix", primary_key=None, data=df)
+    assert set(rel_data.list_all_tables()) == {
+        "mix-sfx",
+        "mix-lcol-sfx",
+    }
+    assert set(rel_data.get_table_data("mix-sfx").columns) == {
+        "id",
+        "~PRIMARY_KEY_ID~",
+        "dcol>language",
+    }
+    assert set(rel_data.get_table_data("mix-lcol-sfx").columns) == {
+        "~PRIMARY_KEY_ID~",
+        "content",
+        "array~order",
+        "mix~id",
+    }
 
 
 def test_all_tables_are_present_in_debug_summary(documents):
