@@ -71,7 +71,6 @@ def _normalize_json(
     name, df = nested_dfs.pop()
     cols_to_scan = columns or [col for col in df.columns if df.dtypes[col] == "object"]
     dict_cols = [col for col in cols_to_scan if df[col].dropna().apply(is_dict).all()]
-    list_cols = [col for col in cols_to_scan if df[col].dropna().apply(is_list).all()]
     if dict_cols:
         df[dict_cols] = nulls_to_empty_dicts(df[dict_cols])
         for col in dict_cols:
@@ -79,19 +78,23 @@ def _normalize_json(
             df = pd.concat([df, new_cols], axis="columns")
             df = df.drop(columns=new_cols.columns[new_cols.isnull().all()])
         nested_dfs.append((name, df.drop(columns=dict_cols)))
-    elif list_cols:
-        for col in list_cols:
-            new_table = df[col].explode().dropna().rename(CONTENT_COLUMN).to_frame()
-            new_table[ORDER_COLUMN] = new_table.groupby(level=0).cumcount()
-            nested_dfs.append(
-                (
-                    name + TABLE_SEPARATOR + col,
-                    new_table.reset_index(names=name + ID_SUFFIX),
-                )
-            )
-        nested_dfs.append((name, df.drop(columns=list_cols)))
     else:
-        flat_dfs.append((name, df))
+        list_cols = [
+            col for col in cols_to_scan if df[col].dropna().apply(is_list).all()
+        ]
+        if list_cols:
+            for col in list_cols:
+                new_table = df[col].explode().dropna().rename(CONTENT_COLUMN).to_frame()
+                new_table[ORDER_COLUMN] = new_table.groupby(level=0).cumcount()
+                nested_dfs.append(
+                    (
+                        name + TABLE_SEPARATOR + col,
+                        new_table.reset_index(names=name + ID_SUFFIX),
+                    )
+                )
+            nested_dfs.append((name, df.drop(columns=list_cols)))
+        else:
+            flat_dfs.append((name, df))
     return _normalize_json(nested_dfs, flat_dfs)
 
 
