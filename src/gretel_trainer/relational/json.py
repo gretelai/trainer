@@ -13,6 +13,8 @@ from unflatten import unflatten
 
 logger = logging.getLogger(__name__)
 
+PREVIEW_ROW_COUNT = 5
+
 # JSON dict to multi-column and list to multi-table
 
 FIELD_SEPARATOR = ">"
@@ -337,7 +339,7 @@ def _generate_commands(
 
 def get_json_columns(df: pd.DataFrame) -> list[str]:
     column_previews = {
-        col: df[col].dropna().head(5)
+        col: df[col].dropna().head(PREVIEW_ROW_COUNT)
         for col in df.columns
         if df.dtypes[col] == "object"
     }
