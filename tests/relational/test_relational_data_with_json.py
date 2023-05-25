@@ -759,6 +759,33 @@ def test_lists_of_lists():
     )
 
 
+def test_mix_of_dict_and_list_cols():
+    df = pd.DataFrame(
+        data={
+            "id": [1, 2],
+            "dcol": [{"language": "english"}, {"language": "spanish"}],
+            "lcol": [["a", "b"], ["c", "d"]],
+        }
+    )
+    rel_data = RelationalData()
+    rel_data.add_table(name="mix", primary_key=None, data=df)
+    assert set(rel_data.list_all_tables()) == {
+        "mix-sfx",
+        "mix-lcol-sfx",
+    }
+    assert set(rel_data.get_table_data("mix-sfx").columns) == {
+        "id",
+        "~PRIMARY_KEY_ID~",
+        "dcol>language",
+    }
+    assert set(rel_data.get_table_data("mix-lcol-sfx").columns) == {
+        "~PRIMARY_KEY_ID~",
+        "content",
+        "array~order",
+        "mix~id",
+    }
+
+
 def test_all_tables_are_present_in_debug_summary(documents):
     assert documents.debug_summary() == {
         "foreign_key_count": 4,
