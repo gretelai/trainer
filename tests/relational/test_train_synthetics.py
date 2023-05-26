@@ -37,7 +37,7 @@ def test_train_synthetics_defaults_to_training_all_tables(ecom, tmpdir):
 
 def test_train_synthetics_only_includes_specified_tables(ecom, tmpdir, project):
     mt = MultiTable(ecom, project_display_name=tmpdir)
-    mt.train_synthetics(only=["users"])
+    mt.train_synthetics(only={"users"})
 
     assert set(mt._synthetics_train.models.keys()) == {"users"}
     project.create_model_obj.assert_called_with(
@@ -48,7 +48,7 @@ def test_train_synthetics_only_includes_specified_tables(ecom, tmpdir, project):
 
 def test_train_synthetics_ignore_excludes_specified_tables(ecom, tmpdir):
     mt = MultiTable(ecom, project_display_name=tmpdir)
-    mt.train_synthetics(ignore=["distribution_center", "products"])
+    mt.train_synthetics(ignore={"distribution_center", "products"})
 
     assert set(mt._synthetics_train.models.keys()) == {
         "events",
@@ -61,7 +61,7 @@ def test_train_synthetics_ignore_excludes_specified_tables(ecom, tmpdir):
 def test_train_synthetics_exits_early_if_unrecognized_tables(ecom, tmpdir, project):
     mt = MultiTable(ecom, project_display_name=tmpdir)
     with pytest.raises(MultiTableException):
-        mt.train_synthetics(ignore=["nonsense"])
+        mt.train_synthetics(ignore={"nonsense"})
 
     assert len(mt._synthetics_train.models) == 0
     project.create_model_obj.assert_not_called()
@@ -69,8 +69,8 @@ def test_train_synthetics_exits_early_if_unrecognized_tables(ecom, tmpdir, proje
 
 def test_train_synthetics_multiple_calls_additive(ecom, tmpdir):
     mt = MultiTable(ecom, project_display_name=tmpdir)
-    mt.train_synthetics(only=["products"])
-    mt.train_synthetics(only=["users"])
+    mt.train_synthetics(only={"products"})
+    mt.train_synthetics(only={"users"})
 
     # We do not lose the first table model
     assert set(mt._synthetics_train.models.keys()) == {"products", "users"}
@@ -80,7 +80,7 @@ def test_train_synthetics_multiple_calls_overwrite(ecom, tmpdir, project):
     project.create_model_obj.return_value = "m1"
 
     mt = MultiTable(ecom, project_display_name=tmpdir)
-    mt.train_synthetics(only=["products"])
+    mt.train_synthetics(only={"products"})
 
     assert mt._synthetics_train.models["products"] == "m1"
 
@@ -88,20 +88,20 @@ def test_train_synthetics_multiple_calls_overwrite(ecom, tmpdir, project):
     project.create_model_obj.return_value = "m2"
 
     # calling a second time will create a new model for the table that overwrites the original
-    mt.train_synthetics(only=["products"])
+    mt.train_synthetics(only={"products"})
     assert mt._synthetics_train.models["products"] == "m2"
 
 
 def test_train_synthetics_after_deleting_models(ecom, tmpdir):
     mt = MultiTable(ecom, project_display_name=tmpdir)
-    mt.train_synthetics(only=["products"])
+    mt.train_synthetics(only={"products"})
     mt.delete_models("synthetics")
-    mt.train_synthetics(only=["users"])
+    mt.train_synthetics(only={"users"})
 
     assert set(mt._synthetics_train.models.keys()) == {"users"}
 
     # You can scope deletion to a subset of tables
-    mt.train_synthetics(only=["users", "products"])
+    mt.train_synthetics(only={"users", "products"})
     assert set(mt._synthetics_train.models.keys()) == {"users", "products"}
-    mt.delete_models("synthetics", ignore=["products"])
+    mt.delete_models("synthetics", ignore={"products"})
     assert set(mt._synthetics_train.models.keys()) == {"products"}

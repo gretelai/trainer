@@ -665,7 +665,7 @@ class RelationalData:
 
 
 def skip_table(
-    table: str, only: Optional[list[str]], ignore: Optional[list[str]]
+    table: str, only: Optional[set[str]], ignore: Optional[set[str]]
 ) -> bool:
     skip = False
     if only is not None and table not in only:

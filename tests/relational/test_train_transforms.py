@@ -38,7 +38,7 @@ def test_train_transforms_defaults_to_transforming_all_tables(ecom, tmpdir):
 
 def test_train_transforms_only_includes_specified_tables(ecom, tmpdir, project):
     mt = MultiTable(ecom, project_display_name=tmpdir)
-    mt.train_transforms("transform/default", only=["users"])
+    mt.train_transforms("transform/default", only={"users"})
     transforms_train = mt._transforms_train
 
     assert set(transforms_train.models.keys()) == {"users"}
@@ -50,7 +50,7 @@ def test_train_transforms_only_includes_specified_tables(ecom, tmpdir, project):
 
 def test_train_transforms_ignore_excludes_specified_tables(ecom, tmpdir):
     mt = MultiTable(ecom, project_display_name=tmpdir)
-    mt.train_transforms("transform/default", ignore=["distribution_center", "products"])
+    mt.train_transforms("transform/default", ignore={"distribution_center", "products"})
     transforms_train = mt._transforms_train
 
     assert set(transforms_train.models.keys()) == {
@@ -64,7 +64,7 @@ def test_train_transforms_ignore_excludes_specified_tables(ecom, tmpdir):
 def test_train_transforms_exits_early_if_unrecognized_tables(ecom, tmpdir, project):
     mt = MultiTable(ecom, project_display_name=tmpdir)
     with pytest.raises(MultiTableException):
-        mt.train_transforms("transform/default", ignore=["nonsense"])
+        mt.train_transforms("transform/default", ignore={"nonsense"})
     transforms_train = mt._transforms_train
 
     assert len(transforms_train.models) == 0
@@ -73,8 +73,8 @@ def test_train_transforms_exits_early_if_unrecognized_tables(ecom, tmpdir, proje
 
 def test_train_transforms_multiple_calls_additive(ecom, tmpdir):
     mt = MultiTable(ecom, project_display_name=tmpdir)
-    mt.train_transforms("transform/default", only=["products"])
-    mt.train_transforms("transform/default", only=["users"])
+    mt.train_transforms("transform/default", only={"products"})
+    mt.train_transforms("transform/default", only={"users"})
 
     # We do not lose the first table model
     assert set(mt._transforms_train.models.keys()) == {"products", "users"}
@@ -84,7 +84,7 @@ def test_train_transforms_multiple_calls_overwrite(ecom, tmpdir, project):
     project.create_model_obj.return_value = "m1"
 
     mt = MultiTable(ecom, project_display_name=tmpdir)
-    mt.train_transforms("transform/default", only=["products"])
+    mt.train_transforms("transform/default", only={"products"})
 
     assert mt._transforms_train.models["products"] == "m1"
 
@@ -92,15 +92,15 @@ def test_train_transforms_multiple_calls_overwrite(ecom, tmpdir, project):
     project.create_model_obj.return_value = "m2"
 
     # calling a second time will create a new model for the table that overwrites the original
-    mt.train_transforms("transform/default", only=["products"])
+    mt.train_transforms("transform/default", only={"products"})
     assert mt._transforms_train.models["products"] == "m2"
 
 
 def test_train_transforms_after_deleting_models(ecom, tmpdir):
     mt = MultiTable(ecom, project_display_name=tmpdir)
-    mt.train_transforms("transform/default", only=["products"])
+    mt.train_transforms("transform/default", only={"products"})
     mt.delete_models("transforms")
-    mt.train_transforms("transform/default", only=["users"])
+    mt.train_transforms("transform/default", only={"users"})
 
     assert set(mt._transforms_train.models.keys()) == {"users"}
 

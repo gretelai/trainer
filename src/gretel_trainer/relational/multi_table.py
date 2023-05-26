@@ -514,8 +514,8 @@ class MultiTable:
         self,
         workflow: str,
         *,
-        only: Optional[list[str]] = None,
-        ignore: Optional[list[str]] = None,
+        only: Optional[set[str]] = None,
+        ignore: Optional[set[str]] = None,
     ) -> None:
         only, ignore = self._get_only_and_ignore(only, ignore)
         tables = [
@@ -625,8 +625,8 @@ class MultiTable:
         self,
         config: GretelModelConfig,
         *,
-        only: Optional[list[str]] = None,
-        ignore: Optional[list[str]] = None,
+        only: Optional[set[str]] = None,
+        ignore: Optional[set[str]] = None,
     ) -> None:
         only, ignore = self._get_only_and_ignore(only, ignore)
 
@@ -727,8 +727,8 @@ class MultiTable:
         self.transform_output_tables = reshaped_tables
 
     def _get_only_and_ignore(
-        self, only: Optional[list[str]], ignore: Optional[list[str]]
-    ) -> tuple[Optional[list[str]], Optional[list[str]]]:
+        self, only: Optional[set[str]], ignore: Optional[set[str]]
+    ) -> tuple[Optional[set[str]], Optional[set[str]]]:
         if only is not None and ignore is not None:
             raise MultiTableException("Cannot specify both `only` and `ignore`.")
 
@@ -739,12 +739,12 @@ class MultiTable:
                 only_and_ignore.append(None)
                 continue
 
-            modelable_tables = []
+            modelable_tables = set()
             for table in given_tables:
                 m_names = self.relational_data.get_modelable_table_names(table)
                 if len(m_names) == 0:
                     raise MultiTableException(f"Unrecognized table name: `{table}`")
-                modelable_tables.extend(m_names)
+                modelable_tables.update(m_names)
 
             only_and_ignore.append(modelable_tables)
 
@@ -819,8 +819,8 @@ class MultiTable:
     def train_synthetics(
         self,
         *,
-        only: Optional[list[str]] = None,
-        ignore: Optional[list[str]] = None,
+        only: Optional[set[str]] = None,
+        ignore: Optional[set[str]] = None,
     ) -> None:
         """
         Train synthetic data models for the tables in the tableset,
