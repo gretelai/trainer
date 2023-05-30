@@ -703,23 +703,19 @@ class MultiTable:
         if only is not None and ignore is not None:
             raise MultiTableException("Cannot specify both `only` and `ignore`.")
 
-        only_and_ignore = []
+        modelable_tables = set()
+        for table in only or ignore or {}:
+            m_names = self.relational_data.get_modelable_table_names(table)
+            if len(m_names) == 0:
+                raise MultiTableException(f"Unrecognized table name: `{table}`")
+            modelable_tables.update(m_names)
 
-        for given_tables in [only, ignore]:
-            if given_tables is None:
-                only_and_ignore.append(None)
-                continue
-
-            modelable_tables = set()
-            for table in given_tables:
-                m_names = self.relational_data.get_modelable_table_names(table)
-                if len(m_names) == 0:
-                    raise MultiTableException(f"Unrecognized table name: `{table}`")
-                modelable_tables.update(m_names)
-
-            only_and_ignore.append(modelable_tables)
-
-        return tuple(only_and_ignore)
+        if only is None:
+            return (None, modelable_tables)
+        elif ignore is None:
+            return (modelable_tables, None)
+        else:
+            return (None, None)
 
     def _prepare_training_data(self, tables: list[str]) -> dict[str, Path]:
         """
