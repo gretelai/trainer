@@ -148,12 +148,13 @@ def test_get_modelable_names_ignores_empty_mapped_tables(bball):
         "bball-suspensions-sfx",
     }
 
-    # ...BUT clients of RelationalData only care about invented tables that were added
-    # to the graph (i.e. that contain data), so that class does not expose the empty table.
+    # ...BUT clients of RelationalData only care about invented tables that can be modeled
+    # (i.e. that contain data), so that class does not expose the empty table.
     assert set(bball.get_modelable_table_names("bball")) == {
         "bball-sfx",
         "bball-teams-sfx",
     }
+    assert set(bball.list_all_tables()) == {"bball-sfx", "bball-teams-sfx"}
 
 
 def test_invented_json_column_names(documents, bball):
