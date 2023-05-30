@@ -17,11 +17,11 @@ def test_extract_subsets_of_relational_data(example_dbs):
         connector = sqlite_conn(f.name)
 
         with pytest.raises(MultiTableException):
-            connector.extract(only=["users"], ignore=["events"])
+            connector.extract(only={"users"}, ignore={"events"})
 
-        only = connector.extract(only=["users", "events", "products"])
+        only = connector.extract(only={"users", "events", "products"})
         ignore = connector.extract(
-            ignore=["distribution_center", "order_items", "inventory_items"]
+            ignore={"distribution_center", "order_items", "inventory_items"}
         )
 
     expected_tables = {"users", "events", "products"}

@@ -33,7 +33,7 @@ class AncestralStrategy:
         return common.label_encode_keys(rel_data, tables)
 
     def prepare_training_data(
-        self, rel_data: RelationalData
+        self, rel_data: RelationalData, tables: list[str]
     ) -> dict[str, pd.DataFrame]:
         """
         Returns tables with:
@@ -43,6 +43,7 @@ class AncestralStrategy:
         - artificial min/max seed records added
         """
         all_tables = rel_data.list_all_tables()
+        omitted_tables = [t for t in all_tables if t not in tables]
         altered_tableset = {}
         training_data = {}
 
@@ -51,13 +52,17 @@ class AncestralStrategy:
             altered_tableset[table_name] = rel_data.get_table_data(table_name).copy()
 
         # Translate all keys to a contiguous list of integers
-        altered_tableset = common.label_encode_keys(rel_data, altered_tableset)
+        altered_tableset = common.label_encode_keys(
+            rel_data, altered_tableset, omit=omitted_tables
+        )
 
         # Add artificial rows to support seeding
-        altered_tableset = _add_artifical_rows_for_seeding(rel_data, altered_tableset)
+        altered_tableset = _add_artifical_rows_for_seeding(
+            rel_data, altered_tableset, omitted_tables
+        )
 
         # Collect all data in multigenerational format
-        for table_name in all_tables:
+        for table_name in tables:
             data = ancestry.get_table_data_with_ancestors(
                 rel_data=rel_data,
                 table=table_name,
@@ -133,7 +138,6 @@ class AncestralStrategy:
         record_size_ratio: float,
         output_tables: dict[str, pd.DataFrame],
         target_dir: Path,
-        training_columns: list[str],
     ) -> dict[str, Any]:
         """
         Returns kwargs for creating a record handler job via the Gretel SDK.
@@ -149,7 +153,7 @@ class AncestralStrategy:
             return {"params": {"num_records": synth_size}}
         else:
             seed_df = self._build_seed_data_for_table(
-                table, output_tables, rel_data, synth_size, training_columns
+                table, output_tables, rel_data, synth_size
             )
             seed_path = target_dir / f"synthetics_seed_{table}.csv"
             seed_df.to_csv(seed_path, index=False)
@@ -161,8 +165,8 @@ class AncestralStrategy:
         output_tables: dict[str, pd.DataFrame],
         rel_data: RelationalData,
         synth_size: int,
-        training_columns: list[str],
     ) -> pd.DataFrame:
+        column_legend = ancestry.get_seed_safe_multigenerational_columns(rel_data)
         seed_df = pd.DataFrame()
 
         source_data = rel_data.get_table_data(table)
@@ -202,7 +206,9 @@ class AncestralStrategy:
 
             # Drop any columns that weren't used in training, as well as the temporary merge column
             columns_to_drop = [
-                col for col in this_fk_seed_df.columns if col not in training_columns
+                col
+                for col in this_fk_seed_df.columns
+                if col not in column_legend[table]
             ]
             columns_to_drop.append(tmp_column_name)
             this_fk_seed_df = this_fk_seed_df.drop(columns=columns_to_drop)
@@ -325,11 +331,14 @@ class AncestralStrategy:
 
 
 def _add_artifical_rows_for_seeding(
-    rel_data: RelationalData, tables: dict[str, pd.DataFrame]
+    rel_data: RelationalData, tables: dict[str, pd.DataFrame], omitted: list[str]
 ) -> dict[str, pd.DataFrame]:
     # On each table, add an artifical row with the max possible PK value
+    # unless the table is omitted from synthetics
     max_pk_values = {}
     for table_name, data in tables.items():
+        if table_name in omitted:
+            continue
         max_pk_values[table_name] = len(data) * 50
 
         random_record = tables[table_name].sample().copy()
@@ -343,6 +352,10 @@ def _add_artifical_rows_for_seeding(
         if len(foreign_keys) == 0:
             continue
 
+        # Skip if the parent table is omitted and is the only parent
+        if len(foreign_keys) == 1 and foreign_keys[0].parent_table_name in omitted:
+            continue
+
         two_records = tables[table_name].sample(2)
         min_fk_record = two_records.head(1).copy()
         max_fk_record = two_records.tail(1).copy()
@@ -354,6 +367,9 @@ def _add_artifical_rows_for_seeding(
 
         # This can potentially overwrite the auto-incremented primary keys above in the case of composite keys
         for foreign_key in foreign_keys:
+            # Treat FK columns to omitted parents as normal columns
+            if foreign_key.parent_table_name in omitted:
+                continue
             for fk_col in foreign_key.columns:
                 min_fk_record[fk_col] = 0
                 max_fk_record[fk_col] = max_pk_values[foreign_key.parent_table_name]

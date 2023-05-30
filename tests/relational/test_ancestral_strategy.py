@@ -22,7 +22,7 @@ def test_preparing_training_data_does_not_mutate_source_data(pets, art):
         }
 
         strategy = AncestralStrategy()
-        strategy.prepare_training_data(rel_data)
+        strategy.prepare_training_data(rel_data, rel_data.list_all_tables())
 
         for table in rel_data.list_all_tables():
             pdtest.assert_frame_equal(
@@ -30,10 +30,26 @@ def test_preparing_training_data_does_not_mutate_source_data(pets, art):
             )
 
 
+def test_prepare_training_data_subset_of_tables(pets):
+    strategy = AncestralStrategy()
+
+    # We aren't synthesizing the "humans" table, so it is not in this list argument...
+    training_data = strategy.prepare_training_data(pets, ["pets"])
+    # ...nor do we create training data for it
+    assert set(training_data.keys()) == {"pets"}
+
+    # Since the humans table is omitted from synthetics, we leave the FK values alone; specifically:
+    # - they are not label-encoded (which would effectively zero-index them)
+    # - we do not add artificial min/max values
+    assert set(training_data["pets"]["self|human_id"].values) == {1, 2, 3, 4, 5}
+    # We do add the artificial max PK row, though, since this table is being synthesized
+    assert len(training_data["pets"]) == 6
+
+
 def test_prepare_training_data_returns_multigenerational_data(pets):
     strategy = AncestralStrategy()
 
-    training_data = strategy.prepare_training_data(pets)
+    training_data = strategy.prepare_training_data(pets, pets.list_all_tables())
 
     for expected_column in ["self|id", "self|name", "self.human_id|id"]:
         assert expected_column in training_data["pets"]
@@ -61,7 +77,7 @@ def test_prepare_training_data_drops_highly_unique_categorical_ancestor_fields(a
     )
 
     strategy = AncestralStrategy()
-    training_data = strategy.prepare_training_data(art)
+    training_data = strategy.prepare_training_data(art, art.list_all_tables())
 
     # Does not contain `self.artist_id|name` because it is highly unique categorical
     assert set(training_data["paintings"].columns) == {
@@ -100,7 +116,7 @@ def test_prepare_training_data_drops_highly_nan_ancestor_fields(art):
     )
 
     strategy = AncestralStrategy()
-    training_data = strategy.prepare_training_data(art)
+    training_data = strategy.prepare_training_data(art, art.list_all_tables())
 
     # Does not contain `self.artist_id|name` because it is highly NaN
     assert set(training_data["paintings"].columns) == {
@@ -115,7 +131,7 @@ def test_prepare_training_data_translates_alphanumeric_keys_and_adds_min_max_rec
     art,
 ):
     strategy = AncestralStrategy()
-    training_data = strategy.prepare_training_data(art)
+    training_data = strategy.prepare_training_data(art, art.list_all_tables())
 
     # Artists, a parent table, should have 1 additional row
     assert len(training_data["artists"]) == len(art.get_table_data("artists")) + 1
@@ -142,7 +158,7 @@ def test_prepare_training_data_translates_alphanumeric_keys_and_adds_min_max_rec
 
 def test_prepare_training_data_with_composite_keys(tpch):
     strategy = AncestralStrategy()
-    training_data = strategy.prepare_training_data(tpch)
+    training_data = strategy.prepare_training_data(tpch, tpch.list_all_tables())
 
     l_max = len(tpch.get_table_data("lineitem")) * 50
     ps_max = len(tpch.get_table_data("partsupp")) * 50
@@ -339,28 +355,11 @@ def test_table_generation_readiness(ecom):
 def test_generation_job(pets):
     strategy = AncestralStrategy()
 
-    training_columns = {
-        "humans": [
-            "self|id",
-            "self|name",
-            "self|city",
-        ],
-        "pets": [
-            "self|id",
-            "self|name",
-            "self|age",
-            "self|human_id",
-            "self.human_id|id",
-            # "self.human_id|name", # highly unique categorical
-            "self.human_id|city",
-        ],
-    }
-
     # Table with no ancestors
     with tempfile.TemporaryDirectory() as tmp:
         working_dir = Path(tmp)
         parent_table_job = strategy.get_generation_job(
-            "humans", pets, 2.0, {}, working_dir, training_columns["humans"]
+            "humans", pets, 2.0, {}, working_dir
         )
         assert len(os.listdir(working_dir)) == 0
         assert parent_table_job == {"params": {"num_records": 10}}
@@ -389,7 +388,7 @@ def test_generation_job(pets):
     with tempfile.TemporaryDirectory() as tmp:
         working_dir = Path(tmp)
         child_table_job = strategy.get_generation_job(
-            "pets", pets, 2.0, output_tables, working_dir, training_columns["pets"]
+            "pets", pets, 2.0, output_tables, working_dir
         )
 
         assert len(os.listdir(working_dir)) == 1
@@ -429,29 +428,6 @@ def test_generation_job_seeds_go_back_multiple_generations(source_nba, synthetic
         "cities": ancestry.get_table_data_with_ancestors(synthetic_nba, "cities"),
         "states": ancestry.get_table_data_with_ancestors(synthetic_nba, "states"),
     }
-    training_columns = {
-        "teams": [
-            "self|name",
-            "self|id",
-            "self|city_id",
-            "self.city_id|id",
-            "self.city_id|state_id",
-            # "self.city_id|name", # highly unique categorical
-            "self.city_id.state_id|id",
-            # "self.city_id.state_id|name", # highly unique categorical
-        ],
-        "cities": [
-            "self|id",
-            "self|state_id",
-            # "self|name", # highly unique categorical
-            "self.state_id|id",
-            # "self.state_id|name", # highly unique categorical
-        ],
-        "states": [
-            "self|id",
-            "self|name",
-        ],
-    }
 
     strategy = AncestralStrategy()
 
@@ -463,7 +439,6 @@ def test_generation_job_seeds_go_back_multiple_generations(source_nba, synthetic
             1.0,
             output_tables,
             working_dir,
-            training_columns["teams"],
         )
         seed_df = pd.read_csv(job["data_source"])
 

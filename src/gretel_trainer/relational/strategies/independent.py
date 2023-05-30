@@ -34,14 +34,14 @@ class IndependentStrategy:
         return common.label_encode_keys(rel_data, tables)
 
     def prepare_training_data(
-        self, rel_data: RelationalData
+        self, rel_data: RelationalData, tables: list[str]
     ) -> dict[str, pd.DataFrame]:
         """
         Returns source tables with primary and foreign keys removed
         """
         training_data = {}
 
-        for table_name in rel_data.list_all_tables():
+        for table_name in tables:
             columns_to_drop = []
             columns_to_drop.extend(rel_data.get_primary_key(table_name))
             for foreign_key in rel_data.get_foreign_keys(table_name):
@@ -100,7 +100,6 @@ class IndependentStrategy:
         record_size_ratio: float,
         output_tables: dict[str, pd.DataFrame],
         target_dir: Path,
-        training_columns: list[str],
     ) -> dict[str, Any]:
         """
         Returns kwargs for a record handler job requesting an output record

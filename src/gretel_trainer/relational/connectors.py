@@ -42,7 +42,7 @@ class Connector:
         logger.info("Successfully connected to db")
 
     def extract(
-        self, only: Optional[list[str]] = None, ignore: Optional[list[str]] = None
+        self, only: Optional[set[str]] = None, ignore: Optional[set[str]] = None
     ) -> RelationalData:
         """
         Extracts table data and relationships from the database.

@@ -19,7 +19,6 @@ class TransformsTrain:
 class SyntheticsTrain:
     models: dict[str, Model] = field(default_factory=dict)
     lost_contact: list[str] = field(default_factory=list)
-    training_columns: dict[str, list[str]] = field(default_factory=dict)
 
 
 @dataclass
@@ -29,4 +28,3 @@ class SyntheticsRun:
     preserved: list[str]
     record_handlers: dict[str, RecordHandler]
     lost_contact: list[str]
-    missing_model: list[str]

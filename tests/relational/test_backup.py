@@ -130,10 +130,6 @@ def test_backup():
             "customer": "1234567890",
             "address": "0987654321",
         },
-        training_columns={
-            "customer": ["id", "first", "last"],
-            "address": ["customer_id", "street", "city"],
-        },
         lost_contact=[],
     )
     backup_generate = BackupGenerate(
@@ -141,7 +137,6 @@ def test_backup():
         preserved=[],
         record_size_ratio=1.0,
         lost_contact=[],
-        missing_model=[],
         record_handler_ids={
             "customer": "555444666",
             "address": "333111222",

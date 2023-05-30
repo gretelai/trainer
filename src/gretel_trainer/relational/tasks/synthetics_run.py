@@ -3,7 +3,7 @@ from pathlib import Path
 from typing import Optional
 
 import pandas as pd
-from gretel_client.projects.jobs import ACTIVE_STATES, Job
+from gretel_client.projects.jobs import ACTIVE_STATES, Job, Status
 from gretel_client.projects.projects import Project
 from gretel_client.projects.records import RecordHandler
 
@@ -31,14 +31,20 @@ class SyntheticsRunTask:
 
     def _setup_working_tables(self) -> dict[str, Optional[pd.DataFrame]]:
         working_tables = {}
+        all_tables = self.multitable.relational_data.list_all_tables()
 
-        for table in self.synthetics_run.missing_model:
-            working_tables[table] = None
+        for table in all_tables:
+            model = self.synthetics_train.models.get(table)
 
-        for table in self.synthetics_run.preserved:
-            working_tables[table] = self.multitable._strategy.get_preserved_data(
-                table, self.multitable.relational_data
-            )
+            # Table was either omitted from training or marked as to-be-preserved during generation
+            if model is None or table in self.synthetics_run.preserved:
+                working_tables[table] = self.multitable._strategy.get_preserved_data(
+                    table, self.multitable.relational_data
+                )
+
+            # Table was included in training, but failed at that step
+            elif model.status != Status.COMPLETED:
+                working_tables[table] = None
 
         return working_tables
 
@@ -139,7 +145,6 @@ class SyntheticsRunTask:
                 self.synthetics_run.record_size_ratio,
                 present_working_tables,
                 self.run_dir,
-                self.synthetics_train.training_columns[table_name],
             )
             model = self.synthetics_train.models[table_name]
             record_handler = model.create_record_handler_obj(**table_job)

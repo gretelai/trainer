@@ -48,13 +48,19 @@ def _get_report_json(model: Model) -> Optional[dict]:
 
 
 def label_encode_keys(
-    rel_data: RelationalData, tables: dict[str, pd.DataFrame]
+    rel_data: RelationalData,
+    tables: dict[str, pd.DataFrame],
+    omit: Optional[list[str]] = None,
 ) -> dict[str, pd.DataFrame]:
     """
     Crawls tables for all key columns (primary and foreign). For each PK (and FK columns referencing it),
     runs all values through a LabelEncoder and updates tables' columns to use LE-transformed values.
     """
+    omit = omit or []
     for table_name in rel_data.list_tables_parents_before_children():
+        if table_name in omit:
+            continue
+
         df = tables.get(table_name)
         if df is None:
             continue
