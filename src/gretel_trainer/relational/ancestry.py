@@ -14,6 +14,7 @@ _END_LINEAGE = "|"
 def get_multigenerational_primary_key(
     rel_data: RelationalData, table: str
 ) -> list[str]:
+    "Returns the provided table's primary key with the ancestral lineage prefix appended"
     return [
         f"{_START_LINEAGE}{_END_LINEAGE}{pk}" for pk in rel_data.get_primary_key(table)
     ]
@@ -22,6 +23,17 @@ def get_multigenerational_primary_key(
 def get_ancestral_foreign_key_maps(
     rel_data: RelationalData, table: str
 ) -> list[tuple[str, str]]:
+    """
+    Returns a list of two-element tuples where the first element is a foreign key column
+    with ancestral lineage prefix, and the second element is the ancestral-lineage-prefixed
+    referred column. This function ultimately provides a list of which columns are duplicates
+    in a fully-joined ancestral table (i.e. `get_table_data_with_ancestors`) (only between
+    the provided table and its direct parents, not between parents and grandparents).
+
+    For example: given an events table with foreign key `events.user_id` => `users.id`,
+    this method returns: [("self|user_id", "self.user_id|id")]
+    """
+
     def _ancestral_fk_map(fk: ForeignKey) -> list[tuple[str, str]]:
         maps = []
         fk_lineage = _COL_DELIMITER.join(fk.columns)
@@ -49,6 +61,12 @@ def get_ancestral_foreign_key_maps(
 def get_seed_safe_multigenerational_columns(
     rel_data: RelationalData,
 ) -> dict[str, list[str]]:
+    """
+    Returns a dict with Scope.MODELABLE table names as keys and lists of columns to use
+    for conditional seeding as values. By using a tableset of empty dataframes, this provides
+    a significantly faster / less resource-intensive way to get just the column names
+    from the results of `get_table_data_with_ancestors` for all tables.
+    """
     tableset = {
         table: pd.DataFrame(columns=list(rel_data.get_table_columns(table)))
         for table in rel_data.list_all_tables()
