@@ -112,18 +112,3 @@ def test_train_synthetics_multiple_calls_overwrite(ecom, tmpdir, project):
     # calling a second time will create a new model for the table that overwrites the original
     mt.train_synthetics(only={"products"})
     assert mt._synthetics_train.models["products"] == "m2"
-
-
-def test_train_synthetics_after_deleting_models(ecom, tmpdir):
-    mt = MultiTable(ecom, project_display_name=tmpdir)
-    mt.train_synthetics(only={"products"})
-    mt.delete_models("synthetics")
-    mt.train_synthetics(only={"users"})
-
-    assert set(mt._synthetics_train.models.keys()) == {"users"}
-
-    # You can scope deletion to a subset of tables
-    mt.train_synthetics(only={"users", "products"})
-    assert set(mt._synthetics_train.models.keys()) == {"users", "products"}
-    mt.delete_models("synthetics", ignore={"products"})
-    assert set(mt._synthetics_train.models.keys()) == {"products"}

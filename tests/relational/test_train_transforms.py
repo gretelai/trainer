@@ -96,15 +96,6 @@ def test_train_transforms_multiple_calls_overwrite(ecom, tmpdir, project):
     assert mt._transforms_train.models["products"] == "m2"
 
 
-def test_train_transforms_after_deleting_models(ecom, tmpdir):
-    mt = MultiTable(ecom, project_display_name=tmpdir)
-    mt.train_transforms("transform/default", only={"products"})
-    mt.delete_models("transforms")
-    mt.train_transforms("transform/default", only={"users"})
-
-    assert set(mt._transforms_train.models.keys()) == {"users"}
-
-
 # The public method under test here is deprecated
 def test_train_transform_models(ecom, tmpdir):
     mt = MultiTable(ecom, project_display_name=tmpdir)

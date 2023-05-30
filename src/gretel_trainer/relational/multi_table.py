@@ -510,35 +510,6 @@ class MultiTable:
             self._project, str(debug_summary_path)
         )
 
-    def delete_models(
-        self,
-        workflow: str,
-        *,
-        only: Optional[set[str]] = None,
-        ignore: Optional[set[str]] = None,
-    ) -> None:
-        only, ignore = self._get_only_and_ignore(only, ignore)
-        tables = [
-            table
-            for table in self.relational_data.list_all_tables()
-            if not skip_table(table, only, ignore)
-        ]
-        if workflow == "classify":
-            state = self._classify
-        elif workflow == "transforms":
-            state = self._transforms_train
-        elif workflow == "synthetics":
-            state = self._synthetics_train
-        else:
-            raise MultiTableException(
-                "Unknown workflow; must specify `classify`, `transforms`, or `synthetics`."
-            )
-
-        for table in tables:
-            if (model := state.models.get(table)) is not None:
-                model.delete()
-                del state.models[table]
-
     def classify(self, config: GretelModelConfig, all_rows: bool = False) -> None:
         classify_data_sources = {}
         for table in self.relational_data.list_all_tables():
