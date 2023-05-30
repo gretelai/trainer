@@ -148,6 +148,7 @@ class _RelationalData(Protocol):
 class InventedTableMetadata:
     invented_root_table_name: str
     original_table_name: str
+    empty: bool
 
 
 class RelationalJson:
@@ -198,6 +199,7 @@ class RelationalJson:
 
     @property
     def table_names(self) -> list[str]:
+        """Returns sanitized, model-friendly table names, *including* those of empty invented tables."""
         return list(self.table_name_mappings.values())
 
     @property
@@ -295,13 +297,12 @@ def _generate_commands(
     Returns lists of keyword arguments designed to be passed to a
     RelationalData instance's _add_single_table and add_foreign_key methods
     """
-    tables = [(rel_json.table_name_mappings[name], df) for name, df in tables]
-    non_empty_tables = [t for t in tables if not t[1].empty]
+    tables_to_add = {rel_json.table_name_mappings[name]: df for name, df in tables}
 
     _add_single_table = []
     add_foreign_key = []
 
-    for table_name, table_df in non_empty_tables:
+    for table_name, table_df in tables_to_add.items():
         if table_name == rel_json.root_table_name:
             table_pk = rel_json.original_primary_key + [PRIMARY_KEY_COLUMN]
         else:
@@ -314,6 +315,7 @@ def _generate_commands(
         metadata = InventedTableMetadata(
             invented_root_table_name=invented_root_table_name,
             original_table_name=rel_json.original_table_name,
+            empty=table_df.empty,
         )
         _add_single_table.append(
             {
@@ -324,7 +326,7 @@ def _generate_commands(
             }
         )
 
-    for table_name, table_df in non_empty_tables:
+    for table_name, table_df in tables_to_add.items():
         for column in get_id_columns(table_df):
             referred_table = rel_json.table_name_mappings[
                 get_parent_table_name_from_child_id_column(column)
@@ -341,17 +343,34 @@ def _generate_commands(
 
 
 def get_json_columns(df: pd.DataFrame) -> list[str]:
+    """
+    Samples non-null values from all columns and returns those that contain
+    valid JSON dicts or lists.
+
+    Raises an error if *all* columns are lists, as that is not currently supported.
+    """
     column_previews = {
-        col: df[col].dropna().head(PREVIEW_ROW_COUNT)
+        col: preview_data
         for col in df.columns
         if df.dtypes[col] == "object"
+        and len(preview_data := df[col].dropna().head(PREVIEW_ROW_COUNT)) > 0
     }
 
-    return [
-        col
-        for col, series in column_previews.items()
-        if series.apply(is_dict).all() or series.apply(is_list).all()
+    if len(column_previews) == 0:
+        return []
+
+    list_cols = [
+        col for col, series in column_previews.items() if series.apply(is_list).all()
     ]
+
+    if len(list_cols) == len(df.columns):
+        raise ValueError("Cannot accept tables with JSON lists in all columns")
+
+    dict_cols = [
+        col for col, series in column_previews.items() if series.apply(is_dict).all()
+    ]
+
+    return dict_cols + list_cols
 
 
 CommandsT = tuple[list[dict], list[dict]]

@@ -14,8 +14,8 @@ from gretel_trainer.relational.json import get_json_columns
 @pytest.fixture
 def bball():
     bball_jsonl = """
-    {"name": "LeBron James", "age": 38, "draft": {"year": 2003}, "teams": ["Cavaliers", "Heat", "Lakers"]}
-    {"name": "Steph Curry", "age": 35, "draft": {"year": 2009, "college": "Davidson"}, "teams": ["Warriors"]}
+    {"name": "LeBron James", "age": 38, "draft": {"year": 2003}, "teams": ["Cavaliers", "Heat", "Lakers"], "suspensions": []}
+    {"name": "Steph Curry", "age": 35, "draft": {"year": 2009, "college": "Davidson"}, "teams": ["Warriors"], "suspensions": []}
     """
     bball_df = pd.read_json(bball_jsonl, lines=True)
 
@@ -29,7 +29,11 @@ def test_list_json_cols(documents, bball):
     assert get_json_columns(documents.get_table_data("users")) == []
     assert get_json_columns(documents.get_table_data("purchases")) == ["data"]
 
-    assert set(get_json_columns(bball.get_table_data("bball"))) == {"draft", "teams"}
+    assert set(get_json_columns(bball.get_table_data("bball"))) == {
+        "draft",
+        "teams",
+        "suspensions",
+    }
 
 
 def test_json_columns_produce_invented_flattened_tables(documents):
@@ -133,6 +137,26 @@ def test_get_modelable_table_names(documents):
     assert documents.get_modelable_table_names("nonsense") == []
 
 
+def test_get_modelable_names_ignores_empty_mapped_tables(bball):
+    # The `suspensions` column in the source data contained empty lists for all records.
+    # We need to hold onto that table name on the RelationalJson instance to support
+    # denormalizing back to the original source data shape. It is therefore exposed
+    # in the `table_names` attribute on RelationalJson...
+    assert set(bball.relational_jsons["bball"].table_names) == {
+        "bball-sfx",
+        "bball-teams-sfx",
+        "bball-suspensions-sfx",
+    }
+
+    # ...BUT clients of RelationalData only care about invented tables that can be modeled
+    # (i.e. that contain data), so that class does not expose the empty table.
+    assert set(bball.get_modelable_table_names("bball")) == {
+        "bball-sfx",
+        "bball-teams-sfx",
+    }
+    assert set(bball.list_all_tables()) == {"bball-sfx", "bball-teams-sfx"}
+
+
 def test_invented_json_column_names(documents, bball):
     # The root invented table adds columns for dictionary properties lifted from nested JSON objects
     assert set(documents.get_table_columns("purchases-sfx")) == {
@@ -189,9 +213,9 @@ def test_primary_key(documents, bball):
     assert documents.get_foreign_keys("payments") == original_payments_fks
 
     # Setting a None primary key to some column puts us in the correct state
-    assert len(bball.list_all_tables(Scope.ALL)) == 3
+    assert len(bball.list_all_tables(Scope.ALL)) == 4
     bball.set_primary_key(table="bball", primary_key="name")
-    assert len(bball.list_all_tables(Scope.ALL)) == 3
+    assert len(bball.list_all_tables(Scope.ALL)) == 4
     assert bball.get_primary_key("bball") == ["name"]
     assert bball.get_primary_key("bball-sfx") == ["name", "~PRIMARY_KEY_ID~"]
     assert bball.get_foreign_keys("bball-teams-sfx") == [
@@ -580,6 +604,37 @@ def test_restore_with_incomplete_tableset(documents, mt_output_tables):
     )
 
 
+def test_restore_with_empty_tables(bball):
+    synthetic_bball_output_tables = {
+        "bball-sfx": pd.DataFrame(
+            data={
+                "name": ["Jimmy Butler"],
+                "age": [33],
+                "draft>year": [2011],
+                "draft>college": ["Marquette"],
+                "~PRIMARY_KEY_ID~": [0],
+            }
+        ),
+        "bball-teams-sfx": pd.DataFrame(
+            data={
+                "content": ["Bulls", "Timberwolves", "Sixers", "Heat"],
+                "array~order": [0, 1, 2, 3],
+                "~PRIMARY_KEY_ID~": [0, 1, 2, 3],
+                "bball~id": [0, 0, 0, 0],
+            }
+        ),
+    }
+
+    restored_tables = bball.restore(synthetic_bball_output_tables)
+    jimmy = restored_tables["bball"].iloc[0]
+
+    assert jimmy["name"] == "Jimmy Butler"
+    assert jimmy["age"] == 33
+    assert jimmy["draft"] == {"year": 2011, "college": "Marquette"}
+    assert jimmy["teams"] == ["Bulls", "Timberwolves", "Sixers", "Heat"]
+    assert jimmy["suspensions"] == []
+
+
 def test_flatten_and_restore_all_sorts_of_json():
     json = """
 [
@@ -706,14 +761,12 @@ def test_only_lists_edge_case():
     list_df = pd.DataFrame(data={"l": [[1, 2, 3, 4]]})
     rel_data = RelationalData()
 
-    # Since there are no flat fields on the source, we cannot create an invented root table.
-    # Internally, the call below fails when trying to create a foreign key from the invented child table up to a nonexistent root.
-    with pytest.raises(MultiTableException):
+    # Since there are no flat fields on the source, the invented root table would be empty.
+    # The root table is what we use for evaluation, so we bail.
+    with pytest.raises(ValueError):
         rel_data.add_table(name="list", primary_key=None, data=list_df)
 
-    # TODO: Ideally we should "roll back the transaction" and the call below should return an empty set,
-    # but instead we currently get left in a nonsensical state.
-    assert set(rel_data.list_all_tables(Scope.ALL)) == {"list", "list-l-sfx"}
+    assert rel_data.list_all_tables(Scope.ALL) == []
 
 
 def test_lists_of_lists():

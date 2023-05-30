@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import logging
-from contextlib import suppress
 from dataclasses import dataclass, replace
 from enum import Enum
 from pathlib import Path
@@ -238,7 +237,7 @@ class RelationalData:
         )
 
         for invented_table_name in rel_json.table_names:
-            with suppress(KeyError):
+            if invented_table_name in self.graph.nodes:
                 self.graph.remove_node(invented_table_name)
         del self.relational_jsons[table]
 
@@ -430,34 +429,47 @@ class RelationalData:
                 self._clear_safe_ancestral_seed_columns(table)
 
     def list_all_tables(self, scope: Scope = Scope.MODELABLE) -> list[str]:
-        modelable_nodes = self.graph.nodes
+        """
+        Returns a list of table names belonging to the provided Scope.
+        See Scope enum documentation for details.
+        By default, returns tables that can be submitted as jobs to Gretel
+        (i.e. that are MODELABLE).
+        """
+        graph_nodes = list(self.graph.nodes)
 
         json_source_tables = [
             rel_json.original_table_name
             for _, rel_json in self.relational_jsons.items()
         ]
 
+        all_tables = graph_nodes + json_source_tables
+
+        modelable_tables = []
+        evaluatable_tables = []
+        invented_tables: list[str] = []
+
+        for n in graph_nodes:
+            meta = self.graph.nodes[n]["metadata"]
+            if (invented_meta := meta.invented_table_metadata) is not None:
+                invented_tables.append(n)
+                if invented_meta.invented_root_table_name == n:
+                    evaluatable_tables.append(n)
+                if not invented_meta.empty:
+                    modelable_tables.append(n)
+            else:
+                modelable_tables.append(n)
+                evaluatable_tables.append(n)
+
         if scope == Scope.MODELABLE:
-            return list(modelable_nodes)
+            return modelable_tables
         elif scope == Scope.EVALUATABLE:
-            e = []
-            for n in modelable_nodes:
-                meta = self.graph.nodes[n]["metadata"]
-                if (
-                    meta.invented_table_metadata is None
-                    or meta.invented_table_metadata.invented_root_table_name == n
-                ):
-                    e.append(n)
-            return e
+            return evaluatable_tables
         elif scope == Scope.INVENTED:
-            return [n for n in modelable_nodes if self._is_invented(n)]
+            return invented_tables
         elif scope == Scope.ALL:
-            return list(modelable_nodes) + json_source_tables
+            return all_tables
         elif scope == Scope.PUBLIC:
-            non_invented_nodes = [
-                n for n in modelable_nodes if not self._is_invented(n)
-            ]
-            return json_source_tables + non_invented_nodes
+            return [t for t in all_tables if t not in invented_tables]
 
     def _is_invented(self, table: str) -> bool:
         return (
@@ -467,16 +479,20 @@ class RelationalData:
 
     def get_modelable_table_names(self, table: str) -> list[str]:
         """Returns a list of MODELABLE table names connected to the provided table.
-        If the provided table is already modelable, returns [table].
-        If the provided table is not modelable (e.g. source with JSON), returns tables invented from that source.
-        If the provided table does not exist, returns empty list.
+        If the provided table is the source of invented tables, returns the modelable invented tables created from it.
+        If the provided table is itself modelable, returns that table name back.
+        Otherwise returns an empty list.
         """
         if (rel_json := self.relational_jsons.get(table)) is not None:
-            return rel_json.table_names
-        elif table not in self.list_all_tables(Scope.ALL):
-            return []
-        else:
+            return [
+                t
+                for t in rel_json.table_names
+                if t in self.list_all_tables(Scope.MODELABLE)
+            ]
+        elif table in self.list_all_tables(Scope.MODELABLE):
             return [table]
+        else:
+            return []
 
     def get_public_name(self, table: str) -> Optional[str]:
         if table in self.relational_jsons:

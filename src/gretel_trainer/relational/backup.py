@@ -10,7 +10,7 @@ from gretel_trainer.relational.core import ForeignKey, RelationalData
 @dataclass
 class BackupRelationalDataTable:
     primary_key: list[str]
-    invented_table_metadata: Optional[dict[str, str]] = None
+    invented_table_metadata: Optional[dict[str, Any]] = None
 
 
 @dataclass
@@ -36,7 +36,6 @@ class BackupRelationalJson:
     original_primary_key: list[str]
     original_columns: list[str]
     table_name_mappings: dict[str, str]
-    invented_table_names: list[str]
 
 
 @dataclass
@@ -71,7 +70,6 @@ class BackupRelationalData:
                 original_primary_key=rel_json.original_primary_key,
                 original_columns=rel_json.original_columns,
                 table_name_mappings=rel_json.table_name_mappings,
-                invented_table_names=rel_json.table_names,
             )
         return BackupRelationalData(
             tables=tables, foreign_keys=foreign_keys, relational_jsons=relational_jsons
