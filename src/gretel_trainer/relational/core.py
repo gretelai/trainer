@@ -142,6 +142,9 @@ class RelationalData:
     ) -> Optional[IngestResponseT]:
         json_cols = get_json_columns(data)
         if len(json_cols) > 0:
+            logger.info(
+                f"Detected JSON data in table `{table}`. Running JSON normalization."
+            )
             return RelationalJson.ingest(table, primary_key, data, json_cols)
 
     def _add_rel_json_and_tables(self, table: str, rj_ingest: IngestResponseT) -> None:
