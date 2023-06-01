@@ -3,6 +3,7 @@ TODO
 """
 from __future__ import annotations
 from typing import TYPE_CHECKING
+from pathlib import Path
 
 from dataclasses import dataclass
 
@@ -37,6 +38,7 @@ class Subsetter:
     _connector: Connector
     _rel_data: RelationalData
     _config: SubsetConfig
+    _storage_dir: Path
 
     def __init__(
         self,
@@ -44,7 +46,13 @@ class Subsetter:
         config: SubsetConfig,
         connector: Connector,
         relational_data: RelationalData,
+        storage_dir: Path,
     ):
         self._connector = connector
         self._rel_data = relational_data
         self._config = config
+
+        if not storage_dir.is_dir():
+            raise ValueError("The `storage_dir` must be a directory!")
+
+        self._storage_dir = storage_dir

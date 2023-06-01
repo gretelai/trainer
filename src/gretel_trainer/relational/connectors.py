@@ -82,12 +82,6 @@ class Connector:
 
         return relational_data
 
-    def _extract_full_tables(self) -> None:
-        ...
-
-    def _extract_subsetted_tables(self) -> None:
-        ...
-
     def save(self, tables: dict[str, pd.DataFrame], prefix: str = "") -> None:
         for name, data in tables.items():
             data.to_sql(
