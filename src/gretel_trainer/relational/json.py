@@ -174,14 +174,11 @@ class RelationalJson:
         df: pd.DataFrame,
         json_columns: Optional[list[str]] = None,
     ) -> Optional[IngestResponseT]:
-        logger.debug(f"Checking table `{table_name}` for JSON columns")
         tables = _normalize_json([(table_name, df.copy())], [], json_columns)
         # If we created additional tables (from JSON lists) or added columns (from JSON dicts)
         if len(tables) > 1 or len(tables[0][1].columns) > len(df.columns):
             mappings = {name: sanitize_str(name) for name, _ in tables}
-            logger.info(
-                f"Found JSON data in table `{table_name}`, transformed into {len(mappings)} tables for modeling."
-            )
+            logger.info(f"Transformed JSON into {len(mappings)} tables for modeling.")
             logger.debug(f"Invented table names: {list(mappings.values())}")
             rel_json = RelationalJson(
                 original_table_name=table_name,
