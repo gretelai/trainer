@@ -169,8 +169,7 @@ class TableExtractor:
     _connector: Connector
     _config: ExtractorConfig
     _storage_dir: Path
-    _relational_data: RelationalData
-    _bootstrapped: bool = False
+    _relational_data: RelationalData | None
     _chunk_size: int = 50_000
 
     table_order: list[str]
@@ -190,7 +189,7 @@ class TableExtractor:
 
         self._storage_dir = storage_dir
 
-        self._relational_data = RelationalData()
+        self._relational_data = None
         self.table_order = []
 
     def _get_table_session(self, table_name: str) -> _TableSession:
@@ -199,7 +198,8 @@ class TableExtractor:
         table = metadata.tables[table_name]
         return _TableSession(table=table, engine=self._connector.engine)
 
-    def extract_schema(self) -> TableExtractor:
+    def _extract_schema(self) -> None:
+        self._relational_data = RelationalData()
         inspector = inspect(self._connector.engine)
         foreign_keys: list[tuple[str, dict]] = []
 
@@ -237,8 +237,6 @@ class TableExtractor:
         self.table_order = list(
             reversed(self._relational_data.list_tables_parents_before_children())
         )
-        self._bootstrapped = True
-        return self
 
     def _table_path(self, table_name: str) -> Path:
         return self._storage_dir / f"{table_name}.csv"
@@ -371,10 +369,8 @@ class TableExtractor:
     def sample_table(
         self, table_name: str, child_tables: list[str] | None = None
     ) -> TableMetadata:
-        if not self._bootstrapped:
-            raise TableExtractorError(
-                "Cannot sample tables, please extract the Table Metadata first by running `extract_schema()`"
-            )
+        if self._relational_data is None:
+            self._extract_schema()
 
         table_path = self._table_path(table_name)
         table_session = self._get_table_session(table_name)
@@ -430,6 +426,8 @@ class TableExtractor:
         )
 
     def sample_tables(self) -> dict[str, TableMetadata]:
+        if self._relational_data is None:
+            self._extract_schema()
         table_data = {}
         for table_name in self.table_order:
             child_tables = self._relational_data.get_descendants(table_name)

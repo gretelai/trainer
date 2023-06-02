@@ -64,7 +64,8 @@ def test_extract_schema(connector_ecom: Connector, tmpdir):
     config = ExtractorConfig()
     extractor = TableExtractor(
         config=config, connector=connector_ecom, storage_dir=Path(tmpdir)
-    ).extract_schema()
+    )
+    extractor._extract_schema()
     assert extractor.table_order == [
         "events",
         "order_items",
@@ -91,7 +92,7 @@ def test_sample_table(target, expect, connector_art, tmpdir):
     config = ExtractorConfig(target_row_count=target)
     extractor = TableExtractor(
         config=config, connector=connector_art, storage_dir=Path(tmpdir)
-    ).extract_schema()
+    )
     extractor._chunk_size = 1
     meta = extractor.sample_table("paintings")
     assert meta.original_row_count == 7
@@ -117,7 +118,7 @@ def test_sample_tables(connector_art, tmpdir):
     config = ExtractorConfig(target_row_count=0.5)
     extractor = TableExtractor(
         config=config, connector=connector_art, storage_dir=Path(tmpdir)
-    ).extract_schema()
+    )
     meta = extractor.sample_tables()
     paintings = meta["paintings"]
     assert paintings.sampled_row_count == 3
