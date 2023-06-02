@@ -718,11 +718,12 @@ class MultiTable:
         else:
             return (None, None)
 
-    def _prepare_training_data(self, tables: list[str]) -> dict[str, Path]:
+    def _train_synthetics_models(self, tables: list[str]) -> None:
         """
-        Exports a copy of each table prepared for training by the configured strategy
-        to the working directory. Returns a dict with table names as keys and Paths
-        to the CSVs as values.
+        Uses the configured strategy to prepare training data sources for each table,
+        exported to the working directory. Creates a model for each table and submits
+        it for training. Upon completion, downloads the evaluation reports for each
+        table to the working directory.
         """
         training_paths = {
             table: self._working_dir / f"synthetics_train_{table}.csv"
@@ -731,10 +732,7 @@ class MultiTable:
 
         self._strategy.prepare_training_data(self.relational_data, training_paths)
 
-        return training_paths
-
-    def _train_synthetics_models(self, training_data: dict[str, Path]) -> None:
-        for table_name, training_csv in training_data.items():
+        for table_name, training_csv in training_paths.items():
             synthetics_config = make_synthetics_config(table_name, self._model_config)
             model = self._project.create_model_obj(
                 model_config=synthetics_config, data_source=str(training_csv)
@@ -742,7 +740,7 @@ class MultiTable:
             self._synthetics_train.models[table_name] = model
 
         archive_path = self._working_dir / "synthetics_training.tar.gz"
-        for table_name, csv_path in training_data.items():
+        for table_name, csv_path in training_paths.items():
             add_to_tar(archive_path, csv_path, csv_path.name)
         self._artifact_collection.upload_synthetics_training_archive(
             self._project, str(archive_path)
@@ -778,8 +776,7 @@ class MultiTable:
         tables = self.relational_data.list_all_tables()
         self._synthetics_train = SyntheticsTrain()
 
-        training_data = self._prepare_training_data(tables)
-        self._train_synthetics_models(training_data)
+        self._train_synthetics_models(tables)
 
     def train_synthetics(
         self,
@@ -809,8 +806,7 @@ class MultiTable:
         # along the way informing the user of which required tables are missing).
         self._strategy.validate_preserved_tables(omit_tables, self.relational_data)
 
-        training_data = self._prepare_training_data(include_tables)
-        self._train_synthetics_models(training_data)
+        self._train_synthetics_models(include_tables)
 
     def retrain_tables(self, tables: dict[str, pd.DataFrame]) -> None:
         """
@@ -830,8 +826,8 @@ class MultiTable:
         for table in tables_to_retrain:
             with suppress(KeyError):
                 del self._synthetics_train.models[table]
-        training_data = self._prepare_training_data(tables_to_retrain)
-        self._train_synthetics_models(training_data)
+
+        self._train_synthetics_models(tables_to_retrain)
 
     def _upload_sources_to_project(self) -> None:
         archive_path = self._working_dir / "source_tables.tar.gz"
