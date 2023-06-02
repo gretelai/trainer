@@ -34,25 +34,24 @@ class IndependentStrategy:
         return common.label_encode_keys(rel_data, tables)
 
     def prepare_training_data(
-        self, rel_data: RelationalData, tables: list[str]
-    ) -> dict[str, pd.DataFrame]:
+        self, rel_data: RelationalData, table_paths: dict[str, Path]
+    ) -> dict[str, Path]:
         """
-        Returns source tables with primary and foreign keys removed
+        Writes tables' training data to provided paths.
+        Training data has primary and foreign key columns removed.
         """
-        training_data = {}
-
-        for table_name in tables:
+        for table, path in table_paths.items():
             columns_to_drop = []
-            columns_to_drop.extend(rel_data.get_primary_key(table_name))
-            for foreign_key in rel_data.get_foreign_keys(table_name):
+            columns_to_drop.extend(rel_data.get_primary_key(table))
+            for foreign_key in rel_data.get_foreign_keys(table):
                 columns_to_drop.extend(foreign_key.columns)
 
-            data = rel_data.get_table_data(table_name)
+            data = rel_data.get_table_data(table)
             data = data.drop(columns=columns_to_drop)
 
-            training_data[table_name] = data
+            data.to_csv(path, index=False)
 
-        return training_data
+        return table_paths
 
     def tables_to_retrain(
         self, tables: list[str], rel_data: RelationalData

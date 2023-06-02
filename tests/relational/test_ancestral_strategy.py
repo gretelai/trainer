@@ -14,45 +14,56 @@ from gretel_trainer.relational.strategies.ancestral import AncestralStrategy
 from gretel_trainer.relational.table_evaluation import TableEvaluation
 
 
-def test_preparing_training_data_does_not_mutate_source_data(pets, art):
-    for rel_data in [pets, art]:
-        original_tables = {
-            table: rel_data.get_table_data(table).copy()
-            for table in rel_data.list_all_tables()
-        }
+def test_preparing_training_data_does_not_mutate_source_data(pets):
+    original_tables = {
+        table: pets.get_table_data(table).copy() for table in pets.list_all_tables()
+    }
 
-        strategy = AncestralStrategy()
-        strategy.prepare_training_data(rel_data, rel_data.list_all_tables())
+    strategy = AncestralStrategy()
 
-        for table in rel_data.list_all_tables():
-            pdtest.assert_frame_equal(
-                original_tables[table], rel_data.get_table_data(table)
-            )
+    with tempfile.NamedTemporaryFile() as pets_dest, tempfile.NamedTemporaryFile() as humans_dest:
+        strategy.prepare_training_data(
+            pets, {"pets": Path(pets_dest.name), "humans": Path(humans_dest.name)}
+        )
+
+    for table in pets.list_all_tables():
+        pdtest.assert_frame_equal(original_tables[table], pets.get_table_data(table))
 
 
 def test_prepare_training_data_subset_of_tables(pets):
     strategy = AncestralStrategy()
 
-    # We aren't synthesizing the "humans" table, so it is not in this list argument...
-    training_data = strategy.prepare_training_data(pets, ["pets"])
-    # ...nor do we create training data for it
-    assert set(training_data.keys()) == {"pets"}
+    with tempfile.NamedTemporaryFile() as pets_dest, tempfile.NamedTemporaryFile() as humans_dest:
+        # We aren't synthesizing the "humans" table, so it is not in this list argument...
+        training_data = strategy.prepare_training_data(
+            pets, {"pets": Path(pets_dest.name)}
+        )
+
+        train_pets = pd.read_csv(training_data["pets"])
+
+        # ...nor do we create training data for it
+        assert not train_pets.empty
+        assert os.stat(humans_dest.name).st_size == 0
 
     # Since the humans table is omitted from synthetics, we leave the FK values alone; specifically:
     # - they are not label-encoded (which would effectively zero-index them)
     # - we do not add artificial min/max values
-    assert set(training_data["pets"]["self|human_id"].values) == {1, 2, 3, 4, 5}
+    assert set(train_pets["self|human_id"].values) == {1, 2, 3, 4, 5}
     # We do add the artificial max PK row, though, since this table is being synthesized
-    assert len(training_data["pets"]) == 6
+    assert len(train_pets) == 6
 
 
 def test_prepare_training_data_returns_multigenerational_data(pets):
     strategy = AncestralStrategy()
 
-    training_data = strategy.prepare_training_data(pets, pets.list_all_tables())
+    with tempfile.NamedTemporaryFile() as pets_dest, tempfile.NamedTemporaryFile() as humans_dest:
+        training_data = strategy.prepare_training_data(
+            pets, {"pets": Path(pets_dest.name), "humans": Path(humans_dest.name)}
+        )
+        train_pets = pd.read_csv(training_data["pets"])
 
     for expected_column in ["self|id", "self|name", "self.human_id|id"]:
-        assert expected_column in training_data["pets"]
+        assert expected_column in train_pets
 
 
 def test_prepare_training_data_drops_highly_unique_categorical_ancestor_fields(art):
@@ -77,10 +88,19 @@ def test_prepare_training_data_drops_highly_unique_categorical_ancestor_fields(a
     )
 
     strategy = AncestralStrategy()
-    training_data = strategy.prepare_training_data(art, art.list_all_tables())
+
+    with tempfile.NamedTemporaryFile() as artists_dest, tempfile.NamedTemporaryFile() as paintings_dest:
+        training_data = strategy.prepare_training_data(
+            art,
+            {
+                "artists": Path(artists_dest.name),
+                "paintings": Path(paintings_dest.name),
+            },
+        )
+        train_paintings = pd.read_csv(training_data["paintings"])
 
     # Does not contain `self.artist_id|name` because it is highly unique categorical
-    assert set(training_data["paintings"].columns) == {
+    assert set(train_paintings.columns) == {
         "self|id",
         "self|name",
         "self|artist_id",
@@ -116,10 +136,19 @@ def test_prepare_training_data_drops_highly_nan_ancestor_fields(art):
     )
 
     strategy = AncestralStrategy()
-    training_data = strategy.prepare_training_data(art, art.list_all_tables())
+
+    with tempfile.NamedTemporaryFile() as artists_dest, tempfile.NamedTemporaryFile() as paintings_dest:
+        training_data = strategy.prepare_training_data(
+            art,
+            {
+                "artists": Path(artists_dest.name),
+                "paintings": Path(paintings_dest.name),
+            },
+        )
+        train_paintings = pd.read_csv(training_data["paintings"])
 
     # Does not contain `self.artist_id|name` because it is highly NaN
-    assert set(training_data["paintings"].columns) == {
+    assert set(train_paintings.columns) == {
         "self|id",
         "self|name",
         "self|artist_id",
@@ -131,12 +160,22 @@ def test_prepare_training_data_translates_alphanumeric_keys_and_adds_min_max_rec
     art,
 ):
     strategy = AncestralStrategy()
-    training_data = strategy.prepare_training_data(art, art.list_all_tables())
+
+    with tempfile.NamedTemporaryFile() as artists_dest, tempfile.NamedTemporaryFile() as paintings_dest:
+        training_data = strategy.prepare_training_data(
+            art,
+            {
+                "artists": Path(artists_dest.name),
+                "paintings": Path(paintings_dest.name),
+            },
+        )
+        train_artists = pd.read_csv(training_data["artists"])
+        train_paintings = pd.read_csv(training_data["paintings"])
 
     # Artists, a parent table, should have 1 additional row
-    assert len(training_data["artists"]) == len(art.get_table_data("artists")) + 1
+    assert len(train_artists) == len(art.get_table_data("artists")) + 1
     # The last record has the artifical max PK
-    assert training_data["artists"]["self|id"].to_list() == [0, 1, 2, 3, 200]
+    assert train_artists["self|id"].to_list() == [0, 1, 2, 3, 200]
     # We do not assert on the value of "self|name" because the artificial max PK record is
     # randomly sampled from source and so the exact value is not deterministic
 
@@ -144,9 +183,9 @@ def test_prepare_training_data_translates_alphanumeric_keys_and_adds_min_max_rec
     # - artificial max PK
     # - artificial min FKs
     # - artificial max FKs
-    assert len(training_data["paintings"]) == len(art.get_table_data("paintings")) + 3
+    assert len(train_paintings) == len(art.get_table_data("paintings")) + 3
 
-    last_three = training_data["paintings"].tail(3)
+    last_three = train_paintings.tail(3)
     last_two = last_three.tail(2)
 
     # PKs are max, +1, +2
@@ -158,7 +197,19 @@ def test_prepare_training_data_translates_alphanumeric_keys_and_adds_min_max_rec
 
 def test_prepare_training_data_with_composite_keys(tpch):
     strategy = AncestralStrategy()
-    training_data = strategy.prepare_training_data(tpch, tpch.list_all_tables())
+    with tempfile.NamedTemporaryFile() as supplier_dest, tempfile.NamedTemporaryFile() as part_dest, tempfile.NamedTemporaryFile() as partsupp_dest, tempfile.NamedTemporaryFile() as lineitem_dest:
+        training_data = strategy.prepare_training_data(
+            tpch,
+            {
+                "supplier": Path(supplier_dest.name),
+                "part": Path(part_dest.name),
+                "partsupp": Path(partsupp_dest.name),
+                "lineitem": Path(lineitem_dest.name),
+            },
+        )
+
+        train_partsupp = pd.read_csv(training_data["partsupp"])
+        train_lineitem = pd.read_csv(training_data["lineitem"])
 
     l_max = len(tpch.get_table_data("lineitem")) * 50
     ps_max = len(tpch.get_table_data("partsupp")) * 50
@@ -166,7 +217,6 @@ def test_prepare_training_data_with_composite_keys(tpch):
     s_max = len(tpch.get_table_data("supplier")) * 50
 
     # partsupp table, composite PK
-    train_partsupp = training_data["partsupp"]
     assert set(train_partsupp.columns) == {
         "self|ps_partkey",
         "self|ps_suppkey",
@@ -189,7 +239,6 @@ def test_prepare_training_data_with_composite_keys(tpch):
     )
 
     # lineitem table, composite FK to partsupp
-    train_lineitem = training_data["lineitem"]
     assert set(train_lineitem.columns) == {
         "self|l_partkey",
         "self|l_suppkey",

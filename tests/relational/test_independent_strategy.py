@@ -1,4 +1,5 @@
 import json
+import os
 import tempfile
 from collections import defaultdict
 from pathlib import Path
@@ -11,36 +12,43 @@ from gretel_trainer.relational.strategies.independent import IndependentStrategy
 from gretel_trainer.relational.table_evaluation import TableEvaluation
 
 
-def test_preparing_training_data_does_not_mutate_source_data(pets, art):
-    for rel_data in [pets, art]:
-        original_tables = {
-            table: rel_data.get_table_data(table).copy()
-            for table in rel_data.list_all_tables()
-        }
+def test_preparing_training_data_does_not_mutate_source_data(pets):
+    original_tables = {
+        table: pets.get_table_data(table).copy() for table in pets.list_all_tables()
+    }
 
-        strategy = IndependentStrategy()
-        strategy.prepare_training_data(rel_data, rel_data.list_all_tables())
+    strategy = IndependentStrategy()
 
-        for table in rel_data.list_all_tables():
-            pdtest.assert_frame_equal(
-                original_tables[table], rel_data.get_table_data(table)
-            )
+    with tempfile.NamedTemporaryFile() as pets_dest, tempfile.NamedTemporaryFile() as humans_dest:
+        strategy.prepare_training_data(
+            pets, {"pets": Path(pets_dest.name), "humans": Path(humans_dest.name)}
+        )
+
+    for table in pets.list_all_tables():
+        pdtest.assert_frame_equal(original_tables[table], pets.get_table_data(table))
 
 
 def test_prepare_training_data_removes_primary_and_foreign_keys(pets):
     strategy = IndependentStrategy()
 
-    training_data = strategy.prepare_training_data(pets, pets.list_all_tables())
+    with tempfile.NamedTemporaryFile() as pets_dest, tempfile.NamedTemporaryFile() as humans_dest:
+        training_data = strategy.prepare_training_data(
+            pets, {"pets": Path(pets_dest.name), "humans": Path(humans_dest.name)}
+        )
+        train_pets = pd.read_csv(training_data["pets"])
 
-    assert set(training_data["pets"].columns) == {"name", "age"}
+    assert set(train_pets.columns) == {"name", "age"}
 
 
 def test_prepare_training_data_subset_of_tables(pets):
     strategy = IndependentStrategy()
 
-    training_data = strategy.prepare_training_data(pets, ["humans"])
-
-    assert set(training_data.keys()) == {"humans"}
+    with tempfile.NamedTemporaryFile() as pets_dest, tempfile.NamedTemporaryFile() as humans_dest:
+        training_data = strategy.prepare_training_data(
+            pets, {"humans": Path(humans_dest.name)}
+        )
+        assert not pd.read_csv(training_data["humans"]).empty
+        assert os.stat(pets_dest.name).st_size == 0
 
 
 def test_retraining_a_set_of_tables_only_retrains_those_tables(ecom):
