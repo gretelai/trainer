@@ -21,8 +21,6 @@ if TYPE_CHECKING:
 
     from gretel_trainer.relational.connectors import Connector
 
-
-logging.basicConfig()
 logger = logging.getLogger(__name__)
 
 
@@ -96,10 +94,10 @@ class ExtractorConfig:
         return self.target_row_count == 0
 
     def should_skip_table(self, table_name: str) -> bool:
-        if self.only is not None and table_name not in self.only:
+        if self.only and table_name not in self.only:
             return True
 
-        if self.ignore is not None and table_name in self.ignore:
+        if self.ignore and table_name in self.ignore:
             return True
 
         return False
@@ -157,7 +155,7 @@ def _stream_df_to_path(df_iter: Iterator[pd.DataFrame], path: Path) -> int:
     row_count = 0
 
     for df in df_iter:
-        df.to_csv(path, mode="a", index=False, header=False, compression="gzip")
+        df.to_csv(path, mode="a", index=False, header=False)
         row_count += len(df)
 
     return row_count
@@ -209,7 +207,7 @@ class TableExtractor:
             if self._config.should_skip_table(table_name):
                 continue
 
-            logger.debug(f"Extracting source schema data from `{table_name}`")
+            logger.info(f"Extracting source schema data from `{table_name}`")
 
             # Initially we only populate the RelationalData Graph with empty DataFrames
             # that contain the columns of the target tables.
@@ -243,14 +241,14 @@ class TableExtractor:
         return self
 
     def _table_path(self, table_name: str) -> Path:
-        return self._storage_dir / f"{table_name}.csv.gz"
+        return self._storage_dir / f"{table_name}.csv"
 
     def get_table_df(self, table_name: str) -> pd.DataFrame:
         table_path = self._table_path(table_name)
         if not table_path.is_file():
             raise ValueError(f"The table name: {table_name}, does not exist.")
 
-        return pd.read_csv(table_path, compression="gzip")
+        return pd.read_csv(table_path)
 
     def _load_table_pk_values(
         self, table_name: str, child_table_names: list[str]
@@ -271,7 +269,7 @@ class TableExtractor:
         parent_column_names: list[str] = None
         pk_set = set(self._relational_data.get_primary_key(table_name))
         logger.info(
-            f"Extacting primary key values for sampling from table: {table_name}"
+            f"Extacting primary key values for sampling from table '{table_name}'"
         )
 
         for child_table_name in child_table_names:
@@ -336,6 +334,9 @@ class TableExtractor:
                     write_count = _stream_df_to_path(df_iter, table_path)
                     row_count += write_count
 
+        logger.info(
+            f"Sampling primary key values for intermediate table '{pk_values.table_name}'"
+        )
         pk_values.values_ddf.map_partitions(handle_partition).compute()
 
         return row_count
@@ -352,6 +353,10 @@ class TableExtractor:
             )
         elif self._config.sample_mode == SampleMode.CONTIGUOUS:
             ...
+
+        logger.info(
+            f"Sampling {sample_row_count} rows from table '{table_session.table.name}'"
+        )
 
         with table_session.engine.connect() as conn:
             df_iter = pd.read_sql_query(query, conn, chunksize=self._chunk_size)
@@ -378,7 +383,7 @@ class TableExtractor:
         # First we'll create our table file on disk and bootstrap
         # it with just the column names
         df = pd.DataFrame(columns=table_session.columns)
-        df.to_csv(table_path, index=False, compression="gzip")
+        df.to_csv(table_path, index=False)
 
         # If we aren't sampling any rows, we're done!
         if self._config.empty_table:
