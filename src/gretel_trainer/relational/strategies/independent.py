@@ -41,15 +41,17 @@ class IndependentStrategy:
         Training data has primary and foreign key columns removed.
         """
         for table, path in table_paths.items():
-            columns_to_drop = []
-            columns_to_drop.extend(rel_data.get_primary_key(table))
+            columns_to_drop = set()
+            columns_to_drop.update(rel_data.get_primary_key(table))
             for foreign_key in rel_data.get_foreign_keys(table):
-                columns_to_drop.extend(foreign_key.columns)
+                columns_to_drop.update(foreign_key.columns)
 
-            data = rel_data.get_table_data(table)
-            data = data.drop(columns=columns_to_drop)
+            all_columns = rel_data.get_table_columns(table)
+            use_columns = all_columns - columns_to_drop
 
-            data.to_csv(path, index=False)
+            rel_data.get_table_data(table, usecols=use_columns).to_csv(
+                path, index=False
+            )
 
         return table_paths
 
