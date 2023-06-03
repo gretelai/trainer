@@ -1,4 +1,6 @@
 import logging
+import tempfile
+from pathlib import Path
 from typing import Optional
 
 import pandas as pd
@@ -11,6 +13,7 @@ from gretel_trainer.relational.core import (
     RelationalData,
     skip_table,
 )
+from gretel_trainer.relational.extractor import ExtractorConfig, TableExtractor
 
 logger = logging.getLogger(__name__)
 
@@ -46,46 +49,36 @@ class Connector:
         only: Optional[set[str]] = None,
         ignore: Optional[set[str]] = None,
         schema: Optional[str] = None,
+        config: Optional[ExtractorConfig] = None,
     ) -> RelationalData:
         """
         Extracts table data and relationships from the database. Optional args include:
-        - `only` (restrict extraction to these tables; cannot be used with `ignore`)
-        - `ignore` (exclude these tables from extraction; cannot be used with `only`)
-        - `schema` (limit scope to a specific schema; this is dialect-specific and not supported by all databases)
+
+        Args:
+            config: An optional extraction config. This config can be used to only include
+                specific tables, ignore specific tables, and configure subsetting. Please
+                see the `ExtractorConfig` docs for more details.
+
+        NOTE: The `only`, `ignore`, and `schema` args will be deprecated. Only the `config` param
+        will be used in the future, which contains all of the params from above.
         """
-        if only is not None and ignore is not None:
-            raise MultiTableException("Cannot specify both `only` and `ignore`.")
-
-        inspector = inspect(self.engine)
-
-        relational_data = RelationalData()
-        foreign_keys: list[tuple[str, dict]] = []
-
-        for table_name in inspector.get_table_names(schema=schema):
-            if skip_table(table_name, only, ignore):
-                continue
-
-            logger.debug(f"Extracting source data from `{table_name}`")
-            df = pd.read_sql_table(table_name, self.engine, schema=schema)
-            primary_key = inspector.get_pk_constraint(table_name)["constrained_columns"]
-            for fk in inspector.get_foreign_keys(table_name):
-                if skip_table(fk["referred_table"], only, ignore):
-                    continue
-                else:
-                    foreign_keys.append((table_name, fk))
-
-            relational_data.add_table(name=table_name, primary_key=primary_key, data=df)
-
-        for foreign_key in foreign_keys:
-            table, fk = foreign_key
-            relational_data.add_foreign_key_constraint(
-                table=table,
-                constrained_columns=fk["constrained_columns"],
-                referred_table=fk["referred_table"],
-                referred_columns=fk["referred_columns"],
+        if only or ignore or schema:
+            logger.warning(
+                "Deprecation warning: in the future only the `config` param will be suported, please use an `ExtractorConfig` object for this param."
             )
 
-        return relational_data
+        if config is None:
+            config = ExtractorConfig(only=only, ignore=ignore, schema=schema)
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            extractor = TableExtractor(
+                config=config, connector=self, storage_dir=Path(tmpdir)
+            )
+            # We ensure to re-create RelationalData after extraction so
+            # we can account for any embedded JSON.
+            extractor.sample_tables(refresh_relational_data=True)
+
+        return extractor.relational_data
 
     def save(self, tables: dict[str, pd.DataFrame], prefix: str = "") -> None:
         for name, data in tables.items():

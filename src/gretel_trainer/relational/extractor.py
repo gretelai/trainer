@@ -34,21 +34,23 @@ class ExtractorConfig:
     target_row_count: float = -1.0
     """
     The target number of rows to sample. This will be used as the sample target for "leaf" tables, 
-    or tables that do not have any references to their primary keys. If this number is > 1 then
+    or tables that do not have any references to their primary keys. If this number is => 1 then
     that number of rows will be used, if the value is between 0..1 then it is considered to be a percetange
     of the total number of rows. A 0 value will just extracted headers and -1 will extract entire tables.
+
+    The default value, -1, implies that full tables should be extracted
     """
 
     sample_mode: SampleMode = SampleMode.RANDOM
 
     only: list[str] | None = None
     """
-    Only extract these tables.
+    Only extract these tables. Cannot be used with `ignore.`
     """
 
     ignore: list[str] | None = None
     """
-    Ignore these tables during extraction
+    Ignore these tables during extraction. Cannot be used with `only.`
     """
 
     schema: str | None = None
@@ -198,8 +200,29 @@ class TableExtractor:
         table = metadata.tables[table_name]
         return _TableSession(table=table, engine=self._connector.engine)
 
-    def _extract_schema(self) -> None:
-        self._relational_data = RelationalData()
+    def _create_rel_data(
+        self, extracted_tables: list[str] | None = None
+    ) -> RelationalData:
+        """
+        Internal helper method. This can be used to construct a `RelationalData`
+        object that either contains just the table headers and FK/PK relationships
+        or create an instance that has loaded DataFrames.
+
+        You may need to use this in order to build up a "fresh" `RelationalData` object
+        _after_ tables have already been sampled. Especially if you need to consider
+        any embedded JSON data that is used to create additional PK/FK mappings
+        that are invented.
+
+        If any table names are provided in the `tables` list, then those tables
+        will be loaded as DFs and added as the data to nodes.
+
+        NOTE: If `tables` are provided, then these tables must have already been
+        extracted!
+        """
+        if extracted_tables is None:
+            extracted_tables = []
+
+        rel_data = RelationalData()
         inspector = inspect(self._connector.engine)
         foreign_keys: list[tuple[str, dict]] = []
 
@@ -209,29 +232,41 @@ class TableExtractor:
 
             logger.info(f"Extracting source schema data from `{table_name}`")
 
-            # Initially we only populate the RelationalData Graph with empty DataFrames
-            # that contain the columns of the target tables.
-            df = pd.DataFrame(
-                columns=[col["name"] for col in inspector.get_columns(table_name)]
-            )
+            if table_name not in extracted_tables:
+                df = pd.DataFrame(
+                    columns=[col["name"] for col in inspector.get_columns(table_name)]
+                )
+            else:
+                df = self.get_table_df(table_name)
+
             primary_key = inspector.get_pk_constraint(table_name)["constrained_columns"]
             for fk in inspector.get_foreign_keys(table_name):
                 if self._config.should_skip_table(fk["referred_table"]):
                     continue
                 foreign_keys.append((table_name, fk))
 
-            self._relational_data.add_table(
-                name=table_name, primary_key=primary_key, data=df
-            )
+            rel_data.add_table(name=table_name, primary_key=primary_key, data=df)
 
         for foreign_key in foreign_keys:
             table, fk = foreign_key
-            self._relational_data.add_foreign_key_constraint(
+            rel_data.add_foreign_key_constraint(
                 table=table,
                 constrained_columns=fk["constrained_columns"],
                 referred_table=fk["referred_table"],
                 referred_columns=fk["referred_columns"],
             )
+
+        return rel_data
+
+    def _extract_schema(self) -> None:
+        # This will initially only populate RelationalData with empty
+        # DataFrames which are only used for building up the right order
+        # to extract tables for subsetting purposes. There will be no
+        # actual table contents stored on the Graph. This means that
+        # after this runs the `RelationalData` object will not have
+        # any relationships that may exist from embedded JSON.
+
+        self._relational_data = self._create_rel_data()
 
         # Set the table processing order for extraction
         self.table_order = list(
@@ -425,7 +460,19 @@ class TableExtractor:
             column_count=table_session.total_column_count,
         )
 
-    def sample_tables(self) -> dict[str, TableMetadata]:
+    def sample_tables(
+        self, refresh_relational_data: bool = False
+    ) -> dict[str, TableMetadata]:
+        """
+        Extract database tables according to the `ExtractorConfig.` Tables will be stored in the
+        configured storage directory from the `ExtractorConfig` object.
+
+        Args:
+            refresh_relational_data: If this is set, the `RelationalData` object will be re-created
+                using the extracted tables. This is useful if there is nested JSON in the tables because
+                the invented keys for the embedded JSON will now be extracted and accounted for in
+                the learned schema.
+        """
         if self._relational_data is None:
             self._extract_schema()
         table_data = {}
@@ -433,4 +480,14 @@ class TableExtractor:
             child_tables = self._relational_data.get_descendants(table_name)
             meta = self.sample_table(table_name, child_tables=child_tables)
             table_data[table_name] = meta
+
+        if refresh_relational_data:
+            self._relational_data = self._create_rel_data(
+                extracted_tables=self.table_order
+            )
+
         return table_data
+
+    @property
+    def relational_data(self) -> RelationalData:
+        return self._relational_data
