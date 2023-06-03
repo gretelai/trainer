@@ -77,8 +77,15 @@ class Connector:
                 "Deprecation warning: in the future only the `config` param will be suported, please use an `ExtractorConfig` object for this param."
             )
 
+        if only is None:
+            only = set()
+        if ignore is None:
+            ignore = set()
+
         if config is None:
-            config = ExtractorConfig(only=only, ignore=ignore, schema=schema)
+            config = ExtractorConfig(
+                only=list(only), ignore=list(ignore), schema=schema
+            )
 
         with tempfile.TemporaryDirectory() as tmpdir:
             extractor = TableExtractor(

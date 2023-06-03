@@ -7,7 +7,7 @@ import logging
 from dataclasses import asdict, dataclass
 from enum import Enum
 from pathlib import Path
-from typing import TYPE_CHECKING, Iterator
+from typing import TYPE_CHECKING, Iterator, Optional
 
 import dask.dataframe as dd
 import numpy as np
@@ -43,12 +43,12 @@ class ExtractorConfig:
 
     sample_mode: SampleMode = SampleMode.RANDOM
 
-    only: list[str] | None = None
+    only: Optional[list[str]] = None
     """
     Only extract these tables. Cannot be used with `ignore.`
     """
 
-    ignore: list[str] | None = None
+    ignore: Optional[list[str]] = None
     """
     Ignore these tables during extraction. Cannot be used with `only.`
     """
@@ -106,7 +106,7 @@ def _determine_sample_size(config: ExtractorConfig, total_row_count: int) -> int
     many rows we should sample from it.
     """
     if config.target_row_count >= 1:
-        return config.target_row_count
+        return int(config.target_row_count)
 
     if config.entire_table:
         return total_row_count
@@ -123,7 +123,8 @@ class _TableSession:
     def total_row_count(self) -> int:
         with self.engine.connect() as conn:
             query = select(func.count()).select_from(self.table)
-            return conn.execute(query).scalar()
+            count = conn.execute(query).scalar()
+            return 0 if count is None else int(count)
 
     @property
     def total_column_count(self) -> int:
@@ -141,7 +142,7 @@ class _PKValues:
     """
 
     table_name: str
-    values_ddf: dd.DataFrame
+    values_ddf: dd.DataFrame  # pyright: ignore
     column_names: list[str]
 
 
@@ -180,8 +181,8 @@ class TableExtractor:
     _connector: Connector
     _config: ExtractorConfig
     _storage_dir: Path
-    _relational_data: RelationalData | None
-    _chunk_size: int = 50_000
+    _relational_data: RelationalData
+    _chunk_size: int
 
     table_order: list[str]
 
@@ -200,8 +201,9 @@ class TableExtractor:
 
         self._storage_dir = storage_dir
 
-        self._relational_data = None
+        self._relational_data = RelationalData()
         self.table_order = []
+        self._chunk_size = 50_000
 
     def _get_table_session(self, table_name: str) -> _TableSession:
         metadata = MetaData()
@@ -314,8 +316,8 @@ class TableExtractor:
         This function assumes the children table already sampled and stored
         based on the required table ordering needed to completed subsetting.1
         """
-        values_ddf = None
-        parent_column_names: list[str] = None
+        values_ddf = dd.from_pandas(pd.DataFrame())  # pyright: ignore
+        parent_column_names: list[str] = []
         pk_set = set(self._relational_data.get_primary_key(table_name))
         logger.debug(
             f"Extacting primary key values for sampling from table '{table_name}'"
@@ -327,7 +329,7 @@ class TableExtractor:
                 if fk.parent_table_name == table_name and pk_set == set(
                     fk.parent_columns
                 ):
-                    if parent_column_names is None:
+                    if not parent_column_names:
                         parent_column_names = fk.parent_columns
                     logger.debug(
                         f"Found primary key values for table '{table_name}' in child table '{child_table_name}'"
@@ -340,18 +342,23 @@ class TableExtractor:
                     # NOTE: The child tables MUST have alraedy been extracted!
                     child_table_path = self._table_path(child_table_name)
 
-                    tmp_ddf = dd.read_csv(str(child_table_path), usecols=fk.columns)
+                    tmp_ddf = dd.read_csv(  # pyright: ignore
+                        str(child_table_path), usecols=fk.columns
+                    )
                     tmp_ddf = tmp_ddf.rename(columns=rename_map)
                     if values_ddf is None:
                         values_ddf = tmp_ddf
                     else:
-                        values_ddf = dd.concat([values_ddf, tmp_ddf])
+                        values_ddf = dd.concat([values_ddf, tmp_ddf])  # pyright: ignore
 
-        values_ddf = values_ddf[parent_column_names].drop_duplicates()
+        if parent_column_names:
+            values_ddf = values_ddf[  # pyright: ignore
+                parent_column_names
+            ].drop_duplicates()  # pyright: ignore
 
         return _PKValues(
             table_name=table_name,
-            values_ddf=values_ddf,
+            values_ddf=values_ddf,  # pyright: ignore
             column_names=parent_column_names,
         )
 
@@ -396,14 +403,12 @@ class TableExtractor:
         sample_row_count = _determine_sample_size(
             self._config, table_session.total_row_count
         )
-        if self._config.sample_mode == SampleMode.RANDOM:
-            query = (
-                select(table_session.table)
-                .order_by(func.random())
-                .limit(sample_row_count)
-            )
-        elif self._config.sample_mode == SampleMode.CONTIGUOUS:
-            ...
+
+        # TODO: Re-instate when other modes are added
+        # if self._config.sample_mode == SampleMode.RANDOM:
+        query = (
+            select(table_session.table).order_by(func.random()).limit(sample_row_count)
+        )
 
         logger.debug(
             f"Sampling {sample_row_count} rows from table '{table_session.table.name}'"
@@ -509,4 +514,8 @@ class TableExtractor:
 
     @property
     def relational_data(self) -> RelationalData:
+        if self._relational_data is None:
+            raise TableExtractorError(
+                "Cannot return `RelationalData`, `sample_tables()` must be run first."
+            )
         return self._relational_data
