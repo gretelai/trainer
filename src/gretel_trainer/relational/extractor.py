@@ -33,7 +33,7 @@ class SampleMode(str, Enum):
 class ExtractorConfig:
     target_row_count: float = -1.0
     """
-    The target number of rows to sample. This will be used as the sample target for "leaf" tables, 
+    The target number of rows (or ratio of rows) to sample. This will be used as the sample target for "leaf" tables, 
     or tables that do not have any references to their primary keys. If this number is >= 1 then
     that number of rows will be used, if the value is between 0..1 then it is considered to be a percetange
     of the total number of rows. A 0 value will just extracted headers and -1 will extract entire tables.
