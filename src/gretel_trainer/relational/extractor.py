@@ -43,12 +43,12 @@ class ExtractorConfig:
 
     sample_mode: SampleMode = SampleMode.RANDOM
 
-    only: Optional[list[str]] = None
+    only: Optional[set[str]] = None
     """
     Only extract these tables. Cannot be used with `ignore.`
     """
 
-    ignore: Optional[list[str]] = None
+    ignore: Optional[set[str]] = None
     """
     Ignore these tables during extraction. Cannot be used with `only.`
     """
@@ -70,10 +70,7 @@ class ExtractorConfig:
         if self.target_row_count < -1:
             errors.append("The `target_row_count` must be -1 or higher")
 
-        # We will allow both ignore/only to be emptly lists, though
-        if (self.ignore is not None and self.ignore) and (
-            self.only is not None and self.only
-        ):
+        if self.ignore is not None and self.only is not None:
             errors.append("Cannot specify both `only` and `ignore` together")
 
         if self.sample_mode not in ("random", "contiguous"):

@@ -10,7 +10,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.engine.base import Engine
 from sqlalchemy.exc import OperationalError
 
-from gretel_trainer.relational.core import RelationalData, MultiTableException
+from gretel_trainer.relational.core import MultiTableException, RelationalData
 from gretel_trainer.relational.extractor import ExtractorConfig, TableExtractor
 
 logger = logging.getLogger(__name__)
@@ -80,14 +80,9 @@ class Connector:
         if only is not None and ignore is not None:
             raise MultiTableException("Cannot specify both `only` and `ignore`.")
 
-        if only is None:
-            only = set()
-        if ignore is None:
-            ignore = set()
-
         if config is None:
             config = ExtractorConfig(
-                only=list(only), ignore=list(ignore), schema=schema
+                only=only, ignore=ignore, schema=schema  # pyright: ignore
             )
 
         with tempfile.TemporaryDirectory() as tmpdir:

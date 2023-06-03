@@ -4,7 +4,7 @@ import tempfile
 import pytest
 
 from gretel_trainer.relational.connectors import sqlite_conn
-from gretel_trainer.relational.core import Scope, MultiTableException
+from gretel_trainer.relational.core import MultiTableException, Scope
 
 
 def test_extract_subsets_of_relational_data(example_dbs):

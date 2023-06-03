@@ -2,6 +2,7 @@ import sqlite3
 import tempfile
 from pathlib import Path
 from typing import Iterable
+
 import pytest
 
 from gretel_trainer.relational.connectors import Connector, sqlite_conn
@@ -22,7 +23,7 @@ def test_subset_config():
     assert _determine_sample_size(config, 200) == 100
 
     # Ratio
-    config = ExtractorConfig(target_row_count=0.5, ignore=[], only=[])
+    config = ExtractorConfig(target_row_count=0.5)
     assert _determine_sample_size(config, 100) == 50
 
     # Entire table
@@ -38,7 +39,7 @@ def test_subset_config():
 
     # Can't have both only and ignore
     with pytest.raises(ValueError):
-        ExtractorConfig(ignore=["foo"], only=["bar"])
+        ExtractorConfig(ignore={"foo"}, only={"bar"})
 
 
 @pytest.fixture
