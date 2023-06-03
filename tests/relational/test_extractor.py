@@ -1,8 +1,7 @@
 import sqlite3
 import tempfile
 from pathlib import Path
-
-import pandas as pd
+from typing import Iterable
 import pytest
 
 from gretel_trainer.relational.connectors import Connector, sqlite_conn
@@ -43,7 +42,7 @@ def test_subset_config():
 
 
 @pytest.fixture
-def connector_ecom(example_dbs) -> Connector:
+def connector_ecom(example_dbs) -> Iterable[Connector]:
     with tempfile.NamedTemporaryFile() as f:
         con = sqlite3.connect(f.name)
         cur = con.cursor()
@@ -55,7 +54,7 @@ def connector_ecom(example_dbs) -> Connector:
 
 
 @pytest.fixture
-def connector_art(example_dbs) -> Connector:
+def connector_art(example_dbs) -> Iterable[Connector]:
     with tempfile.NamedTemporaryFile() as f:
         con = sqlite3.connect(f.name)
         cur = con.cursor()

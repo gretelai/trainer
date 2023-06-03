@@ -316,7 +316,7 @@ class TableExtractor:
         This function assumes the children table already sampled and stored
         based on the required table ordering needed to completed subsetting.1
         """
-        values_ddf = dd.from_pandas(pd.DataFrame())  # pyright: ignore
+        values_ddf = None
         parent_column_names: list[str] = []
         pk_set = set(self._relational_data.get_primary_key(table_name))
         logger.debug(
@@ -427,7 +427,7 @@ class TableExtractor:
     def _sample_table(
         self, table_name: str, child_tables: list[str] | None = None
     ) -> TableMetadata:
-        if self._relational_data is None:
+        if not self._relational_data.graph.number_of_nodes():
             self._extract_schema()
 
         table_path = self._table_path(table_name)
@@ -496,7 +496,7 @@ class TableExtractor:
                 the invented keys for the embedded JSON will now be extracted and accounted for in
                 the learned schema.
         """
-        if self._relational_data is None:
+        if not self._relational_data.graph.number_of_nodes():
             self._extract_schema()
 
         table_data = {}
