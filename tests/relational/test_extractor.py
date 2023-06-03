@@ -6,7 +6,11 @@ import pandas as pd
 import pytest
 
 from gretel_trainer.relational.connectors import Connector, sqlite_conn
-from gretel_trainer.relational.extractor import ExtractorConfig, TableExtractor
+from gretel_trainer.relational.extractor import (
+    ExtractorConfig,
+    TableExtractor,
+    _determine_sample_size,
+)
 
 
 def test_subset_config():
@@ -16,20 +20,22 @@ def test_subset_config():
 
     # Concrete row count
     config = ExtractorConfig(target_row_count=100)
-    assert config.sample_size(200) == 100
+    assert _determine_sample_size(config, 200) == 100
 
     # Ratio
     config = ExtractorConfig(target_row_count=0.5, ignore=[], only=[])
-    assert config.sample_size(100) == 50
+    assert _determine_sample_size(config, 100) == 50
 
     # Entire table
     config = ExtractorConfig()
     assert config.entire_table
+    assert _determine_sample_size(config, 101) == 101
 
     # Empty table
     config = ExtractorConfig(target_row_count=0)
     assert not config.entire_table
     assert config.empty_table
+    assert _determine_sample_size(config, 101) == 0
 
     # Can't have both only and ignore
     with pytest.raises(ValueError):
@@ -94,7 +100,7 @@ def test_sample_table(target, expect, connector_art, tmpdir):
         config=config, connector=connector_art, storage_dir=Path(tmpdir)
     )
     extractor._chunk_size = 1
-    meta = extractor.sample_table("paintings")
+    meta = extractor._sample_table("paintings")
     assert meta.original_row_count == 7
     assert meta.sampled_row_count == expect
     assert meta.column_count == 3
@@ -102,7 +108,7 @@ def test_sample_table(target, expect, connector_art, tmpdir):
     assert len(df) == expect
 
     # Now we can sample from an intermediate table
-    meta = extractor.sample_table("artists", child_tables=["paintings"])
+    meta = extractor._sample_table("artists", child_tables=["paintings"])
     assert meta.original_row_count == 4
     assert (
         0 <= meta.sampled_row_count <= 4

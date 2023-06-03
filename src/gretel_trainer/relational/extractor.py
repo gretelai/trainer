@@ -34,11 +34,11 @@ class ExtractorConfig:
     target_row_count: float = -1.0
     """
     The target number of rows to sample. This will be used as the sample target for "leaf" tables, 
-    or tables that do not have any references to their primary keys. If this number is => 1 then
+    or tables that do not have any references to their primary keys. If this number is >= 1 then
     that number of rows will be used, if the value is between 0..1 then it is considered to be a percetange
     of the total number of rows. A 0 value will just extracted headers and -1 will extract entire tables.
 
-    The default value, -1, implies that full tables should be extracted
+    The default value, -1, implies that full tables should be extracted.
     """
 
     sample_mode: SampleMode = SampleMode.RANDOM
@@ -62,6 +62,11 @@ class ExtractorConfig:
     def __post_init__(self):
         errors = []
 
+        if self.sample_mode != SampleMode.RANDOM:
+            raise NotImplementedError(
+                "Additional sampling modes are not enabled yet, please use `random`"
+            )
+
         if self.target_row_count < -1:
             errors.append("The `target_row_count` must be -1 or higher")
 
@@ -76,16 +81,6 @@ class ExtractorConfig:
 
         if errors:
             raise ValueError(f"The following errors occured: {', '.join(errors)}")
-
-    def sample_size(self, total_row_count: int) -> int:
-        """
-        Given the actual total row count of a table, determine how
-        many rows we should sample from it.
-        """
-        if self.target_row_count > 1:
-            return self.target_row_count
-
-        return int(total_row_count * self.target_row_count)
 
     @property
     def entire_table(self) -> bool:
@@ -103,6 +98,20 @@ class ExtractorConfig:
             return True
 
         return False
+
+
+def _determine_sample_size(config: ExtractorConfig, total_row_count: int) -> int:
+    """
+    Given the actual total row count of a table, determine how
+    many rows we should sample from it.
+    """
+    if config.target_row_count >= 1:
+        return config.target_row_count
+
+    if config.entire_table:
+        return total_row_count
+
+    return int(total_row_count * config.target_row_count)
 
 
 @dataclass
@@ -230,7 +239,7 @@ class TableExtractor:
             if self._config.should_skip_table(table_name):
                 continue
 
-            logger.info(f"Extracting source schema data from `{table_name}`")
+            logger.debug(f"Extracting source schema data from `{table_name}`")
 
             if table_name not in extracted_tables:
                 df = pd.DataFrame(
@@ -277,9 +286,16 @@ class TableExtractor:
         return self._storage_dir / f"{table_name}.csv"
 
     def get_table_df(self, table_name: str) -> pd.DataFrame:
+        """
+        Return a sampled table as a DataFrame. This assumes tables have
+        already been sampled and are stored on disk.
+
+        Args:
+            table_name: The name of the table to fetch as a DataFrame.
+        """
         table_path = self._table_path(table_name)
         if not table_path.is_file():
-            raise ValueError(f"The table name: {table_name}, does not exist.")
+            raise ValueError(f"The table name: `{table_name}` does not exist.")
 
         return pd.read_csv(table_path)
 
@@ -301,7 +317,7 @@ class TableExtractor:
         values_ddf = None
         parent_column_names: list[str] = None
         pk_set = set(self._relational_data.get_primary_key(table_name))
-        logger.info(
+        logger.debug(
             f"Extacting primary key values for sampling from table '{table_name}'"
         )
 
@@ -313,7 +329,7 @@ class TableExtractor:
                 ):
                     if parent_column_names is None:
                         parent_column_names = fk.parent_columns
-                    logger.info(
+                    logger.debug(
                         f"Found primary key values for table '{table_name}' in child table '{child_table_name}'"
                     )
 
@@ -367,7 +383,7 @@ class TableExtractor:
                     write_count = _stream_df_to_path(df_iter, table_path)
                     row_count += write_count
 
-        logger.info(
+        logger.debug(
             f"Sampling primary key values for intermediate table '{pk_values.table_name}'"
         )
         pk_values.values_ddf.map_partitions(handle_partition).compute()
@@ -377,7 +393,9 @@ class TableExtractor:
     def _flat_sample(
         self, table_path: Path, table_session: _TableSession
     ) -> TableMetadata:
-        sample_row_count = self._config.sample_size(table_session.total_row_count)
+        sample_row_count = _determine_sample_size(
+            self._config, table_session.total_row_count
+        )
         if self._config.sample_mode == SampleMode.RANDOM:
             query = (
                 select(table_session.table)
@@ -387,7 +405,7 @@ class TableExtractor:
         elif self._config.sample_mode == SampleMode.CONTIGUOUS:
             ...
 
-        logger.info(
+        logger.debug(
             f"Sampling {sample_row_count} rows from table '{table_session.table.name}'"
         )
 
@@ -401,7 +419,7 @@ class TableExtractor:
             column_count=table_session.total_column_count,
         )
 
-    def sample_table(
+    def _sample_table(
         self, table_name: str, child_tables: list[str] | None = None
     ) -> TableMetadata:
         if self._relational_data is None:
@@ -427,7 +445,7 @@ class TableExtractor:
         # If we are sampling the entire table, we can just short circuit here
         # and start streaing data into the file
         if self._config.entire_table:
-            logger.info(f"Extracting entire table: {table_name}")
+            logger.debug(f"Extracting entire table: {table_name}")
             with engine.connect() as conn:
                 df_iter = pd.read_sql_table(
                     table_name, conn, chunksize=self._chunk_size
@@ -475,10 +493,11 @@ class TableExtractor:
         """
         if self._relational_data is None:
             self._extract_schema()
+
         table_data = {}
         for table_name in self.table_order:
             child_tables = self._relational_data.get_descendants(table_name)
-            meta = self.sample_table(table_name, child_tables=child_tables)
+            meta = self._sample_table(table_name, child_tables=child_tables)
             table_data[table_name] = meta
 
         if refresh_relational_data:

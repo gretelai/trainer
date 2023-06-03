@@ -1,18 +1,16 @@
+from __future__ import annotations
+
 import logging
 import tempfile
 from pathlib import Path
 from typing import Optional
 
 import pandas as pd
-from sqlalchemy import create_engine, inspect
+from sqlalchemy import create_engine
 from sqlalchemy.engine.base import Engine
 from sqlalchemy.exc import OperationalError
 
-from gretel_trainer.relational.core import (
-    MultiTableException,
-    RelationalData,
-    skip_table,
-)
+from gretel_trainer.relational.core import RelationalData
 from gretel_trainer.relational.extractor import ExtractorConfig, TableExtractor
 
 logger = logging.getLogger(__name__)
@@ -43,6 +41,18 @@ class Connector:
             logger.error(f"{e}, {e.__cause__}")
             raise e
         logger.info("Successfully connected to db")
+
+    @classmethod
+    def from_conn_str(cls, conn_str: str) -> Connector:
+        """
+        Alternate constructor that creates a Connector instance
+        directly from a connection string.
+
+        Args:
+            conn_str: A full connection string for the target database.
+        """
+        engine = create_engine(conn_str)
+        return cls(engine)
 
     def extract(
         self,
