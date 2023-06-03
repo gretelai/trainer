@@ -10,7 +10,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.engine.base import Engine
 from sqlalchemy.exc import OperationalError
 
-from gretel_trainer.relational.core import RelationalData
+from gretel_trainer.relational.core import RelationalData, MultiTableException
 from gretel_trainer.relational.extractor import ExtractorConfig, TableExtractor
 
 logger = logging.getLogger(__name__)
@@ -76,6 +76,9 @@ class Connector:
             logger.warning(
                 "Deprecation warning: in the future only the `config` param will be suported, please use an `ExtractorConfig` object for this param."
             )
+
+        if only is not None and ignore is not None:
+            raise MultiTableException("Cannot specify both `only` and `ignore`.")
 
         if only is None:
             only = set()

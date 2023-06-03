@@ -4,7 +4,7 @@ import tempfile
 import pytest
 
 from gretel_trainer.relational.connectors import sqlite_conn
-from gretel_trainer.relational.core import Scope
+from gretel_trainer.relational.core import Scope, MultiTableException
 
 
 def test_extract_subsets_of_relational_data(example_dbs):
@@ -16,7 +16,7 @@ def test_extract_subsets_of_relational_data(example_dbs):
 
         connector = sqlite_conn(f.name)
 
-        with pytest.raises(ValueError):
+        with pytest.raises(MultiTableException):
             connector.extract(only={"users"}, ignore={"events"})
 
         only = connector.extract(only={"users", "events", "products"})
