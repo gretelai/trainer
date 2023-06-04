@@ -84,6 +84,10 @@ class RelationalData:
         self.graph = networkx.DiGraph()
         self.relational_jsons: dict[str, RelationalJson] = {}
 
+    @property
+    def is_empty(self) -> bool:
+        return not self.graph.number_of_nodes() > 0
+
     def restore(self, tableset: dict[str, pd.DataFrame]) -> dict[str, pd.DataFrame]:
         """Restores a given tableset (presumably output from some MultiTable workflow,
         i.e. transforms or synthetics) to its original shape (specifically, "re-nests"

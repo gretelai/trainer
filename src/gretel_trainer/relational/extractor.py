@@ -424,7 +424,7 @@ class TableExtractor:
     def _sample_table(
         self, table_name: str, child_tables: list[str] | None = None
     ) -> TableMetadata:
-        if not self._relational_data.graph.number_of_nodes():
+        if self._relational_data.is_empty:
             self._extract_schema()
 
         table_path = self._table_path(table_name)
@@ -493,7 +493,7 @@ class TableExtractor:
                 the invented keys for the embedded JSON will now be extracted and accounted for in
                 the learned schema.
         """
-        if not self._relational_data.graph.number_of_nodes():
+        if self._relational_data.is_empty:
             self._extract_schema()
 
         table_data = {}
@@ -511,7 +511,7 @@ class TableExtractor:
 
     @property
     def relational_data(self) -> RelationalData:
-        if self._relational_data is None:
+        if self._relational_data.is_empty:
             raise TableExtractorError(
                 "Cannot return `RelationalData`, `sample_tables()` must be run first."
             )
