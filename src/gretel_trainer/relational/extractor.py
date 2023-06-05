@@ -74,7 +74,7 @@ class ExtractorConfig:
             errors.append("Cannot specify both `only` and `ignore` together")
 
         if self.sample_mode not in ("random", "contiguous"):
-            errors.append("`sample_mode` must be one of 'random`, 'contiguous'")
+            errors.append("`sample_mode` must be one of 'random', 'contiguous'")
 
         if errors:
             raise ValueError(f"The following errors occured: {', '.join(errors)}")
