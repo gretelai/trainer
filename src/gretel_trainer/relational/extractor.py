@@ -422,7 +422,7 @@ class TableExtractor:
         )
 
     def _sample_table(
-        self, table_name: str, child_tables: list[str] | None = None
+        self, table_name: str, child_tables: Optional[list[str]] = None
     ) -> TableMetadata:
         if self._relational_data.is_empty:
             self._extract_schema()
