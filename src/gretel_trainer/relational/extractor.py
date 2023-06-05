@@ -149,9 +149,9 @@ class TableMetadata:
     Contains information about an extracted table.
     """
 
-    original_row_count: int = 0
-    sampled_row_count: int = 0
-    column_count: int = 0
+    original_row_count: int
+    sampled_row_count: int
+    column_count: int
 
     def dict(self) -> dict[str, int]:
         return asdict(self)
