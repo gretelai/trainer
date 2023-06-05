@@ -33,19 +33,19 @@ class AncestralStrategy:
         return common.label_encode_keys(rel_data, tables)
 
     def prepare_training_data(
-        self, rel_data: RelationalData, tables: list[str]
-    ) -> dict[str, pd.DataFrame]:
+        self, rel_data: RelationalData, table_paths: dict[str, Path]
+    ) -> dict[str, Path]:
         """
-        Returns tables with:
+        Writes tables' training data to provided paths.
+        Training data has:
         - all safe-for-seed ancestor fields added
         - columns in multigenerational format
         - all keys translated to contiguous integers
         - artificial min/max seed records added
         """
         all_tables = rel_data.list_all_tables()
-        omitted_tables = [t for t in all_tables if t not in tables]
+        omitted_tables = [t for t in all_tables if t not in table_paths]
         altered_tableset = {}
-        training_data = {}
 
         # Create a new table set identical to source data
         for table_name in all_tables:
@@ -62,16 +62,16 @@ class AncestralStrategy:
         )
 
         # Collect all data in multigenerational format
-        for table_name in tables:
+        for table, path in table_paths.items():
             data = ancestry.get_table_data_with_ancestors(
                 rel_data=rel_data,
-                table=table_name,
+                table=table,
                 tableset=altered_tableset,
                 ancestral_seeding=True,
             )
-            training_data[table_name] = data
+            data.to_csv(path, index=False)
 
-        return training_data
+        return table_paths
 
     def tables_to_retrain(
         self, tables: list[str], rel_data: RelationalData
