@@ -88,7 +88,9 @@ class Connector:
             extractor.sample_tables()
 
             # We ensure to re-create RelationalData after extraction so
-            # we can account for any embedded JSON.
+            # we can account for any embedded JSON. This also loads
+            # each table as a DF in the object which is currently
+            # the expected behavior for later operations.
             extractor._relational_data = extractor._create_rel_data(
                 extracted_tables=extractor.table_order
             )
