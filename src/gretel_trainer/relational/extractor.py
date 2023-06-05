@@ -4,9 +4,11 @@ Extraction of SQL tables to compressed flat files with optional subsetting.
 from __future__ import annotations
 
 import logging
+from contextlib import nullcontext
 from dataclasses import asdict, dataclass
 from enum import Enum
 from pathlib import Path
+from threading import Lock
 from typing import TYPE_CHECKING, Iterator, Optional
 
 import dask.dataframe as dd
@@ -53,7 +55,7 @@ class ExtractorConfig:
     Ignore these tables during extraction. Cannot be used with `only.`
     """
 
-    schema: str | None = None
+    schema: Optional[None] = None
     """
     Limit scope to a specific schema, this is a pass-through param to SQLAlchemy. It is not
     supported by all dialects
@@ -135,7 +137,9 @@ class _TableSession:
 @dataclass
 class _PKValues:
     """
-    Contains information that is needed to sample rows from an intermediate table
+    Contains information that is needed to sample rows from a parent table
+    where we need the foreign key values of the table's children so we
+    can extract only those rows from the parent table.
     """
 
     table_name: str
@@ -157,15 +161,23 @@ class TableMetadata:
         return asdict(self)
 
 
-def _stream_df_to_path(df_iter: Iterator[pd.DataFrame], path: Path) -> int:
+def _stream_df_to_path(
+    df_iter: Iterator[pd.DataFrame], path: Path, lock: Optional[Lock] = None
+) -> int:
     """
     Stream the contents of a DF to disk, this function only does appending
     """
+    if lock is None:
+        lock_ = nullcontext()
+    else:
+        lock_ = lock
+
     row_count = 0
 
     for df in df_iter:
-        df.to_csv(path, mode="a", index=False, header=False)
-        row_count += len(df)
+        with lock_:
+            df.to_csv(path, mode="a", index=False, header=False)
+            row_count += len(df)
 
     return row_count
 
@@ -333,7 +345,7 @@ class TableExtractor:
                     )
 
                     # NOTE: When we extract the FK values from the child tables, we store them under the PK
-                    # column names for the current intermediate table we are processing.
+                    # column names for the current parent table we are processing.
                     rename_map = dict(zip(fk.columns, fk.parent_columns))
 
                     # NOTE: The child tables MUST have alraedy been extracted!
@@ -367,7 +379,9 @@ class TableExtractor:
         """
         row_count = 0
 
-        def handle_partition(df: pd.DataFrame):
+        lock = Lock()
+
+        def handle_partition(df: pd.DataFrame, lock: Lock):
             # This runs in another thread so we have to re-create our table session info
             table_session = self._get_table_session(pk_values.table_name)
             nonlocal row_count
@@ -384,13 +398,13 @@ class TableExtractor:
 
                 with table_session.engine.connect() as conn:
                     df_iter = pd.read_sql_query(query, conn, chunksize=self._chunk_size)
-                    write_count = _stream_df_to_path(df_iter, table_path)
+                    write_count = _stream_df_to_path(df_iter, table_path, lock=lock)
                     row_count += write_count
 
         logger.debug(
-            f"Sampling primary key values for intermediate table '{pk_values.table_name}'"
+            f"Sampling primary key values for parent table '{pk_values.table_name}'"
         )
-        pk_values.values_ddf.map_partitions(handle_partition).compute()
+        pk_values.values_ddf.map_partitions(handle_partition, lock).compute()
 
         return row_count
 
@@ -467,10 +481,10 @@ class TableExtractor:
 
         # Child nodes exist at this point.
 
-        # If this is an intermediate table, first we build a DDF that contains
-        # all of the PK values that we will sample from this intermediate table.
-        # These PK values is the set intersection of all the FK values of this
-        # intermediate table's child tables
+        # At this point, we are at a parent table, first we build a DDF that contains
+        # all of the PK values that we will sample from this parent table.
+        # These PK values are the set union of all the FK values of this
+        # parent table's child tables
         pk_values = self._load_table_pk_values(table_name, child_tables)
         sampled_row_count = self._sample_pk_values(table_path, pk_values)
 
@@ -480,18 +494,10 @@ class TableExtractor:
             column_count=table_session.total_column_count,
         )
 
-    def sample_tables(
-        self, refresh_relational_data: bool = False
-    ) -> dict[str, TableMetadata]:
+    def sample_tables(self) -> dict[str, TableMetadata]:
         """
         Extract database tables according to the `ExtractorConfig.` Tables will be stored in the
         configured storage directory from the `ExtractorConfig` object.
-
-        Args:
-            refresh_relational_data: If this is set, the `RelationalData` object will be re-created
-                using the extracted tables. This is useful if there is nested JSON in the tables because
-                the invented keys for the embedded JSON will now be extracted and accounted for in
-                the learned schema.
         """
         if self._relational_data.is_empty:
             self._extract_schema()
@@ -501,11 +507,6 @@ class TableExtractor:
             child_tables = self._relational_data.get_descendants(table_name)
             meta = self._sample_table(table_name, child_tables=child_tables)
             table_data[table_name] = meta
-
-        if refresh_relational_data:
-            self._relational_data = self._create_rel_data(
-                extracted_tables=self.table_order
-            )
 
         return table_data
 

@@ -65,18 +65,14 @@ class Connector:
         Extracts table data and relationships from the database. Optional args include:
 
         Args:
+            only: Only extract these table names, cannot be used with `ignore`
+            ignore: Skip extracting these table names, cannot be used with `only`
+            schema: An optional schema name that is passed through to SQLAlchemy, may only
+                be used with certain dialects.
             config: An optional extraction config. This config can be used to only include
                 specific tables, ignore specific tables, and configure subsetting. Please
                 see the `ExtractorConfig` docs for more details.
-
-        NOTE: The `only`, `ignore`, and `schema` args will be deprecated. Only the `config` param
-        will be used in the future, which contains all of the params from above.
         """
-        if only or ignore or schema:
-            logger.warning(
-                "Deprecation warning: in the future only the `config` param will be suported, please use an `ExtractorConfig` object for this param."
-            )
-
         if only is not None and ignore is not None:
             raise MultiTableException("Cannot specify both `only` and `ignore`.")
 
@@ -89,9 +85,13 @@ class Connector:
             extractor = TableExtractor(
                 config=config, connector=self, storage_dir=Path(tmpdir)
             )
+            extractor.sample_tables()
+
             # We ensure to re-create RelationalData after extraction so
             # we can account for any embedded JSON.
-            extractor.sample_tables(refresh_relational_data=True)
+            extractor._relational_data = extractor._create_rel_data(
+                extracted_tables=extractor.table_order
+            )
 
         return extractor.relational_data
 
