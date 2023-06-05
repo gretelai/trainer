@@ -209,7 +209,7 @@ class TableExtractor:
         return _TableSession(table=table, engine=self._connector.engine)
 
     def _create_rel_data(
-        self, extracted_tables: list[str] | None = None
+        self, extracted_tables: Optional[list[str]] = None
     ) -> RelationalData:
         """
         Internal helper method. This can be used to construct a `RelationalData`
