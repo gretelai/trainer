@@ -233,10 +233,10 @@ class TableExtractor:
         any embedded JSON data that is used to create additional PK/FK mappings
         that are invented.
 
-        If any table names are provided in the `tables` list, then those tables
+        If any table names are provided in the `extracted_tables` list, then those tables
         will be loaded as DFs and added as the data to nodes.
 
-        NOTE: If `tables` are provided, then these tables must have already been
+        NOTE: If `extracted_tables` are provided, then these tables must have already been
         extracted!
         """
         if extracted_tables is None:
