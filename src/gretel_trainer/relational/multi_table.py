@@ -5,6 +5,7 @@ import logging
 import os
 import shutil
 import tarfile
+import tempfile
 from collections import defaultdict
 from contextlib import suppress
 from dataclasses import replace
@@ -318,8 +319,17 @@ class MultiTable:
             )
         if synthetics_output_archive_path.exists():
             any_outputs = True
-            with tarfile.open(synthetics_output_archive_path, "r:gz") as tar:
-                tar.extractall(path=self._working_dir)
+            # Extract the nested archives to a temporary directory, and then
+            # extract the contents of each run archive to a subdir in the working directory
+            with tarfile.open(
+                synthetics_output_archive_path, "r:gz"
+            ) as tar, tempfile.TemporaryDirectory() as tmpdir:
+                tar.extractall(path=tmpdir)
+                for run_tar in os.listdir(tmpdir):
+                    with tarfile.open(f"{tmpdir}/{run_tar}", "r:gz") as rt:
+                        rt.extractall(
+                            path=self._working_dir / run_tar.removesuffix(".tar.gz")
+                        )
 
         ## Then, restore latest, potentially in-progress run data if present
         backup_generate = backup.generate
