@@ -361,9 +361,7 @@ class TableExtractor:
                         values_ddf = dd.concat([values_ddf, tmp_ddf])  # pyright: ignore
 
         if parent_column_names:
-            values_ddf = values_ddf[  # pyright: ignore
-                parent_column_names
-            ].drop_duplicates()  # pyright: ignore
+            values_ddf = values_ddf.drop_duplicates()  # pyright: ignore
 
         return _PKValues(
             table_name=table_name,
