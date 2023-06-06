@@ -348,7 +348,7 @@ class TableExtractor:
                     # column names for the current parent table we are processing.
                     rename_map = dict(zip(fk.columns, fk.parent_columns))
 
-                    # NOTE: The child tables MUST have alraedy been extracted!
+                    # NOTE: The child tables MUST have already been extracted!
                     child_table_path = self._table_path(child_table_name)
 
                     tmp_ddf = dd.read_csv(  # pyright: ignore
