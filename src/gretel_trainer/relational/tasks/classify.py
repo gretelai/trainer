@@ -30,7 +30,7 @@ class ClassifyTask:
         self.failed_models = []
         self.completed_record_handlers = []
         self.failed_record_handlers = []
-        self.result_filepaths: dict[str, Path] = {}
+        self.result_filepaths: list[Path] = []
 
     def action(self, job: Job) -> str:
         if self.all_rows:
@@ -153,4 +153,4 @@ class ClassifyTask:
             job.get_artifact_link(artifact_name), "rb"
         ) as src, smart_open.open(str(destpath), "wb") as dest:
             shutil.copyfileobj(src, dest)
-        self.result_filepaths[filename] = destpath
+        self.result_filepaths.append(destpath)

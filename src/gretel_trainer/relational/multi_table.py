@@ -19,7 +19,11 @@ from gretel_client.projects import Project, create_project, get_project
 from gretel_client.projects.jobs import ACTIVE_STATES, END_STATES, Status
 from gretel_client.projects.records import RecordHandler
 
-from gretel_trainer.relational.artifacts import ArtifactCollection, add_to_tar
+from gretel_trainer.relational.artifacts import (
+    ArtifactCollection,
+    archive_items,
+    archive_nested_dir,
+)
 from gretel_trainer.relational.backup import (
     Backup,
     BackupClassify,
@@ -546,8 +550,7 @@ class MultiTable:
         run_task(task, self._extended_sdk)
 
         archive_path = self._working_dir / "classify_outputs.tar.gz"
-        for arcname, path in task.result_filepaths.items():
-            add_to_tar(archive_path, path, arcname)
+        archive_items(archive_path, task.result_filepaths)
         self._artifact_collection.upload_classify_outputs_archive(
             self._project, str(archive_path)
         )
@@ -689,11 +692,16 @@ class MultiTable:
             out_path = run_dir / filename
             df.to_csv(out_path, index=False)
 
-        archive_path = self._working_dir / "transforms_outputs.tar.gz"
-        add_to_tar(archive_path, run_dir, identifier)
+        all_runs_archive_path = self._working_dir / "transforms_outputs.tar.gz"
+
+        archive_nested_dir(
+            targz=all_runs_archive_path,
+            directory=run_dir,
+            name=identifier,
+        )
 
         self._artifact_collection.upload_transforms_outputs_archive(
-            self._project, str(archive_path)
+            self._project, str(all_runs_archive_path)
         )
         self._backup()
         self.transform_output_tables = reshaped_tables
@@ -740,8 +748,7 @@ class MultiTable:
             self._synthetics_train.models[table_name] = model
 
         archive_path = self._working_dir / "synthetics_training.tar.gz"
-        for table_name, csv_path in training_paths.items():
-            add_to_tar(archive_path, csv_path, csv_path.name)
+        archive_items(archive_path, list(training_paths.values()))
         self._artifact_collection.upload_synthetics_training_archive(
             self._project, str(archive_path)
         )
@@ -993,11 +1000,16 @@ class MultiTable:
             target_dir=run_dir,
         )
 
-        archive_path = self._working_dir / "synthetics_outputs.tar.gz"
-        add_to_tar(archive_path, run_dir, self._synthetics_run.identifier)
+        all_runs_archive_path = self._working_dir / "synthetics_outputs.tar.gz"
+
+        archive_nested_dir(
+            targz=all_runs_archive_path,
+            directory=run_dir,
+            name=self._synthetics_run.identifier,
+        )
 
         self._artifact_collection.upload_synthetics_outputs_archive(
-            self._project, str(archive_path)
+            self._project, str(all_runs_archive_path)
         )
         self.synthetic_output_tables = reshaped_tables
         self._backup()
