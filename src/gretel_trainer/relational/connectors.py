@@ -1,16 +1,17 @@
+from __future__ import annotations
+
 import logging
+import tempfile
+from pathlib import Path
 from typing import Optional
 
 import pandas as pd
-from sqlalchemy import create_engine, inspect
+from sqlalchemy import create_engine
 from sqlalchemy.engine.base import Engine
 from sqlalchemy.exc import OperationalError
 
-from gretel_trainer.relational.core import (
-    MultiTableException,
-    RelationalData,
-    skip_table,
-)
+from gretel_trainer.relational.core import MultiTableException, RelationalData
+from gretel_trainer.relational.extractor import ExtractorConfig, TableExtractor
 
 logger = logging.getLogger(__name__)
 
@@ -41,51 +42,60 @@ class Connector:
             raise e
         logger.info("Successfully connected to db")
 
+    @classmethod
+    def from_conn_str(cls, conn_str: str) -> Connector:
+        """
+        Alternate constructor that creates a Connector instance
+        directly from a connection string.
+
+        Args:
+            conn_str: A full connection string for the target database.
+        """
+        engine = create_engine(conn_str)
+        return cls(engine)
+
     def extract(
         self,
         only: Optional[set[str]] = None,
         ignore: Optional[set[str]] = None,
         schema: Optional[str] = None,
+        config: Optional[ExtractorConfig] = None,
     ) -> RelationalData:
         """
         Extracts table data and relationships from the database. Optional args include:
-        - `only` (restrict extraction to these tables; cannot be used with `ignore`)
-        - `ignore` (exclude these tables from extraction; cannot be used with `only`)
-        - `schema` (limit scope to a specific schema; this is dialect-specific and not supported by all databases)
+
+        Args:
+            only: Only extract these table names, cannot be used with `ignore`
+            ignore: Skip extracting these table names, cannot be used with `only`
+            schema: An optional schema name that is passed through to SQLAlchemy, may only
+                be used with certain dialects.
+            config: An optional extraction config. This config can be used to only include
+                specific tables, ignore specific tables, and configure subsetting. Please
+                see the `ExtractorConfig` docs for more details.
         """
         if only is not None and ignore is not None:
             raise MultiTableException("Cannot specify both `only` and `ignore`.")
 
-        inspector = inspect(self.engine)
-
-        relational_data = RelationalData()
-        foreign_keys: list[tuple[str, dict]] = []
-
-        for table_name in inspector.get_table_names(schema=schema):
-            if skip_table(table_name, only, ignore):
-                continue
-
-            logger.debug(f"Extracting source data from `{table_name}`")
-            df = pd.read_sql_table(table_name, self.engine, schema=schema)
-            primary_key = inspector.get_pk_constraint(table_name)["constrained_columns"]
-            for fk in inspector.get_foreign_keys(table_name):
-                if skip_table(fk["referred_table"], only, ignore):
-                    continue
-                else:
-                    foreign_keys.append((table_name, fk))
-
-            relational_data.add_table(name=table_name, primary_key=primary_key, data=df)
-
-        for foreign_key in foreign_keys:
-            table, fk = foreign_key
-            relational_data.add_foreign_key_constraint(
-                table=table,
-                constrained_columns=fk["constrained_columns"],
-                referred_table=fk["referred_table"],
-                referred_columns=fk["referred_columns"],
+        if config is None:
+            config = ExtractorConfig(
+                only=only, ignore=ignore, schema=schema  # pyright: ignore
             )
 
-        return relational_data
+        with tempfile.TemporaryDirectory() as tmpdir:
+            extractor = TableExtractor(
+                config=config, connector=self, storage_dir=Path(tmpdir)
+            )
+            extractor.sample_tables()
+
+            # We ensure to re-create RelationalData after extraction so
+            # we can account for any embedded JSON. This also loads
+            # each table as a DF in the object which is currently
+            # the expected behavior for later operations.
+            extractor._relational_data = extractor._create_rel_data(
+                extracted_tables=extractor.table_order
+            )
+
+        return extractor.relational_data
 
     def save(self, tables: dict[str, pd.DataFrame], prefix: str = "") -> None:
         for name, data in tables.items():

@@ -11,3 +11,4 @@ scikit-learn~=1.0
 smart-open[s3]~=5.2
 sqlalchemy~=1.4
 unflatten==0.1.1
+dask[complete]==2023.5.1
