@@ -74,7 +74,7 @@ def test_train_synthetics_custom_config_for_all_tables(ecom, tmpdir, project):
     mt = MultiTable(ecom, project_display_name=tmpdir, gretel_model="amplify")
 
     # ...but provide an actgan config to train_synthetics.
-    mt.train_synthetics(mock_actgan_config)
+    mt.train_synthetics(config=mock_actgan_config)
 
     # The actgan config is used instead of amplify.
     project.create_model_obj.assert_called_with(
@@ -91,7 +91,9 @@ def test_train_synthetics_custom_configs_per_table(ecom, tmpdir, project):
     mt = MultiTable(ecom, project_display_name=tmpdir, gretel_model="amplify")
 
     # ...but provide an actgan config to use for tables PLUS a tabular-dp config for one specific table.
-    mt.train_synthetics(mock_actgan_config, table_configs={"events": mock_tabdp_config})
+    mt.train_synthetics(
+        config=mock_actgan_config, table_configs={"events": mock_tabdp_config}
+    )
 
     # The tabular-dp config is used for the singularly called-out table...
     project.create_model_obj.assert_any_call(
@@ -112,7 +114,7 @@ def test_train_synthetics_errors(ecom, tmpdir):
 
     # Invalid config
     with pytest.raises(MultiTableException):
-        mt.train_synthetics("nonsense")
+        mt.train_synthetics(config="nonsense")
 
     # Unrecognized table
     with pytest.raises(MultiTableException):
@@ -125,7 +127,7 @@ def test_train_synthetics_errors(ecom, tmpdir):
     # Config for unsupported model
     mt = MultiTable(ecom, project_display_name=tmpdir, strategy="ancestral")
     with pytest.raises(MultiTableException):
-        mt.train_synthetics(actgan_config)
+        mt.train_synthetics(config=actgan_config)
 
     # Table config for unsupported model
     mt = MultiTable(ecom, project_display_name=tmpdir, strategy="ancestral")

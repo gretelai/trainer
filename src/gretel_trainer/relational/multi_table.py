@@ -812,11 +812,11 @@ class MultiTable:
 
     def train_synthetics(
         self,
-        config: Optional[GretelModelConfig] = None,
         *,
+        config: Optional[GretelModelConfig] = None,
+        table_configs: Optional[dict[str, GretelModelConfig]] = None,
         only: Optional[set[str]] = None,
         ignore: Optional[set[str]] = None,
-        table_configs: Optional[dict[str, GretelModelConfig]] = None,
     ) -> None:
         """
         Train synthetic data models for the tables in the tableset,
