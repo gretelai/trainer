@@ -20,7 +20,7 @@ def get_model_key(config_dict: dict[str, Any]) -> Optional[str]:
         return None
 
 
-def _ingest(config: GretelModelConfig) -> dict[str, Any]:
+def ingest(config: GretelModelConfig) -> dict[str, Any]:
     return read_model_config(deepcopy(config))
 
 
@@ -30,19 +30,19 @@ def _model_name(workflow: str, table: str) -> str:
 
 
 def make_classify_config(table: str, config: GretelModelConfig) -> dict[str, Any]:
-    tailored_config = _ingest(config)
+    tailored_config = ingest(config)
     tailored_config["name"] = _model_name("classify", table)
     return tailored_config
 
 
 def make_evaluate_config(table: str) -> dict[str, Any]:
-    tailored_config = _ingest("evaluate/default")
+    tailored_config = ingest("evaluate/default")
     tailored_config["name"] = _model_name("evaluate", table)
     return tailored_config
 
 
 def make_synthetics_config(table: str, config: GretelModelConfig) -> dict[str, Any]:
-    tailored_config = _ingest(config)
+    tailored_config = ingest(config)
     tailored_config["name"] = _model_name("synthetics", table)
     return tailored_config
 
@@ -50,7 +50,7 @@ def make_synthetics_config(table: str, config: GretelModelConfig) -> dict[str, A
 def make_transform_config(
     rel_data: RelationalData, table: str, config: GretelModelConfig
 ) -> dict[str, Any]:
-    tailored_config = _ingest(config)
+    tailored_config = ingest(config)
     tailored_config["name"] = _model_name("transforms", table)
 
     key_columns = rel_data.get_all_key_columns(table)
