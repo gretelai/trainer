@@ -1,5 +1,5 @@
 from copy import deepcopy
-from typing import Any
+from typing import Any, Optional
 
 from gretel_client.projects.models import read_model_config
 
@@ -8,6 +8,16 @@ from gretel_trainer.relational.core import (
     MultiTableException,
     RelationalData,
 )
+
+
+def get_model_key(config_dict: dict[str, Any]) -> Optional[str]:
+    try:
+        models = config_dict["models"]
+        assert isinstance(models, list)
+        assert isinstance(models[0], dict)
+        return list(models[0])[0]
+    except (AssertionError, IndexError, KeyError):
+        return None
 
 
 def _ingest(config: GretelModelConfig) -> dict[str, Any]:
