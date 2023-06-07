@@ -108,6 +108,38 @@ def test_train_synthetics_custom_configs_per_table(ecom, tmpdir, project):
     )
 
 
+def test_train_synthetics_table_config_and_mt_init_default(ecom, tmpdir, project):
+    mock_tabdp_config = {"models": [{"tabular-dp": {}}]}
+
+    # We set amplify on the MultiTable instance...
+    mt = MultiTable(ecom, project_display_name=tmpdir, gretel_model="amplify")
+
+    # ...and provide a tabular-dp config for one specific table (but NOT a config).
+    mt.train_synthetics(table_configs={"events": mock_tabdp_config})
+
+    # The tabular-dp config is used for the singularly called-out table...
+    project.create_model_obj.assert_any_call(
+        model_config={"name": "synthetics-events", **mock_tabdp_config},
+        data_source=f"{tmpdir}/synthetics_train_events.csv",
+    )
+
+    # ...and the amplify blueprint config is used for all the rest.
+    project.create_model_obj.assert_any_call(
+        model_config=AmplifyConfigMatcher(),
+        data_source=f"{tmpdir}/synthetics_train_users.csv",
+    )
+
+
+# Temporary helper to simplify matching an Amplify model config.
+# We don't care about recreating the entire Amplify blueprint (which can also change unexpectedly);
+# we only care that the model type is Amplify.
+# This can be removed once a synthetics config is required by train_synthetics (and we're
+# no longer setting or using a gretel_model / blueprint config on the MultiTable instance).
+class AmplifyConfigMatcher:
+    def __eq__(self, other):
+        return list(other["models"][0])[0] == "amplify"
+
+
 def test_train_synthetics_errors(ecom, tmpdir):
     actgan_config = {"models": [{"actgan": {}}]}
     mt = MultiTable(ecom, project_display_name=tmpdir)
