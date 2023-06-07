@@ -1,6 +1,7 @@
 from copy import deepcopy
 from typing import Any, Optional
 
+from gretel_client.projects.exceptions import ModelConfigError
 from gretel_client.projects.models import read_model_config
 
 from gretel_trainer.relational.core import (
@@ -21,7 +22,10 @@ def get_model_key(config_dict: dict[str, Any]) -> Optional[str]:
 
 
 def ingest(config: GretelModelConfig) -> dict[str, Any]:
-    return read_model_config(deepcopy(config))
+    try:
+        return read_model_config(deepcopy(config))
+    except ModelConfigError as e:
+        raise MultiTableException("Invalid config") from e
 
 
 def _model_name(workflow: str, table: str) -> str:

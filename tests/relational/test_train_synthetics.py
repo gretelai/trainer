@@ -67,6 +67,72 @@ def test_train_synthetics_exits_early_if_unrecognized_tables(ecom, tmpdir, proje
     project.create_model_obj.assert_not_called()
 
 
+def test_train_synthetics_custom_config_for_all_tables(ecom, tmpdir, project):
+    mock_actgan_config = {"models": [{"actgan": {}}]}
+
+    # We set amplify on the MultiTable instance...
+    mt = MultiTable(ecom, project_display_name=tmpdir, gretel_model="amplify")
+
+    # ...but provide an actgan config to train_synthetics.
+    mt.train_synthetics(mock_actgan_config)
+
+    # The actgan config is used instead of amplify.
+    project.create_model_obj.assert_called_with(
+        model_config={"name": "synthetics-users", **mock_actgan_config},
+        data_source=f"{tmpdir}/synthetics_train_users.csv",
+    )
+
+
+def test_train_synthetics_custom_configs_per_table(ecom, tmpdir, project):
+    mock_actgan_config = {"models": [{"actgan": {}}]}
+    mock_tabdp_config = {"models": [{"tabular-dp": {}}]}
+
+    # We set amplify on the MultiTable instance...
+    mt = MultiTable(ecom, project_display_name=tmpdir, gretel_model="amplify")
+
+    # ...but provide an actgan config to use for tables PLUS a tabular-dp config for one specific table.
+    mt.train_synthetics(mock_actgan_config, table_configs={"events": mock_tabdp_config})
+
+    # The tabular-dp config is used for the singularly called-out table...
+    project.create_model_obj.assert_any_call(
+        model_config={"name": "synthetics-events", **mock_tabdp_config},
+        data_source=f"{tmpdir}/synthetics_train_events.csv",
+    )
+
+    # ...and the actgan config is used for all the rest.
+    project.create_model_obj.assert_any_call(
+        model_config={"name": "synthetics-users", **mock_actgan_config},
+        data_source=f"{tmpdir}/synthetics_train_users.csv",
+    )
+
+
+def test_train_synthetics_errors(ecom, tmpdir):
+    actgan_config = {"models": [{"actgan": {}}]}
+    mt = MultiTable(ecom, project_display_name=tmpdir)
+
+    # Invalid config
+    with pytest.raises(MultiTableException):
+        mt.train_synthetics("nonsense")
+
+    # Unrecognized table
+    with pytest.raises(MultiTableException):
+        mt.train_synthetics(table_configs={"not-a-table": actgan_config})
+
+    # Config provided for omitted table
+    with pytest.raises(MultiTableException):
+        mt.train_synthetics(ignore={"users"}, table_configs={"users": actgan_config})
+
+    # Config for unsupported model
+    mt = MultiTable(ecom, project_display_name=tmpdir, strategy="ancestral")
+    with pytest.raises(MultiTableException):
+        mt.train_synthetics(actgan_config)
+
+    # Table config for unsupported model
+    mt = MultiTable(ecom, project_display_name=tmpdir, strategy="ancestral")
+    with pytest.raises(MultiTableException):
+        mt.train_synthetics(table_configs={"users": actgan_config})
+
+
 def test_train_synthetics_multiple_calls_additive(ecom, tmpdir):
     mt = MultiTable(ecom, project_display_name=tmpdir)
     mt.train_synthetics(only={"products"})

@@ -11,7 +11,7 @@ from contextlib import suppress
 from dataclasses import replace
 from datetime import datetime
 from pathlib import Path
-from typing import Optional, Union
+from typing import Any, Optional, Union
 
 import pandas as pd
 import smart_open
@@ -43,6 +43,8 @@ from gretel_trainer.relational.core import (
 from gretel_trainer.relational.json import InventedTableMetadata, RelationalJson
 from gretel_trainer.relational.log import silent_logs
 from gretel_trainer.relational.model_config import (
+    get_model_key,
+    ingest,
     make_classify_config,
     make_evaluate_config,
     make_synthetics_config,
@@ -741,7 +743,7 @@ class MultiTable:
         else:
             return (None, None)
 
-    def _train_synthetics_models(self, tables: list[str]) -> None:
+    def _train_synthetics_models(self, configs: dict[str, dict[str, Any]]) -> None:
         """
         Uses the configured strategy to prepare training data sources for each table,
         exported to the working directory. Creates a model for each table and submits
@@ -750,15 +752,16 @@ class MultiTable:
         """
         training_paths = {
             table: self._working_dir / f"synthetics_train_{table}.csv"
-            for table in tables
+            for table in configs
         }
 
         self._strategy.prepare_training_data(self.relational_data, training_paths)
 
-        for table_name, training_csv in training_paths.items():
-            synthetics_config = make_synthetics_config(table_name, self._model_config)
+        for table_name, config in configs.items():
+            synthetics_config = make_synthetics_config(table_name, config)
             model = self._project.create_model_obj(
-                model_config=synthetics_config, data_source=str(training_csv)
+                model_config=synthetics_config,
+                data_source=str(training_paths[table_name]),
             )
             self._synthetics_train.models[table_name] = model
 
@@ -795,16 +798,25 @@ class MultiTable:
             "This method is deprecated and will be removed in a future release. "
             "Please use `train_synthetics` instead."
         )
-        tables = self.relational_data.list_all_tables()
+        # This method completely resets any existing SyntheticsTrain state,
+        # orphaning any existing models in the project.
         self._synthetics_train = SyntheticsTrain()
 
-        self._train_synthetics_models(tables)
+        # This method only supports using a single config
+        # (the blueprint config set at MultiTable initialization)
+        # and cannot omit any tables from training.
+        config = ingest(self._model_config)
+        configs = {table: config for table in self.relational_data.list_all_tables()}
+
+        self._train_synthetics_models(configs)
 
     def train_synthetics(
         self,
+        config: Optional[GretelModelConfig] = None,
         *,
         only: Optional[set[str]] = None,
         ignore: Optional[set[str]] = None,
+        table_configs: Optional[dict[str, GretelModelConfig]] = None,
     ) -> None:
         """
         Train synthetic data models for the tables in the tableset,
@@ -812,10 +824,9 @@ class MultiTable:
         """
         only, ignore = self._get_only_and_ignore(only, ignore)
 
-        all_tables = self.relational_data.list_all_tables()
-        include_tables = []
-        omit_tables = []
-        for table in all_tables:
+        include_tables: list[str] = []
+        omit_tables: list[str] = []
+        for table in self.relational_data.list_all_tables():
             if skip_table(table, only, ignore):
                 omit_tables.append(table)
             else:
@@ -828,7 +839,44 @@ class MultiTable:
         # along the way informing the user of which required tables are missing).
         self._strategy.validate_preserved_tables(omit_tables, self.relational_data)
 
-        self._train_synthetics_models(include_tables)
+        # Translate any JSON-source tables in table_config_overrides to invented tables
+        overrides = {}
+        for table, conf in (table_configs or {}).items():
+            m_names = self.relational_data.get_modelable_table_names(table)
+            if len(m_names) == 0:
+                raise MultiTableException(f"Unrecognized table name: `{table}`")
+            overrides.update({m: conf for m in m_names})
+
+        # Ensure compatibility between only/ignore and table_configs
+        omitted_tables_with_overrides_specified = []
+        for table in overrides:
+            if table in omit_tables:
+                omitted_tables_with_overrides_specified.append(table)
+        if len(omitted_tables_with_overrides_specified) > 0:
+            raise MultiTableException(
+                f"Cannot provide configs for tables that have been omitted from synthetics training: "
+                f"{omitted_tables_with_overrides_specified}"
+            )
+
+        # Validate the provided config, or fall back to the one configured on self
+        # (gretel_model, which is validated against the strategy on MultiTable initialization)
+        if config is not None:
+            default_config_dict = self._validate_synthetics_config(config)
+        else:
+            default_config_dict = ingest(self._model_config)
+
+        # Validate any override configs
+        override_config_dicts = {
+            table: self._validate_synthetics_config(conf)
+            for table, conf in overrides.items()
+        }
+
+        configs = {
+            table: override_config_dicts.get(table, default_config_dict)
+            for table in include_tables
+        }
+
+        self._train_synthetics_models(configs)
 
     def retrain_tables(self, tables: dict[str, pd.DataFrame]) -> None:
         """
@@ -849,7 +897,10 @@ class MultiTable:
             with suppress(KeyError):
                 del self._synthetics_train.models[table]
 
-        self._train_synthetics_models(tables_to_retrain)
+        config = ingest(self._model_config)
+        configs = {table: config for table in tables_to_retrain}
+
+        self._train_synthetics_models(configs)
 
     def _upload_sources_to_project(self) -> None:
         archive_path = self._working_dir / "source_tables.tar.gz"
@@ -1075,6 +1126,27 @@ class MultiTable:
         }
 
         return (gretel_model, _BLUEPRINTS[gretel_model])
+
+    def _validate_synthetics_config(self, config: GretelModelConfig) -> dict[str, Any]:
+        """
+        Validates that the provided config:
+        - has the general shape of a Gretel model config (or can be read into one, e.g. blueprints)
+        - is supported by the configured synthetics strategy
+
+        Returns the parsed config as read by read_model_config.
+        """
+        config_dict = ingest(config)
+        if (model_key := get_model_key(config_dict)) is None:
+            raise MultiTableException("Invalid config")
+        else:
+            supported_models = self._strategy.supported_models
+            if model_key not in supported_models:
+                raise MultiTableException(
+                    f"Invalid gretel model requested: {model_key}. "
+                    f"The selected strategy supports: {supported_models}."
+                )
+
+        return config_dict
 
 
 def _validate_strategy(strategy: str) -> Union[IndependentStrategy, AncestralStrategy]:
