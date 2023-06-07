@@ -277,25 +277,45 @@ def create_standin_project_artifacts(
             rel_data.get_table_data(table).to_csv(table_path, index=False)
             tar.add(table_path, arcname=f"synthetics_train_{table}.csv")
 
+    # Reports
+    for table in rel_data.list_all_tables():
+        for kind in ["individual", "cross_table"]:
+            html_filename = f"synthetics_{kind}_evaluation_{table}.html"
+            html_path = setup_path / html_filename
+            with open(html_path, "w") as f:
+                f.write("<html></html>")
+            json_filename = f"synthetics_{kind}_evaluation_{table}.json"
+            json_path = setup_path / json_filename
+            with open(json_path, "w") as f:
+                json.dump(_report_json_dict, f)
+
     # Synthetics output archive
-    with tarfile.open(
-        local_file(setup_path, "synthetics_outputs_archive"), "w:gz"
-    ) as tar:
-        for table in rel_data.list_all_tables():
-            table_path = setup_path / f"synth_{table}.csv"
-            rel_data.get_table_data(table).to_csv(table_path, index=False)
-            tar.add(table_path, arcname=f"run-id/synth_{table}.csv")
-            for kind in ["individual", "cross_table"]:
-                html_filename = f"synthetics_{kind}_evaluation_{table}.html"
-                html_path = setup_path / html_filename
-                with open(html_path, "w") as f:
-                    f.write("<html></html>")
-                tar.add(html_path, arcname=f"run-id/{html_filename}")
-                json_filename = f"synthetics_{kind}_evaluation_{table}.json"
-                json_path = setup_path / json_filename
-                with open(json_path, "w") as f:
-                    json.dump(_report_json_dict, f)
-                tar.add(json_path, arcname=f"run-id/{json_filename}")
+    # Create a subdirectory with the run outputs
+    setup_run_path = setup_path / "run-id"
+    os.makedirs(setup_run_path)
+    for table in rel_data.list_all_tables():
+        table_path = setup_run_path / f"synth_{table}.csv"
+        rel_data.get_table_data(table).to_csv(table_path, index=False)
+        for kind in ["individual", "cross_table"]:
+            html_filename = f"synthetics_{kind}_evaluation_{table}.html"
+            json_filename = f"synthetics_{kind}_evaluation_{table}.json"
+            shutil.copy(setup_path / html_filename, setup_run_path / html_filename)
+            shutil.copy(setup_path / json_filename, setup_run_path / json_filename)
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        runtar = Path(tmpdir) / "run-id"
+        # Create the archive for this run...
+        shutil.make_archive(
+            base_name=str(runtar),
+            format="gztar",
+            root_dir=setup_run_path,
+        )
+
+        # ...and add it to the outputs archive
+        with tarfile.open(
+            local_file(setup_path, "synthetics_outputs_archive"), "w:gz"
+        ) as tar:
+            tar.add(f"{runtar}.tar.gz", arcname="run-id.tar.gz")
 
 
 # For non-archive files, we patch Project#get_artifact_link to return paths to files

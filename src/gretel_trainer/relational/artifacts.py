@@ -58,21 +58,42 @@ class ArtifactCollection:
         return latest
 
 
-def add_to_tar(targz: Path, src: Path, arcname: str) -> None:
+def archive_items(targz: Path, items: list[Path]) -> None:
+    with tempfile.TemporaryDirectory() as tmpdir:
+        for item in items:
+            shutil.copy(item, tmpdir)
+        _archive_dir(targz, Path(tmpdir))
+
+
+def archive_nested_dir(targz: Path, directory: Path, name: str) -> None:
+    """
+    Creates an archive of the provided `directory` with name `{name}.tar.gz`
+    and adds it to the provided `targz` archive (or creates it if `targz` does not yet exist).
+    """
+    with tempfile.TemporaryDirectory() as tmpdir:
+        nested_archive = Path(f"{tmpdir}/{name}.tar.gz")
+        _archive_dir(nested_archive, directory)
+        _add_to_archive(targz, nested_archive)
+
+
+def _archive_dir(targz: Path, directory: Path) -> None:
+    shutil.make_archive(
+        base_name=_base_name(targz),
+        format="gztar",
+        root_dir=directory,
+    )
+
+
+def _add_to_archive(targz: Path, item: Path) -> None:
     if targz.exists():
         with tempfile.TemporaryDirectory() as tmpdir:
-            tmpdir = Path(tmpdir)
-
-            backup = tmpdir / "backup.tar.gz"
-            shutil.copy(targz, backup)
-
-            with tarfile.open(targz, "w:gz") as w, tarfile.open(backup, "r:gz") as r:
-                w.add(src, arcname=arcname)
-
-                r.extractall(tmpdir)
-                for member in r.getnames():
-                    if os.path.isfile(tmpdir / member) and not member == arcname:
-                        w.add(tmpdir / member, arcname=member)
+            shutil.unpack_archive(targz, extract_dir=tmpdir, format="gztar")
+            shutil.copy(item, tmpdir)
+            _archive_dir(targz, Path(tmpdir))
     else:
-        with tarfile.open(targz, "w:gz") as tar:
-            tar.add(src, arcname=arcname)
+        archive_items(targz, [item])
+
+
+def _base_name(targz: Path) -> str:
+    # shutil.make_archive base_name expects a name *without* a format-specific extension
+    return str(targz).removesuffix(".tar.gz")
