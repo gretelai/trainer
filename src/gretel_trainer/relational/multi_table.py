@@ -719,6 +719,11 @@ class MultiTable:
     def _get_only_and_ignore(
         self, only: Optional[set[str]], ignore: Optional[set[str]]
     ) -> tuple[Optional[set[str]], Optional[set[str]]]:
+        """
+        Accepts the `only` and `ignore` parameter values as provided by the user and:
+        - ensures both are not set (must provide one or the other, or neither)
+        - translates any JSON-source tables to the invented tables
+        """
         if only is not None and ignore is not None:
             raise MultiTableException("Cannot specify both `only` and `ignore`.")
 
