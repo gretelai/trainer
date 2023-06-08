@@ -21,10 +21,6 @@ class IndependentStrategy:
         return "independent"
 
     @property
-    def default_model(self) -> str:
-        return "amplify"
-
-    @property
     def supported_models(self) -> list[str]:
         return ["amplify", "actgan", "lstm", "tabular-dp"]
 

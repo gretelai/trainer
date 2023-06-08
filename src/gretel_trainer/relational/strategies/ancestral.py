@@ -20,10 +20,6 @@ class AncestralStrategy:
         return "ancestral"
 
     @property
-    def default_model(self) -> str:
-        return "amplify"
-
-    @property
     def supported_models(self) -> list[str]:
         return ["amplify"]
 
