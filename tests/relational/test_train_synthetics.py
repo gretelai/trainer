@@ -92,7 +92,7 @@ def test_train_synthetics_custom_configs_per_table(ecom, tmpdir, project):
 
     # ...but provide an actgan config to use for tables PLUS a tabular-dp config for one specific table.
     mt.train_synthetics(
-        config=mock_actgan_config, table_configs={"events": mock_tabdp_config}
+        config=mock_actgan_config, table_specific_configs={"events": mock_tabdp_config}
     )
 
     # The tabular-dp config is used for the singularly called-out table...
@@ -115,7 +115,7 @@ def test_train_synthetics_table_config_and_mt_init_default(ecom, tmpdir, project
     mt = MultiTable(ecom, project_display_name=tmpdir, gretel_model="amplify")
 
     # ...and provide a tabular-dp config for one specific table (but NOT a config).
-    mt.train_synthetics(table_configs={"events": mock_tabdp_config})
+    mt.train_synthetics(table_specific_configs={"events": mock_tabdp_config})
 
     # The tabular-dp config is used for the singularly called-out table...
     project.create_model_obj.assert_any_call(
@@ -150,11 +150,13 @@ def test_train_synthetics_errors(ecom, tmpdir):
 
     # Unrecognized table
     with pytest.raises(MultiTableException):
-        mt.train_synthetics(table_configs={"not-a-table": actgan_config})
+        mt.train_synthetics(table_specific_configs={"not-a-table": actgan_config})
 
     # Config provided for omitted table
     with pytest.raises(MultiTableException):
-        mt.train_synthetics(ignore={"users"}, table_configs={"users": actgan_config})
+        mt.train_synthetics(
+            ignore={"users"}, table_specific_configs={"users": actgan_config}
+        )
 
     # Config for unsupported model
     mt = MultiTable(ecom, project_display_name=tmpdir, strategy="ancestral")
@@ -164,7 +166,7 @@ def test_train_synthetics_errors(ecom, tmpdir):
     # Table config for unsupported model
     mt = MultiTable(ecom, project_display_name=tmpdir, strategy="ancestral")
     with pytest.raises(MultiTableException):
-        mt.train_synthetics(table_configs={"users": actgan_config})
+        mt.train_synthetics(table_specific_configs={"users": actgan_config})
 
 
 def test_train_synthetics_multiple_calls_additive(ecom, tmpdir):

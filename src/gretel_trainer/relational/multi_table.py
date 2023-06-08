@@ -814,7 +814,7 @@ class MultiTable:
         self,
         *,
         config: Optional[GretelModelConfig] = None,
-        table_configs: Optional[dict[str, GretelModelConfig]] = None,
+        table_specific_configs: Optional[dict[str, GretelModelConfig]] = None,
         only: Optional[set[str]] = None,
         ignore: Optional[set[str]] = None,
     ) -> None:
@@ -841,13 +841,13 @@ class MultiTable:
 
         # Translate any JSON-source tables in table_config_overrides to invented tables
         overrides = {}
-        for table, conf in (table_configs or {}).items():
+        for table, conf in (table_specific_configs or {}).items():
             m_names = self.relational_data.get_modelable_table_names(table)
             if len(m_names) == 0:
                 raise MultiTableException(f"Unrecognized table name: `{table}`")
             overrides.update({m: conf for m in m_names})
 
-        # Ensure compatibility between only/ignore and table_configs
+        # Ensure compatibility between only/ignore and table_specific_configs
         omitted_tables_with_overrides_specified = []
         for table in overrides:
             if table in omit_tables:
