@@ -287,6 +287,12 @@ class RelationalData:
     ) -> None:
         """
         Add a foreign key relationship between two tables.
+
+        Args:
+            table: The table name that contains the foreign keys.
+            constrained_columns: The column names that are foreign keys to the "referred" table (the parent table).
+            referred_table: The table name that the foreign keys in `table` refer to (the parent table).
+            referred_columns: The name of the columns in the parent table (i.e. the primary keys) that map to the foreign keys.
         """
         known_tables = self.list_all_tables(Scope.ALL)
 
@@ -388,6 +394,9 @@ class RelationalData:
         self._clear_safe_ancestral_seed_columns(table)
 
     def update_table_data(self, table: str, data: pd.DataFrame) -> None:
+        """
+        Set a DataFrame as the table data for a given table name.
+        """
         if table in self.relational_jsons:
             _, original_pk, original_fks = self._remove_relational_json(table)
             if (
@@ -521,9 +530,18 @@ class RelationalData:
         return self.graph.nodes[table]["metadata"].invented_table_metadata
 
     def get_parents(self, table: str) -> list[str]:
+        """
+        Given a table name, return the table names that are referred to
+        by the foreign keys in this table.
+        """
         return list(self.graph.successors(table))
 
     def get_ancestors(self, table: str) -> list[str]:
+        """
+        Same as `get_parents` except recursively keep adding
+        parent tables until there are no more.
+        """
+
         def _add_parents(ancestors, table):
             parents = self.get_parents(table)
             if len(parents) > 0:
@@ -537,6 +555,12 @@ class RelationalData:
         return list(ancestors)
 
     def get_descendants(self, table: str) -> list[str]:
+        """
+        Given a table name, recursively return all tables that
+        carry foreign keys that reference the primary key in this table
+        and all subsequent tables that are discovered.
+        """
+
         def _add_children(descendants, table):
             children = list(self.graph.predecessors(table))
             if len(children) > 0:
@@ -559,6 +583,10 @@ class RelationalData:
         return list(reversed(list(topological_sort(self.graph))))
 
     def get_primary_key(self, table: str) -> list[str]:
+        """
+        Return the primary key for a table. It may be a single
+        column or multiple columns (composite key).
+        """
         try:
             return self.graph.nodes[table]["metadata"].primary_key
         except KeyError:
@@ -570,6 +598,9 @@ class RelationalData:
     def get_table_data(
         self, table: str, usecols: Optional[set[str]] = None
     ) -> pd.DataFrame:
+        """
+        Return the table contents for a given table name as a DataFrame.
+        """
         usecols = usecols or self.get_table_columns(table)
         try:
             return self.graph.nodes[table]["metadata"].data[list(usecols)]
@@ -582,6 +613,9 @@ class RelationalData:
                 raise MultiTableException(f"Unrecognized table: `{table}`")
 
     def get_table_columns(self, table: str) -> set[str]:
+        """
+        Return the column names for a provided table name.
+        """
         try:
             return self.graph.nodes[table]["metadata"].columns
         except KeyError:
