@@ -80,12 +80,31 @@ class TableMetadata:
 
 
 class RelationalData:
+    """
+    Stores information about a multiple tables and their relationships. When
+    using this object you could create it without any arguments and rely
+    on the instance methods for adding tables and key relationships.
+
+    Example::
+
+        rel_data = RelationalData()
+        rel_data.add_table(...)
+        rel_data.add_table(...)
+        rel_data.add_foreign_key_constraint(...)
+
+    See the specific method docstrings for details on each method.
+    """
+
     def __init__(self):
         self.graph = networkx.DiGraph()
         self.relational_jsons: dict[str, RelationalJson] = {}
 
     @property
     def is_empty(self) -> bool:
+        """
+        Return a bool to indicate of the `RelationalData` contains
+        any table information.
+        """
         return not self.graph.number_of_nodes() > 0
 
     def restore(self, tableset: dict[str, pd.DataFrame]) -> dict[str, pd.DataFrame]:
