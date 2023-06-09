@@ -1,3 +1,8 @@
+"""
+This module provides the "MultiTable" class to users. This allows you to
+take extracted data from a database or data warehouse, and process it
+with Gretel using transforms, synthetics, or a combination of the two.
+"""
 from __future__ import annotations
 
 import json

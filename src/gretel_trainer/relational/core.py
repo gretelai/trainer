@@ -1,3 +1,17 @@
+"""
+This module exposes the "RelationalData" class to users. Which allows the processing
+of relational databases and data warehouses with Gretel.ai.
+
+When using a "Connector" or a "TableExtractor" instance to automatically connect
+to a database, a "RelationalData" instance will be created for you that contains
+all of the learned metadata.
+
+If you are processing relational tables manually, with your own CSVs, you
+will need to create a "RelationalData" instnace and populate it yourself.
+
+Please see the specific docs for the "RelationalData" class on how to do this.
+"""
+
 from __future__ import annotations
 
 import logging
@@ -466,7 +480,7 @@ class RelationalData:
     def list_all_tables(self, scope: Scope = Scope.MODELABLE) -> list[str]:
         """
         Returns a list of table names belonging to the provided Scope.
-        See Scope enum documentation for details.
+        See "Scope" enum documentation for details.
         By default, returns tables that can be submitted as jobs to Gretel
         (i.e. that are MODELABLE).
         """
@@ -513,7 +527,8 @@ class RelationalData:
         )
 
     def get_modelable_table_names(self, table: str) -> list[str]:
-        """Returns a list of MODELABLE table names connected to the provided table.
+        """
+        Returns a list of MODELABLE table names connected to the provided table.
         If the provided table is the source of invented tables, returns the modelable invented tables created from it.
         If the provided table is itself modelable, returns that table name back.
         Otherwise returns an empty list.
