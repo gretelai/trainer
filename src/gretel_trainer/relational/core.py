@@ -95,7 +95,7 @@ class TableMetadata:
 
 class RelationalData:
     """
-    Stores information about a multiple tables and their relationships. When
+    Stores information about multiple tables and their relationships. When
     using this object you could create it without any arguments and rely
     on the instance methods for adding tables and key relationships.
 
