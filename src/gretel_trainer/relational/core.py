@@ -1,5 +1,5 @@
 """
-This module exposes the "RelationalData" class to users. Which allows the processing
+This module exposes the "RelationalData" class to users, which allows the processing
 of relational databases and data warehouses with Gretel.ai.
 
 When using a "Connector" or a "TableExtractor" instance to automatically connect
