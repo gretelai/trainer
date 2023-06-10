@@ -618,8 +618,8 @@ class RelationalData:
 
     def get_primary_key(self, table: str) -> list[str]:
         """
-        Return the primary key for a table. It may be a single
-        column or multiple columns (composite key).
+        Return the list of columns defining the primary key for a table.
+        It may be a single column or multiple columns (composite key).
         """
         try:
             return self.graph.nodes[table]["metadata"].primary_key
