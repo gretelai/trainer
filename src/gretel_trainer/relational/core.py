@@ -116,7 +116,7 @@ class RelationalData:
     @property
     def is_empty(self) -> bool:
         """
-        Return a bool to indicate of the `RelationalData` contains
+        Return a bool to indicate if the `RelationalData` contains
         any table information.
         """
         return not self.graph.number_of_nodes() > 0
