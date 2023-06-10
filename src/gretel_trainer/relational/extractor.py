@@ -52,7 +52,7 @@ class ExtractorConfig:
     """
     The method to sample records from tables that do not contain
     any primary keys that are referenced by other tables. We call these
-    "leaf" tables because in a graph respresentation they do not
+    "leaf" tables because in a graph representation they do not
     have any children.
 
     Currently only "random" mode is supported.
