@@ -322,10 +322,10 @@ class RelationalData:
         Add a foreign key relationship between two tables.
 
         Args:
-            table: The table name that contains the foreign keys.
-            constrained_columns: The column names that are foreign keys to the "referred" table (the parent table).
-            referred_table: The table name that the foreign keys in `table` refer to (the parent table).
-            referred_columns: The name of the columns in the parent table (i.e. the primary keys) that map to the foreign keys.
+            table: The table name that contains the foreign key.
+            constrained_columns: The column name(s) defining a relationship to the `referred_table` (the parent table).
+            referred_table: The table name that the foreign key in `table` refers to (the parent table).
+            referred_columns: The column name(s) in the parent table that the `constrained_columns` point to.
         """
         known_tables = self.list_all_tables(Scope.ALL)
 
