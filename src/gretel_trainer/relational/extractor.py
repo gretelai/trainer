@@ -531,7 +531,7 @@ class TableExtractor:
     @property
     def relational_data(self) -> RelationalData:
         """
-        Return the "RelationalData" instnace that was created
+        Return the "RelationalData" instance that was created
         during table extraction.
         """
         if self._relational_data.is_empty:
