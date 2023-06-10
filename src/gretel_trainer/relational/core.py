@@ -7,7 +7,7 @@ to a database, a "RelationalData" instance will be created for you that contains
 all of the learned metadata.
 
 If you are processing relational tables manually, with your own CSVs, you
-will need to create a "RelationalData" instnace and populate it yourself.
+will need to create a "RelationalData" instance and populate it yourself.
 
 Please see the specific docs for the "RelationalData" class on how to do this.
 """
