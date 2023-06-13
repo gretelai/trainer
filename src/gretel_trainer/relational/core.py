@@ -1,3 +1,17 @@
+"""
+This module exposes the "RelationalData" class to users, which allows the processing
+of relational databases and data warehouses with Gretel.ai.
+
+When using a "Connector" or a "TableExtractor" instance to automatically connect
+to a database, a "RelationalData" instance will be created for you that contains
+all of the learned metadata.
+
+If you are processing relational tables manually, with your own CSVs, you
+will need to create a "RelationalData" instance and populate it yourself.
+
+Please see the specific docs for the "RelationalData" class on how to do this.
+"""
+
 from __future__ import annotations
 
 import logging
@@ -80,12 +94,31 @@ class TableMetadata:
 
 
 class RelationalData:
+    """
+    Stores information about multiple tables and their relationships. When
+    using this object you could create it without any arguments and rely
+    on the instance methods for adding tables and key relationships.
+
+    Example::
+
+        rel_data = RelationalData()
+        rel_data.add_table(...)
+        rel_data.add_table(...)
+        rel_data.add_foreign_key_constraint(...)
+
+    See the specific method docstrings for details on each method.
+    """
+
     def __init__(self):
         self.graph = networkx.DiGraph()
         self.relational_jsons: dict[str, RelationalJson] = {}
 
     @property
     def is_empty(self) -> bool:
+        """
+        Return a bool to indicate if the `RelationalData` contains
+        any table information.
+        """
         return not self.graph.number_of_nodes() > 0
 
     def restore(self, tableset: dict[str, pd.DataFrame]) -> dict[str, pd.DataFrame]:
@@ -287,6 +320,12 @@ class RelationalData:
     ) -> None:
         """
         Add a foreign key relationship between two tables.
+
+        Args:
+            table: The table name that contains the foreign key.
+            constrained_columns: The column name(s) defining a relationship to the `referred_table` (the parent table).
+            referred_table: The table name that the foreign key in `table` refers to (the parent table).
+            referred_columns: The column name(s) in the parent table that the `constrained_columns` point to.
         """
         known_tables = self.list_all_tables(Scope.ALL)
 
@@ -388,6 +427,9 @@ class RelationalData:
         self._clear_safe_ancestral_seed_columns(table)
 
     def update_table_data(self, table: str, data: pd.DataFrame) -> None:
+        """
+        Set a DataFrame as the table data for a given table name.
+        """
         if table in self.relational_jsons:
             _, original_pk, original_fks = self._remove_relational_json(table)
             if (
@@ -438,7 +480,7 @@ class RelationalData:
     def list_all_tables(self, scope: Scope = Scope.MODELABLE) -> list[str]:
         """
         Returns a list of table names belonging to the provided Scope.
-        See Scope enum documentation for details.
+        See "Scope" enum documentation for details.
         By default, returns tables that can be submitted as jobs to Gretel
         (i.e. that are MODELABLE).
         """
@@ -485,7 +527,8 @@ class RelationalData:
         )
 
     def get_modelable_table_names(self, table: str) -> list[str]:
-        """Returns a list of MODELABLE table names connected to the provided table.
+        """
+        Returns a list of MODELABLE table names connected to the provided table.
         If the provided table is the source of invented tables, returns the modelable invented tables created from it.
         If the provided table is itself modelable, returns that table name back.
         Otherwise returns an empty list.
@@ -521,9 +564,18 @@ class RelationalData:
         return self.graph.nodes[table]["metadata"].invented_table_metadata
 
     def get_parents(self, table: str) -> list[str]:
+        """
+        Given a table name, return the table names that are referred to
+        by the foreign keys in this table.
+        """
         return list(self.graph.successors(table))
 
     def get_ancestors(self, table: str) -> list[str]:
+        """
+        Same as `get_parents` except recursively keep adding
+        parent tables until there are no more.
+        """
+
         def _add_parents(ancestors, table):
             parents = self.get_parents(table)
             if len(parents) > 0:
@@ -537,6 +589,12 @@ class RelationalData:
         return list(ancestors)
 
     def get_descendants(self, table: str) -> list[str]:
+        """
+        Given a table name, recursively return all tables that
+        carry foreign keys that reference the primary key in this table
+        and all subsequent tables that are discovered.
+        """
+
         def _add_children(descendants, table):
             children = list(self.graph.predecessors(table))
             if len(children) > 0:
@@ -559,6 +617,10 @@ class RelationalData:
         return list(reversed(list(topological_sort(self.graph))))
 
     def get_primary_key(self, table: str) -> list[str]:
+        """
+        Return the list of columns defining the primary key for a table.
+        It may be a single column or multiple columns (composite key).
+        """
         try:
             return self.graph.nodes[table]["metadata"].primary_key
         except KeyError:
@@ -570,6 +632,9 @@ class RelationalData:
     def get_table_data(
         self, table: str, usecols: Optional[set[str]] = None
     ) -> pd.DataFrame:
+        """
+        Return the table contents for a given table name as a DataFrame.
+        """
         usecols = usecols or self.get_table_columns(table)
         try:
             return self.graph.nodes[table]["metadata"].data[list(usecols)]
@@ -582,6 +647,9 @@ class RelationalData:
                 raise MultiTableException(f"Unrecognized table: `{table}`")
 
     def get_table_columns(self, table: str) -> set[str]:
+        """
+        Return the column names for a provided table name.
+        """
         try:
             return self.graph.nodes[table]["metadata"].columns
         except KeyError:

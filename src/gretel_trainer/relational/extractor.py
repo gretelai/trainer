@@ -1,5 +1,5 @@
 """
-Extraction of SQL tables to compressed flat files with optional subsetting.
+Extract database or data warehouse SQL tables to flat files with optional subsetting.
 """
 from __future__ import annotations
 
@@ -33,6 +33,11 @@ class SampleMode(str, Enum):
 
 @dataclass
 class ExtractorConfig:
+    """
+    Configuration class for extracting tables from a remote database. An instance
+    of this class should be passed as a param to the "TableExtractor" constructor.
+    """
+
     target_row_count: float = -1.0
     """
     The target number of rows (or ratio of rows) to sample. This will be used as the sample target for "leaf" tables, 
@@ -44,6 +49,14 @@ class ExtractorConfig:
     """
 
     sample_mode: SampleMode = SampleMode.RANDOM
+    """
+    The method to sample records from tables that do not contain
+    any primary keys that are referenced by other tables. We call these
+    "leaf" tables because in a graph representation they do not
+    have any children.
+
+    Currently only "random" mode is supported.
+    """
 
     only: Optional[set[str]] = None
     """
@@ -83,13 +96,20 @@ class ExtractorConfig:
 
     @property
     def entire_table(self) -> bool:
+        """
+        Returns True if the config is set to extract entire tables
+        from the remote database.
+        """
         return self.target_row_count == -1
 
     @property
     def empty_table(self) -> bool:
+        """
+        Returns True if the config is set to only extract column names.
+        """
         return self.target_row_count == 0
 
-    def should_skip_table(self, table_name: str) -> bool:
+    def _should_skip_table(self, table_name: str) -> bool:
         if self.only and table_name not in self.only:
             return True
 
@@ -247,7 +267,7 @@ class TableExtractor:
         foreign_keys: list[tuple[str, dict]] = []
 
         for table_name in inspector.get_table_names(schema=self._config.schema):
-            if self._config.should_skip_table(table_name):
+            if self._config._should_skip_table(table_name):
                 continue
 
             logger.debug(f"Extracting source schema data from `{table_name}`")
@@ -261,7 +281,7 @@ class TableExtractor:
 
             primary_key = inspector.get_pk_constraint(table_name)["constrained_columns"]
             for fk in inspector.get_foreign_keys(table_name):
-                if self._config.should_skip_table(fk["referred_table"]):
+                if self._config._should_skip_table(fk["referred_table"]):
                     continue
                 foreign_keys.append((table_name, fk))
 
@@ -495,7 +515,7 @@ class TableExtractor:
     def sample_tables(self) -> dict[str, TableMetadata]:
         """
         Extract database tables according to the `ExtractorConfig.` Tables will be stored in the
-        configured storage directory from the `ExtractorConfig` object.
+        configured storage directory that is configured on the `ExtractorConfig` object.
         """
         if self._relational_data.is_empty:
             self._extract_schema()
@@ -510,6 +530,10 @@ class TableExtractor:
 
     @property
     def relational_data(self) -> RelationalData:
+        """
+        Return the "RelationalData" instance that was created
+        during table extraction.
+        """
         if self._relational_data.is_empty:
             raise TableExtractorError(
                 "Cannot return `RelationalData`, `sample_tables()` must be run first."

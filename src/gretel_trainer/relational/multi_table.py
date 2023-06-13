@@ -1,3 +1,8 @@
+"""
+This module provides the "MultiTable" class to users. This allows you to
+take extracted data from a database or data warehouse, and process it
+with Gretel using Transforms, Classify, and Synthetics.
+"""
 from __future__ import annotations
 
 import json
@@ -402,6 +407,9 @@ class MultiTable:
 
     @classmethod
     def restore(cls, backup_file: str) -> MultiTable:
+        """
+        Create a `MultiTable` instance from a backup file.
+        """
         logger.info(f"Restoring from backup file `{backup_file}`.")
         with open(backup_file, "r") as b:
             backup = Backup.from_dict(json.load(b))
@@ -635,7 +643,7 @@ class MultiTable:
         data: Optional[dict[str, pd.DataFrame]] = None,
     ) -> None:
         """
-        identifier: (str, optional): Unique string identifying a specific call to this method. Defaults to "transforms_" + current timestamp
+        identifier: (str, optional): Unique string identifying a specific call to this method. Defaults to `transforms_` + current timestamp
 
         If `in_place` set to True, overwrites source data in all locations
         (internal Python state, local working directory, project artifact archive).
@@ -876,7 +884,7 @@ class MultiTable:
         Args:
             record_size_ratio (float, optional): Ratio to upsample real world data size with. Defaults to 1.
             preserve_tables (list[str], optional): List of tables to skip sampling and leave (mostly) identical to source.
-            identifier (str, optional): Unique string identifying a specific call to this method. Defaults to "synthetics_" + current timestamp.
+            identifier (str, optional): Unique string identifying a specific call to this method. Defaults to `synthetics_` + current timestamp.
             resume (bool, optional): Set to True when restoring from a backup to complete a previous, interrupted run.
 
         Returns:
