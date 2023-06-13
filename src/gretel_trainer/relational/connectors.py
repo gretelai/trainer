@@ -4,7 +4,7 @@ and writing to databases and data warehouses. This class can handle
 metadata and table extraction automatically. When this is done with
 the "Connector.extract" method, a "RelationalData" instance is provided
 which you can then use with the "MultiTable" class to process data with
-Gretel Transforms, Synthetics, or a combination of both.
+Gretel Transforms, Classify, Synthetics, or a combination of both.
 """
 from __future__ import annotations
 
