@@ -2,12 +2,7 @@ import pandas as pd
 import pandas.testing as pdtest
 import pytest
 
-from gretel_trainer.relational.core import (
-    ForeignKey,
-    MultiTableException,
-    RelationalData,
-    Scope,
-)
+from gretel_trainer.relational.core import ForeignKey, RelationalData, Scope
 from gretel_trainer.relational.json import get_json_columns
 
 
@@ -159,32 +154,32 @@ def test_get_modelable_names_ignores_empty_mapped_tables(bball):
 
 def test_invented_json_column_names(documents, bball):
     # The root invented table adds columns for dictionary properties lifted from nested JSON objects
-    assert set(documents.get_table_columns("purchases-sfx")) == {
+    assert documents.get_table_columns("purchases-sfx") == [
         "~PRIMARY_KEY_ID~",
         "id",
         "user_id",
         "data>item",
         "data>cost",
         "data>details>color",
-    }
+    ]
 
     # JSON lists lead to invented child tables. These tables store the original content,
     # a new primary key, a foreign key back to the parent, and the original array index
-    assert set(documents.get_table_columns("purchases-data-years-sfx")) == {
-        "content",
+    assert documents.get_table_columns("purchases-data-years-sfx") == [
         "~PRIMARY_KEY_ID~",
         "purchases~id",
+        "content",
         "array~order",
-    }
+    ]
 
     # If the source table does not have a primary key defined, one is created on the root invented table
-    assert set(bball.get_table_columns("bball-sfx")) == {
+    assert bball.get_table_columns("bball-sfx") == [
+        "~PRIMARY_KEY_ID~",
         "name",
         "age",
         "draft>year",
         "draft>college",
-        "~PRIMARY_KEY_ID~",
-    }
+    ]
 
 
 def test_primary_key(documents, bball):
@@ -671,35 +666,35 @@ def test_flatten_and_restore_all_sorts_of_json():
         "demo-f-content-ff-sfx",
     }
 
-    assert rel_data.get_table_columns("demo-sfx") == {
+    assert rel_data.get_table_columns("demo-sfx") == [
+        "~PRIMARY_KEY_ID~",
         "a",
         "b>bb",
         "c>cc>ccc",
+    ]
+    assert rel_data.get_table_columns("demo-d-sfx") == [
         "~PRIMARY_KEY_ID~",
-    }
-    assert rel_data.get_table_columns("demo-d-sfx") == {
+        "demo~id",
         "content",
+        "array~order",
+    ]
+    assert rel_data.get_table_columns("demo-e-sfx") == [
         "~PRIMARY_KEY_ID~",
         "demo~id",
         "array~order",
-    }
-    assert rel_data.get_table_columns("demo-e-sfx") == {
         "content>ee",
+    ]
+    assert rel_data.get_table_columns("demo-f-sfx") == [
         "~PRIMARY_KEY_ID~",
         "demo~id",
         "array~order",
-    }
-    assert rel_data.get_table_columns("demo-f-sfx") == {
-        "~PRIMARY_KEY_ID~",
-        "demo~id",
-        "array~order",
-    }
-    assert rel_data.get_table_columns("demo-f-content-ff-sfx") == {
-        "content>fff",
+    ]
+    assert rel_data.get_table_columns("demo-f-content-ff-sfx") == [
         "~PRIMARY_KEY_ID~",
         "demo^f~id",
         "array~order",
-    }
+        "content>fff",
+    ]
 
     output_tables = {
         "demo-sfx": pd.DataFrame(
@@ -826,17 +821,17 @@ def test_mix_of_dict_and_list_cols():
         "mix-sfx",
         "mix-lcol-sfx",
     }
-    assert set(rel_data.get_table_data("mix-sfx").columns) == {
+    assert rel_data.get_table_columns("mix-sfx") == [
+        "~PRIMARY_KEY_ID~",
         "id",
-        "~PRIMARY_KEY_ID~",
         "dcol>language",
-    }
-    assert set(rel_data.get_table_data("mix-lcol-sfx").columns) == {
+    ]
+    assert rel_data.get_table_columns("mix-lcol-sfx") == [
         "~PRIMARY_KEY_ID~",
+        "mix~id",
         "content",
         "array~order",
-        "mix~id",
-    }
+    ]
 
 
 def test_all_tables_are_present_in_debug_summary(documents):

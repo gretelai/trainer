@@ -135,7 +135,7 @@ class _RelationalData(Protocol):
     ) -> list:  # can't specify element type (ForeignKey) without cyclic dependency
         ...
 
-    def get_table_columns(self, table: str) -> set[str]:
+    def get_table_columns(self, table: str) -> list[str]:
         ...
 
     def get_invented_table_metadata(

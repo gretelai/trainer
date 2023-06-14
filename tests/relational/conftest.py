@@ -96,8 +96,8 @@ def trips() -> RelationalData:
         data=pd.DataFrame(
             data={
                 "id": list(range(100)),
-                "vehicle_type_id": [1] * 60 + [2] * 30 + [3] * 5 + [4] * 5,
                 "purpose": ["work"] * 100,
+                "vehicle_type_id": [1] * 60 + [2] * 30 + [3] * 5 + [4] * 5,
             }
         ),
     )

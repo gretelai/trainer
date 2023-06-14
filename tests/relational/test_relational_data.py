@@ -44,7 +44,7 @@ def test_mutagenesis_relational_data(mutagenesis):
 
 
 def test_column_metadata(pets):
-    assert pets.get_table_columns("humans") == {"id", "name", "city"}
+    assert pets.get_table_columns("humans") == ["id", "name", "city"]
 
     # Name is a highly unique categorical field, so is excluded
     assert pets.get_safe_ancestral_seed_columns("humans") == {"id", "city"}
@@ -202,7 +202,7 @@ def test_set_primary_key(ecom):
 def test_get_subset_of_data(pets):
     normal_length = len(pets.get_table_data("humans"))
     subset = pets.get_table_data("humans", ["name", "city"])
-    assert set(subset.columns) == {"name", "city"}
+    assert list(subset.columns) == ["name", "city"]
     assert len(subset) == normal_length
 
 

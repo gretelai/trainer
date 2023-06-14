@@ -710,7 +710,11 @@ class MultiTable:
         for table, df in reshaped_tables.items():
             filename = f"transformed_{table}.csv"
             out_path = run_dir / filename
-            df.to_csv(out_path, index=False)
+            df.to_csv(
+                out_path,
+                index=False,
+                columns=self.relational_data.get_table_columns(table),
+            )
 
         all_runs_archive_path = self._working_dir / "transforms_outputs.tar.gz"
 
@@ -1009,7 +1013,11 @@ class MultiTable:
 
         for table, synth_df in reshaped_tables.items():
             synth_csv_path = run_dir / f"synth_{table}.csv"
-            synth_df.to_csv(synth_csv_path, index=False)
+            synth_df.to_csv(
+                synth_csv_path,
+                index=False,
+                columns=self.relational_data.get_table_columns(table),
+            )
 
         evaluate_project = create_project(
             display_name=f"evaluate-{self._project.display_name}"

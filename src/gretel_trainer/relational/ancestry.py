@@ -120,7 +120,7 @@ def _join_parents(
         parent_table_name = foreign_key.parent_table_name
 
         if ancestral_seeding:
-            usecols = rel_data.get_safe_ancestral_seed_columns(parent_table_name)
+            usecols = list(rel_data.get_safe_ancestral_seed_columns(parent_table_name))
         else:
             usecols = rel_data.get_table_columns(parent_table_name)
 
