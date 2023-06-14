@@ -439,7 +439,8 @@ class TableExtractor:
         # need for the purposes of making the SQL queries). When this
         # dummy partition is mapped, it was using the values in the
         # partition to make additional SQL queries which can have
-        # unintended side effects. See the "map_partition "
+        # unintended side effects. See the "map_partition" docs
+        # for more details if interested.
         pk_values.values_ddf.map_partitions(
             handle_partition, lock, meta=(None, "object")
         ).compute()
