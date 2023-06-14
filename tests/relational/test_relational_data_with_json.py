@@ -671,35 +671,35 @@ def test_flatten_and_restore_all_sorts_of_json():
         "demo-f-content-ff-sfx",
     }
 
-    assert rel_data.get_table_columns("demo-sfx") == {
+    assert rel_data.get_table_columns("demo-sfx") == [
+        "~PRIMARY_KEY_ID~",
         "a",
         "b>bb",
         "c>cc>ccc",
+    ]
+    assert rel_data.get_table_columns("demo-d-sfx") == [
         "~PRIMARY_KEY_ID~",
-    }
-    assert rel_data.get_table_columns("demo-d-sfx") == {
+        "demo~id",
         "content",
+        "array~order",
+    ]
+    assert rel_data.get_table_columns("demo-e-sfx") == [
         "~PRIMARY_KEY_ID~",
         "demo~id",
         "array~order",
-    }
-    assert rel_data.get_table_columns("demo-e-sfx") == {
         "content>ee",
+    ]
+    assert rel_data.get_table_columns("demo-f-sfx") == [
         "~PRIMARY_KEY_ID~",
         "demo~id",
         "array~order",
-    }
-    assert rel_data.get_table_columns("demo-f-sfx") == {
-        "~PRIMARY_KEY_ID~",
-        "demo~id",
-        "array~order",
-    }
-    assert rel_data.get_table_columns("demo-f-content-ff-sfx") == {
-        "content>fff",
+    ]
+    assert rel_data.get_table_columns("demo-f-content-ff-sfx") == [
         "~PRIMARY_KEY_ID~",
         "demo^f~id",
         "array~order",
-    }
+        "content>fff",
+    ]
 
     output_tables = {
         "demo-sfx": pd.DataFrame(

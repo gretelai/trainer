@@ -88,7 +88,7 @@ class Scope(str, Enum):
 class TableMetadata:
     primary_key: list[str]
     data: pd.DataFrame
-    columns: set[str]
+    columns: list[str]
     invented_table_metadata: Optional[InventedTableMetadata] = None
     safe_ancestral_seed_columns: Optional[set[str]] = None
 
@@ -207,7 +207,7 @@ class RelationalData:
         metadata = TableMetadata(
             primary_key=primary_key,
             data=data,
-            columns=set(data.columns),
+            columns=list(data.columns),
             invented_table_metadata=invented_table_metadata,
         )
         self.graph.add_node(name, metadata=metadata)
@@ -474,7 +474,7 @@ class RelationalData:
                     )
             else:
                 metadata.data = data
-                metadata.columns = set(data.columns)
+                metadata.columns = list(data.columns)
                 self._clear_safe_ancestral_seed_columns(table)
 
     def list_all_tables(self, scope: Scope = Scope.MODELABLE) -> list[str]:
@@ -630,14 +630,14 @@ class RelationalData:
                 raise MultiTableException(f"Unrecognized table: `{table}`")
 
     def get_table_data(
-        self, table: str, usecols: Optional[set[str]] = None
+        self, table: str, usecols: Optional[list[str]] = None
     ) -> pd.DataFrame:
         """
         Return the table contents for a given table name as a DataFrame.
         """
         usecols = usecols or self.get_table_columns(table)
         try:
-            return self.graph.nodes[table]["metadata"].data[list(usecols)]
+            return self.graph.nodes[table]["metadata"].data[usecols]
         except KeyError:
             if table in self.relational_jsons:
                 if (df := self.relational_jsons[table].original_data) is None:
@@ -646,7 +646,7 @@ class RelationalData:
             else:
                 raise MultiTableException(f"Unrecognized table: `{table}`")
 
-    def get_table_columns(self, table: str) -> set[str]:
+    def get_table_columns(self, table: str) -> list[str]:
         """
         Return the column names for a provided table name.
         """
@@ -654,7 +654,7 @@ class RelationalData:
             return self.graph.nodes[table]["metadata"].columns
         except KeyError:
             if table in self.relational_jsons:
-                return set(self.relational_jsons[table].original_columns)
+                return self.relational_jsons[table].original_columns
             else:
                 raise MultiTableException(f"Unrecognized table: `{table}`")
 

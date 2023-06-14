@@ -47,7 +47,7 @@ class IndependentStrategy:
                 columns_to_drop.update(foreign_key.columns)
 
             all_columns = rel_data.get_table_columns(table)
-            use_columns = all_columns - columns_to_drop
+            use_columns = [col for col in all_columns if col not in columns_to_drop]
 
             rel_data.get_table_data(table, usecols=use_columns).to_csv(
                 path, index=False

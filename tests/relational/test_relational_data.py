@@ -44,7 +44,7 @@ def test_mutagenesis_relational_data(mutagenesis):
 
 
 def test_column_metadata(pets):
-    assert pets.get_table_columns("humans") == {"id", "name", "city"}
+    assert pets.get_table_columns("humans") == ["id", "name", "city"]
 
     # Name is a highly unique categorical field, so is excluded
     assert pets.get_safe_ancestral_seed_columns("humans") == {"id", "city"}
