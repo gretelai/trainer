@@ -85,7 +85,7 @@ def test_train_synthetics_custom_config_for_all_tables(ecom, tmpdir, project):
 
 def test_train_synthetics_custom_configs_per_table(ecom, tmpdir, project):
     mock_actgan_config = {"models": [{"actgan": {}}]}
-    mock_tabdp_config = {"models": [{"tabular-dp": {}}]}
+    mock_tabdp_config = {"models": [{"tabular_dp": {}}]}
 
     # We set amplify on the MultiTable instance...
     mt = MultiTable(ecom, project_display_name=tmpdir, gretel_model="amplify")
@@ -109,7 +109,7 @@ def test_train_synthetics_custom_configs_per_table(ecom, tmpdir, project):
 
 
 def test_train_synthetics_table_config_and_mt_init_default(ecom, tmpdir, project):
-    mock_tabdp_config = {"models": [{"tabular-dp": {}}]}
+    mock_tabdp_config = {"models": [{"tabular_dp": {}}]}
 
     # We set amplify on the MultiTable instance...
     mt = MultiTable(ecom, project_display_name=tmpdir, gretel_model="amplify")
@@ -138,6 +138,33 @@ def test_train_synthetics_table_config_and_mt_init_default(ecom, tmpdir, project
 class AmplifyConfigMatcher:
     def __eq__(self, other):
         return list(other["models"][0])[0] == "amplify"
+
+
+def test_train_synthetics_validates_against_configured_strategy(pets, tmpdir):
+    # Independent strategy
+    mt_independent = MultiTable(
+        pets, project_display_name=tmpdir, strategy="independent"
+    )
+
+    mt_independent.train_synthetics(config="synthetics/tabular-lstm")
+    mt_independent.train_synthetics(config="synthetics/tabular-actgan")
+    mt_independent.train_synthetics(config="synthetics/amplify")
+    mt_independent.train_synthetics(config="synthetics/tabular-differential-privacy")
+    with pytest.raises(MultiTableException):
+        mt_independent.train_synthetics(config="synthetics/time-series")
+
+    # Ancestral strategy
+    mt_ancestral = MultiTable(pets, project_display_name=tmpdir, strategy="ancestral")
+
+    mt_ancestral.train_synthetics(config="synthetics/amplify")
+    with pytest.raises(MultiTableException):
+        mt_ancestral.train_synthetics(config="synthetics/tabular-lstm")
+    with pytest.raises(MultiTableException):
+        mt_ancestral.train_synthetics(config="synthetics/tabular-actgan")
+    with pytest.raises(MultiTableException):
+        mt_ancestral.train_synthetics(config="synthetics/tabular-differential-privacy")
+    with pytest.raises(MultiTableException):
+        mt_ancestral.train_synthetics(config="synthetics/time-series")
 
 
 def test_train_synthetics_errors(ecom, tmpdir):

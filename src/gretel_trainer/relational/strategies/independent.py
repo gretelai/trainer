@@ -20,13 +20,14 @@ class IndependentStrategy:
     def name(self) -> str:
         return "independent"
 
+    # TODO: remove when `gretel_model` param is removed
     @property
-    def default_model(self) -> str:
-        return "amplify"
+    def supported_gretel_models(self) -> list[str]:
+        return ["amplify", "actgan", "lstm", "tabular-dp"]
 
     @property
-    def supported_models(self) -> list[str]:
-        return ["amplify", "actgan", "lstm", "tabular-dp"]
+    def supported_model_keys(self) -> list[str]:
+        return ["amplify", "actgan", "synthetics", "tabular_dp"]
 
     def label_encode_keys(
         self, rel_data: RelationalData, tables: dict[str, pd.DataFrame]
