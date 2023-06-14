@@ -21,8 +21,12 @@ class IndependentStrategy:
         return "independent"
 
     @property
-    def supported_models(self) -> list[str]:
+    def supported_gretel_models(self) -> list[str]:
         return ["amplify", "actgan", "lstm", "tabular-dp"]
+
+    @property
+    def supported_model_keys(self) -> list[str]:
+        return ["amplify", "actgan", "synthetics", "tabular_dp"]
 
     def label_encode_keys(
         self, rel_data: RelationalData, tables: dict[str, pd.DataFrame]

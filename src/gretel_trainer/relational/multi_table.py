@@ -1144,7 +1144,7 @@ class MultiTable:
         self._evaluations[table].cross_table_report_json = cross_table_report_json
 
     def _validate_gretel_model(self, gretel_model: str) -> tuple[str, str]:
-        supported_models = self._strategy.supported_models
+        supported_models = self._strategy.supported_gretel_models
         if gretel_model not in supported_models:
             msg = f"Invalid gretel model requested: {gretel_model}. The selected strategy supports: {supported_models}."
             logger.warning(msg)
@@ -1171,7 +1171,7 @@ class MultiTable:
         if (model_key := get_model_key(config_dict)) is None:
             raise MultiTableException("Invalid config")
         else:
-            supported_models = self._strategy.supported_models
+            supported_models = self._strategy.supported_model_keys
             if model_key not in supported_models:
                 raise MultiTableException(
                     f"Invalid gretel model requested: {model_key}. "
