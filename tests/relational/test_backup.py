@@ -23,7 +23,7 @@ def test_backup_relational_data(trips):
             ),
             "trips": BackupRelationalDataTable(
                 primary_key=["id"],
-                columns=["id", "vehicle_type_id", "purpose"],
+                columns=["id", "purpose", "vehicle_type_id"],
             ),
         },
         foreign_keys=[
