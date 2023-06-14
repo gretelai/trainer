@@ -202,7 +202,7 @@ def test_set_primary_key(ecom):
 def test_get_subset_of_data(pets):
     normal_length = len(pets.get_table_data("humans"))
     subset = pets.get_table_data("humans", ["name", "city"])
-    assert set(subset.columns) == {"name", "city"}
+    assert list(subset.columns) == ["name", "city"]
     assert len(subset) == normal_length
 
 
