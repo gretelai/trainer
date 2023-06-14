@@ -20,6 +20,7 @@ class IndependentStrategy:
     def name(self) -> str:
         return "independent"
 
+    # TODO: remove when `gretel_model` param is removed
     @property
     def supported_gretel_models(self) -> list[str]:
         return ["amplify", "actgan", "lstm", "tabular-dp"]
