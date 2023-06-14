@@ -1,6 +1,7 @@
 from copy import deepcopy
-from typing import Any
+from typing import Any, Optional
 
+from gretel_client.projects.exceptions import ModelConfigError
 from gretel_client.projects.models import read_model_config
 
 from gretel_trainer.relational.core import (
@@ -10,8 +11,21 @@ from gretel_trainer.relational.core import (
 )
 
 
-def _ingest(config: GretelModelConfig) -> dict[str, Any]:
-    return read_model_config(deepcopy(config))
+def get_model_key(config_dict: dict[str, Any]) -> Optional[str]:
+    try:
+        models = config_dict["models"]
+        assert isinstance(models, list)
+        assert isinstance(models[0], dict)
+        return list(models[0])[0]
+    except (AssertionError, IndexError, KeyError):
+        return None
+
+
+def ingest(config: GretelModelConfig) -> dict[str, Any]:
+    try:
+        return read_model_config(deepcopy(config))
+    except ModelConfigError as e:
+        raise MultiTableException("Invalid config") from e
 
 
 def _model_name(workflow: str, table: str) -> str:
@@ -20,19 +34,19 @@ def _model_name(workflow: str, table: str) -> str:
 
 
 def make_classify_config(table: str, config: GretelModelConfig) -> dict[str, Any]:
-    tailored_config = _ingest(config)
+    tailored_config = ingest(config)
     tailored_config["name"] = _model_name("classify", table)
     return tailored_config
 
 
 def make_evaluate_config(table: str) -> dict[str, Any]:
-    tailored_config = _ingest("evaluate/default")
+    tailored_config = ingest("evaluate/default")
     tailored_config["name"] = _model_name("evaluate", table)
     return tailored_config
 
 
 def make_synthetics_config(table: str, config: GretelModelConfig) -> dict[str, Any]:
-    tailored_config = _ingest(config)
+    tailored_config = ingest(config)
     tailored_config["name"] = _model_name("synthetics", table)
     return tailored_config
 
@@ -40,7 +54,7 @@ def make_synthetics_config(table: str, config: GretelModelConfig) -> dict[str, A
 def make_transform_config(
     rel_data: RelationalData, table: str, config: GretelModelConfig
 ) -> dict[str, Any]:
-    tailored_config = _ingest(config)
+    tailored_config = ingest(config)
     tailored_config["name"] = _model_name("transforms", table)
 
     key_columns = rel_data.get_all_key_columns(table)

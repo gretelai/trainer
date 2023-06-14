@@ -1,10 +1,23 @@
 from gretel_client.projects.models import read_model_config
 
 from gretel_trainer.relational.model_config import (
+    get_model_key,
     make_evaluate_config,
     make_synthetics_config,
     make_transform_config,
 )
+
+
+def test_get_model_key():
+    # Returns the model key when config is valid (at least as far as model key)
+    assert get_model_key({"models": [{"amplify": {}}]}) == "amplify"
+
+    # Returns None when given an invalid config
+    assert get_model_key({"foo": "bar"}) is None
+    assert get_model_key({"models": "wrong type"}) is None
+    assert get_model_key({"models": {"wrong": "type"}}) is None
+    assert get_model_key({"models": []}) is None
+    assert get_model_key({"models": ["wrong type"]}) is None
 
 
 def test_evaluate_config_prepends_workflow():
