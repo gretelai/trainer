@@ -235,6 +235,12 @@ class RelationalData:
         )
         self.graph.add_node(name, metadata=metadata)
 
+    def _get_table_metadata(self, table: str) -> TableMetadata:
+        try:
+            return self.graph.nodes[table]["metadata"]
+        except KeyError:
+            raise MultiTableException(f"Unrecognized table: `{table}`")
+
     def set_primary_key(
         self, *, table: str, primary_key: UserFriendlyPrimaryKeyT
     ) -> None:
@@ -254,7 +260,7 @@ class RelationalData:
 
         # If the table is a "normal" table, updating is fairly straightforward...
         if self.relational_jsons.get(table) is None:
-            self.graph.nodes[table]["metadata"].primary_key = primary_key
+            self._get_table_metadata(table).primary_key = primary_key
             self._clear_safe_ancestral_seed_columns(table)
 
         # ...but if it has JSON and produced invented tables, we redo that whole process
@@ -382,9 +388,6 @@ class RelationalData:
         if abort:
             raise MultiTableException("Unrecognized table(s) in foreign key arguments")
 
-        table = self._tapu(table)
-        referred_table = self._tapu(referred_table)
-
         if len(constrained_columns) != len(referred_columns):
             logger.warning(
                 "Constrained and referred columns must be of the same length"
@@ -411,18 +414,22 @@ class RelationalData:
         if abort:
             raise MultiTableException("Unrecognized column(s) in foreign key arguments")
 
-        self.graph.add_edge(table, referred_table)
-        edge = self.graph.edges[table, referred_table]
+        fk_delegate_table = self._get_fk_delegate_table(table)
+        fk_delegate_referred_table = self._get_fk_delegate_table(referred_table)
+
+        self.graph.add_edge(fk_delegate_table, fk_delegate_referred_table)
+        edge = self.graph.edges[fk_delegate_table, fk_delegate_referred_table]
         via = edge.get("via", [])
         via.append(
             ForeignKey(
-                table_name=table,
+                table_name=fk_delegate_table,
                 columns=constrained_columns,
-                parent_table_name=referred_table,
+                parent_table_name=fk_delegate_referred_table,
                 parent_columns=referred_columns,
             )
         )
         edge["via"] = via
+        self._clear_safe_ancestral_seed_columns(fk_delegate_table)
         self._clear_safe_ancestral_seed_columns(table)
 
     def remove_foreign_key(self, foreign_key: str) -> None:
@@ -447,8 +454,6 @@ class RelationalData:
         if table not in self.list_all_tables(Scope.ALL):
             raise MultiTableException(f"Unrecognized table name: `{table}`")
 
-        table = self._tapu(table)
-
         key_to_remove = None
         for fk in self.get_foreign_keys(table):
             if fk.columns == constrained_columns:
@@ -459,13 +464,16 @@ class RelationalData:
                 f"`{table} does not have a foreign key with constrained columns {constrained_columns}`"
             )
 
-        edge = self.graph.edges[table, key_to_remove.parent_table_name]
+        fk_delegate_table = self._get_fk_delegate_table(table)
+
+        edge = self.graph.edges[fk_delegate_table, key_to_remove.parent_table_name]
         via = edge.get("via")
         via.remove(key_to_remove)
         if len(via) == 0:
-            self.graph.remove_edge(table, key_to_remove.parent_table_name)
+            self.graph.remove_edge(fk_delegate_table, key_to_remove.parent_table_name)
         else:
             edge["via"] = via
+        self._clear_safe_ancestral_seed_columns(fk_delegate_table)
         self._clear_safe_ancestral_seed_columns(table)
 
     def update_table_data(self, table: str, data: pd.DataFrame) -> None:
@@ -498,7 +506,7 @@ class RelationalData:
         json_source_tables = [
             t
             for t in graph_nodes
-            if self.graph.nodes[t]["metadata"].invented_root_table_name is not None
+            if self._get_table_metadata(t).invented_root_table_name is not None
         ]
 
         modelable_tables = []
@@ -506,7 +514,7 @@ class RelationalData:
         invented_tables: list[str] = []
 
         for n in graph_nodes:
-            meta = self.graph.nodes[n]["metadata"]
+            meta = self._get_table_metadata(n)
             if (invented_meta := meta.invented_table_metadata) is not None:
                 invented_tables.append(n)
                 if invented_meta.invented_root_table_name == n:
@@ -532,7 +540,7 @@ class RelationalData:
     def _is_invented(self, table: str) -> bool:
         return (
             table in self.graph.nodes
-            and self.graph.nodes[table]["metadata"].invented_table_metadata is not None
+            and self._get_table_metadata(table).invented_table_metadata is not None
         )
 
     def get_modelable_table_names(self, table: str) -> list[str]:
@@ -555,7 +563,7 @@ class RelationalData:
 
     def get_public_name(self, table: str) -> Optional[str]:
         if (
-            imeta := self.graph.nodes[table]["metadata"].invented_table_metadata
+            imeta := self._get_table_metadata(table).invented_table_metadata
         ) is not None:
             return imeta.original_table_name
 
@@ -564,7 +572,7 @@ class RelationalData:
     def get_invented_table_metadata(
         self, table: str
     ) -> Optional[InventedTableMetadata]:
-        return self.graph.nodes[table]["metadata"].invented_table_metadata
+        return self._get_table_metadata(table).invented_table_metadata
 
     def get_parents(self, table: str) -> list[str]:
         """
@@ -624,10 +632,7 @@ class RelationalData:
         Return the list of columns defining the primary key for a table.
         It may be a single column or multiple columns (composite key).
         """
-        try:
-            return self.graph.nodes[table]["metadata"].primary_key
-        except KeyError:
-            raise MultiTableException(f"Unrecognized table: `{table}`")
+        return self._get_table_metadata(table).primary_key
 
     def get_table_data(
         self, table: str, usecols: Optional[list[str]] = None
@@ -636,22 +641,16 @@ class RelationalData:
         Return the table contents for a given table name as a DataFrame.
         """
         usecols = usecols or self.get_table_columns(table)
-        try:
-            return self.graph.nodes[table]["metadata"].data[usecols]
-        except KeyError:
-            raise MultiTableException(f"Unrecognized table: `{table}`")
+        return self._get_table_metadata(table).data[usecols]
 
     def get_table_columns(self, table: str) -> list[str]:
         """
         Return the column names for a provided table name.
         """
-        try:
-            return self.graph.nodes[table]["metadata"].columns
-        except KeyError:
-            raise MultiTableException(f"Unrecognized table: `{table}`")
+        return self._get_table_metadata(table).columns
 
     def get_safe_ancestral_seed_columns(self, table: str) -> set[str]:
-        safe_columns = self.graph.nodes[table]["metadata"].safe_ancestral_seed_columns
+        safe_columns = self._get_table_metadata(table).safe_ancestral_seed_columns
         if safe_columns is None:
             safe_columns = self._set_safe_ancestral_seed_columns(table)
         return safe_columns
@@ -671,34 +670,26 @@ class RelationalData:
             if _ok_for_train_and_seed(col, data):
                 cols.add(col)
 
-        self.graph.nodes[table]["metadata"].safe_ancestral_seed_columns = cols
+        self._get_table_metadata(table).safe_ancestral_seed_columns = cols
         return cols
 
     def _clear_safe_ancestral_seed_columns(self, table: str) -> None:
-        self.graph.nodes[table]["metadata"].safe_ancestral_seed_columns = None
+        self._get_table_metadata(table).safe_ancestral_seed_columns = None
 
-    def _tapu(self, table: str) -> str:
-        return self.graph.nodes[table]["metadata"].invented_root_table_name or table
+    def _get_fk_delegate_table(self, table: str) -> str:
+        return self._get_table_metadata(table).invented_root_table_name or table
 
     def get_foreign_keys(
         self, table: str, rename_invented_tables: bool = False
     ) -> list[ForeignKey]:
         def _rename_invented(fk: ForeignKey) -> ForeignKey:
-            table_name = fk.table_name
-            parent_table_name = fk.parent_table_name
-            if self._is_invented(table_name):
-                table_name = self.graph.nodes[table_name][
-                    "metadata"
-                ].invented_table_metadata.original_table_name
-            if self._is_invented(parent_table_name):
-                parent_table_name = self.graph.nodes[parent_table_name][
-                    "metadata"
-                ].invented_table_metadata.original_table_name
+            table_name = self.get_public_name(fk.table_name)
+            parent_table_name = self.get_public_name(fk.parent_table_name)
             return replace(
                 fk, table_name=table_name, parent_table_name=parent_table_name
             )
 
-        table = self._tapu(table)
+        table = self._get_fk_delegate_table(table)
         foreign_keys = []
         for parent in self.get_parents(table):
             fks = self.graph.edges[table, parent]["via"]
@@ -727,8 +718,7 @@ class RelationalData:
         for table in all_tables:
             this_table_foreign_key_count = 0
             foreign_keys = []
-            fk_lookup_table_name = self._tapu(table)
-            for key in self.get_foreign_keys(fk_lookup_table_name):
+            for key in self.get_foreign_keys(table):
                 total_foreign_key_count = total_foreign_key_count + 1
                 this_table_foreign_key_count = this_table_foreign_key_count + 1
                 foreign_keys.append(
