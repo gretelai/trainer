@@ -263,7 +263,7 @@ class RelationalData:
             self._get_table_metadata(table).primary_key = primary_key
             self._clear_safe_ancestral_seed_columns(table)
 
-        # ...but if it has JSON and produced invented tables, we redo that whole process
+        # ...but if it has JSON and produced invented tables, we redo JSON ingestion
         # to make sure invented tables have primary keys set properly
         else:
             removal_metadata = self._remove_relational_json(table)
@@ -311,7 +311,7 @@ class RelationalData:
         Removes the RelationalJson instance and removes all invented tables from the graph
         (which in turn removes all edges (foreign keys) to/from other tables).
 
-        Returns a _RemovedTableMetadata object for restoring data in broader "update" contexts.
+        Returns a _RemovedTableMetadata object for restoring metadata in broader "update" contexts.
         """
         rel_json = self.relational_jsons[table]
 
