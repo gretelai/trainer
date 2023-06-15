@@ -258,14 +258,13 @@ class RelationalData:
             if col not in known_columns:
                 raise MultiTableException(f"Unrecognized column name: `{col}`")
 
-        # If the table is a "normal" table, updating is fairly straightforward...
-        if self.relational_jsons.get(table) is None:
-            self._get_table_metadata(table).primary_key = primary_key
-            self._clear_safe_ancestral_seed_columns(table)
+        # Prevent interfering with manually invented tables
+        if self._is_invented(table):
+            raise MultiTableException("Cannot change primary key on invented tables")
 
-        # ...but if it has JSON and produced invented tables, we redo JSON ingestion
-        # to make sure invented tables have primary keys set properly
-        else:
+        # If `table` is a producer of invented tables, we redo JSON ingestion
+        # to ensure primary keys are set properly on invented tables
+        elif self._is_producer_of_invented_tables(table):
             removal_metadata = self._remove_relational_json(table)
             if (original_data := removal_metadata.data) is None:
                 raise MultiTableException("Original data with JSON is lost.")
@@ -278,6 +277,11 @@ class RelationalData:
 
             self._add_rel_json_and_tables(table, original_data, new_rj_ingest)
             self._restore_fks_in_both_directions(table, removal_metadata)
+
+        # At this point we are working with a "normal" table
+        else:
+            self._get_table_metadata(table).primary_key = primary_key
+            self._clear_safe_ancestral_seed_columns(table)
 
     def _restore_fks_in_both_directions(
         self, table: str, removal_metadata: _RemovedTableMetadata
@@ -480,7 +484,9 @@ class RelationalData:
         """
         Set a DataFrame as the table data for a given table name.
         """
-        if table in self.relational_jsons:
+        if self._is_invented(table):
+            raise MultiTableException("Cannot modify invented tables' data")
+        elif self._is_producer_of_invented_tables(table):
             removal_metadata = self._remove_relational_json(table)
         else:
             removal_metadata = _RemovedTableMetadata(
@@ -539,6 +545,9 @@ class RelationalData:
 
     def _is_invented(self, table: str) -> bool:
         return self._get_table_metadata(table).invented_table_metadata is not None
+
+    def _is_producer_of_invented_tables(self, table: str) -> bool:
+        return self._get_table_metadata(table).invented_root_table_name is not None
 
     def get_modelable_table_names(self, table: str) -> list[str]:
         """
