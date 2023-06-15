@@ -538,10 +538,7 @@ class RelationalData:
             return [t for t in graph_nodes if t not in invented_tables]
 
     def _is_invented(self, table: str) -> bool:
-        return (
-            table in self.graph.nodes
-            and self._get_table_metadata(table).invented_table_metadata is not None
-        )
+        return self._get_table_metadata(table).invented_table_metadata is not None
 
     def get_modelable_table_names(self, table: str) -> list[str]:
         """
@@ -562,9 +559,7 @@ class RelationalData:
             return []
 
     def get_public_name(self, table: str) -> Optional[str]:
-        if (
-            imeta := self._get_table_metadata(table).invented_table_metadata
-        ) is not None:
+        if (imeta := self.get_invented_table_metadata(table)) is not None:
             return imeta.original_table_name
 
         return table
