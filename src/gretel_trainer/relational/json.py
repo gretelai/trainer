@@ -151,6 +151,16 @@ class InventedTableMetadata:
     empty: bool
 
 
+@dataclass
+class ProducerMetadata:
+    invented_root_table_name: str
+    table_name_mappings: dict[str, str]
+
+    @property
+    def table_names(self) -> list[str]:
+        return list(self.table_name_mappings.values())
+
+
 class RelationalJson:
     def __init__(
         self,
@@ -188,7 +198,11 @@ class RelationalJson:
                 table_name_mappings=mappings,
             )
             commands = _generate_commands(rel_json, tables)
-            return (rel_json, commands)
+            producer_metadata = ProducerMetadata(
+                invented_root_table_name=mappings[table_name],
+                table_name_mappings=mappings,
+            )
+            return (rel_json, commands, producer_metadata)
 
     @property
     def root_table_name(self) -> str:
@@ -371,4 +385,4 @@ def get_json_columns(df: pd.DataFrame) -> list[str]:
 
 
 CommandsT = tuple[list[dict], list[dict]]
-IngestResponseT = tuple[RelationalJson, CommandsT]
+IngestResponseT = tuple[RelationalJson, CommandsT, ProducerMetadata]

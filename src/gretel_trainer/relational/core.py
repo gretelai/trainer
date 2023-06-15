@@ -28,6 +28,7 @@ from pandas.api.types import is_string_dtype
 from gretel_trainer.relational.json import (
     IngestResponseT,
     InventedTableMetadata,
+    ProducerMetadata,
     RelationalJson,
     get_json_columns,
 )
@@ -84,15 +85,13 @@ class Scope(str, Enum):
     """
 
 
-# invented_table_metadata should be set if the table is invented
-# invented_root_table_name should be set if the table _produced_ (other) invented tables
 @dataclass
 class TableMetadata:
     primary_key: list[str]
     data: pd.DataFrame
     columns: list[str]
     invented_table_metadata: Optional[InventedTableMetadata] = None
-    invented_root_table_name: Optional[str] = None
+    producer_metadata: Optional[ProducerMetadata] = None
     safe_ancestral_seed_columns: Optional[set[str]] = None
 
 
@@ -178,7 +177,7 @@ class RelationalData:
         """
         primary_key = self._format_key_column(primary_key)
         if (rj_ingest := self._check_for_json(name, primary_key, data)) is not None:
-            self._add_rel_json_and_tables(name, data, rj_ingest)
+            self._add_rel_json_and_tables(name, primary_key, data, rj_ingest)
         else:
             self._add_single_table(name=name, primary_key=primary_key, data=data)
 
@@ -196,19 +195,23 @@ class RelationalData:
             return RelationalJson.ingest(table, primary_key, data, json_cols)
 
     def _add_rel_json_and_tables(
-        self, table: str, data: pd.DataFrame, rj_ingest: IngestResponseT
+        self,
+        table: str,
+        primary_key: list[str],
+        data: pd.DataFrame,
+        rj_ingest: IngestResponseT,
     ) -> None:
-        rel_json, commands = rj_ingest
+        rel_json, commands, producer_metadata = rj_ingest
         tables, foreign_keys = commands
 
         self.relational_jsons[table] = rel_json
 
         # Add this table as a standalone node
         metadata = TableMetadata(
-            primary_key=rel_json.original_primary_key,
+            primary_key=primary_key,
             data=data,
             columns=list(data.columns),
-            invented_root_table_name=rel_json.root_table_name,
+            producer_metadata=producer_metadata,
         )
         self.graph.add_node(table, metadata=metadata)
 
@@ -275,7 +278,9 @@ class RelationalData:
                     "Failed to change primary key on tables invented from JSON data"
                 )
 
-            self._add_rel_json_and_tables(table, original_data, new_rj_ingest)
+            self._add_rel_json_and_tables(
+                table, primary_key, original_data, new_rj_ingest
+            )
             self._restore_fks_in_both_directions(table, removal_metadata)
 
         # At this point we are working with a "normal" table
@@ -317,23 +322,30 @@ class RelationalData:
 
         Returns a _RemovedTableMetadata object for restoring metadata in broader "update" contexts.
         """
-        rel_json = self.relational_jsons[table]
+        table_metadata = self._get_table_metadata(table)
+        producer_metadata = table_metadata.producer_metadata
 
-        metadata = _RemovedTableMetadata(
-            data=rel_json.original_data,
-            primary_key=rel_json.original_primary_key,
+        if producer_metadata is None:
+            raise MultiTableException(
+                "Cannot remove invented tables from non-producer table"
+            )
+
+        removal_metadata = _RemovedTableMetadata(
+            data=table_metadata.data,
+            primary_key=table_metadata.primary_key,
             fks_to_parents=self.get_foreign_keys(table),
             fks_from_children=self._get_user_defined_fks_to_table(
-                rel_json.root_table_name
+                self._get_fk_delegate_table(table)
             ),
         )
 
-        for invented_table_name in rel_json.table_names:
+        for invented_table_name in producer_metadata.table_names:
             if invented_table_name in self.graph.nodes:
                 self.graph.remove_node(invented_table_name)
+        self.graph.remove_node(table)
         del self.relational_jsons[table]
 
-        return metadata
+        return removal_metadata
 
     def _format_key_column(self, key: Optional[Union[str, list[str]]]) -> list[str]:
         if key is None:
@@ -512,7 +524,7 @@ class RelationalData:
         json_source_tables = [
             t
             for t in graph_nodes
-            if self._get_table_metadata(t).invented_root_table_name is not None
+            if self._get_table_metadata(t).producer_metadata is not None
         ]
 
         modelable_tables = []
@@ -547,7 +559,7 @@ class RelationalData:
         return self._get_table_metadata(table).invented_table_metadata is not None
 
     def _is_producer_of_invented_tables(self, table: str) -> bool:
-        return self._get_table_metadata(table).invented_root_table_name is not None
+        return self._get_table_metadata(table).producer_metadata is not None
 
     def get_modelable_table_names(self, table: str) -> list[str]:
         """
@@ -556,10 +568,15 @@ class RelationalData:
         If the provided table is itself modelable, returns that table name back.
         Otherwise returns an empty list.
         """
-        if (rel_json := self.relational_jsons.get(table)) is not None:
+        try:
+            table_metadata = self._get_table_metadata(table)
+        except MultiTableException:
+            return []
+
+        if (pmeta := table_metadata.producer_metadata) is not None:
             return [
                 t
-                for t in rel_json.table_names
+                for t in pmeta.table_names
                 if t in self.list_all_tables(Scope.MODELABLE)
             ]
         elif table in self.list_all_tables(Scope.MODELABLE):
@@ -681,7 +698,10 @@ class RelationalData:
         self._get_table_metadata(table).safe_ancestral_seed_columns = None
 
     def _get_fk_delegate_table(self, table: str) -> str:
-        return self._get_table_metadata(table).invented_root_table_name or table
+        if (pmeta := self._get_table_metadata(table).producer_metadata) is not None:
+            return pmeta.invented_root_table_name
+
+        return table
 
     def get_foreign_keys(
         self, table: str, rename_invented_tables: bool = False
