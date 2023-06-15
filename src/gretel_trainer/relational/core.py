@@ -93,6 +93,14 @@ class TableMetadata:
     safe_ancestral_seed_columns: Optional[set[str]] = None
 
 
+@dataclass
+class _RemovedTableMetadata:
+    data: Optional[pd.DataFrame]
+    primary_key: list[str]
+    fks_to_parents: list[ForeignKey]
+    fks_from_children: list[ForeignKey]
+
+
 class RelationalData:
     """
     Stores information about multiple tables and their relationships. When
@@ -229,9 +237,16 @@ class RelationalData:
             if col not in known_columns:
                 raise MultiTableException(f"Unrecognized column name: `{col}`")
 
-        if self.relational_jsons.get(table) is not None:
-            original_data, _, original_fks = self._remove_relational_json(table)
-            if original_data is None:
+        # If the table is a "normal" table, updating is fairly straightforward...
+        if self.relational_jsons.get(table) is None:
+            self.graph.nodes[table]["metadata"].primary_key = primary_key
+            self._clear_safe_ancestral_seed_columns(table)
+
+        # ...but if it has JSON and produced invented tables, we redo that whole process
+        # to make sure invented tables have primary keys set properly
+        else:
+            removal_metadata = self._remove_relational_json(table)
+            if (original_data := removal_metadata.data) is None:
                 raise MultiTableException("Original data with JSON is lost.")
 
             new_rj_ingest = RelationalJson.ingest(table, primary_key, original_data)
@@ -241,16 +256,24 @@ class RelationalData:
                 )
 
             self._add_rel_json_and_tables(table, new_rj_ingest)
-            for fk in original_fks:
-                self.add_foreign_key_constraint(
-                    table=fk.table_name,
-                    constrained_columns=fk.columns,
-                    referred_table=fk.parent_table_name,
-                    referred_columns=fk.parent_columns,
-                )
-        else:
-            self.graph.nodes[table]["metadata"].primary_key = primary_key
-            self._clear_safe_ancestral_seed_columns(table)
+            self._restore_fks_in_both_directions(table, removal_metadata)
+
+    def _restore_fks_in_both_directions(self, table: str, removal_metadata: _RemovedTableMetadata) -> None:
+        for fk in removal_metadata.fks_to_parents:
+            self.add_foreign_key_constraint(
+                table=table,
+                constrained_columns=fk.columns,
+                referred_table=fk.parent_table_name,
+                referred_columns=fk.parent_columns,
+            )
+
+        for fk in removal_metadata.fks_from_children:
+            self.add_foreign_key_constraint(
+                table=fk.table_name,
+                constrained_columns=fk.columns,
+                referred_table=table,
+                referred_columns=fk.parent_columns,
+            )
 
     def _get_user_defined_fks_to_table(self, table: str) -> list[ForeignKey]:
         return [
@@ -260,20 +283,20 @@ class RelationalData:
             if fk.parent_table_name == table and not self._is_invented(fk.table_name)
         ]
 
-    def _remove_relational_json(
-        self, table: str
-    ) -> tuple[Optional[pd.DataFrame], list[str], list[ForeignKey]]:
+    def _remove_relational_json(self, table: str) -> _RemovedTableMetadata:
         """
-        Removes the RelationalJson instance and removes all invented tables from the graph.
+        Removes the RelationalJson instance and removes all invented tables from the graph
+        (which in turn removes all edges (foreign keys) to/from other tables).
 
-        Returns the original data, primary key, and foreign keys.
+        Returns a _RemovedTableMetadata object for restoring data in broader "update" contexts.
         """
         rel_json = self.relational_jsons[table]
 
-        original_data = rel_json.original_data
-        original_primary_key = rel_json.original_primary_key
-        original_foreign_keys = self._get_user_defined_fks_to_table(
-            rel_json.root_table_name
+        metadata = _RemovedTableMetadata(
+            data=rel_json.original_data,
+            primary_key=rel_json.original_primary_key,
+            fks_to_parents=self.get_foreign_keys(table),
+            fks_from_children=self._get_user_defined_fks_to_table(table),
         )
 
         for invented_table_name in rel_json.table_names:
@@ -281,7 +304,7 @@ class RelationalData:
                 self.graph.remove_node(invented_table_name)
         del self.relational_jsons[table]
 
-        return original_data, original_primary_key, original_foreign_keys
+        return metadata
 
     def _format_key_column(self, key: Optional[Union[str, list[str]]]) -> list[str]:
         if key is None:
@@ -431,51 +454,18 @@ class RelationalData:
         Set a DataFrame as the table data for a given table name.
         """
         if table in self.relational_jsons:
-            _, original_pk, original_fks = self._remove_relational_json(table)
-            if (
-                new_rj_ingest := self._check_for_json(table, original_pk, data)
-            ) is not None:
-                self._add_rel_json_and_tables(table, new_rj_ingest)
-                parent_table_name = new_rj_ingest[0].root_table_name
-            else:
-                self._add_single_table(
-                    name=table,
-                    primary_key=original_pk,
-                    data=data,
-                )
-                parent_table_name = table
-            for fk in original_fks:
-                self.add_foreign_key_constraint(
-                    table=fk.table_name,
-                    constrained_columns=fk.columns,
-                    referred_table=parent_table_name,
-                    referred_columns=fk.parent_columns,
-                )
+            removal_metadata = self._remove_relational_json(table)
         else:
-            try:
-                metadata = self.graph.nodes[table]["metadata"]
-            except KeyError:
-                raise MultiTableException(
-                    f"Unrecognized table name: {table}. If this is a new table to add, use `add_table`."
-                )
+            removal_metadata = _RemovedTableMetadata(
+                data=None,  # we don't care about the old data
+                primary_key=self.get_primary_key(table),
+                fks_to_parents=self.get_foreign_keys(table),
+                fks_from_children=self._get_user_defined_fks_to_table(table),
+            )
+            self.graph.remove_node(table)
 
-            if (
-                new_rj_ingest := self._check_for_json(table, metadata.primary_key, data)
-            ) is not None:
-                original_foreign_keys = self._get_user_defined_fks_to_table(table)
-                self.graph.remove_node(table)
-                self._add_rel_json_and_tables(table, new_rj_ingest)
-                for fk in original_foreign_keys:
-                    self.add_foreign_key_constraint(
-                        table=fk.table_name,
-                        constrained_columns=fk.columns,
-                        referred_table=new_rj_ingest[0].root_table_name,
-                        referred_columns=fk.parent_columns,
-                    )
-            else:
-                metadata.data = data
-                metadata.columns = list(data.columns)
-                self._clear_safe_ancestral_seed_columns(table)
+        self.add_table(name=table, primary_key=removal_metadata.primary_key, data=data)
+        self._restore_fks_in_both_directions(table, removal_metadata)
 
     def list_all_tables(self, scope: Scope = Scope.MODELABLE) -> list[str]:
         """
