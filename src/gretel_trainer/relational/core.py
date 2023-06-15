@@ -258,7 +258,9 @@ class RelationalData:
             self._add_rel_json_and_tables(table, new_rj_ingest)
             self._restore_fks_in_both_directions(table, removal_metadata)
 
-    def _restore_fks_in_both_directions(self, table: str, removal_metadata: _RemovedTableMetadata) -> None:
+    def _restore_fks_in_both_directions(
+        self, table: str, removal_metadata: _RemovedTableMetadata
+    ) -> None:
         for fk in removal_metadata.fks_to_parents:
             self.add_foreign_key_constraint(
                 table=table,
@@ -296,7 +298,9 @@ class RelationalData:
             data=rel_json.original_data,
             primary_key=rel_json.original_primary_key,
             fks_to_parents=self.get_foreign_keys(table),
-            fks_from_children=self._get_user_defined_fks_to_table(table),
+            fks_from_children=self._get_user_defined_fks_to_table(
+                rel_json.root_table_name
+            ),
         )
 
         for invented_table_name in rel_json.table_names:
