@@ -134,6 +134,7 @@ def test_get_modelable_table_names(documents):
 
 def test_get_modelable_names_ignores_empty_mapped_tables(bball):
     # The `suspensions` column in the source data contained empty lists for all records.
+    # The normalization process transforms that into a standalone, empty table.
     # We need to hold onto that table name to support denormalizing back to the original
     # source data shape. It is therefore present when listing ALL tables...
     assert set(bball.list_all_tables(Scope.ALL)) == {
