@@ -525,7 +525,7 @@ class RelationalData:
         json_source_tables = [
             t
             for t in graph_nodes
-            if self._get_table_metadata(t).producer_metadata is not None
+            if self.get_producer_metadata(t) is not None
         ]
 
         modelable_tables = []
@@ -557,10 +557,10 @@ class RelationalData:
             return [t for t in graph_nodes if t not in invented_tables]
 
     def _is_invented(self, table: str) -> bool:
-        return self._get_table_metadata(table).invented_table_metadata is not None
+        return self.get_invented_table_metadata(table) is not None
 
     def _is_producer_of_invented_tables(self, table: str) -> bool:
-        return self._get_table_metadata(table).producer_metadata is not None
+        return self.get_producer_metadata(table) is not None
 
     def get_modelable_table_names(self, table: str) -> list[str]:
         """
@@ -704,7 +704,7 @@ class RelationalData:
         self._get_table_metadata(table).safe_ancestral_seed_columns = None
 
     def _get_fk_delegate_table(self, table: str) -> str:
-        if (pmeta := self._get_table_metadata(table).producer_metadata) is not None:
+        if (pmeta := self.get_producer_metadata(table)) is not None:
             return pmeta.invented_root_table_name
 
         return table
