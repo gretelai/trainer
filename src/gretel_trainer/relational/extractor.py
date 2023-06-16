@@ -472,7 +472,7 @@ class TableExtractor:
                 random_success = False
                 random_errs = []
                 # Different dialects will use different random functions
-                # so we just try them until on works. If none work,
+                # so we just try them until one works. If none work,
                 # we fall back to contiguous mode
                 for rand_func in (func.random(), func.rand()):
                     random_query = (
