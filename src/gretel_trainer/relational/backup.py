@@ -1,10 +1,11 @@
 from __future__ import annotations
 
 from dataclasses import asdict, dataclass
-from typing import Any, Optional
+from typing import Any, Optional, Union
 
 from gretel_trainer.relational.artifacts import ArtifactCollection
 from gretel_trainer.relational.core import ForeignKey, RelationalData, Scope
+from gretel_trainer.relational.json import InventedTableMetadata, ProducerMetadata
 
 
 @dataclass
@@ -42,18 +43,20 @@ class BackupRelationalData:
         tables = {}
         foreign_keys = []
         for table in rel_data.list_all_tables(Scope.ALL):
-            backup_table = BackupRelationalDataTable(
+            tables[table] = BackupRelationalDataTable(
                 primary_key=rel_data.get_primary_key(table),
                 columns=rel_data.get_table_columns(table),
+                invented_table_metadata=_optionally_as_dict(
+                    rel_data.get_invented_table_metadata(table)
+                ),
+                producer_metadata=_optionally_as_dict(
+                    rel_data.get_producer_metadata(table)
+                ),
             )
-            if (
-                invented_table_metadata := rel_data.get_invented_table_metadata(table)
-            ) is not None:
-                backup_table.invented_table_metadata = asdict(invented_table_metadata)
-            if (producer_metadata := rel_data.get_producer_metadata(table)) is not None:
-                backup_table.producer_metadata = asdict(producer_metadata)
-            tables[table] = backup_table
-            if producer_metadata is None:
+
+            # Producer tables delegate their foreign keys to root invented tables.
+            # We exclude producers here to avoid adding duplicate foreign keys.
+            if not rel_data.is_producer_of_invented_tables(table):
                 foreign_keys.extend(
                     [
                         BackupForeignKey.from_fk(key)
@@ -61,6 +64,15 @@ class BackupRelationalData:
                     ]
                 )
         return BackupRelationalData(tables=tables, foreign_keys=foreign_keys)
+
+
+def _optionally_as_dict(
+    metadata: Optional[Union[InventedTableMetadata, ProducerMetadata]]
+) -> Optional[dict[str, Any]]:
+    if metadata is None:
+        return None
+
+    return asdict(metadata)
 
 
 @dataclass

@@ -277,7 +277,7 @@ class RelationalData:
 
         # If `table` is a producer of invented tables, we redo JSON ingestion
         # to ensure primary keys are set properly on invented tables
-        elif self._is_producer_of_invented_tables(table):
+        elif self.is_producer_of_invented_tables(table):
             removal_metadata = self._remove_relational_json(table)
             if (original_data := removal_metadata.data) is None:
                 raise MultiTableException("Original data with JSON is lost.")
@@ -507,7 +507,7 @@ class RelationalData:
         """
         if self._is_invented(table):
             raise MultiTableException("Cannot modify invented tables' data")
-        elif self._is_producer_of_invented_tables(table):
+        elif self.is_producer_of_invented_tables(table):
             removal_metadata = self._remove_relational_json(table)
         else:
             removal_metadata = _RemovedTableMetadata(
@@ -565,7 +565,7 @@ class RelationalData:
     def _is_invented(self, table: str) -> bool:
         return self.get_invented_table_metadata(table) is not None
 
-    def _is_producer_of_invented_tables(self, table: str) -> bool:
+    def is_producer_of_invented_tables(self, table: str) -> bool:
         return self.get_producer_metadata(table) is not None
 
     def get_modelable_table_names(self, table: str) -> list[str]:
