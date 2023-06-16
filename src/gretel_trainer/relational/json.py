@@ -255,7 +255,9 @@ def restore(
         )
         return None
 
-    return _denormalize_json(tables, rel_data, table_name_mappings, original_table_name)[original_columns]
+    return _denormalize_json(
+        tables, rel_data, table_name_mappings, original_table_name
+    )[original_columns]
 
 
 def _denormalize_json(
@@ -266,9 +268,7 @@ def _denormalize_json(
 ) -> pd.DataFrame:
     table_names = list(table_name_mappings.values())
     inverse_table_name_mappings = {v: k for k, v in table_name_mappings.items()}
-    table_dict: dict = {
-        inverse_table_name_mappings[k]: v for k, v in tables.items()
-    }
+    table_dict: dict = {inverse_table_name_mappings[k]: v for k, v in tables.items()}
     for table_name in list(reversed(table_names)):
         table_provenance_name = inverse_table_name_mappings[table_name]
         empty_fallback = pd.DataFrame(

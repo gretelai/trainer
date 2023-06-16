@@ -57,7 +57,7 @@ def test_backup_relational_data_with_json(documents):
                         "purchases": "purchases-sfx",
                         "purchases^data>years": "purchases-data-years-sfx",
                     },
-                }
+                },
             ),
             "purchases-sfx": BackupRelationalDataTable(
                 primary_key=["id", "~PRIMARY_KEY_ID~"],

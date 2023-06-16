@@ -531,9 +531,7 @@ class RelationalData:
         graph_nodes = list(self.graph.nodes)
 
         json_source_tables = [
-            t
-            for t in graph_nodes
-            if self.get_producer_metadata(t) is not None
+            t for t in graph_nodes if self.get_producer_metadata(t) is not None
         ]
 
         modelable_tables = []
@@ -604,9 +602,7 @@ class RelationalData:
     ) -> Optional[InventedTableMetadata]:
         return self._get_table_metadata(table).invented_table_metadata
 
-    def get_producer_metadata(
-        self, table: str
-    ) -> Optional[ProducerMetadata]:
+    def get_producer_metadata(self, table: str) -> Optional[ProducerMetadata]:
         return self._get_table_metadata(table).producer_metadata
 
     def get_parents(self, table: str) -> list[str]:

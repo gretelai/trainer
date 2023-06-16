@@ -50,9 +50,7 @@ class BackupRelationalData:
                 invented_table_metadata := rel_data.get_invented_table_metadata(table)
             ) is not None:
                 backup_table.invented_table_metadata = asdict(invented_table_metadata)
-            if (
-                producer_metadata := rel_data.get_producer_metadata(table)
-            ) is not None:
+            if (producer_metadata := rel_data.get_producer_metadata(table)) is not None:
                 backup_table.producer_metadata = asdict(producer_metadata)
             tables[table] = backup_table
             if producer_metadata is None:
@@ -62,9 +60,7 @@ class BackupRelationalData:
                         for key in rel_data.get_foreign_keys(table)
                     ]
                 )
-        return BackupRelationalData(
-            tables=tables, foreign_keys=foreign_keys
-        )
+        return BackupRelationalData(tables=tables, foreign_keys=foreign_keys)
 
 
 @dataclass
