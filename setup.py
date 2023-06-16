@@ -5,15 +5,15 @@ local_path = pathlib.Path(__file__).parent
 install_requires = (local_path / "requirements.txt").read_text().splitlines()
 
 mysql_extras = [
-    "mysqlclient",
+    "mysqlclient~=2.1",
 ]
 postgres_extras = [
-    "psycopg2-binary",
+    "psycopg2-binary~=2.9",
 ]
 snowflake_extras = [
-    "snowflake-sqlalchemy",
+    "snowflake-sqlalchemy~=1.4",
 ]
-bigquery_extras = ["sqlalchemy-bigquery[bqstorage]"]
+bigquery_extras = ["sqlalchemy-bigquery[bqstorage]~=1.6"]
 
 connectors_extras = mysql_extras + postgres_extras + snowflake_extras + bigquery_extras
 
