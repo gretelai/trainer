@@ -527,8 +527,8 @@ class RelationalData:
         """
         graph_nodes = list(self.graph.nodes)
 
-        json_source_tables = [
-            t for t in graph_nodes if self.get_producer_metadata(t) is not None
+        producer_tables = [
+            t for t in graph_nodes if self.is_producer_of_invented_tables(t)
         ]
 
         modelable_tables = []
@@ -544,7 +544,7 @@ class RelationalData:
                 if not invented_meta.empty:
                     modelable_tables.append(n)
             else:
-                if n not in json_source_tables:
+                if n not in producer_tables:
                     modelable_tables.append(n)
                     evaluatable_tables.append(n)
 
