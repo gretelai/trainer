@@ -134,17 +134,24 @@ def test_get_modelable_table_names(documents):
 
 def test_get_modelable_names_ignores_empty_mapped_tables(bball):
     # The `suspensions` column in the source data contained empty lists for all records.
-    # We need to hold onto that table name on the RelationalJson instance to support
-    # denormalizing back to the original source data shape. It is therefore exposed
-    # in the `table_names` attribute on RelationalJson...
-    assert set(bball.relational_jsons["bball"].table_names) == {
+    # We need to hold onto that table name to support denormalizing back to the original
+    # source data shape. It is therefore present when listing ALL tables...
+    assert set(bball.list_all_tables(Scope.ALL)) == {
+        "bball",
         "bball-sfx",
         "bball-teams-sfx",
         "bball-suspensions-sfx",
     }
 
-    # ...BUT clients of RelationalData only care about invented tables that can be modeled
-    # (i.e. that contain data), so that class does not expose the empty table.
+    # ...and the producer metadata is aware of it...
+    assert set(bball.get_producer_metadata("bball").table_names) == {
+        "bball-sfx",
+        "bball-teams-sfx",
+        "bball-suspensions-sfx",
+    }
+
+    # ...BUT most clients only care about invented tables that can be modeled
+    # (i.e. that contain data), so the empty table does not appear in these contexts:
     assert set(bball.get_modelable_table_names("bball")) == {
         "bball-sfx",
         "bball-teams-sfx",

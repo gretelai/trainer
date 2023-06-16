@@ -25,11 +25,11 @@ import pandas as pd
 from networkx.algorithms.dag import dag_longest_path_length, topological_sort
 from pandas.api.types import is_string_dtype
 
+import gretel_trainer.relational.json as relational_json
 from gretel_trainer.relational.json import (
     IngestResponseT,
     InventedTableMetadata,
     ProducerMetadata,
-    RelationalJson,
     get_json_columns,
 )
 
@@ -121,7 +121,6 @@ class RelationalData:
 
     def __init__(self):
         self.graph = networkx.DiGraph()
-        self.relational_jsons: dict[str, RelationalJson] = {}
 
     @property
     def is_empty(self) -> bool:
@@ -143,16 +142,28 @@ class RelationalData:
         discarded = set()
 
         # Restore any invented tables to nested-JSON format
-        for table_name, rel_json in self.relational_jsons.items():
+        producers = {
+            table: pmeta
+            for table in self.list_all_tables(Scope.ALL)
+            if (pmeta := self.get_producer_metadata(table)) is not None
+        }
+        for table_name, producer_metadata in producers.items():
             tables = {
                 table: data
                 for table, data in tableset.items()
-                if table in rel_json.table_names
+                if table in producer_metadata.table_names
             }
-            data = rel_json.restore(tables, self)
+            data = relational_json.restore(
+                tables=tables,
+                rel_data=self,
+                root_table_name=producer_metadata.invented_root_table_name,
+                original_columns=self.get_table_columns(table_name),
+                table_name_mappings=producer_metadata.table_name_mappings,
+                original_table_name=table_name,
+            )
             if data is not None:
                 restored[table_name] = data
-            discarded.update(rel_json.table_names)
+            discarded.update(producer_metadata.table_names)
 
         # Add remaining tables
         for table, data in tableset.items():
@@ -192,7 +203,7 @@ class RelationalData:
             logger.info(
                 f"Detected JSON data in table `{table}`. Running JSON normalization."
             )
-            return RelationalJson.ingest(table, primary_key, data, json_cols)
+            return relational_json.ingest(table, primary_key, data, json_cols)
 
     def _add_rel_json_and_tables(
         self,
@@ -201,19 +212,16 @@ class RelationalData:
         data: pd.DataFrame,
         rj_ingest: IngestResponseT,
     ) -> None:
-        rel_json, commands, producer_metadata = rj_ingest
+        commands, producer_metadata = rj_ingest
         tables, foreign_keys = commands
 
-        self.relational_jsons[table] = rel_json
-
         # Add this table as a standalone node
-        metadata = TableMetadata(
+        self._add_single_table(
+            name=table,
             primary_key=primary_key,
             data=data,
-            columns=list(data.columns),
             producer_metadata=producer_metadata,
         )
-        self.graph.add_node(table, metadata=metadata)
 
         # Add the invented tables
         for tbl in tables:
@@ -236,6 +244,7 @@ class RelationalData:
             data=data,
             columns=list(data.columns),
             invented_table_metadata=invented_table_metadata,
+            producer_metadata=producer_metadata,
         )
         self.graph.add_node(name, metadata=metadata)
 
@@ -273,7 +282,7 @@ class RelationalData:
             if (original_data := removal_metadata.data) is None:
                 raise MultiTableException("Original data with JSON is lost.")
 
-            new_rj_ingest = RelationalJson.ingest(table, primary_key, original_data)
+            new_rj_ingest = relational_json.ingest(table, primary_key, original_data)
             if new_rj_ingest is None:
                 raise MultiTableException(
                     "Failed to change primary key on tables invented from JSON data"
@@ -318,7 +327,7 @@ class RelationalData:
 
     def _remove_relational_json(self, table: str) -> _RemovedTableMetadata:
         """
-        Removes the RelationalJson instance and removes all invented tables from the graph
+        Removes the producer table and all invented tables from the graph
         (which in turn removes all edges (foreign keys) to/from other tables).
 
         Returns a _RemovedTableMetadata object for restoring metadata in broader "update" contexts.
@@ -344,7 +353,6 @@ class RelationalData:
             if invented_table_name in self.graph.nodes:
                 self.graph.remove_node(invented_table_name)
         self.graph.remove_node(table)
-        del self.relational_jsons[table]
 
         return removal_metadata
 
