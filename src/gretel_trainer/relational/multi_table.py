@@ -653,16 +653,21 @@ class MultiTable:
         identifier: Optional[str] = None,
         in_place: bool = False,
         data: Optional[dict[str, pd.DataFrame]] = None,
+        encode_keys: bool = False,
     ) -> None:
         """
-        identifier: (str, optional): Unique string identifying a specific call to this method. Defaults to `transforms_` + current timestamp
+        Run pre-trained Gretel Transform models on Relational table data:
 
-        If `in_place` set to True, overwrites source data in all locations
-        (internal Python state, local working directory, project artifact archive).
-        Used for transforms->synthetics workflows.
-
-        If `data` is supplied, runs only the supplied data through the corresponding transforms models.
-        Otherwise runs source data through all existing transforms models.
+        Args:
+            identifier: Unique string identifying a specific call to this method. Defaults to `transforms_` + current timestamp
+            in_place: If True, overwrites source data in all locations
+                (internal Python state, local working directory, project artifact archive).
+                Used for transforms->synthetics workflows.
+            data: If supplied, runs only the supplied data through the corresponding transforms models.
+                Otherwise runs source data through all existing transforms models.
+            encode_keys: If set, primary and foreign keys will be replaced with label encoded variants. This can add
+                an additional level of privacy at the cost of referential integrity between transformed and
+                original data.
         """
         if data is not None:
             unrunnable_tables = [
@@ -706,9 +711,11 @@ class MultiTable:
         )
         run_task(task, self._extended_sdk)
 
-        output_tables = self._strategy.label_encode_keys(
-            self.relational_data, task.output_tables
-        )
+        output_tables = task.output_tables
+        if encode_keys:
+            output_tables = self._strategy.label_encode_keys(
+                self.relational_data, task.output_tables
+            )
 
         if in_place:
             for table_name, transformed_table in output_tables.items():
