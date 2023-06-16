@@ -228,6 +228,7 @@ class RelationalData:
         primary_key: UserFriendlyPrimaryKeyT,
         data: pd.DataFrame,
         invented_table_metadata: Optional[InventedTableMetadata] = None,
+        producer_metadata: Optional[ProducerMetadata] = None,
     ) -> None:
         primary_key = self._format_key_column(primary_key)
         metadata = TableMetadata(
@@ -594,6 +595,11 @@ class RelationalData:
         self, table: str
     ) -> Optional[InventedTableMetadata]:
         return self._get_table_metadata(table).invented_table_metadata
+
+    def get_producer_metadata(
+        self, table: str
+    ) -> Optional[ProducerMetadata]:
+        return self._get_table_metadata(table).producer_metadata
 
     def get_parents(self, table: str) -> list[str]:
         """
