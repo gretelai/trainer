@@ -653,6 +653,7 @@ class MultiTable:
         identifier: Optional[str] = None,
         in_place: bool = False,
         data: Optional[dict[str, pd.DataFrame]] = None,
+        encode_keys: bool = False,
     ) -> None:
         """
         identifier: (str, optional): Unique string identifying a specific call to this method. Defaults to `transforms_` + current timestamp
@@ -663,6 +664,9 @@ class MultiTable:
 
         If `data` is supplied, runs only the supplied data through the corresponding transforms models.
         Otherwise runs source data through all existing transforms models.
+
+        If `encode_keys` is set to True, then we'll internally track the keys and update them
+        instead of relying on whatever was transformed
         """
         if data is not None:
             unrunnable_tables = [
@@ -706,9 +710,11 @@ class MultiTable:
         )
         run_task(task, self._extended_sdk)
 
-        output_tables = self._strategy.label_encode_keys(
-            self.relational_data, task.output_tables
-        )
+        output_tables = task.output_tables
+        if encode_keys:
+            output_tables = self._strategy.label_encode_keys(
+                self.relational_data, task.output_tables
+            )
 
         if in_place:
             for table_name, transformed_table in output_tables.items():
