@@ -277,7 +277,7 @@ class RelationalData:
         # If `table` is a producer of invented tables, we redo JSON ingestion
         # to ensure primary keys are set properly on invented tables
         elif self.is_producer_of_invented_tables(table):
-            removal_metadata = self._remove_relational_json(table)
+            removal_metadata = self._remove_producer(table)
             original_data = removal_metadata.data
             new_rj_ingest = relational_json.ingest(table, primary_key, original_data)
             if new_rj_ingest is None:
@@ -322,9 +322,9 @@ class RelationalData:
             if fk.parent_table_name == table and not self._is_invented(fk.table_name)
         ]
 
-    def _remove_relational_json(self, table: str) -> _RemovedTableMetadata:
+    def _remove_producer(self, table: str) -> _RemovedTableMetadata:
         """
-        Removes the producer table and all invented tables from the graph
+        Removes the producer table and all its invented tables from the graph
         (which in turn removes all edges (foreign keys) to/from other tables).
 
         Returns a _RemovedTableMetadata object for restoring metadata in broader "update" contexts.
@@ -505,7 +505,7 @@ class RelationalData:
         if self._is_invented(table):
             raise MultiTableException("Cannot modify invented tables' data")
         elif self.is_producer_of_invented_tables(table):
-            removal_metadata = self._remove_relational_json(table)
+            removal_metadata = self._remove_producer(table)
         else:
             removal_metadata = _RemovedTableMetadata(
                 data=pd.DataFrame(),  # we don't care about the old data
