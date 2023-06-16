@@ -120,10 +120,13 @@ def test_sample_table(target, expect, connector_art, tmpdir):
     assert "A001" not in df["id"]
 
 
-def test_sample_tables(connector_art, tmpdir):
-    config = ExtractorConfig(target_row_count=0.5)
+@pytest.mark.parametrize("sample_mode", ["random", "contiguous"])
+def test_sample_tables(sample_mode, connector_art, tmpdir):
+    config = ExtractorConfig(target_row_count=0.5, sample_mode=sample_mode)
     extractor = TableExtractor(
-        config=config, connector=connector_art, storage_dir=Path(tmpdir)
+        config=config,
+        connector=connector_art,
+        storage_dir=Path(tmpdir),
     )
     meta = extractor.sample_tables()
     paintings = meta["paintings"]

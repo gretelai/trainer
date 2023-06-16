@@ -48,14 +48,22 @@ class ExtractorConfig:
     The default value, -1, implies that full tables should be extracted.
     """
 
-    sample_mode: SampleMode = SampleMode.RANDOM
+    sample_mode: SampleMode = SampleMode.CONTIGUOUS
     """
     The method to sample records from tables that do not contain
     any primary keys that are referenced by other tables. We call these
     "leaf" tables because in a graph representation they do not
     have any children.
 
-    Currently only "random" mode is supported.
+    The default mode is to sample contiguously based on how the
+    specific database/data warehouse supports it. This essentially
+    does a 'SELECT * FROM table LIMIT <N>' based on the provided
+    `target_row_count`.
+
+    If using "random" sampling, the extractor will attempt to
+    random leaf table rows randomly, however different dialects
+    have different support for this. If the "random" sampling fails,
+    the extractor will fall back to the "contiguous" method.
     """
 
     only: Optional[set[str]] = None
@@ -77,10 +85,8 @@ class ExtractorConfig:
     def __post_init__(self):
         errors = []
 
-        if self.sample_mode != SampleMode.RANDOM:
-            raise NotImplementedError(
-                "Additional sampling modes are not enabled yet, please use `random`"
-            )
+        if self.sample_mode not in (SampleMode.RANDOM, SampleMode.CONTIGUOUS):
+            raise ValueError("Invalid `sample_mode`")
 
         if self.target_row_count < -1:
             errors.append("The `target_row_count` must be -1 or higher")
@@ -454,18 +460,50 @@ class TableExtractor:
             self._config, table_session.total_row_count
         )
 
-        # TODO: Re-instate when other modes are added
-        # if self._config.sample_mode == SampleMode.RANDOM:
-        query = (
-            select(table_session.table).order_by(func.random()).limit(sample_row_count)
-        )
-
         logger.debug(
             f"Sampling {sample_row_count} rows from table '{table_session.table.name}'"
         )
 
+        df_iter = iter([pd.DataFrame()])
+
         with table_session.engine.connect() as conn:
-            df_iter = pd.read_sql_query(query, conn, chunksize=self._chunk_size)
+            contiguous_query = select(table_session.table).limit(sample_row_count)
+            if self._config.sample_mode == SampleMode.RANDOM:
+                random_success = False
+                random_errs = []
+                # Different dialects will use different random functions
+                # so we just try them until on works. If none work,
+                # we fall back to contiguous mode
+                for rand_func in (func.random(), func.rand()):
+                    random_query = (
+                        select(table_session.table)
+                        .order_by(rand_func)
+                        .limit(sample_row_count)
+                    )
+                    try:
+                        df_iter = pd.read_sql_query(
+                            random_query, conn, chunksize=self._chunk_size
+                        )
+                    except Exception as err:
+                        random_errs.append(str(err))
+                    else:
+                        random_success = True
+                        break
+
+                if not random_success:
+                    logger.info(
+                        f"Could not sample randomly, received the following errors: {', '.join(random_errs)}. Will fall back to contiguous mode."
+                    )
+
+                    df_iter = pd.read_sql_query(
+                        contiguous_query, conn, chunksize=self._chunk_size
+                    )
+
+            else:
+                df_iter = pd.read_sql_query(
+                    contiguous_query, conn, chunksize=self._chunk_size
+                )
+
             sampled_row_count = _stream_df_to_path(df_iter, table_path)
 
         return TableMetadata(
