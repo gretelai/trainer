@@ -30,7 +30,6 @@ from gretel_trainer.relational.json import (
     IngestResponseT,
     InventedTableMetadata,
     ProducerMetadata,
-    get_json_columns,
 )
 
 logger = logging.getLogger(__name__)
@@ -97,7 +96,7 @@ class TableMetadata:
 
 @dataclass
 class _RemovedTableMetadata:
-    data: Optional[pd.DataFrame]
+    data: pd.DataFrame
     primary_key: list[str]
     fks_to_parents: list[ForeignKey]
     fks_from_children: list[ForeignKey]
@@ -198,7 +197,7 @@ class RelationalData:
         primary_key: list[str],
         data: pd.DataFrame,
     ) -> Optional[IngestResponseT]:
-        json_cols = get_json_columns(data)
+        json_cols = relational_json.get_json_columns(data)
         if len(json_cols) > 0:
             logger.info(
                 f"Detected JSON data in table `{table}`. Running JSON normalization."
@@ -279,9 +278,7 @@ class RelationalData:
         # to ensure primary keys are set properly on invented tables
         elif self.is_producer_of_invented_tables(table):
             removal_metadata = self._remove_relational_json(table)
-            if (original_data := removal_metadata.data) is None:
-                raise MultiTableException("Original data with JSON is lost.")
-
+            original_data = removal_metadata.data
             new_rj_ingest = relational_json.ingest(table, primary_key, original_data)
             if new_rj_ingest is None:
                 raise MultiTableException(
@@ -511,7 +508,7 @@ class RelationalData:
             removal_metadata = self._remove_relational_json(table)
         else:
             removal_metadata = _RemovedTableMetadata(
-                data=None,  # we don't care about the old data
+                data=pd.DataFrame(),  # we don't care about the old data
                 primary_key=self.get_primary_key(table),
                 fks_to_parents=self.get_foreign_keys(table),
                 fks_from_children=self._get_user_defined_fks_to_table(table),
