@@ -60,8 +60,8 @@ class ExtractorConfig:
     does a 'SELECT * FROM table LIMIT <N>' based on the provided
     `target_row_count`.
 
-    If using "random" sampling, the extractor will attempt to
-    random leaf table rows randomly, however different dialects
+    If using "random" sampling, the extractor will attempt to select
+    leaf table rows randomly, however different dialects
     have different support for this. If the "random" sampling fails,
     the extractor will fall back to the "contiguous" method.
     """
