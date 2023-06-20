@@ -945,7 +945,11 @@ class MultiTable:
                 filename = f"source_{table}.csv"
                 out_path = self._working_dir / filename
                 df = self.relational_data.get_table_data(table)
-                df.to_csv(out_path, index=False)
+                df.to_csv(
+                    out_path,
+                    index=False,
+                    columns=self.relational_data.get_table_columns(table),
+                )
                 tar.add(out_path, arcname=filename)
         self._artifact_collection.upload_source_archive(
             self._project, str(archive_path)
