@@ -10,7 +10,6 @@ from gretel_trainer.relational.core import ForeignKey, RelationalData
 @dataclass
 class BackupRelationalDataTable:
     primary_key: list[str]
-    columns: list[str]
     invented_table_metadata: Optional[dict[str, Any]] = None
 
 
@@ -53,7 +52,6 @@ class BackupRelationalData:
         for table in rel_data.list_all_tables():
             backup_table = BackupRelationalDataTable(
                 primary_key=rel_data.get_primary_key(table),
-                columns=rel_data.get_table_columns(table),
             )
             if (
                 invented_table_metadata := rel_data.get_invented_table_metadata(table)
