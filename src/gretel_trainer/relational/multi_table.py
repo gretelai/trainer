@@ -103,10 +103,11 @@ class MultiTable:
     ):
         self._strategy = _validate_strategy(strategy)
         if gretel_model is not None:
-            logger.warning(
-                "The `gretel_model` argument is deprecated and will be removed in a future release. "
-                "Going forward you should provide a config to `train_synthetics`."
-            )
+            if backup is None:
+                logger.warning(
+                    "The `gretel_model` argument is deprecated and will be removed in a future release. "
+                    "Going forward you should provide a config to `train_synthetics`."
+                )
             model_name, model_config = self._validate_gretel_model(gretel_model)
             self._gretel_model = model_name
             self._model_config = model_config
