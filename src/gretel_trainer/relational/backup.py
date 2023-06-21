@@ -11,7 +11,6 @@ from gretel_trainer.relational.json import InventedTableMetadata, ProducerMetada
 @dataclass
 class BackupRelationalDataTable:
     primary_key: list[str]
-    columns: list[str]
     invented_table_metadata: Optional[dict[str, Any]] = None
     producer_metadata: Optional[dict[str, Any]] = None
 
@@ -45,7 +44,6 @@ class BackupRelationalData:
         for table in rel_data.list_all_tables(Scope.ALL):
             tables[table] = BackupRelationalDataTable(
                 primary_key=rel_data.get_primary_key(table),
-                columns=rel_data.get_table_columns(table),
                 invented_table_metadata=_optionally_as_dict(
                     rel_data.get_invented_table_metadata(table)
                 ),

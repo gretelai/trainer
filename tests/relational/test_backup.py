@@ -18,11 +18,9 @@ def test_backup_relational_data(trips):
         tables={
             "vehicle_types": BackupRelationalDataTable(
                 primary_key=["id"],
-                columns=["id", "name"],
             ),
             "trips": BackupRelationalDataTable(
                 primary_key=["id"],
-                columns=["id", "purpose", "vehicle_type_id"],
             ),
         },
         foreign_keys=[
@@ -41,16 +39,9 @@ def test_backup_relational_data(trips):
 def test_backup_relational_data_with_json(documents):
     expected = BackupRelationalData(
         tables={
-            "users": BackupRelationalDataTable(
-                primary_key=["id"], columns=["id", "name"]
-            ),
+            "users": BackupRelationalDataTable(primary_key=["id"]),
             "purchases": BackupRelationalDataTable(
                 primary_key=["id"],
-                columns=[
-                    "id",
-                    "user_id",
-                    "data",
-                ],
                 producer_metadata={
                     "invented_root_table_name": "purchases-sfx",
                     "table_name_mappings": {
@@ -61,14 +52,6 @@ def test_backup_relational_data_with_json(documents):
             ),
             "purchases-sfx": BackupRelationalDataTable(
                 primary_key=["id", "~PRIMARY_KEY_ID~"],
-                columns=[
-                    "~PRIMARY_KEY_ID~",
-                    "id",
-                    "user_id",
-                    "data>item",
-                    "data>cost",
-                    "data>details>color",
-                ],
                 invented_table_metadata={
                     "invented_root_table_name": "purchases-sfx",
                     "original_table_name": "purchases",
@@ -77,16 +60,13 @@ def test_backup_relational_data_with_json(documents):
             ),
             "purchases-data-years-sfx": BackupRelationalDataTable(
                 primary_key=["~PRIMARY_KEY_ID~"],
-                columns=["~PRIMARY_KEY_ID~", "purchases~id", "content", "array~order"],
                 invented_table_metadata={
                     "invented_root_table_name": "purchases-sfx",
                     "original_table_name": "purchases",
                     "empty": False,
                 },
             ),
-            "payments": BackupRelationalDataTable(
-                primary_key=["id"], columns=["id", "purchase_id", "amount"]
-            ),
+            "payments": BackupRelationalDataTable(primary_key=["id"]),
         },
         foreign_keys=[
             BackupForeignKey(
@@ -118,11 +98,9 @@ def test_backup():
         tables={
             "customer": BackupRelationalDataTable(
                 primary_key=["id"],
-                columns=["a", "b", "c"],
             ),
             "address": BackupRelationalDataTable(
                 primary_key=[],
-                columns=["x", "y", "z"],
             ),
         },
         foreign_keys=[
