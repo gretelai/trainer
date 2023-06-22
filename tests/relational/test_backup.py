@@ -8,7 +8,6 @@ from gretel_trainer.relational.backup import (
     BackupGenerate,
     BackupRelationalData,
     BackupRelationalDataTable,
-    BackupRelationalJson,
     BackupSyntheticsTrain,
     BackupTransformsTrain,
 )
@@ -32,7 +31,6 @@ def test_backup_relational_data(trips):
                 referred_columns=["id"],
             )
         ],
-        relational_jsons={},
     )
 
     assert BackupRelationalData.from_relational_data(trips) == expected
@@ -42,6 +40,16 @@ def test_backup_relational_data_with_json(documents):
     expected = BackupRelationalData(
         tables={
             "users": BackupRelationalDataTable(primary_key=["id"]),
+            "purchases": BackupRelationalDataTable(
+                primary_key=["id"],
+                producer_metadata={
+                    "invented_root_table_name": "purchases-sfx",
+                    "table_name_mappings": {
+                        "purchases": "purchases-sfx",
+                        "purchases^data>years": "purchases-data-years-sfx",
+                    },
+                },
+            ),
             "purchases-sfx": BackupRelationalDataTable(
                 primary_key=["id", "~PRIMARY_KEY_ID~"],
                 invented_table_metadata={
@@ -80,17 +88,6 @@ def test_backup_relational_data_with_json(documents):
                 referred_columns=["~PRIMARY_KEY_ID~"],
             ),
         ],
-        relational_jsons={
-            "purchases": BackupRelationalJson(
-                original_table_name="purchases",
-                original_primary_key=["id"],
-                original_columns=["id", "user_id", "data"],
-                table_name_mappings={
-                    "purchases": "purchases-sfx",
-                    "purchases^data>years": "purchases-data-years-sfx",
-                },
-            ),
-        },
     )
 
     assert BackupRelationalData.from_relational_data(documents) == expected
@@ -114,7 +111,6 @@ def test_backup():
                 referred_columns=["id"],
             )
         ],
-        relational_jsons={},
     )
     backup_classify = BackupClassify(
         model_ids={

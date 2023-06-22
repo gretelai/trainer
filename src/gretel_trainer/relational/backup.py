@@ -1,16 +1,18 @@
 from __future__ import annotations
 
 from dataclasses import asdict, dataclass
-from typing import Any, Optional
+from typing import Any, Optional, Union
 
 from gretel_trainer.relational.artifacts import ArtifactCollection
-from gretel_trainer.relational.core import ForeignKey, RelationalData
+from gretel_trainer.relational.core import ForeignKey, RelationalData, Scope
+from gretel_trainer.relational.json import InventedTableMetadata, ProducerMetadata
 
 
 @dataclass
 class BackupRelationalDataTable:
     primary_key: list[str]
     invented_table_metadata: Optional[dict[str, Any]] = None
+    producer_metadata: Optional[dict[str, Any]] = None
 
 
 @dataclass
@@ -31,49 +33,44 @@ class BackupForeignKey:
 
 
 @dataclass
-class BackupRelationalJson:
-    original_table_name: str
-    original_primary_key: list[str]
-    original_columns: list[str]
-    table_name_mappings: dict[str, str]
-
-
-@dataclass
 class BackupRelationalData:
     tables: dict[str, BackupRelationalDataTable]
     foreign_keys: list[BackupForeignKey]
-    relational_jsons: dict[str, BackupRelationalJson]
 
     @classmethod
     def from_relational_data(cls, rel_data: RelationalData) -> BackupRelationalData:
         tables = {}
         foreign_keys = []
-        relational_jsons = {}
-        for table in rel_data.list_all_tables():
-            backup_table = BackupRelationalDataTable(
+        for table in rel_data.list_all_tables(Scope.ALL):
+            tables[table] = BackupRelationalDataTable(
                 primary_key=rel_data.get_primary_key(table),
+                invented_table_metadata=_optionally_as_dict(
+                    rel_data.get_invented_table_metadata(table)
+                ),
+                producer_metadata=_optionally_as_dict(
+                    rel_data.get_producer_metadata(table)
+                ),
             )
-            if (
-                invented_table_metadata := rel_data.get_invented_table_metadata(table)
-            ) is not None:
-                backup_table.invented_table_metadata = asdict(invented_table_metadata)
-            tables[table] = backup_table
-            foreign_keys.extend(
-                [
-                    BackupForeignKey.from_fk(key)
-                    for key in rel_data.get_foreign_keys(table)
-                ]
-            )
-        for key, rel_json in rel_data.relational_jsons.items():
-            relational_jsons[key] = BackupRelationalJson(
-                original_table_name=rel_json.original_table_name,
-                original_primary_key=rel_json.original_primary_key,
-                original_columns=rel_json.original_columns,
-                table_name_mappings=rel_json.table_name_mappings,
-            )
-        return BackupRelationalData(
-            tables=tables, foreign_keys=foreign_keys, relational_jsons=relational_jsons
-        )
+
+            # Producer tables delegate their foreign keys to root invented tables.
+            # We exclude producers here to avoid adding duplicate foreign keys.
+            if not rel_data.is_producer_of_invented_tables(table):
+                foreign_keys.extend(
+                    [
+                        BackupForeignKey.from_fk(key)
+                        for key in rel_data.get_foreign_keys(table)
+                    ]
+                )
+        return BackupRelationalData(tables=tables, foreign_keys=foreign_keys)
+
+
+def _optionally_as_dict(
+    metadata: Optional[Union[InventedTableMetadata, ProducerMetadata]]
+) -> Optional[dict[str, Any]]:
+    if metadata is None:
+        return None
+
+    return asdict(metadata)
 
 
 @dataclass
@@ -137,10 +134,6 @@ class Backup:
                 )
                 for fk in relational_data.get("foreign_keys", [])
             ],
-            relational_jsons={
-                k: BackupRelationalJson(**v)
-                for k, v in relational_data.get("relational_jsons", {}).items()
-            },
         )
 
         backup = Backup(
