@@ -44,7 +44,7 @@ def test_train_transforms_only_includes_specified_tables(ecom, tmpdir, project):
     assert set(transforms_train.models.keys()) == {"users"}
     project.create_model_obj.assert_called_with(
         model_config=ANY,  # a tailored transforms config, in dict form
-        data_source=f"{tmpdir}/transforms_train_users.csv",
+        data_source=f"{tmpdir}/users.csv",
     )
 
 

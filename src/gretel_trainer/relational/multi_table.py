@@ -575,18 +575,9 @@ class MultiTable:
         self, configs: dict[str, GretelModelConfig]
     ) -> None:
         for table, config in configs.items():
-            transform_config = make_transform_config(
-                self.relational_data, table, config
-            )
-
-            # Ensure consistent, friendly data source names in Console
-            table_data = self.relational_data.get_table_data(table)
-            transforms_train_path = self._working_dir / f"transforms_train_{table}.csv"
-            table_data.to_csv(transforms_train_path, index=False)
-
-            # Create model
             model = self._project.create_model_obj(
-                model_config=transform_config, data_source=str(transforms_train_path)
+                model_config=make_transform_config(self.relational_data, table, config),
+                data_source=str(self.relational_data.get_table_source(table)),
             )
             self._transforms_train.models[table] = model
 
