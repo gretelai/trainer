@@ -9,7 +9,6 @@ import pytest
 from gretel_client.projects.jobs import Status
 
 from gretel_trainer.benchmark import (
-    Comparison,
     Datatype,
     GretelGPTX,
     GretelLSTM,

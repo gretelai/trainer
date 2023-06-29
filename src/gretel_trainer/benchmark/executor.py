@@ -1,6 +1,4 @@
 from enum import Enum
-from multiprocessing.managers import DictProxy
-from pathlib import Path
 from typing import Optional, Protocol
 
 from gretel_client.projects.models import Model

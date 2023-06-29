@@ -4,10 +4,9 @@ import time
 from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
-from typing import Tuple, Type, Union
+from typing import Tuple
 
 import smart_open
-from typing_extensions import Protocol
 
 logger = logging.getLogger(__name__)
 

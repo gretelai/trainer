@@ -17,7 +17,6 @@ from gretel_trainer.benchmark.core import (
     BenchmarkConfig,
     BenchmarkException,
     Dataset,
-    log,
 )
 from gretel_trainer.benchmark.custom.datasets import CustomDataset
 from gretel_trainer.benchmark.custom.models import CustomModel

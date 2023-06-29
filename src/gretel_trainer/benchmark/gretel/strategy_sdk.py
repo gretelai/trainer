@@ -1,12 +1,10 @@
 import copy
 import gzip
-import logging
 from pathlib import Path
-from typing import Any, Dict, Optional, Tuple
+from typing import Optional
 
 import requests
 from gretel_client.projects.jobs import (
-    ACTIVE_STATES,
     END_STATES,
     Job,
     RunnerMode,
@@ -20,7 +18,6 @@ from gretel_trainer.benchmark.core import (
     BenchmarkConfig,
     BenchmarkException,
     Dataset,
-    log,
     run_out_path,
 )
 from gretel_trainer.benchmark.gretel.models import GretelModel, GretelModelConfig
