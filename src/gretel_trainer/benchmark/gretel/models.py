@@ -1,7 +1,7 @@
 import copy
 from inspect import isclass
 from pathlib import Path
-from typing import Dict, Optional, Type, Union, cast
+from typing import Optional, Type, Union, cast
 
 from gretel_client.projects.exceptions import ModelConfigError
 from gretel_client.projects.models import read_model_config
@@ -10,7 +10,7 @@ import gretel_trainer
 from gretel_trainer import models
 from gretel_trainer.benchmark.core import BenchmarkException, Dataset, Datatype
 
-GretelModelConfig = Union[str, Path, Dict]
+GretelModelConfig = Union[str, Path, dict]
 
 
 TRAINER_MODEL_TYPE_CONSTRUCTORS = {

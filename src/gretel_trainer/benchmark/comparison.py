@@ -5,7 +5,7 @@ from concurrent.futures import Future, ThreadPoolExecutor
 from datetime import datetime
 from inspect import isclass
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple, Type, Union, cast
+from typing import Any, Optional, Type, Union, cast
 
 import pandas as pd
 from gretel_client import configure_session
@@ -47,7 +47,7 @@ ModelTypes = Union[
 ]
 
 
-class RunKey(Tuple[str, str]):
+class RunKey(tuple[str, str]):
     RUN_IDENTIFIER_SEPARATOR = "-"
 
     @property
@@ -76,13 +76,13 @@ FutureKeyT = Union[str, RunKey]
 
 def compare(
     *,
-    datasets: List[DatasetTypes],
-    models: List[ModelTypes],
+    datasets: list[DatasetTypes],
+    models: list[ModelTypes],
     project_display_name: Optional[str] = None,
     trainer: bool = False,
     refresh_interval: int = 15,
     working_dir: Optional[str] = None,
-    additional_report_scores: Optional[List[str]] = None,
+    additional_report_scores: Optional[list[str]] = None,
 ) -> Comparison:
     comparison = Comparison(
         datasets=datasets,
@@ -100,13 +100,13 @@ class Comparison:
     def __init__(
         self,
         *,
-        datasets: List[DatasetTypes],
-        models: List[ModelTypes],
+        datasets: list[DatasetTypes],
+        models: list[ModelTypes],
         project_display_name: Optional[str] = None,
         trainer: bool = False,
         refresh_interval: int = 15,
         working_dir: Optional[str] = None,
-        additional_report_scores: Optional[List[str]] = None,
+        additional_report_scores: Optional[list[str]] = None,
     ):
         model_instances = [
             cast(Union[GretelModel, CustomModel], m() if isclass(m) else m)
@@ -134,11 +134,11 @@ class Comparison:
         self.datasets = [
             _make_dataset(dataset, self.config.working_dir) for dataset in datasets
         ]
-        self._gretel_executors: Dict[RunKey, Executor] = {}
-        self._custom_executors: Dict[RunKey, Executor] = {}
-        self.trainer_project_names: Dict[str, str] = {}
+        self._gretel_executors: dict[RunKey, Executor] = {}
+        self._custom_executors: dict[RunKey, Executor] = {}
+        self.trainer_project_names: dict[str, str] = {}
         self.thread_pool = ThreadPoolExecutor(5)
-        self.futures: Dict[FutureKeyT, Future] = {}
+        self.futures: dict[FutureKeyT, Future] = {}
 
         self._report_scores = {
             score_name: ALL_REPORT_SCORES[score_name]
@@ -146,7 +146,7 @@ class Comparison:
         }
 
     @property
-    def executors(self) -> Dict[RunKey, Executor]:
+    def executors(self) -> dict[RunKey, Executor]:
         return self._gretel_executors | self._custom_executors
 
     def _make_project(self) -> Project:
@@ -202,7 +202,7 @@ class Comparison:
         [future.result() for future in self.futures.values()]
         return self
 
-    def whats_happening(self) -> Dict[str, str]:
+    def whats_happening(self) -> dict[str, str]:
         return {
             str(key): self._basic_status(future) for key, future in self.futures.items()
         }
@@ -243,7 +243,7 @@ class Comparison:
             for project in search_projects(query=self.config.project_display_name):
                 project.delete()
 
-    def _result_dict(self, run_key: RunKey) -> Dict[str, Any]:
+    def _result_dict(self, run_key: RunKey) -> dict[str, Any]:
         executor = self.executors[run_key]
         model_name, dataset_name = run_key
 
@@ -360,7 +360,7 @@ def _run_gretel(executor: Executor) -> None:
     executor.run()
 
 
-def _run_custom(executors: List[Executor]) -> None:
+def _run_custom(executors: list[Executor]) -> None:
     for executor in executors:
         executor.run()
 
@@ -388,9 +388,9 @@ def _make_run_key(model: Union[GretelModel, CustomModel], dataset: Dataset) -> R
 
 def _validate_setup(
     config: BenchmarkConfig,
-    gretel_models: List[GretelModel],
-    custom_models: List[CustomModel],
-    all_datasets: List[DatasetTypes],
+    gretel_models: list[GretelModel],
+    custom_models: list[CustomModel],
+    all_datasets: list[DatasetTypes],
 ) -> None:
     dataset_names = [d.name for d in all_datasets]
     model_names = [_model_name(m) for m in (gretel_models + custom_models)]
@@ -403,12 +403,12 @@ def _validate_setup(
         _validate_sdk_setup(gretel_models)
 
 
-def _ensure_unique(col: List[str], kind: str) -> None:
+def _ensure_unique(col: list[str], kind: str) -> None:
     if len(set(col)) < len(col):
         raise BenchmarkException(f"{kind} must have unique names")
 
 
-def _validate_trainer_setup(gretel_models: List[GretelModel]) -> None:
+def _validate_trainer_setup(gretel_models: list[GretelModel]) -> None:
     unsupported_models = []
     for model in gretel_models:
         if model.trainer_model_type is None:
@@ -421,7 +421,7 @@ def _validate_trainer_setup(gretel_models: List[GretelModel]) -> None:
         raise BenchmarkException("Invalid configuration")
 
 
-def _validate_sdk_setup(gretel_models: List[GretelModel]) -> None:
+def _validate_sdk_setup(gretel_models: list[GretelModel]) -> None:
     if any(isinstance(m, GretelAuto) for m in gretel_models):
         logger.error(
             "GretelAuto is only supported when using Trainer. "

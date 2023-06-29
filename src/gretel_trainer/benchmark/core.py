@@ -4,7 +4,6 @@ import time
 from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
-from typing import Tuple
 
 import smart_open
 
@@ -61,7 +60,7 @@ def log(run_identifier: str, msg: str) -> None:
     logger.info(f"{run_identifier} - {msg}")
 
 
-def get_data_shape(path: str, delimiter: str = ",") -> Tuple[int, int]:
+def get_data_shape(path: str, delimiter: str = ",") -> tuple[int, int]:
     with smart_open.open(path) as f:
         reader = csv.reader(f, delimiter=delimiter)
         cols = len(next(reader))
