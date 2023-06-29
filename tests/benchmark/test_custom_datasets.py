@@ -8,12 +8,13 @@ from gretel_trainer.benchmark.core import BenchmarkException
 
 def test_making_good_datasets(df):
     str_datatype = make_dataset(df, datatype="tabular", name="via_str")
-    enum_datatype = make_dataset(df, datatype=Datatype.tabular, name="via_str")
+    capital_str_datatype = make_dataset(df, datatype="TABULAR", name="via_str")
+    enum_datatype = make_dataset(df, datatype=Datatype.TABULAR, name="via_str")
     with tempfile.NamedTemporaryFile() as f:
         df.to_csv(f.name, index=False)
         file_source = make_dataset(f.name, datatype="tabular", name="from_file")
 
-    for dataset in [str_datatype, enum_datatype, file_source]:
+    for dataset in [str_datatype, capital_str_datatype, enum_datatype, file_source]:
         assert dataset.row_count == 3
         assert dataset.column_count == 2
 

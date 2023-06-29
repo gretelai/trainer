@@ -256,7 +256,7 @@ def test_gptx_skips_too_many_columns(working_dir, project):
         data={"english": ["hello", "world"], "spanish": ["hola", "mundo"]}
     )
     dataset = make_dataset(
-        two_columns, datatype=Datatype.natural_language, name="skippy"
+        two_columns, datatype=Datatype.NATURAL_LANGUAGE, name="skippy"
     )
 
     comparison = compare(
@@ -271,7 +271,7 @@ def test_gptx_skips_too_many_columns(working_dir, project):
 
 def test_gptx_skips_non_natural_language_datatype(working_dir, project):
     tabular = pd.DataFrame(data={"foo": [1, 2, 3]})
-    dataset = make_dataset(tabular, datatype=Datatype.tabular, name="skippy")
+    dataset = make_dataset(tabular, datatype=Datatype.TABULAR, name="skippy")
 
     comparison = compare(
         datasets=[dataset],
@@ -285,7 +285,7 @@ def test_gptx_skips_non_natural_language_datatype(working_dir, project):
 
 def test_lstm_skips_datasets_with_over_150_columns(working_dir, project):
     jumbo = pd.DataFrame(columns=list(range(151)))
-    dataset = make_dataset(jumbo, datatype=Datatype.tabular, name="skippy")
+    dataset = make_dataset(jumbo, datatype=Datatype.TABULAR, name="skippy")
 
     comparison = compare(
         datasets=[dataset],

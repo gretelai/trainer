@@ -94,6 +94,6 @@ class GretelDatasetRepo:
 
 def _coerce_datatype(datatype: str) -> Datatype:
     if datatype in ("tabular_numeric", "tabular_mixed"):
-        return Datatype.tabular
+        return Datatype.TABULAR
     else:
         return Datatype(datatype)

@@ -15,9 +15,9 @@ class BenchmarkException(Exception):
 
 
 class Datatype(str, Enum):
-    tabular = "tabular"
-    time_series = "time_series"
-    natural_language = "natural_language"
+    TABULAR = "tabular"
+    TIME_SERIES = "time_series"
+    NATURAL_LANGUAGE = "natural_language"
 
 
 @dataclass

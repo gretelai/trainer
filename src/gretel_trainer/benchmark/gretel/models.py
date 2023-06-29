@@ -54,7 +54,7 @@ class GretelModel:
         elif self.model_key == "gpt_x":
             return (
                 dataset.column_count == 1
-                and dataset.datatype == Datatype.natural_language
+                and dataset.datatype == Datatype.NATURAL_LANGUAGE
             )
         else:
             return True

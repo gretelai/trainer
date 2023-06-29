@@ -34,8 +34,8 @@ def _to_datatype(d: Union[str, Datatype]) -> Datatype:
     if isinstance(d, Datatype):
         return d
     try:
-        return Datatype[d]
-    except KeyError:
+        return Datatype(d.lower())
+    except ValueError:
         raise BenchmarkException("Unrecognized datatype requested")
 
 
