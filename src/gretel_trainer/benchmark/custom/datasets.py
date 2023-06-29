@@ -73,6 +73,12 @@ def make_dataset(
     logger.warning(
         "`make_dataset` is deprecated and will be removed in a future release. Please use `create_dataset` instead."
     )
+
+    if not isinstance(sources, list):
+        raise BenchmarkException(
+            "Did not receive list argument to `sources`, but instead of adjusting, please use `create_dataset` instead of this deprecated function."
+        )
+
     if len(sources) > 1:
         raise BenchmarkException(
             "`make_dataset` no longer supports multiple sources. Please create separate datasets using `create_dataset`."
