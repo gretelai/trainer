@@ -128,7 +128,8 @@ class Comparison:
 
         self.config.working_dir.mkdir(exist_ok=True)
         self.datasets = [
-            _make_dataset(dataset, self.config.working_dir) for dataset in datasets
+            _standardize_dataset(dataset, self.config.working_dir)
+            for dataset in datasets
         ]
         self._gretel_executors: dict[RunKey, Executor] = {}
         self._custom_executors: dict[RunKey, Executor] = {}
@@ -361,7 +362,7 @@ def _run_custom(executors: list[Executor]) -> None:
         executor.run()
 
 
-def _make_dataset(dataset: DatasetTypes, working_dir: Path) -> Dataset:
+def _standardize_dataset(dataset: DatasetTypes, working_dir: Path) -> Dataset:
     source = dataset.data_source
     if isinstance(source, pd.DataFrame):
         csv_path = working_dir / f"{dataset.name}.csv"

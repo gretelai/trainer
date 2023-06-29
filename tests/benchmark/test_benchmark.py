@@ -13,7 +13,7 @@ from gretel_trainer.benchmark import (
     GretelGPTX,
     GretelLSTM,
     compare,
-    make_dataset,
+    create_dataset,
 )
 from tests.benchmark.mocks import (
     DoNothingModel,
@@ -58,7 +58,7 @@ def test_run_with_custom_csv_dataset(working_dir, project, evaluate_report_path,
     with tempfile.NamedTemporaryFile() as f:
         df.to_csv(f.name, index=False)
 
-        dataset = make_dataset(f.name, datatype="tabular", name="pets")
+        dataset = create_dataset(f.name, datatype="tabular", name="pets")
 
         comparison = compare(
             datasets=[dataset],
@@ -86,7 +86,7 @@ def test_run_with_custom_psv_dataset(working_dir, project, evaluate_report_path,
     with tempfile.NamedTemporaryFile() as f:
         df.to_csv(f.name, sep="|", index=False)
 
-        dataset = make_dataset(f.name, datatype="tabular", name="pets", delimiter="|")
+        dataset = create_dataset(f.name, datatype="tabular", name="pets", delimiter="|")
 
         comparison = compare(
             datasets=[dataset],
@@ -113,7 +113,7 @@ def test_run_with_custom_dataframe_dataset(
     evaluate_model.get_artifact_link.return_value = evaluate_report_path
     project.create_model_obj.side_effect = [evaluate_model]
 
-    dataset = make_dataset(df, datatype="tabular", name="pets")
+    dataset = create_dataset(df, datatype="tabular", name="pets")
 
     comparison = compare(
         datasets=[dataset],
@@ -235,7 +235,7 @@ def test_custom_gretel_model_configs_do_not_overwrite_each_other(
     )
     project.create_model_obj.return_value = model
 
-    pets = make_dataset(df, datatype="tabular", name="pets")
+    pets = create_dataset(df, datatype="tabular", name="pets")
 
     comparison = compare(
         datasets=[iris, pets],
@@ -255,7 +255,7 @@ def test_gptx_skips_too_many_columns(working_dir, project):
     two_columns = pd.DataFrame(
         data={"english": ["hello", "world"], "spanish": ["hola", "mundo"]}
     )
-    dataset = make_dataset(
+    dataset = create_dataset(
         two_columns, datatype=Datatype.NATURAL_LANGUAGE, name="skippy"
     )
 
@@ -271,7 +271,7 @@ def test_gptx_skips_too_many_columns(working_dir, project):
 
 def test_gptx_skips_non_natural_language_datatype(working_dir, project):
     tabular = pd.DataFrame(data={"foo": [1, 2, 3]})
-    dataset = make_dataset(tabular, datatype=Datatype.TABULAR, name="skippy")
+    dataset = create_dataset(tabular, datatype=Datatype.TABULAR, name="skippy")
 
     comparison = compare(
         datasets=[dataset],
@@ -285,7 +285,7 @@ def test_gptx_skips_non_natural_language_datatype(working_dir, project):
 
 def test_lstm_skips_datasets_with_over_150_columns(working_dir, project):
     jumbo = pd.DataFrame(columns=list(range(151)))
-    dataset = make_dataset(jumbo, datatype=Datatype.TABULAR, name="skippy")
+    dataset = create_dataset(jumbo, datatype=Datatype.TABULAR, name="skippy")
 
     comparison = compare(
         datasets=[dataset],

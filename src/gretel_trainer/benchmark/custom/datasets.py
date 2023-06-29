@@ -1,11 +1,15 @@
+import logging
 import os
+import uuid
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Union
+from typing import Optional, Union
 
 import pandas as pd
 
 from gretel_trainer.benchmark.core import BenchmarkException, Datatype, get_data_shape
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -39,7 +43,7 @@ def _to_datatype(d: Union[str, Datatype]) -> Datatype:
         raise BenchmarkException("Unrecognized datatype requested")
 
 
-def make_dataset(
+def create_dataset(
     source: Union[str, pd.DataFrame],
     *,
     datatype: Union[str, Datatype],
@@ -56,4 +60,37 @@ def make_dataset(
 
     return CustomDataset(
         data_source=source, datatype=datatype, name=name, delimiter=delimiter
+    )
+
+
+def make_dataset(
+    sources: Union[list[str], list[pd.DataFrame]],
+    *,
+    datatype: Union[str, Datatype],
+    namespace: Optional[str] = None,
+    delimiter: str = ",",
+) -> CustomDataset:
+    logger.warning(
+        "`make_dataset` is deprecated and will be removed in a future release. Please use `create_dataset` instead."
+    )
+    if len(sources) > 1:
+        raise BenchmarkException(
+            "`make_dataset` no longer supports multiple sources. Please create separate datasets using `create_dataset`."
+        )
+
+    source = sources[0]
+
+    if isinstance(source, pd.DataFrame):
+        ns = namespace or "DataFrames"
+        shorthash = str(uuid.uuid4())[:8]
+        name = f"{ns}::{shorthash}"
+    else:
+        ns = f"{namespace}::" if namespace else ""
+        name = f"{ns}{source}"
+
+    return create_dataset(
+        source=source,
+        datatype=datatype,
+        name=name,
+        delimiter=delimiter,
     )
