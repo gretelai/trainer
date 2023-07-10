@@ -468,8 +468,8 @@ def test_generation_job(pets):
 
 
 def test_generation_job_seeds_go_back_multiple_generations(source_nba, synthetic_nba):
-    source_nba = next(source_nba)[0]
-    synthetic_nba = next(synthetic_nba)[0]
+    source_nba = source_nba[0]
+    synthetic_nba = synthetic_nba[0]
     output_tables = {
         "cities": ancestry.get_table_data_with_ancestors(synthetic_nba, "cities"),
         "states": ancestry.get_table_data_with_ancestors(synthetic_nba, "states"),

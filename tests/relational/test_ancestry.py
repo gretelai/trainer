@@ -101,8 +101,8 @@ def test_tpch_add_and_remove_ancestor_data(tpch):
 
 
 def test_ancestral_data_from_different_tablesets(source_nba, synthetic_nba):
-    source_nba = next(source_nba)[0]
-    _, custom_states, custom_cities, custom_teams = next(synthetic_nba)
+    source_nba = source_nba[0]
+    _, custom_states, custom_cities, custom_teams = synthetic_nba
 
     # By default, get data from source
     source_teams_with_ancestors = ancestry.get_table_data_with_ancestors(
@@ -211,7 +211,7 @@ def test_get_seed_safe_multigenerational_columns_1(pets):
 
 
 def test_get_seed_safe_multigenerational_columns_2(source_nba):
-    source_nba = next(source_nba)[0]
+    source_nba = source_nba[0]
     table_cols = ancestry.get_seed_safe_multigenerational_columns(source_nba)
 
     expected = {

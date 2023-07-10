@@ -161,7 +161,7 @@ def _setup_nba(directory: str, synthetic: bool):
         referred_columns=["id"],
     )
 
-    yield rel_data, states, cities, teams
+    return rel_data, states, cities, teams
 
 
 @pytest.fixture()
