@@ -4,10 +4,8 @@ import time
 from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
-from typing import Tuple, Type, Union
 
 import smart_open
-from typing_extensions import Protocol
 
 logger = logging.getLogger(__name__)
 
@@ -17,9 +15,9 @@ class BenchmarkException(Exception):
 
 
 class Datatype(str, Enum):
-    tabular = "tabular"
-    time_series = "time_series"
-    natural_language = "natural_language"
+    TABULAR = "tabular"
+    TIME_SERIES = "time_series"
+    NATURAL_LANGUAGE = "natural_language"
 
 
 @dataclass
@@ -62,7 +60,7 @@ def log(run_identifier: str, msg: str) -> None:
     logger.info(f"{run_identifier} - {msg}")
 
 
-def get_data_shape(path: str, delimiter: str = ",") -> Tuple[int, int]:
+def get_data_shape(path: str, delimiter: str = ",") -> tuple[int, int]:
     with smart_open.open(path) as f:
         reader = csv.reader(f, delimiter=delimiter)
         cols = len(next(reader))

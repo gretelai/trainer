@@ -13,7 +13,7 @@ def test_repo_list_datasets(repo):
 
     # querying by datatype, using enum or string
     tabular_datasets = repo.list_datasets(datatype="tabular")
-    tabular_enum_datasets = repo.list_datasets(datatype=Datatype.tabular)
+    tabular_enum_datasets = repo.list_datasets(datatype=Datatype.TABULAR)
     assert len(tabular_datasets) > 0
     assert len(tabular_datasets) == len(tabular_enum_datasets)
 

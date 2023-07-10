@@ -1,9 +1,8 @@
 from __future__ import annotations
 
 import json
-from dataclasses import dataclass, field
-from functools import cached_property, wraps
-from typing import Dict, List, Optional, Tuple, Union
+from functools import cached_property
+from typing import Optional, Union
 
 import boto3
 from botocore import UNSIGNED
@@ -13,7 +12,7 @@ from gretel_trainer.benchmark.core import BenchmarkException, Datatype, get_data
 
 
 class GretelDataset:
-    def __init__(self, name: str, datatype: Datatype, tags: List[str]):
+    def __init__(self, name: str, datatype: Datatype, tags: list[str]):
         self.name = name
         self.datatype = datatype
         self.tags = tags
@@ -31,7 +30,7 @@ class GretelDataset:
         return self._shape[1]
 
     @cached_property
-    def _shape(self) -> Tuple[int, int]:
+    def _shape(self) -> tuple[int, int]:
         return get_data_shape(self.data_source)
 
     def __repr__(self) -> str:
@@ -53,8 +52,8 @@ class GretelDatasetRepo:
     def list_datasets(
         self,
         datatype: Optional[Union[Datatype, str]] = None,
-        tags: Optional[List[str]] = None,
-    ) -> List[GretelDataset]:
+        tags: Optional[list[str]] = None,
+    ) -> list[GretelDataset]:
         matches = list(self.manifest.values())
         if datatype is not None:
             matches = [dataset for dataset in matches if dataset.datatype == datatype]
@@ -72,14 +71,14 @@ class GretelDatasetRepo:
         except KeyError:
             raise BenchmarkException(f"No dataset exists with name {name}")
 
-    def list_tags(self) -> List[str]:
+    def list_tags(self) -> list[str]:
         unique_tags = set()
         for dataset in self.manifest.values():
             for tag in dataset.tags:
                 unique_tags.add(tag)
         return list(unique_tags)
 
-    def _read_manifest(self) -> Dict[str, GretelDataset]:
+    def _read_manifest(self) -> dict[str, GretelDataset]:
         response = self.s3.get_object(Bucket=self.bucket, Key="manifest.json")
         data = response["Body"].read()
         manifest = json.loads(data)["datasets"]
@@ -95,6 +94,6 @@ class GretelDatasetRepo:
 
 def _coerce_datatype(datatype: str) -> Datatype:
     if datatype in ("tabular_numeric", "tabular_mixed"):
-        return Datatype.tabular
+        return Datatype.TABULAR
     else:
         return Datatype(datatype)

@@ -1,7 +1,5 @@
 from pathlib import Path
-from typing import Any, Dict, Optional
-
-from gretel_client.projects.projects import Project
+from typing import Optional
 
 from gretel_trainer.benchmark.core import BenchmarkConfig, Dataset, Timer, run_out_path
 from gretel_trainer.benchmark.custom.models import CustomModel
