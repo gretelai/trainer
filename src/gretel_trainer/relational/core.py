@@ -15,7 +15,6 @@ Please see the specific docs for the "RelationalData" class on how to do this.
 from __future__ import annotations
 
 import logging
-import os
 import shutil
 import tempfile
 from dataclasses import dataclass, replace
@@ -127,7 +126,7 @@ class RelationalData:
 
     def __init__(self, directory: Optional[Union[str, Path]] = None):
         self.dir = Path(directory or DEFAULT_RELATIONAL_SOURCE_DIR)
-        os.makedirs(self.dir, exist_ok=True)
+        self.dir.mkdir(parents=True, exist_ok=True)
         self.graph = networkx.DiGraph()
 
     @property

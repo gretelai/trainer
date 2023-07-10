@@ -1186,7 +1186,7 @@ def _table_trained_successfully(train_state: TransformsTrain, table: str) -> boo
 
 def _mkdir(name: str) -> Path:
     d = Path(name)
-    os.makedirs(d, exist_ok=True)
+    d.mkdir(parents=True, exist_ok=True)
     return d
 
 

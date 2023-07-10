@@ -9,7 +9,6 @@ Gretel Transforms, Classify, Synthetics, or a combination of both.
 from __future__ import annotations
 
 import logging
-import os
 from pathlib import Path
 from typing import Optional
 
@@ -96,7 +95,7 @@ class Connector:
             )
 
         storage_dir_path = Path(storage_dir)
-        os.makedirs(storage_dir_path, exist_ok=True)
+        storage_dir_path.mkdir(parents=True, exist_ok=True)
 
         extractor = TableExtractor(
             config=config, connector=self, storage_dir=storage_dir_path
