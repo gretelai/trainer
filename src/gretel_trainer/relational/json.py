@@ -4,7 +4,7 @@ import hashlib
 import logging
 import re
 from dataclasses import dataclass
-from json import JSONDecodeError, loads
+from json import JSONDecodeError, dumps, loads
 from typing import Any, Optional, Protocol, Union
 
 import numpy as np
@@ -12,8 +12,6 @@ import pandas as pd
 from unflatten import unflatten
 
 logger = logging.getLogger(__name__)
-
-PREVIEW_ROW_COUNT = 5
 
 # JSON dict to multi-column and list to multi-table
 
@@ -129,6 +127,49 @@ def make_suffix(s):
     return hashlib.sha256(s.encode("utf-8")).hexdigest()[:10]
 
 
+def jsonencode(df: pd.DataFrame, cols: list[str]) -> pd.DataFrame:
+    """
+    Returns a dataframe with the specified columns transformed such that their JSON-like
+    values can be written to CSV and later re-read back to Pandas from CSV.
+    """
+    # Save memory and return the *original dataframe* (not a copy!) if no columns to transform
+    if len(cols) == 0:
+        return df
+
+    def _jsonencode(x):
+        if isinstance(x, str):
+            return x
+        elif isinstance(x, (dict, list)):
+            return dumps(x)
+
+    copy = df.copy()
+    for col in cols:
+        copy[col] = copy[col].map(_jsonencode)
+
+    return copy
+
+
+def jsondecode(df: pd.DataFrame, cols: list[str]) -> pd.DataFrame:
+    """
+    Returns a dataframe with the specified columns parsed from JSON to Python objects.
+    """
+    # Save memory and return the *original dataframe* (not a copy!) if no columns to transform
+    if len(cols) == 0:
+        return df
+
+    def _jsondecode(obj):
+        try:
+            return loads(obj)
+        except (ValueError, TypeError, JSONDecodeError):
+            return obj
+
+    copy = df.copy()
+    for col in cols:
+        copy[col] = copy[col].map(_jsondecode)
+
+    return copy
+
+
 class _RelationalData(Protocol):
     def get_foreign_keys(
         self, table: str
@@ -165,9 +206,11 @@ def ingest(
     table_name: str,
     primary_key: list[str],
     df: pd.DataFrame,
-    json_columns: Optional[list[str]] = None,
+    json_columns: list[str],
 ) -> Optional[IngestResponseT]:
-    tables = _normalize_json([(table_name, df.copy())], [], json_columns)
+    json_decoded = jsondecode(df, json_columns)
+    tables = _normalize_json([(table_name, json_decoded)], [], json_columns)
+
     # If we created additional tables (from JSON lists) or added columns (from JSON dicts)
     if len(tables) > 1 or len(tables[0][1].columns) > len(df.columns):
         mappings = {name: sanitize_str(name) for name, _ in tables}
@@ -336,25 +379,26 @@ def get_json_columns(df: pd.DataFrame) -> list[str]:
 
     Raises an error if *all* columns are lists, as that is not currently supported.
     """
-    column_previews = {
-        col: preview_data
+    object_cols = {
+        col: data
         for col in df.columns
-        if df.dtypes[col] == "object"
-        and len(preview_data := df[col].dropna().head(PREVIEW_ROW_COUNT)) > 0
+        if df.dtypes[col] == "object" and len(data := df[col].dropna()) > 0
     }
 
-    if len(column_previews) == 0:
+    if len(object_cols) == 0:
         return []
 
     list_cols = [
-        col for col, series in column_previews.items() if series.apply(is_list).all()
+        col for col, series in object_cols.items() if series.apply(is_list).all()
     ]
 
     if len(list_cols) == len(df.columns):
         raise ValueError("Cannot accept tables with JSON lists in all columns")
 
     dict_cols = [
-        col for col, series in column_previews.items() if series.apply(is_dict).all()
+        col
+        for col, series in object_cols.items()
+        if col not in list_cols and series.apply(is_dict).all()
     ]
 
     return dict_cols + list_cols

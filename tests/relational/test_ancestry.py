@@ -101,7 +101,7 @@ def test_tpch_add_and_remove_ancestor_data(tpch):
 
 
 def test_ancestral_data_from_different_tablesets(source_nba, synthetic_nba):
-    source_nba, _, _, _ = source_nba
+    source_nba = source_nba[0]
     _, custom_states, custom_cities, custom_teams = synthetic_nba
 
     # By default, get data from source

@@ -4,18 +4,18 @@ import gretel_trainer.relational.strategies.common as common
 from gretel_trainer.relational.core import RelationalData
 
 
-def test_composite_pk_columns():
-    table = pd.DataFrame(
+def test_composite_pk_columns(tmpdir):
+    df = pd.DataFrame(
         data={
             "letter": ["a", "a", "a", "a", "b", "b", "b", "b"],
             "number": [1, 2, 3, 4, 1, 2, 3, 4],
         }
     )
-    rel_data = RelationalData()
+    rel_data = RelationalData(directory=tmpdir)
     rel_data.add_table(
         name="table",
         primary_key=["letter", "number"],
-        data=table,
+        data=df,
     )
 
     result = common.make_composite_pk_columns(
@@ -45,18 +45,18 @@ def test_composite_pk_columns():
     assert len(set(result[1])) == 4
 
 
-def test_composite_pk_columns_2():
-    table = pd.DataFrame(
+def test_composite_pk_columns_2(tmpdir):
+    df = pd.DataFrame(
         data={
             "letter": ["a", "a", "a", "a", "b", "b", "b", "b"],
             "number": [1, 2, 3, 4, 5, 6, 7, 8],
         }
     )
-    rel_data = RelationalData()
+    rel_data = RelationalData(directory=tmpdir)
     rel_data.add_table(
         name="table",
         primary_key=["letter", "number"],
-        data=table,
+        data=df,
     )
 
     result = common.make_composite_pk_columns(

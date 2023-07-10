@@ -1,7 +1,7 @@
 import pandas as pd
 import pytest
 
-from gretel_trainer.relational.core import MultiTableException, RelationalData
+from gretel_trainer.relational.core import MultiTableException
 
 
 def test_ecommerce_relational_data(ecom):
@@ -43,26 +43,28 @@ def test_mutagenesis_relational_data(mutagenesis):
     assert set(mutagenesis.get_all_key_columns("atom")) == {"atom_id", "molecule_id"}
 
 
-def test_column_metadata(pets):
+def test_column_metadata(pets, tmpfile):
     assert pets.get_table_columns("humans") == ["id", "name", "city"]
 
     # Name is a highly unique categorical field, so is excluded
     assert pets.get_safe_ancestral_seed_columns("humans") == {"id", "city"}
 
     # Update the table data such that:
-    # - id is highly unique categorical, but still the PK
+    # - id is highly unique categorical (_ to force string instead of int), but still the PK
     # - name is no longer highly unique
     # - city is highly NaN
+    pd.DataFrame(
+        data={
+            "id": ["1_", "2_", "3_"],
+            "name": ["n", "n", "n"],
+            "city": [None, None, "Chicago"],
+        }
+    ).to_csv(tmpfile.name, index=False)
     pets.update_table_data(
         "humans",
-        pd.DataFrame(
-            data={
-                "id": ["1", "2", "3"],
-                "name": ["n", "n", "n"],
-                "city": [None, None, "Chicago"],
-            }
-        ),
+        tmpfile.name,
     )
+
     assert pets.get_safe_ancestral_seed_columns("humans") == {"id", "name"}
 
     # Resetting the primary key refreshes the cache state
@@ -87,95 +89,77 @@ def test_column_metadata(pets):
     assert pets.get_safe_ancestral_seed_columns("humans") == {"id", "name"}
 
 
-def test_adding_and_removing_foreign_keys():
-    rel_data = RelationalData()
-    rel_data.add_table(
-        name="users", primary_key="id", data=pd.DataFrame(data={"id": [1, 2, 3]})
+def test_adding_and_removing_foreign_keys(pets):
+    # pets has a foreign key defined out of the box.
+    # First lets successfully remove it and re-add it.
+    assert len(pets.get_foreign_keys("pets")) == 1
+
+    pets.remove_foreign_key_constraint(table="pets", constrained_columns=["human_id"])
+    assert len(pets.get_foreign_keys("pets")) == 0
+
+    pets.add_foreign_key_constraint(
+        table="pets",
+        constrained_columns=["human_id"],
+        referred_table="humans",
+        referred_columns=["id"],
     )
-    rel_data.add_table(
-        name="events",
-        primary_key="id",
-        data=pd.DataFrame(data={"id": [1, 2, 3], "user_id": [1, 2, 3]}),
-    )
+    assert len(pets.get_foreign_keys("pets")) == 1
+
+    # Now we'll make some assertions about our defense
 
     # Cannot add to an unrecognized table
     with pytest.raises(MultiTableException):
-        rel_data.add_foreign_key_constraint(
+        pets.add_foreign_key_constraint(
             table="unrecognized",
             constrained_columns=["user_id"],
-            referred_table="users",
+            referred_table="humans",
             referred_columns=["id"],
         )
 
     # Cannot add to an unrecognized referred table
     with pytest.raises(MultiTableException):
-        rel_data.add_foreign_key_constraint(
-            table="events",
-            constrained_columns=["user_id"],
+        pets.add_foreign_key_constraint(
+            table="pets",
+            constrained_columns=["human_id"],
             referred_table="unrecognized",
             referred_columns=["id"],
         )
 
     # Cannot add unrecognized columns
     with pytest.raises(MultiTableException):
-        rel_data.add_foreign_key_constraint(
-            table="events",
-            constrained_columns=["user_id"],
-            referred_table="users",
+        pets.add_foreign_key_constraint(
+            table="pets",
+            constrained_columns=["human_id"],
+            referred_table="humans",
             referred_columns=["unrecognized"],
         )
     with pytest.raises(MultiTableException):
-        rel_data.add_foreign_key_constraint(
-            table="events",
+        pets.add_foreign_key_constraint(
+            table="pets",
             constrained_columns=["unrecognized"],
-            referred_table="users",
+            referred_table="humans",
             referred_columns=["id"],
         )
 
-    # Successful add
-    rel_data.add_foreign_key_constraint(
-        table="events",
-        constrained_columns=["user_id"],
-        referred_table="users",
-        referred_columns=["id"],
-    )
-    assert len(rel_data.get_foreign_keys("events")) == 1
-
     # Cannot remove from unrecognized table
     with pytest.raises(MultiTableException):
-        rel_data.remove_foreign_key_constraint(
+        pets.remove_foreign_key_constraint(
             table="unrecognized", constrained_columns=["id"]
         )
 
     # Cannot remove a non-existent key
     with pytest.raises(MultiTableException):
-        rel_data.remove_foreign_key_constraint(
-            table="events", constrained_columns=["id"]
-        )
-
-    # Successful remove
-    rel_data.remove_foreign_key_constraint(
-        table="events", constrained_columns=["user_id"]
-    )
-    assert len(rel_data.get_foreign_keys("events")) == 0
+        pets.remove_foreign_key_constraint(table="pets", constrained_columns=["id"])
 
 
-def test_add_remove_foreign_key_shorthand():
-    rel_data = RelationalData()
-    rel_data.add_table(
-        name="users", primary_key="id", data=pd.DataFrame(data={"id": [1, 2, 3]})
-    )
-    rel_data.add_table(
-        name="events",
-        primary_key="id",
-        data=pd.DataFrame(data={"id": [1, 2, 3], "user_id": [1, 2, 3]}),
-    )
+def test_add_remove_foreign_key_shorthand(pets):
+    assert len(pets.get_foreign_keys("pets")) == 1
 
-    rel_data.add_foreign_key(foreign_key="events.user_id", referencing="users.id")
-    assert len(rel_data.get_foreign_keys("events")) == 1
+    pets.remove_foreign_key("pets.human_id")
+    assert len(pets.get_foreign_keys("pets")) == 0
 
-    rel_data.remove_foreign_key("events.user_id")
-    assert len(rel_data.get_foreign_keys("events")) == 0
+    pets.add_foreign_key(foreign_key="pets.human_id", referencing="humans.id")
+    assert len(pets.get_foreign_keys("pets")) == 1
 
 
 def test_set_primary_key(ecom):

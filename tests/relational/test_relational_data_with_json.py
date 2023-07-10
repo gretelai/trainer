@@ -1,3 +1,5 @@
+import tempfile
+
 import pandas as pd
 import pandas.testing as pdtest
 import pytest
@@ -7,14 +9,14 @@ from gretel_trainer.relational.json import get_json_columns
 
 
 @pytest.fixture
-def bball():
+def bball(tmpdir):
     bball_jsonl = """
     {"name": "LeBron James", "age": 38, "draft": {"year": 2003}, "teams": ["Cavaliers", "Heat", "Lakers"], "suspensions": []}
     {"name": "Steph Curry", "age": 35, "draft": {"year": 2009, "college": "Davidson"}, "teams": ["Warriors"], "suspensions": []}
     """
     bball_df = pd.read_json(bball_jsonl, lines=True)
 
-    rel_data = RelationalData()
+    rel_data = RelationalData(directory=tmpdir)
     rel_data.add_table(name="bball", primary_key=None, data=bball_df)
 
     return rel_data
@@ -190,13 +192,11 @@ def test_invented_json_column_names(documents, bball):
     ]
 
 
-def test_primary_key(documents, bball):
-    # The root invented table's primary key is a composite key that includes the source PK and an invented column
+def test_set_some_primary_key_to_none(documents, bball):
+    # The producer table has a single column primary key,
+    # so the root invented table has a composite key that includes the source PK and an invented column
     assert documents.get_primary_key("purchases") == ["id"]
     assert documents.get_primary_key("purchases-sfx") == ["id", "~PRIMARY_KEY_ID~"]
-
-    assert bball.get_primary_key("bball") == []
-    assert bball.get_primary_key("bball-sfx") == ["~PRIMARY_KEY_ID~"]
 
     # Setting an existing primary key to None puts us in the correct state
     assert len(documents.list_all_tables(Scope.ALL)) == 5
@@ -214,6 +214,13 @@ def test_primary_key(documents, bball):
         )
     ]
     assert documents.get_foreign_keys("payments") == original_payments_fks
+
+
+def test_set_none_primary_key_to_some_value(bball):
+    # The producer table has no primary key,
+    # so the root invented table has a single invented key column
+    assert bball.get_primary_key("bball") == []
+    assert bball.get_primary_key("bball-sfx") == ["~PRIMARY_KEY_ID~"]
 
     # Setting a None primary key to some column puts us in the correct state
     assert len(bball.list_all_tables(Scope.ALL)) == 4
@@ -407,30 +414,31 @@ def test_update_data_existing_flat_to_json(documents):
             "data": ["pen", "paint", "ink", "pen", "paint", "ink"],
         }
     )
-    rel_data = RelationalData()
-    rel_data.add_table(
-        name="users", primary_key="id", data=documents.get_table_data("users")
-    )
-    rel_data.add_table(name="purchases", primary_key="id", data=flat_purchases_df)
-    rel_data.add_table(
-        name="payments", primary_key="id", data=documents.get_table_data("payments")
-    )
-    rel_data.add_foreign_key_constraint(
-        table="purchases",
-        constrained_columns=["user_id"],
-        referred_table="users",
-        referred_columns=["id"],
-    )
-    rel_data.add_foreign_key_constraint(
-        table="payments",
-        constrained_columns=["purchase_id"],
-        referred_table="purchases",
-        referred_columns=["id"],
-    )
-    assert len(rel_data.list_all_tables(Scope.ALL)) == 3
-    assert len(rel_data.list_all_tables(Scope.MODELABLE)) == 3
+    with tempfile.TemporaryDirectory() as tmpdir:
+        rel_data = RelationalData(directory=tmpdir)
+        rel_data.add_table(
+            name="users", primary_key="id", data=documents.get_table_data("users")
+        )
+        rel_data.add_table(name="purchases", primary_key="id", data=flat_purchases_df)
+        rel_data.add_table(
+            name="payments", primary_key="id", data=documents.get_table_data("payments")
+        )
+        rel_data.add_foreign_key_constraint(
+            table="purchases",
+            constrained_columns=["user_id"],
+            referred_table="users",
+            referred_columns=["id"],
+        )
+        rel_data.add_foreign_key_constraint(
+            table="payments",
+            constrained_columns=["purchase_id"],
+            referred_table="purchases",
+            referred_columns=["id"],
+        )
+        assert len(rel_data.list_all_tables(Scope.ALL)) == 3
+        assert len(rel_data.list_all_tables(Scope.MODELABLE)) == 3
 
-    rel_data.update_table_data("purchases", documents.get_table_data("purchases"))
+        rel_data.update_table_data("purchases", documents.get_table_data("purchases"))
 
     assert set(rel_data.list_all_tables(Scope.ALL)) == {
         "users",
@@ -638,7 +646,7 @@ def test_restore_with_empty_tables(bball):
     assert jimmy["suspensions"] == []
 
 
-def test_flatten_and_restore_all_sorts_of_json():
+def test_flatten_and_restore_all_sorts_of_json(tmpdir):
     json = """
 [
     {
@@ -662,7 +670,7 @@ def test_flatten_and_restore_all_sorts_of_json():
 ]
 """
     json_df = pd.read_json(json, orient="records")
-    rel_data = RelationalData()
+    rel_data = RelationalData(directory=tmpdir)
     rel_data.add_table(name="demo", primary_key=None, data=json_df)
 
     assert set(rel_data.list_all_tables(Scope.ALL)) == {
@@ -759,10 +767,10 @@ def test_flatten_and_restore_all_sorts_of_json():
     pdtest.assert_frame_equal(restored["demo"], expected)
 
 
-def test_only_lists_edge_case():
+def test_only_lists_edge_case(tmpdir):
     # Smallest reproduction: a dataframe with just one row and one column, and the value is a list
     list_df = pd.DataFrame(data={"l": [[1, 2, 3, 4]]})
-    rel_data = RelationalData()
+    rel_data = RelationalData(directory=tmpdir)
 
     # Since there are no flat fields on the source, the invented root table would be empty.
     # The root table is what we use for evaluation, so we bail.
@@ -772,12 +780,12 @@ def test_only_lists_edge_case():
     assert rel_data.list_all_tables(Scope.ALL) == []
 
 
-def test_lists_of_lists():
+def test_lists_of_lists(tmpdir):
     # Enough flat data in the source to create a root invented table.
     # Upping the complexity by making the special value a list of lists,
     # but not to fear: we can handle this correctly.
     lol_df = pd.DataFrame(data={"a": [1], "l": [[[1, 2], [3, 4]]]})
-    rel_data = RelationalData()
+    rel_data = RelationalData(directory=tmpdir)
     rel_data.add_table(name="lol", primary_key=None, data=lol_df)
 
     assert set(rel_data.list_all_tables(Scope.ALL)) == {
@@ -815,7 +823,7 @@ def test_lists_of_lists():
     )
 
 
-def test_mix_of_dict_and_list_cols():
+def test_mix_of_dict_and_list_cols(tmpdir):
     df = pd.DataFrame(
         data={
             "id": [1, 2],
@@ -823,7 +831,7 @@ def test_mix_of_dict_and_list_cols():
             "lcol": [["a", "b"], ["c", "d"]],
         }
     )
-    rel_data = RelationalData()
+    rel_data = RelationalData(directory=tmpdir)
     rel_data.add_table(name="mix", primary_key=None, data=df)
     assert set(rel_data.list_all_tables()) == {
         "mix-sfx",
