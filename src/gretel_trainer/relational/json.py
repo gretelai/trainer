@@ -128,6 +128,14 @@ def make_suffix(s):
 
 
 def jsonencode(df: pd.DataFrame, cols: list[str]) -> pd.DataFrame:
+    """
+    Returns a dataframe with the specified columns transformed such that their JSON-like
+    values can be written to CSV and later re-read back to Pandas from CSV.
+    """
+    # Save memory and return the *original dataframe* (not a copy!) if no columns to transform
+    if len(cols) == 0:
+        return df
+
     def _jsonencode(x):
         if isinstance(x, str):
             return x
@@ -142,6 +150,13 @@ def jsonencode(df: pd.DataFrame, cols: list[str]) -> pd.DataFrame:
 
 
 def jsondecode(df: pd.DataFrame, cols: list[str]) -> pd.DataFrame:
+    """
+    Returns a dataframe with the specified columns parsed from JSON to Python objects.
+    """
+    # Save memory and return the *original dataframe* (not a copy!) if no columns to transform
+    if len(cols) == 0:
+        return df
+
     def _jsondecode(obj):
         try:
             return loads(obj)
