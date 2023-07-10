@@ -1,7 +1,7 @@
 import csv
 import logging
 import time
-from dataclasses import InitVar, dataclass, field
+from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
 from pathlib import Path
@@ -37,19 +37,20 @@ def _default_name() -> str:
     return f"benchmark-{current_time}"
 
 
-@dataclass
 class BenchmarkConfig:
-    project_display_name: str = field(default_factory=_default_name)
-    refresh_interval: int = 15
-    trainer: bool = False
-    work_dir: InitVar[Optional[Union[str, Path]]] = None
-    working_dir: Path = field(init=False)
-    additional_report_scores: list[str] = field(default_factory=list)
-
-    def __post_init__(self, work_dir):
-        if work_dir is None:
-            work_dir = self.project_display_name
-        self.working_dir = Path(work_dir)
+    def __init__(
+        self,
+        project_display_name: Optional[str] = None,
+        refresh_interval: int = 15,
+        trainer: bool = False,
+        working_dir: Optional[Union[str, Path]] = None,
+        additional_report_scores: Optional[list[str]] = None,
+    ):
+        self.project_display_name = project_display_name or _default_name()
+        self.working_dir = Path(working_dir or self.project_display_name)
+        self.refresh_interval = refresh_interval
+        self.trainer = trainer
+        self.additional_report_scores = additional_report_scores or []
 
 
 class Timer:

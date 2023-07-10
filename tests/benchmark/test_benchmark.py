@@ -36,7 +36,7 @@ def test_run_with_gretel_dataset(working_dir, project, evaluate_report_path, iri
         datasets=[iris],
         models=[DoNothingModel],
         config=BenchmarkConfig(
-            work_dir=working_dir,
+            working_dir=working_dir,
         ),
     ).wait()
 
@@ -67,7 +67,7 @@ def test_run_with_custom_csv_dataset(working_dir, project, evaluate_report_path,
             datasets=[dataset],
             models=[DoNothingModel],
             config=BenchmarkConfig(
-                work_dir=working_dir,
+                working_dir=working_dir,
             ),
         ).wait()
 
@@ -97,7 +97,7 @@ def test_run_with_custom_psv_dataset(working_dir, project, evaluate_report_path,
             datasets=[dataset],
             models=[DoNothingModel],
             config=BenchmarkConfig(
-                work_dir=working_dir,
+                working_dir=working_dir,
             ),
         ).wait()
 
@@ -126,7 +126,7 @@ def test_run_with_custom_dataframe_dataset(
         datasets=[dataset],
         models=[DoNothingModel],
         config=BenchmarkConfig(
-            work_dir=working_dir,
+            working_dir=working_dir,
         ),
     ).wait()
 
@@ -177,7 +177,7 @@ def test_run_happy_path_gretel_sdk(
             datasets=[iris],
             models=[benchmark_model],
             config=BenchmarkConfig(
-                work_dir=working_dir,
+                working_dir=working_dir,
             ),
         ).wait()
 
@@ -214,7 +214,7 @@ def test_sdk_model_failure(working_dir, iris, project):
         datasets=[iris],
         models=[GretelLSTM],
         config=BenchmarkConfig(
-            work_dir=working_dir,
+            working_dir=working_dir,
         ),
     ).wait()
 
@@ -233,7 +233,7 @@ def test_run_with_failures(working_dir, project, iris):
         datasets=[iris],
         models=[FailsToTrain, FailsToGenerate],
         config=BenchmarkConfig(
-            work_dir=working_dir,
+            working_dir=working_dir,
         ),
     ).wait()
 
@@ -256,7 +256,7 @@ def test_custom_gretel_model_configs_do_not_overwrite_each_other(
         datasets=[iris, pets],
         models=[SharedDictLstm],
         config=BenchmarkConfig(
-            work_dir=working_dir,
+            working_dir=working_dir,
         ),
     ).wait()
 
@@ -280,7 +280,7 @@ def test_gptx_skips_too_many_columns(working_dir, project):
         datasets=[dataset],
         models=[GretelGPTX],
         config=BenchmarkConfig(
-            work_dir=working_dir,
+            working_dir=working_dir,
         ),
     ).wait()
 
@@ -296,7 +296,7 @@ def test_gptx_skips_non_natural_language_datatype(working_dir, project):
         datasets=[dataset],
         models=[GretelGPTX],
         config=BenchmarkConfig(
-            work_dir=working_dir,
+            working_dir=working_dir,
         ),
     ).wait()
 
@@ -312,7 +312,7 @@ def test_lstm_skips_datasets_with_over_150_columns(working_dir, project):
         datasets=[dataset],
         models=[GretelLSTM],
         config=BenchmarkConfig(
-            work_dir=working_dir,
+            working_dir=working_dir,
         ),
     ).wait()
 

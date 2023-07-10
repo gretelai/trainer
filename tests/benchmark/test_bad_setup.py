@@ -21,7 +21,7 @@ def test_bad_session_exits_early(iris):
                 datasets=[iris],
                 models=[GretelLSTM],
                 config=BenchmarkConfig(
-                    work_dir="should_not_be_created",
+                    working_dir="should_not_be_created",
                 ),
             )
 
@@ -34,7 +34,7 @@ def test_dataset_names_must_be_unique(iris):
             datasets=[iris, iris],
             models=[GretelLSTM],
             config=BenchmarkConfig(
-                work_dir="should_not_be_created",
+                working_dir="should_not_be_created",
             ),
         )
     assert not os.path.exists("should_not_be_created")
@@ -46,7 +46,7 @@ def test_model_names_must_be_unique(iris):
             datasets=[iris],
             models=[GretelLSTM, GretelLSTM],
             config=BenchmarkConfig(
-                work_dir="should_not_be_created",
+                working_dir="should_not_be_created",
             ),
         )
     assert not os.path.exists("should_not_be_created")
