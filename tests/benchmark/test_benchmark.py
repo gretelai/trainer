@@ -9,6 +9,7 @@ import pytest
 from gretel_client.projects.jobs import Status
 
 from gretel_trainer.benchmark import (
+    BenchmarkConfig,
     Datatype,
     GretelGPTX,
     GretelLSTM,
@@ -34,7 +35,9 @@ def test_run_with_gretel_dataset(working_dir, project, evaluate_report_path, iri
     comparison = compare(
         datasets=[iris],
         models=[DoNothingModel],
-        working_dir=working_dir,
+        config=BenchmarkConfig(
+            work_dir=working_dir,
+        ),
     ).wait()
 
     assert len(comparison.results) == 1
@@ -63,7 +66,9 @@ def test_run_with_custom_csv_dataset(working_dir, project, evaluate_report_path,
         comparison = compare(
             datasets=[dataset],
             models=[DoNothingModel],
-            working_dir=working_dir,
+            config=BenchmarkConfig(
+                work_dir=working_dir,
+            ),
         ).wait()
 
     assert len(comparison.results) == 1
@@ -91,7 +96,9 @@ def test_run_with_custom_psv_dataset(working_dir, project, evaluate_report_path,
         comparison = compare(
             datasets=[dataset],
             models=[DoNothingModel],
-            working_dir=working_dir,
+            config=BenchmarkConfig(
+                work_dir=working_dir,
+            ),
         ).wait()
 
     assert len(comparison.results) == 1
@@ -118,7 +125,9 @@ def test_run_with_custom_dataframe_dataset(
     comparison = compare(
         datasets=[dataset],
         models=[DoNothingModel],
-        working_dir=working_dir,
+        config=BenchmarkConfig(
+            work_dir=working_dir,
+        ),
     ).wait()
 
     assert len(comparison.results) == 1
@@ -167,7 +176,9 @@ def test_run_happy_path_gretel_sdk(
         comparison = compare(
             datasets=[iris],
             models=[benchmark_model],
-            working_dir=working_dir,
+            config=BenchmarkConfig(
+                work_dir=working_dir,
+            ),
         ).wait()
 
     assert len(comparison.results) == 1
@@ -202,7 +213,9 @@ def test_sdk_model_failure(working_dir, iris, project):
     comparison = compare(
         datasets=[iris],
         models=[GretelLSTM],
-        working_dir=working_dir,
+        config=BenchmarkConfig(
+            work_dir=working_dir,
+        ),
     ).wait()
 
     assert len(comparison.results) == 1
@@ -219,7 +232,9 @@ def test_run_with_failures(working_dir, project, iris):
     comparison = compare(
         datasets=[iris],
         models=[FailsToTrain, FailsToGenerate],
-        working_dir=working_dir,
+        config=BenchmarkConfig(
+            work_dir=working_dir,
+        ),
     ).wait()
 
     assert len(comparison.results) == 2
@@ -237,10 +252,12 @@ def test_custom_gretel_model_configs_do_not_overwrite_each_other(
 
     pets = create_dataset(df, datatype="tabular", name="pets")
 
-    comparison = compare(
+    compare(
         datasets=[iris, pets],
         models=[SharedDictLstm],
-        working_dir=working_dir,
+        config=BenchmarkConfig(
+            work_dir=working_dir,
+        ),
     ).wait()
 
     model_names = [
@@ -262,7 +279,9 @@ def test_gptx_skips_too_many_columns(working_dir, project):
     comparison = compare(
         datasets=[dataset],
         models=[GretelGPTX],
-        working_dir=working_dir,
+        config=BenchmarkConfig(
+            work_dir=working_dir,
+        ),
     ).wait()
 
     assert len(comparison.results) == 1
@@ -276,7 +295,9 @@ def test_gptx_skips_non_natural_language_datatype(working_dir, project):
     comparison = compare(
         datasets=[dataset],
         models=[GretelGPTX],
-        working_dir=working_dir,
+        config=BenchmarkConfig(
+            work_dir=working_dir,
+        ),
     ).wait()
 
     assert len(comparison.results) == 1
@@ -290,7 +311,9 @@ def test_lstm_skips_datasets_with_over_150_columns(working_dir, project):
     comparison = compare(
         datasets=[dataset],
         models=[GretelLSTM],
-        working_dir=working_dir,
+        config=BenchmarkConfig(
+            work_dir=working_dir,
+        ),
     ).wait()
 
     assert len(comparison.results) == 1
