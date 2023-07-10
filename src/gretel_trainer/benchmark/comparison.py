@@ -119,7 +119,7 @@ class Comparison:
 
         self._report_scores = {
             score_name: ALL_REPORT_SCORES[score_name]
-            for score_name in ["SQS"] + (self.config.additional_report_scores or [])
+            for score_name in ["SQS"] + self.config.additional_report_scores
         }
 
     @property
