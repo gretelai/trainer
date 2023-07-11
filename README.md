@@ -64,6 +64,15 @@ df = model.generate()
 
 ## Development
 
+Setup environment and install dependencies.
+
+```sh
+python -m venv venv
+source venv/bin/activate
+pip install -r requirements-dev.txt
+pip install -e .
+```
+
 - Run tests via `make test`
 - Run type-checking (limited coverage) via `make type`
 
