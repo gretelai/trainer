@@ -44,7 +44,7 @@ def project():
 
 
 def _rel_data_connector(name) -> Connector:
-    con = sqlite3.connect(f"file:{name}?mode=memory&cache=shared")
+    con = sqlite3.connect(f"file:{name}?mode=memory&cache=shared", uri=True)
     cur = con.cursor()
     with open(EXAMPLE_DBS / f"{name}.sql") as f:
         cur.executescript(f.read())
