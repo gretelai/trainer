@@ -2,8 +2,10 @@ import csv
 import logging
 import time
 from dataclasses import dataclass, field
+from datetime import datetime
 from enum import Enum
 from pathlib import Path
+from typing import Optional, Union
 
 import smart_open
 
@@ -30,12 +32,25 @@ class Dataset:
     public: bool = field(default=False)
 
 
-@dataclass
+def _default_name() -> str:
+    current_time = datetime.now().strftime("%Y%m%d%H%M%S")
+    return f"benchmark-{current_time}"
+
+
 class BenchmarkConfig:
-    project_display_name: str
-    refresh_interval: int
-    trainer: bool
-    working_dir: Path
+    def __init__(
+        self,
+        project_display_name: Optional[str] = None,
+        refresh_interval: int = 15,
+        trainer: bool = False,
+        working_dir: Optional[Union[str, Path]] = None,
+        additional_report_scores: Optional[list[str]] = None,
+    ):
+        self.project_display_name = project_display_name or _default_name()
+        self.working_dir = Path(working_dir or self.project_display_name)
+        self.refresh_interval = refresh_interval
+        self.trainer = trainer
+        self.additional_report_scores = additional_report_scores or []
 
 
 class Timer:

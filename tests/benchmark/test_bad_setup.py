@@ -4,7 +4,7 @@ from unittest.mock import patch
 import pytest
 
 from gretel_trainer.benchmark import GretelLSTM, compare
-from gretel_trainer.benchmark.core import BenchmarkException
+from gretel_trainer.benchmark.core import BenchmarkConfig, BenchmarkException
 
 
 def test_bad_session_exits_early(iris):
@@ -20,7 +20,9 @@ def test_bad_session_exits_early(iris):
             compare(
                 datasets=[iris],
                 models=[GretelLSTM],
-                working_dir="should_not_be_created",
+                config=BenchmarkConfig(
+                    working_dir="should_not_be_created",
+                ),
             )
 
     assert not os.path.exists("should_not_be_created")
@@ -31,7 +33,9 @@ def test_dataset_names_must_be_unique(iris):
         compare(
             datasets=[iris, iris],
             models=[GretelLSTM],
-            working_dir="should_not_be_created",
+            config=BenchmarkConfig(
+                working_dir="should_not_be_created",
+            ),
         )
     assert not os.path.exists("should_not_be_created")
 
@@ -41,6 +45,8 @@ def test_model_names_must_be_unique(iris):
         compare(
             datasets=[iris],
             models=[GretelLSTM, GretelLSTM],
-            working_dir="should_not_be_created",
+            config=BenchmarkConfig(
+                working_dir="should_not_be_created",
+            ),
         )
     assert not os.path.exists("should_not_be_created")

@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import logging
 from concurrent.futures import Future, ThreadPoolExecutor
-from datetime import datetime
 from inspect import isclass
 from pathlib import Path
 from typing import Any, Optional, Type, Union, cast
@@ -74,20 +73,12 @@ def compare(
     *,
     datasets: list[DatasetTypes],
     models: list[ModelTypes],
-    project_display_name: Optional[str] = None,
-    trainer: bool = False,
-    refresh_interval: int = 15,
-    working_dir: Optional[str] = None,
-    additional_report_scores: Optional[list[str]] = None,
+    config: Optional[BenchmarkConfig] = None,
 ) -> Comparison:
     comparison = Comparison(
         datasets=datasets,
         models=models,
-        project_display_name=project_display_name,
-        trainer=trainer,
-        refresh_interval=refresh_interval,
-        working_dir=working_dir,
-        additional_report_scores=additional_report_scores,
+        config=config,
     )
     return comparison.prepare().execute()
 
@@ -98,11 +89,7 @@ class Comparison:
         *,
         datasets: list[DatasetTypes],
         models: list[ModelTypes],
-        project_display_name: Optional[str] = None,
-        trainer: bool = False,
-        refresh_interval: int = 15,
-        working_dir: Optional[str] = None,
-        additional_report_scores: Optional[list[str]] = None,
+        config: Optional[BenchmarkConfig] = None,
     ):
         model_instances = [
             cast(Union[GretelModel, CustomModel], m() if isclass(m) else m)
@@ -113,14 +100,7 @@ class Comparison:
             m for m in model_instances if not isinstance(m, GretelModel)
         ]
 
-        project_display_name = project_display_name or _default_name()
-        working_dir = working_dir or project_display_name
-        self.config = BenchmarkConfig(
-            project_display_name=project_display_name,
-            trainer=trainer,
-            refresh_interval=refresh_interval,
-            working_dir=Path(working_dir),
-        )
+        self.config = config or BenchmarkConfig()
 
         _validate_setup(self.config, self.gretel_models, self.custom_models, datasets)
 
@@ -139,7 +119,7 @@ class Comparison:
 
         self._report_scores = {
             score_name: ALL_REPORT_SCORES[score_name]
-            for score_name in ["SQS"] + (additional_report_scores or [])
+            for score_name in ["SQS"] + self.config.additional_report_scores
         }
 
     @property
@@ -432,11 +412,6 @@ def _model_name(model: Union[GretelModel, CustomModel]) -> str:
         return model.name
     else:
         return type(model).__name__
-
-
-def _default_name() -> str:
-    current_time = datetime.now().strftime("%Y%m%d%H%M%S")
-    return f"benchmark-{current_time}"
 
 
 def _trainer_project_name(config: BenchmarkConfig, index: int) -> str:

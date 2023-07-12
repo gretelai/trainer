@@ -1,7 +1,7 @@
 import logging
 
 from gretel_trainer.benchmark.comparison import Comparison, compare
-from gretel_trainer.benchmark.core import Datatype
+from gretel_trainer.benchmark.core import BenchmarkConfig, Datatype
 from gretel_trainer.benchmark.custom.datasets import create_dataset, make_dataset
 from gretel_trainer.benchmark.gretel.datasets import GretelDatasetRepo
 from gretel_trainer.benchmark.gretel.datasets_backwards_compatibility import (
