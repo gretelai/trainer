@@ -120,11 +120,12 @@ def sanitize_str(s):
     sanitized_str = "-".join(re.findall(r"[a-zA-Z_0-9]+", s))
     # Generate suffix from original string, in case of sanitized_str collision
     unique_suffix = make_suffix(s)
-    return f"{sanitized_str}-{unique_suffix}"
+    # Max length for a filename is 128 chars
+    return f"{sanitized_str[:100]}-{unique_suffix}"
 
 
 def make_suffix(s):
-    return hashlib.sha256(s.encode("utf-8")).hexdigest()[:10]
+    return hashlib.sha256(s.encode("utf-8")).hexdigest()[:16]
 
 
 def jsonencode(df: pd.DataFrame, cols: list[str]) -> pd.DataFrame:

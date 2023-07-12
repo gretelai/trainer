@@ -20,7 +20,10 @@ def extended_sdk():
 
 
 @pytest.fixture(autouse=True)
-def static_suffix():
+def static_suffix(request):
+    if "no_mock_suffix" in request.keywords:
+        yield
+        return
     with patch("gretel_trainer.relational.json.make_suffix") as make_suffix:
         make_suffix.return_value = "sfx"
         yield

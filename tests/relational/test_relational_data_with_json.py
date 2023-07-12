@@ -22,6 +22,19 @@ def bball(tmpdir):
     return rel_data
 
 
+@pytest.fixture
+def deeply_nested(tmpdir):
+    jsonl = """
+    {"hello1":"world1","level1_long_property_name":[{"hello2":"world2","level2_long_property_name":[{"hello3":"world3","level3_long_property_name":[{"hello4":"world4","level4_long_property_name":[{"hello5":"world5","level5_long_property_name":[{"hello6":"world6","level6_long_property_name":[{"hello7":"world7","level7_long_property_name":[{"hello8":"world8","level8_long_property_name":[{"hello9":"world9"}]}]}]}]}]}]}]}]}
+    """
+    df = pd.read_json(jsonl, lines=True)
+
+    rel_data = RelationalData(directory=tmpdir)
+    rel_data.add_table(name="deeply_nested", primary_key=None, data=df)
+
+    return rel_data
+
+
 def test_list_json_cols(documents, bball):
     assert get_json_columns(documents.get_table_data("users")) == []
     assert get_json_columns(documents.get_table_data("purchases")) == ["data"]
@@ -917,4 +930,40 @@ def test_all_tables_are_present_in_debug_summary(documents):
                 "is_invented_table": True,
             },
         },
+    }
+
+
+@pytest.mark.no_mock_suffix
+def test_get_modelable_table_names_with_real_suffixes(documents):
+    # Given a source-with-JSON name, returns the tables invented from that source
+    assert set(documents.get_modelable_table_names("purchases")) == {
+        "purchases-a9563697877eb9ce",
+        "purchases-data-years-87087375ce849910",
+    }
+
+    # Invented tables are modelable
+    assert documents.get_modelable_table_names("purchases-a9563697877eb9ce") == [
+        "purchases-a9563697877eb9ce"
+    ]
+    assert documents.get_modelable_table_names(
+        "purchases-data-years-87087375ce849910"
+    ) == ["purchases-data-years-87087375ce849910"]
+
+    # Unknown tables return empty list
+    assert documents.get_modelable_table_names("nonsense") == []
+
+
+@pytest.mark.no_mock_suffix
+def test_deeply_nested_json_truncates_length(deeply_nested):
+    assert set(deeply_nested.list_all_tables(Scope.ALL)) == {
+        "deeply_nested",
+        "deeply_nested-452d8603d590d6aa",
+        "deeply_nested-level1_long_property_name-b4297ee35ffe49fb",
+        "deeply_nested-level1_long_property_name-content-level2_long_property_name-00f9d37cfc246a15",
+        "deeply_nested-level1_long_property_name-content-level2_long_property_name-content-level3_long_proper-34f94a8c6def9848",
+        "deeply_nested-level1_long_property_name-content-level2_long_property_name-content-level3_long_proper-da2440b6c76bcef8",
+        "deeply_nested-level1_long_property_name-content-level2_long_property_name-content-level3_long_proper-9d9a0d88fbe3c677",
+        "deeply_nested-level1_long_property_name-content-level2_long_property_name-content-level3_long_proper-c8f5c85e69ac07f1",
+        "deeply_nested-level1_long_property_name-content-level2_long_property_name-content-level3_long_proper-10576bd36c4759b3",
+        "deeply_nested-level1_long_property_name-content-level2_long_property_name-content-level3_long_proper-b0314221e5c1a615",
     }
