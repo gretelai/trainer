@@ -50,9 +50,10 @@ class IndependentStrategy:
             all_columns = rel_data.get_table_columns(table)
             use_columns = [col for col in all_columns if col not in columns_to_drop]
 
-            rel_data.get_table_data(table, usecols=use_columns).to_csv(
-                path, index=False
-            )
+            pd.DataFrame(columns=use_columns).to_csv(path, index=False)
+            source_path = rel_data.get_table_source(table)
+            for chunk in pd.read_csv(source_path, usecols=use_columns, chunksize=10_000):
+                chunk.to_csv(path, index=False, mode="a", header=False)
 
         return table_paths
 
