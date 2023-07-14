@@ -806,13 +806,31 @@ class RelationalData:
                         "parent_columns": key.parent_columns,
                     }
                 )
-            tables[table] = {
+            table_metadata = {
                 "column_count": len(self.get_table_columns(table)),
                 "primary_key": self.get_primary_key(table),
                 "foreign_key_count": this_table_foreign_key_count,
                 "foreign_keys": foreign_keys,
                 "is_invented_table": self._is_invented(table),
             }
+            if self.is_producer_of_invented_tables(table):
+                table_metadata["invented_table_details"] = {}
+                table_metadata["invented_table_details"]["table_type"] = "producer"
+                producer_metadata = self.get_producer_metadata(table)
+                if producer_metadata is not None:
+                    table_metadata["invented_table_details"][
+                        "json_to_table_mappings"
+                    ] = producer_metadata.table_name_mappings
+            elif self._is_invented(table):
+                table_metadata["invented_table_details"] = {}
+                table_metadata["invented_table_details"]["table_type"] = "invented"
+                invented_table_metadata = self.get_invented_table_metadata(table)
+                if invented_table_metadata is not None:
+                    table_metadata["invented_table_details"][
+                        "json_breadcrumb_path"
+                    ] = invented_table_metadata.json_breadcrumb_path
+            tables[table] = table_metadata
+
         return {
             "foreign_key_count": total_foreign_key_count,
             "max_depth": max_depth,

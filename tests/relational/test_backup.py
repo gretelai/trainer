@@ -59,6 +59,7 @@ def test_backup_relational_data_with_json(documents):
                 invented_table_metadata={
                     "invented_root_table_name": purchases_root_invented_table,
                     "original_table_name": "purchases",
+                    "json_breadcrumb_path": "purchases",
                     "empty": False,
                 },
             ),
@@ -67,6 +68,7 @@ def test_backup_relational_data_with_json(documents):
                 invented_table_metadata={
                     "invented_root_table_name": purchases_root_invented_table,
                     "original_table_name": "purchases",
+                    "json_breadcrumb_path": "purchases^data>years",
                     "empty": False,
                 },
             ),

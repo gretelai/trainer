@@ -192,6 +192,7 @@ class _RelationalData(Protocol):
 class InventedTableMetadata:
     invented_root_table_name: str
     original_table_name: str
+    json_breadcrumb_path: str
     empty: bool
 
 
@@ -243,13 +244,13 @@ def _generate_commands(
     Returns lists of keyword arguments designed to be passed to a
     RelationalData instance's _add_single_table and add_foreign_key methods
     """
-    tables_to_add = {table_name_mappings[name]: df for name, df in tables}
     root_table_name = table_name_mappings[original_table_name]
 
     _add_single_table = []
     add_foreign_key = []
 
-    for table_name, table_df in tables_to_add.items():
+    for table_breadcrumb_name, table_df in tables:
+        table_name = table_name_mappings[table_breadcrumb_name]
         if table_name == root_table_name:
             table_pk = original_primary_key + [PRIMARY_KEY_COLUMN]
         else:
@@ -259,6 +260,7 @@ def _generate_commands(
         metadata = InventedTableMetadata(
             invented_root_table_name=root_table_name,
             original_table_name=original_table_name,
+            json_breadcrumb_path=table_breadcrumb_name,
             empty=table_df.empty,
         )
         _add_single_table.append(
@@ -270,7 +272,8 @@ def _generate_commands(
             }
         )
 
-    for table_name, table_df in tables_to_add.items():
+    for table_breadcrumb_name, table_df in tables:
+        table_name = table_name_mappings[table_breadcrumb_name]
         for column in get_id_columns(table_df):
             referred_table = table_name_mappings[
                 get_parent_table_name_from_child_id_column(column)

@@ -976,6 +976,13 @@ def test_all_tables_are_present_in_debug_summary(documents):
                     }
                 ],
                 "is_invented_table": False,
+                "invented_table_details": {
+                    "table_type": "producer",
+                    "json_to_table_mappings": {
+                        "purchases": purchases_root_invented_table,
+                        "purchases^data>years": purchases_data_years_invented_table,
+                    },
+                },
             },
             purchases_root_invented_table: {
                 "column_count": 6,
@@ -989,6 +996,10 @@ def test_all_tables_are_present_in_debug_summary(documents):
                     }
                 ],
                 "is_invented_table": True,
+                "invented_table_details": {
+                    "table_type": "invented",
+                    "json_breadcrumb_path": "purchases",
+                },
             },
             purchases_data_years_invented_table: {
                 "column_count": 4,
@@ -1002,6 +1013,10 @@ def test_all_tables_are_present_in_debug_summary(documents):
                     }
                 ],
                 "is_invented_table": True,
+                "invented_table_details": {
+                    "table_type": "invented",
+                    "json_breadcrumb_path": "purchases^data>years",
+                },
             },
         },
     }
