@@ -1,11 +1,20 @@
+import re
 import tempfile
+from unittest.mock import patch
 
 import pandas as pd
 import pandas.testing as pdtest
 import pytest
 
 from gretel_trainer.relational.core import ForeignKey, RelationalData, Scope
-from gretel_trainer.relational.json import get_json_columns
+from gretel_trainer.relational.json import generate_unique_table_name, get_json_columns
+from tests.relational.conftest import get_invented_table_suffix
+
+purchases_root_invented_table = f"purchases_{get_invented_table_suffix(1)}"
+purchases_data_years_invented_table = f"purchases_{get_invented_table_suffix(2)}"
+bball_root_invented_table = f"bball_{get_invented_table_suffix(1)}"
+bball_suspensions_invented_table = f"bball_{get_invented_table_suffix(2)}"
+bball_teams_invented_table = f"bball_{get_invented_table_suffix(3)}"
 
 
 @pytest.fixture
@@ -48,7 +57,7 @@ def test_list_json_cols(documents, bball):
 
 def test_json_columns_produce_invented_flattened_tables(documents):
     pdtest.assert_frame_equal(
-        documents.get_table_data("purchases-sfx"),
+        documents.get_table_data(purchases_root_invented_table),
         pd.DataFrame(
             data={
                 "~PRIMARY_KEY_ID~": [0, 1, 2, 3, 4, 5],
@@ -63,7 +72,7 @@ def test_json_columns_produce_invented_flattened_tables(documents):
     )
 
     pdtest.assert_frame_equal(
-        documents.get_table_data("purchases-data-years-sfx"),
+        documents.get_table_data(purchases_data_years_invented_table),
         pd.DataFrame(
             data={
                 "content": [2023, 2023, 2022, 2020, 2019, 2021],
@@ -76,11 +85,11 @@ def test_json_columns_produce_invented_flattened_tables(documents):
         check_dtype=False,  # Without this, test fails asserting dtype mismatch in `content` field (object vs. int)
     )
 
-    assert documents.get_foreign_keys("purchases-data-years-sfx") == [
+    assert documents.get_foreign_keys(purchases_data_years_invented_table) == [
         ForeignKey(
-            table_name="purchases-data-years-sfx",
+            table_name=purchases_data_years_invented_table,
             columns=["purchases~id"],
-            parent_table_name="purchases-sfx",
+            parent_table_name=purchases_root_invented_table,
             parent_columns=["~PRIMARY_KEY_ID~"],
         )
     ]
@@ -98,21 +107,21 @@ def test_list_tables_accepts_various_scopes(documents):
     assert set(documents.list_all_tables(Scope.MODELABLE)) == {
         "users",
         "payments",
-        "purchases-sfx",
-        "purchases-data-years-sfx",
+        purchases_root_invented_table,
+        purchases_data_years_invented_table,
     }
 
     # EVALUATABLE is similar to MODELABLE, but omits invented child tables—we only evaluate the root invented table
     assert set(documents.list_all_tables(Scope.EVALUATABLE)) == {
         "users",
         "payments",
-        "purchases-sfx",
+        purchases_root_invented_table,
     }
 
     # INVENTED returns only tables invented from source tables with JSON
     assert set(documents.list_all_tables(Scope.INVENTED)) == {
-        "purchases-sfx",
-        "purchases-data-years-sfx",
+        purchases_root_invented_table,
+        purchases_data_years_invented_table,
     }
 
     # ALL returns every table name, including both source-with-JSON tables and those invented from such tables
@@ -120,8 +129,8 @@ def test_list_tables_accepts_various_scopes(documents):
         "users",
         "purchases",
         "payments",
-        "purchases-sfx",
-        "purchases-data-years-sfx",
+        purchases_root_invented_table,
+        purchases_data_years_invented_table,
     }
 
     # Default scope is MODELABLE
@@ -133,14 +142,16 @@ def test_list_tables_accepts_various_scopes(documents):
 def test_get_modelable_table_names(documents):
     # Given a source-with-JSON name, returns the tables invented from that source
     assert set(documents.get_modelable_table_names("purchases")) == {
-        "purchases-sfx",
-        "purchases-data-years-sfx",
+        purchases_root_invented_table,
+        purchases_data_years_invented_table,
     }
 
     # Invented tables are modelable
-    assert documents.get_modelable_table_names("purchases-sfx") == ["purchases-sfx"]
-    assert documents.get_modelable_table_names("purchases-data-years-sfx") == [
-        "purchases-data-years-sfx"
+    assert documents.get_modelable_table_names(purchases_root_invented_table) == [
+        purchases_root_invented_table
+    ]
+    assert documents.get_modelable_table_names(purchases_data_years_invented_table) == [
+        purchases_data_years_invented_table
     ]
 
     # Unknown tables return empty list
@@ -154,30 +165,33 @@ def test_get_modelable_names_ignores_empty_mapped_tables(bball):
     # source data shape. It is therefore present when listing ALL tables...
     assert set(bball.list_all_tables(Scope.ALL)) == {
         "bball",
-        "bball-sfx",
-        "bball-teams-sfx",
-        "bball-suspensions-sfx",
+        bball_root_invented_table,
+        bball_suspensions_invented_table,
+        bball_teams_invented_table,
     }
 
     # ...and the producer metadata is aware of it...
     assert set(bball.get_producer_metadata("bball").table_names) == {
-        "bball-sfx",
-        "bball-teams-sfx",
-        "bball-suspensions-sfx",
+        bball_root_invented_table,
+        bball_suspensions_invented_table,
+        bball_teams_invented_table,
     }
 
     # ...BUT most clients only care about invented tables that can be modeled
     # (i.e. that contain data), so the empty table does not appear in these contexts:
     assert set(bball.get_modelable_table_names("bball")) == {
-        "bball-sfx",
-        "bball-teams-sfx",
+        bball_root_invented_table,
+        bball_teams_invented_table,
     }
-    assert set(bball.list_all_tables()) == {"bball-sfx", "bball-teams-sfx"}
+    assert set(bball.list_all_tables()) == {
+        bball_root_invented_table,
+        bball_teams_invented_table,
+    }
 
 
 def test_invented_json_column_names(documents, bball):
     # The root invented table adds columns for dictionary properties lifted from nested JSON objects
-    assert documents.get_table_columns("purchases-sfx") == [
+    assert documents.get_table_columns(purchases_root_invented_table) == [
         "~PRIMARY_KEY_ID~",
         "id",
         "user_id",
@@ -188,7 +202,7 @@ def test_invented_json_column_names(documents, bball):
 
     # JSON lists lead to invented child tables. These tables store the original content,
     # a new primary key, a foreign key back to the parent, and the original array index
-    assert documents.get_table_columns("purchases-data-years-sfx") == [
+    assert documents.get_table_columns(purchases_data_years_invented_table) == [
         "~PRIMARY_KEY_ID~",
         "purchases~id",
         "content",
@@ -196,7 +210,8 @@ def test_invented_json_column_names(documents, bball):
     ]
 
     # If the source table does not have a primary key defined, one is created on the root invented table
-    assert bball.get_table_columns("bball-sfx") == [
+    # (bball_teams_invented_table is the root invented table)
+    assert bball.get_table_columns(bball_teams_invented_table) == [
         "~PRIMARY_KEY_ID~",
         "name",
         "age",
@@ -205,47 +220,74 @@ def test_invented_json_column_names(documents, bball):
     ]
 
 
-def test_set_some_primary_key_to_none(documents, bball):
+@patch("gretel_trainer.relational.json.make_suffix")
+def test_set_some_primary_key_to_none(mock_make_suffix, documents):
+    # We need to reset the side_effect iterator later in the test, so we manually mock it
+    mock_make_suffix.side_effect = [f"sfx{i}" for i in range(1, 50)]
+
     # The producer table has a single column primary key,
     # so the root invented table has a composite key that includes the source PK and an invented column
     assert documents.get_primary_key("purchases") == ["id"]
-    assert documents.get_primary_key("purchases-sfx") == ["id", "~PRIMARY_KEY_ID~"]
+    assert documents.get_primary_key(purchases_root_invented_table) == [
+        "id",
+        "~PRIMARY_KEY_ID~",
+    ]
 
     # Setting an existing primary key to None puts us in the correct state
     assert len(documents.list_all_tables(Scope.ALL)) == 5
-    original_payments_fks = documents.get_foreign_keys("payments")
+    original_payments_fks: list[ForeignKey] = documents.get_foreign_keys("payments")
+
+    # Reset the make_suffix iterator back to original count since set_primary_key will call it again
+    # once for each invented table.
+    mock_make_suffix.side_effect = [f"sfx{i}" for i in range(1, 50)]
+
+    # Setting the primary key causes json invented tables to be dropped and reingested
     documents.set_primary_key(table="purchases", primary_key=None)
     assert len(documents.list_all_tables(Scope.ALL)) == 5
     assert documents.get_primary_key("purchases") == []
-    assert documents.get_primary_key("purchases-sfx") == ["~PRIMARY_KEY_ID~"]
-    assert documents.get_foreign_keys("purchases-data-years-sfx") == [
+    assert documents.get_primary_key(purchases_root_invented_table) == [
+        "~PRIMARY_KEY_ID~"
+    ]
+    assert documents.get_foreign_keys(purchases_data_years_invented_table) == [
         ForeignKey(
-            table_name="purchases-data-years-sfx",
+            table_name=purchases_data_years_invented_table,
             columns=["purchases~id"],
-            parent_table_name="purchases-sfx",
+            parent_table_name=purchases_root_invented_table,
             parent_columns=["~PRIMARY_KEY_ID~"],
         )
     ]
     assert documents.get_foreign_keys("payments") == original_payments_fks
 
 
-def test_set_none_primary_key_to_some_value(bball):
+@patch("gretel_trainer.relational.json.make_suffix")
+def test_set_none_primary_key_to_some_value(mock_make_suffix, bball):
+    # We need to reset the side_effect iterator later in the test, so we manually mock it
+    mock_make_suffix.side_effect = [f"sfx{i}" for i in range(1, 50)]
+
     # The producer table has no primary key,
     # so the root invented table has a single invented key column
     assert bball.get_primary_key("bball") == []
-    assert bball.get_primary_key("bball-sfx") == ["~PRIMARY_KEY_ID~"]
+    assert bball.get_primary_key(bball_root_invented_table) == ["~PRIMARY_KEY_ID~"]
 
     # Setting a None primary key to some column puts us in the correct state
     assert len(bball.list_all_tables(Scope.ALL)) == 4
+
+    # Reset the make_suffix iterator back to original count since set_primary_key will call it again
+    # once for each invented table.
+    mock_make_suffix.side_effect = [f"sfx{i}" for i in range(1, 50)]
+
     bball.set_primary_key(table="bball", primary_key="name")
     assert len(bball.list_all_tables(Scope.ALL)) == 4
     assert bball.get_primary_key("bball") == ["name"]
-    assert bball.get_primary_key("bball-sfx") == ["name", "~PRIMARY_KEY_ID~"]
-    assert bball.get_foreign_keys("bball-teams-sfx") == [
+    assert bball.get_primary_key(bball_root_invented_table) == [
+        "name",
+        "~PRIMARY_KEY_ID~",
+    ]
+    assert bball.get_foreign_keys(bball_suspensions_invented_table) == [
         ForeignKey(
-            table_name="bball-teams-sfx",
+            table_name=bball_suspensions_invented_table,
             columns=["bball~id"],
-            parent_table_name="bball-sfx",
+            parent_table_name=bball_root_invented_table,
             parent_columns=["~PRIMARY_KEY_ID~"],
         )
     ]
@@ -254,13 +296,13 @@ def test_set_none_primary_key_to_some_value(bball):
 def test_foreign_keys(documents):
     # Foreign keys from the source-with-JSON table are present on the root invented table
     assert documents.get_foreign_keys("purchases") == documents.get_foreign_keys(
-        "purchases-sfx"
+        purchases_root_invented_table
     )
 
     # The root invented table name is used in the ForeignKey
     assert documents.get_foreign_keys("purchases") == [
         ForeignKey(
-            table_name="purchases-sfx",
+            table_name=purchases_root_invented_table,
             columns=["user_id"],
             parent_table_name="users",
             parent_columns=["id"],
@@ -268,11 +310,11 @@ def test_foreign_keys(documents):
     ]
 
     # Invented children point to invented parents
-    assert documents.get_foreign_keys("purchases-data-years-sfx") == [
+    assert documents.get_foreign_keys(purchases_data_years_invented_table) == [
         ForeignKey(
-            table_name="purchases-data-years-sfx",
+            table_name=purchases_data_years_invented_table,
             columns=["purchases~id"],
-            parent_table_name="purchases-sfx",
+            parent_table_name=purchases_root_invented_table,
             parent_columns=["~PRIMARY_KEY_ID~"],
         )
     ]
@@ -282,7 +324,7 @@ def test_foreign_keys(documents):
         ForeignKey(
             table_name="payments",
             columns=["purchase_id"],
-            parent_table_name="purchases-sfx",
+            parent_table_name=purchases_root_invented_table,
             parent_columns=["id"],
         )
     ]
@@ -310,10 +352,14 @@ def test_foreign_keys(documents):
         table="purchases", constrained_columns=["user_id"]
     )
     assert documents.get_foreign_keys("purchases") == []
-    assert documents.get_foreign_keys("purchases-sfx") == []
+    assert documents.get_foreign_keys(purchases_root_invented_table) == []
 
 
-def test_update_data_with_existing_json_to_new_json(documents):
+@patch("gretel_trainer.relational.json.make_suffix")
+def test_update_data_with_existing_json_to_new_json(mock_make_suffix, documents):
+    # We need to reset the side_effect iterator later in the test, so we manually mock it
+    mock_make_suffix.side_effect = [f"sfx{i}" for i in range(1, 50)]
+
     new_purchases_jsonl = """
     {"id": 1, "user_id": 1, "data": {"item": "watercolor", "cost": 200, "details": {"color": "aquamarine"}, "years": [1999]}}
     {"id": 2, "user_id": 2, "data": {"item": "watercolor", "cost": 200, "details": {"color": "aquamarine"}, "years": [1999]}}
@@ -324,13 +370,17 @@ def test_update_data_with_existing_json_to_new_json(documents):
     """
     new_purchases_df = pd.read_json(new_purchases_jsonl, lines=True)
 
+    # Reset the make_suffix iterator back to original count since make_suffix will be called again
+    # once for each invented table.
+    mock_make_suffix.side_effect = [f"sfx{i}" for i in range(1, 50)]
+
     documents.update_table_data("purchases", data=new_purchases_df)
 
     assert len(documents.list_all_tables(Scope.ALL)) == 5
     assert len(documents.list_all_tables(Scope.MODELABLE)) == 4
 
     expected = {
-        "purchases-sfx": pd.DataFrame(
+        purchases_root_invented_table: pd.DataFrame(
             data={
                 "~PRIMARY_KEY_ID~": [0, 1, 2, 3, 4, 5],
                 "id": [1, 2, 3, 4, 5, 6],
@@ -354,7 +404,7 @@ def test_update_data_with_existing_json_to_new_json(documents):
                 ],
             }
         ),
-        "purchases-data-years-sfx": pd.DataFrame(
+        purchases_data_years_invented_table: pd.DataFrame(
             data={
                 "content": [1999, 1999, 1999, 1998, 1998, 1998],
                 "array~order": [0, 0, 0, 0, 0, 0],
@@ -365,14 +415,14 @@ def test_update_data_with_existing_json_to_new_json(documents):
     }
 
     pdtest.assert_frame_equal(
-        documents.get_table_data("purchases-sfx"),
-        expected["purchases-sfx"],
+        documents.get_table_data(purchases_root_invented_table),
+        expected[purchases_root_invented_table],
         check_like=True,
     )
 
     pdtest.assert_frame_equal(
-        documents.get_table_data("purchases-data-years-sfx"),
-        expected["purchases-data-years-sfx"],
+        documents.get_table_data(purchases_data_years_invented_table),
+        expected[purchases_data_years_invented_table],
         check_like=True,
         check_dtype=False,  # Without this, test fails asserting dtype mismatch in `content` field (object vs. int)
     )
@@ -382,7 +432,7 @@ def test_update_data_with_existing_json_to_new_json(documents):
         ForeignKey(
             table_name="payments",
             columns=["purchase_id"],
-            parent_table_name="purchases-sfx",
+            parent_table_name=purchases_root_invented_table,
             parent_columns=["id"],
         )
     ]
@@ -417,7 +467,11 @@ def test_update_data_existing_json_to_no_json(documents):
     ]
 
 
-def test_update_data_existing_flat_to_json(documents):
+@patch("gretel_trainer.relational.json.make_suffix")
+def test_update_data_existing_flat_to_json(mock_make_suffix, documents):
+    # We need to reset the side_effect iterator later in the test, so we manually mock it
+    mock_make_suffix.side_effect = [f"sfx{i}" for i in range(1, 50)]
+
     # Build up a RelationalData instance that basically mirrors documents,
     # but purchases is flat to start and thus there are no RelationalJson instances
     flat_purchases_df = pd.DataFrame(
@@ -451,27 +505,30 @@ def test_update_data_existing_flat_to_json(documents):
         assert len(rel_data.list_all_tables(Scope.ALL)) == 3
         assert len(rel_data.list_all_tables(Scope.MODELABLE)) == 3
 
+        # Reset the make_suffix iterator back to original count since make_suffix will be called again
+        # once for each invented table.
+        mock_make_suffix.side_effect = [f"sfx{i}" for i in range(1, 50)]
         rel_data.update_table_data("purchases", documents.get_table_data("purchases"))
 
     assert set(rel_data.list_all_tables(Scope.ALL)) == {
         "users",
         "purchases",
-        "purchases-sfx",
-        "purchases-data-years-sfx",
+        purchases_root_invented_table,
+        purchases_data_years_invented_table,
         "payments",
     }
     # the original purchases table is no longer flat, nor (therefore) MODELABLE
     assert set(rel_data.list_all_tables(Scope.MODELABLE)) == {
         "users",
-        "purchases-sfx",
-        "purchases-data-years-sfx",
+        purchases_root_invented_table,
+        purchases_data_years_invented_table,
         "payments",
     }
     assert rel_data.get_foreign_keys("payments") == [
         ForeignKey(
             table_name="payments",
             columns=["purchase_id"],
-            parent_table_name="purchases-sfx",  # The foreign key now points to the root invented table
+            parent_table_name=purchases_root_invented_table,  # The foreign key now points to the root invented table
             parent_columns=["id"],
         )
     ]
@@ -494,7 +551,7 @@ def mt_output_tables():
                 "purchase_id": [1, 2, 3, 4],
             }
         ),
-        "purchases-sfx": pd.DataFrame(
+        purchases_root_invented_table: pd.DataFrame(
             data={
                 "~PRIMARY_KEY_ID~": [0, 1, 2, 3],
                 "id": [1, 2, 3, 4],
@@ -504,7 +561,7 @@ def mt_output_tables():
                 "data>details>color": ["blue", "yellow", "pink", "orange"],
             }
         ),
-        "purchases-data-years-sfx": pd.DataFrame(
+        purchases_data_years_invented_table: pd.DataFrame(
             data={
                 "content": [2000, 2001, 2002, 2003, 2004, 2005, 2006, 2007],
                 "~PRIMARY_KEY_ID~": [0, 1, 2, 3, 4, 5, 6, 7],
@@ -563,11 +620,13 @@ def test_restoring_output_tables_to_original_shape(documents, mt_output_tables):
 
 def test_restore_with_incomplete_tableset(documents, mt_output_tables):
     without_invented_root = {
-        k: v for k, v in mt_output_tables.items() if k != "purchases-sfx"
+        k: v for k, v in mt_output_tables.items() if k != purchases_root_invented_table
     }
 
     without_invented_child = {
-        k: v for k, v in mt_output_tables.items() if k != "purchases-data-years-sfx"
+        k: v
+        for k, v in mt_output_tables.items()
+        if k != purchases_data_years_invented_table
     }
 
     restored_without_invented_root = documents.restore(without_invented_root)
@@ -630,7 +689,7 @@ def test_restore_with_incomplete_tableset(documents, mt_output_tables):
 
 def test_restore_with_empty_tables(bball):
     synthetic_bball_output_tables = {
-        "bball-sfx": pd.DataFrame(
+        bball_root_invented_table: pd.DataFrame(
             data={
                 "name": ["Jimmy Butler"],
                 "age": [33],
@@ -639,7 +698,7 @@ def test_restore_with_empty_tables(bball):
                 "~PRIMARY_KEY_ID~": [0],
             }
         ),
-        "bball-teams-sfx": pd.DataFrame(
+        bball_teams_invented_table: pd.DataFrame(
             data={
                 "content": ["Bulls", "Timberwolves", "Sixers", "Heat"],
                 "array~order": [0, 1, 2, 3],
@@ -682,43 +741,49 @@ def test_flatten_and_restore_all_sorts_of_json(tmpdir):
     }
 ]
 """
+    demo_root_invented_table = f"demo_{get_invented_table_suffix(1)}"
+    demo_invented_f_table = f"demo_{get_invented_table_suffix(2)}"
+    demo_invented_f_content_ff_table = f"demo_{get_invented_table_suffix(3)}"
+    demo_invented_e_table = f"demo_{get_invented_table_suffix(4)}"
+    demo_invented_d_table = f"demo_{get_invented_table_suffix(5)}"
+
     json_df = pd.read_json(json, orient="records")
     rel_data = RelationalData(directory=tmpdir)
     rel_data.add_table(name="demo", primary_key=None, data=json_df)
 
     assert set(rel_data.list_all_tables(Scope.ALL)) == {
         "demo",
-        "demo-sfx",
-        "demo-d-sfx",
-        "demo-e-sfx",
-        "demo-f-sfx",
-        "demo-f-content-ff-sfx",
+        demo_root_invented_table,
+        demo_invented_f_table,
+        demo_invented_f_content_ff_table,
+        demo_invented_e_table,
+        demo_invented_d_table,
     }
 
-    assert rel_data.get_table_columns("demo-sfx") == [
+    assert rel_data.get_table_columns(demo_root_invented_table) == [
         "~PRIMARY_KEY_ID~",
         "a",
         "b>bb",
         "c>cc>ccc",
     ]
-    assert rel_data.get_table_columns("demo-d-sfx") == [
+    assert rel_data.get_table_columns(demo_invented_d_table) == [
         "~PRIMARY_KEY_ID~",
         "demo~id",
         "content",
         "array~order",
     ]
-    assert rel_data.get_table_columns("demo-e-sfx") == [
+    assert rel_data.get_table_columns(demo_invented_e_table) == [
         "~PRIMARY_KEY_ID~",
         "demo~id",
         "array~order",
         "content>ee",
     ]
-    assert rel_data.get_table_columns("demo-f-sfx") == [
+    assert rel_data.get_table_columns(demo_invented_f_table) == [
         "~PRIMARY_KEY_ID~",
         "demo~id",
         "array~order",
     ]
-    assert rel_data.get_table_columns("demo-f-content-ff-sfx") == [
+    assert rel_data.get_table_columns(demo_invented_f_content_ff_table) == [
         "~PRIMARY_KEY_ID~",
         "demo^f~id",
         "array~order",
@@ -726,7 +791,7 @@ def test_flatten_and_restore_all_sorts_of_json(tmpdir):
     ]
 
     output_tables = {
-        "demo-sfx": pd.DataFrame(
+        demo_root_invented_table: pd.DataFrame(
             data={
                 "a": [1, 2],
                 "b>bb": [3, 4],
@@ -734,7 +799,7 @@ def test_flatten_and_restore_all_sorts_of_json(tmpdir):
                 "~PRIMARY_KEY_ID~": [0, 1],
             }
         ),
-        "demo-d-sfx": pd.DataFrame(
+        demo_invented_d_table: pd.DataFrame(
             data={
                 "content": [10, 11, 12, 13],
                 "~PRIMARY_KEY_ID~": [0, 1, 2, 3],
@@ -742,7 +807,7 @@ def test_flatten_and_restore_all_sorts_of_json(tmpdir):
                 "array~order": [0, 1, 2, 0],
             }
         ),
-        "demo-e-sfx": pd.DataFrame(
+        demo_invented_e_table: pd.DataFrame(
             data={
                 "content>ee": [100, 200, 300],
                 "~PRIMARY_KEY_ID~": [0, 1, 2],
@@ -750,10 +815,10 @@ def test_flatten_and_restore_all_sorts_of_json(tmpdir):
                 "array~order": [0, 0, 1],
             }
         ),
-        "demo-f-sfx": pd.DataFrame(
+        demo_invented_f_table: pd.DataFrame(
             data={"~PRIMARY_KEY_ID~": [0, 1], "demo~id": [0, 1], "array~order": [0, 0]}
         ),
-        "demo-f-content-ff-sfx": pd.DataFrame(
+        demo_invented_f_content_ff_table: pd.DataFrame(
             data={
                 "content>fff": [10, 11, 12],
                 "~PRIMARY_KEY_ID~": [0, 1, 2],
@@ -801,19 +866,25 @@ def test_lists_of_lists(tmpdir):
     rel_data = RelationalData(directory=tmpdir)
     rel_data.add_table(name="lol", primary_key=None, data=lol_df)
 
+    lol_invented_root_table = f"lol_{get_invented_table_suffix(1)}"
+    lol_invented_l_table = f"lol_{get_invented_table_suffix(2)}"
+    lol_invented_l_content_table = f"lol_{get_invented_table_suffix(3)}"
+
     assert set(rel_data.list_all_tables(Scope.ALL)) == {
         "lol",
-        "lol-sfx",
-        "lol-l-sfx",
-        "lol-l-content-sfx",
+        lol_invented_root_table,
+        lol_invented_l_table,
+        lol_invented_l_content_table,
     }
 
     output = {
-        "lol-sfx": pd.DataFrame(data={"a": [1, 2], "~PRIMARY_KEY_ID~": [0, 1]}),
-        "lol-l-sfx": pd.DataFrame(
+        lol_invented_root_table: pd.DataFrame(
+            data={"a": [1, 2], "~PRIMARY_KEY_ID~": [0, 1]}
+        ),
+        lol_invented_l_table: pd.DataFrame(
             data={"~PRIMARY_KEY_ID~": [0, 1], "lol~id": [0, 0], "array~order": [0, 1]}
         ),
-        "lol-l-content-sfx": pd.DataFrame(
+        lol_invented_l_content_table: pd.DataFrame(
             data={
                 "content": [10, 20, 30, 40],
                 "~PRIMARY_KEY_ID~": [0, 1, 2, 3],
@@ -844,18 +915,21 @@ def test_mix_of_dict_and_list_cols(tmpdir):
             "lcol": [["a", "b"], ["c", "d"]],
         }
     )
+    mix_invented_root_table = f"mix_{get_invented_table_suffix(1)}"
+    mix_invented_lcol_table = f"mix_{get_invented_table_suffix(2)}"
+
     rel_data = RelationalData(directory=tmpdir)
     rel_data.add_table(name="mix", primary_key=None, data=df)
     assert set(rel_data.list_all_tables()) == {
-        "mix-sfx",
-        "mix-lcol-sfx",
+        mix_invented_root_table,
+        mix_invented_lcol_table,
     }
-    assert rel_data.get_table_columns("mix-sfx") == [
+    assert rel_data.get_table_columns(mix_invented_root_table) == [
         "~PRIMARY_KEY_ID~",
         "id",
         "dcol>language",
     ]
-    assert rel_data.get_table_columns("mix-lcol-sfx") == [
+    assert rel_data.get_table_columns(mix_invented_lcol_table) == [
         "~PRIMARY_KEY_ID~",
         "mix~id",
         "content",
@@ -884,7 +958,7 @@ def test_all_tables_are_present_in_debug_summary(documents):
                 "foreign_keys": [
                     {
                         "columns": ["purchase_id"],
-                        "parent_table_name": "purchases-sfx",
+                        "parent_table_name": purchases_root_invented_table,
                         "parent_columns": ["id"],
                     }
                 ],
@@ -903,7 +977,7 @@ def test_all_tables_are_present_in_debug_summary(documents):
                 ],
                 "is_invented_table": False,
             },
-            "purchases-sfx": {
+            purchases_root_invented_table: {
                 "column_count": 6,
                 "primary_key": ["id", "~PRIMARY_KEY_ID~"],
                 "foreign_key_count": 1,
@@ -916,14 +990,14 @@ def test_all_tables_are_present_in_debug_summary(documents):
                 ],
                 "is_invented_table": True,
             },
-            "purchases-data-years-sfx": {
+            purchases_data_years_invented_table: {
                 "column_count": 4,
                 "primary_key": ["~PRIMARY_KEY_ID~"],
                 "foreign_key_count": 1,
                 "foreign_keys": [
                     {
                         "columns": ["purchases~id"],
-                        "parent_table_name": "purchases-sfx",
+                        "parent_table_name": purchases_root_invented_table,
                         "parent_columns": ["~PRIMARY_KEY_ID~"],
                     }
                 ],
@@ -934,36 +1008,24 @@ def test_all_tables_are_present_in_debug_summary(documents):
 
 
 @pytest.mark.no_mock_suffix
-def test_get_modelable_table_names_with_real_suffixes(documents):
-    # Given a source-with-JSON name, returns the tables invented from that source
-    assert set(documents.get_modelable_table_names("purchases")) == {
-        "purchases-a9563697877eb9ce",
-        "purchases-data-years-87087375ce849910",
-    }
+def test_invented_table_names_contain_uuid(documents: RelationalData):
+    regex = re.compile(r"purchases_invented_[a-fA-F0-9]{32}")
+    tables = documents.list_all_tables(Scope.INVENTED)
+    assert len(tables) == 2
+    assert regex.match(tables[0])
+    assert regex.match(tables[1])
 
-    # Invented tables are modelable
-    assert documents.get_modelable_table_names("purchases-a9563697877eb9ce") == [
-        "purchases-a9563697877eb9ce"
-    ]
-    assert documents.get_modelable_table_names(
-        "purchases-data-years-87087375ce849910"
-    ) == ["purchases-data-years-87087375ce849910"]
 
-    # Unknown tables return empty list
-    assert documents.get_modelable_table_names("nonsense") == []
+@pytest.mark.no_mock_suffix
+def test_generate_unique_table_name_truncates_length():
+    table_name_128_chars = "loremipsumdolorsitametconsecteturadipiscingelitseddoeiusmodtemporincididuntutlaboreetdoloremagnaaliquautenimadminimveniamquisnos"
+    result = generate_unique_table_name(table_name_128_chars)
+    assert len(result) < 128
 
 
 @pytest.mark.no_mock_suffix
 def test_deeply_nested_json_truncates_length(deeply_nested):
-    assert set(deeply_nested.list_all_tables(Scope.ALL)) == {
-        "deeply_nested",
-        "deeply_nested-452d8603d590d6aa",
-        "deeply_nested-level1_long_property_name-b4297ee35ffe49fb",
-        "deeply_nested-level1_long_property_name-content-level2_long_property_name-00f9d37cfc246a15",
-        "deeply_nested-level1_long_property_name-content-level2_long_property_name-content-level3_long_proper-34f94a8c6def9848",
-        "deeply_nested-level1_long_property_name-content-level2_long_property_name-content-level3_long_proper-da2440b6c76bcef8",
-        "deeply_nested-level1_long_property_name-content-level2_long_property_name-content-level3_long_proper-9d9a0d88fbe3c677",
-        "deeply_nested-level1_long_property_name-content-level2_long_property_name-content-level3_long_proper-c8f5c85e69ac07f1",
-        "deeply_nested-level1_long_property_name-content-level2_long_property_name-content-level3_long_proper-10576bd36c4759b3",
-        "deeply_nested-level1_long_property_name-content-level2_long_property_name-content-level3_long_proper-b0314221e5c1a615",
-    }
+    tables = deeply_nested.list_all_tables(Scope.ALL)
+    assert len(tables) == 10
+    for table in tables:
+        assert len(table) < 128

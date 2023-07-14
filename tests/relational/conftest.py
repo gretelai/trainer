@@ -25,8 +25,14 @@ def static_suffix(request):
         yield
         return
     with patch("gretel_trainer.relational.json.make_suffix") as make_suffix:
-        make_suffix.return_value = "sfx"
+        # Each call to make_suffix must be unique or there will be table collisions
+        make_suffix.side_effect = [f"sfx{i}" for i in range(1, 50)]
         yield
+
+
+# Doesn't work well as a fixture due to the need for an input param
+def get_invented_table_suffix(make_suffix_execution_number: int):
+    return f"invented_sfx{str(make_suffix_execution_number)}"
 
 
 @pytest.fixture()

@@ -1,11 +1,11 @@
 from __future__ import annotations
 
-import hashlib
 import logging
 import re
 from dataclasses import dataclass
 from json import JSONDecodeError, dumps, loads
 from typing import Any, Optional, Protocol, Union
+from uuid import uuid4
 
 import numpy as np
 import pandas as pd
@@ -116,16 +116,18 @@ def _is_invented_child_table(table: str, rel_data: _RelationalData) -> bool:
     return imeta is not None and imeta.invented_root_table_name != table
 
 
-def sanitize_str(s):
+def generate_unique_table_name(s: str):
     sanitized_str = "-".join(re.findall(r"[a-zA-Z_0-9]+", s))
-    # Generate suffix from original string, in case of sanitized_str collision
-    unique_suffix = make_suffix(s)
-    # Max length for a filename is 128 chars
-    return f"{sanitized_str[:100]}-{unique_suffix}"
+    # Generate unique suffix to prevent collisions
+    unique_suffix = make_suffix()
+    # Max length for a table/filename is 128 chars
+    return f"{sanitized_str[:80]}_invented_{unique_suffix}"
 
 
-def make_suffix(s):
-    return hashlib.sha256(s.encode("utf-8")).hexdigest()[:16]
+def make_suffix():
+    # Dropping hyphens to save on space since max table/filename length is 128 and we do not need to comply with RFC 4122
+    drop_hyphens = str(uuid4()).split("-")
+    return "".join(drop_hyphens)
 
 
 def jsonencode(df: pd.DataFrame, cols: list[str]) -> pd.DataFrame:
@@ -214,7 +216,8 @@ def ingest(
 
     # If we created additional tables (from JSON lists) or added columns (from JSON dicts)
     if len(tables) > 1 or len(tables[0][1].columns) > len(df.columns):
-        mappings = {name: sanitize_str(name) for name, _ in tables}
+        # Map json breadcrumbs to uniquely generated table name
+        mappings = {name: generate_unique_table_name(table_name) for name, _ in tables}
         logger.info(f"Transformed JSON into {len(mappings)} tables for modeling.")
         logger.debug(f"Invented table names: {list(mappings.values())}")
         commands = _generate_commands(
