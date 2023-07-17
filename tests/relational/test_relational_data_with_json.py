@@ -1009,7 +1009,7 @@ def test_all_tables_are_present_in_debug_summary(documents):
 
 
 @pytest.mark.no_mock_suffix
-def test_invented_table_names_contain_uuid(documents: RelationalData):
+def test_invented_table_names_contain_uuid(documents):
     regex = re.compile(r"purchases_invented_[a-fA-F0-9]{32}")
     tables = documents.list_all_tables(Scope.INVENTED)
     assert len(tables) == 2
