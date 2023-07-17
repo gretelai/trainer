@@ -1,6 +1,6 @@
+import itertools
 import re
 import tempfile
-from unittest.mock import patch
 
 import pandas as pd
 import pandas.testing as pdtest
@@ -189,7 +189,7 @@ def test_get_modelable_names_ignores_empty_mapped_tables(bball):
     }
 
 
-def test_invented_json_column_names(documents, bball):
+def test_invented_json_column_names_documents(documents):
     # The root invented table adds columns for dictionary properties lifted from nested JSON objects
     assert documents.get_table_columns(purchases_root_invented_table) == [
         "~PRIMARY_KEY_ID~",
@@ -209,9 +209,11 @@ def test_invented_json_column_names(documents, bball):
         "array~order",
     ]
 
+
+def test_invented_json_column_names_bball(bball):
     # If the source table does not have a primary key defined, one is created on the root invented table
     # (bball_teams_invented_table is the root invented table)
-    assert bball.get_table_columns(bball_teams_invented_table) == [
+    assert bball.get_table_columns(bball_root_invented_table) == [
         "~PRIMARY_KEY_ID~",
         "name",
         "age",
@@ -220,11 +222,7 @@ def test_invented_json_column_names(documents, bball):
     ]
 
 
-@patch("gretel_trainer.relational.json.make_suffix")
-def test_set_some_primary_key_to_none(mock_make_suffix, documents):
-    # We need to reset the side_effect iterator later in the test, so we manually mock it
-    mock_make_suffix.side_effect = [f"sfx{i}" for i in range(1, 50)]
-
+def test_set_some_primary_key_to_none(static_suffix, documents):
     # The producer table has a single column primary key,
     # so the root invented table has a composite key that includes the source PK and an invented column
     assert documents.get_primary_key("purchases") == ["id"]
@@ -235,11 +233,11 @@ def test_set_some_primary_key_to_none(mock_make_suffix, documents):
 
     # Setting an existing primary key to None puts us in the correct state
     assert len(documents.list_all_tables(Scope.ALL)) == 5
-    original_payments_fks: list[ForeignKey] = documents.get_foreign_keys("payments")
+    original_payments_fks = documents.get_foreign_keys("payments")
 
     # Reset the make_suffix iterator back to original count since set_primary_key will call it again
     # once for each invented table.
-    mock_make_suffix.side_effect = [f"sfx{i}" for i in range(1, 50)]
+    static_suffix.side_effect = itertools.count(start=1)
 
     # Setting the primary key causes json invented tables to be dropped and reingested
     documents.set_primary_key(table="purchases", primary_key=None)
@@ -259,11 +257,7 @@ def test_set_some_primary_key_to_none(mock_make_suffix, documents):
     assert documents.get_foreign_keys("payments") == original_payments_fks
 
 
-@patch("gretel_trainer.relational.json.make_suffix")
-def test_set_none_primary_key_to_some_value(mock_make_suffix, bball):
-    # We need to reset the side_effect iterator later in the test, so we manually mock it
-    mock_make_suffix.side_effect = [f"sfx{i}" for i in range(1, 50)]
-
+def test_set_none_primary_key_to_some_value(static_suffix, bball):
     # The producer table has no primary key,
     # so the root invented table has a single invented key column
     assert bball.get_primary_key("bball") == []
@@ -274,7 +268,7 @@ def test_set_none_primary_key_to_some_value(mock_make_suffix, bball):
 
     # Reset the make_suffix iterator back to original count since set_primary_key will call it again
     # once for each invented table.
-    mock_make_suffix.side_effect = [f"sfx{i}" for i in range(1, 50)]
+    static_suffix.side_effect = itertools.count(start=1)
 
     bball.set_primary_key(table="bball", primary_key="name")
     assert len(bball.list_all_tables(Scope.ALL)) == 4
@@ -355,11 +349,7 @@ def test_foreign_keys(documents):
     assert documents.get_foreign_keys(purchases_root_invented_table) == []
 
 
-@patch("gretel_trainer.relational.json.make_suffix")
-def test_update_data_with_existing_json_to_new_json(mock_make_suffix, documents):
-    # We need to reset the side_effect iterator later in the test, so we manually mock it
-    mock_make_suffix.side_effect = [f"sfx{i}" for i in range(1, 50)]
-
+def test_update_data_with_existing_json_to_new_json(static_suffix, documents):
     new_purchases_jsonl = """
     {"id": 1, "user_id": 1, "data": {"item": "watercolor", "cost": 200, "details": {"color": "aquamarine"}, "years": [1999]}}
     {"id": 2, "user_id": 2, "data": {"item": "watercolor", "cost": 200, "details": {"color": "aquamarine"}, "years": [1999]}}
@@ -372,7 +362,7 @@ def test_update_data_with_existing_json_to_new_json(mock_make_suffix, documents)
 
     # Reset the make_suffix iterator back to original count since make_suffix will be called again
     # once for each invented table.
-    mock_make_suffix.side_effect = [f"sfx{i}" for i in range(1, 50)]
+    static_suffix.side_effect = itertools.count(start=1)
 
     documents.update_table_data("purchases", data=new_purchases_df)
 
@@ -467,11 +457,7 @@ def test_update_data_existing_json_to_no_json(documents):
     ]
 
 
-@patch("gretel_trainer.relational.json.make_suffix")
-def test_update_data_existing_flat_to_json(mock_make_suffix, documents):
-    # We need to reset the side_effect iterator later in the test, so we manually mock it
-    mock_make_suffix.side_effect = [f"sfx{i}" for i in range(1, 50)]
-
+def test_update_data_existing_flat_to_json(static_suffix, documents):
     # Build up a RelationalData instance that basically mirrors documents,
     # but purchases is flat to start and thus there are no RelationalJson instances
     flat_purchases_df = pd.DataFrame(
@@ -507,7 +493,7 @@ def test_update_data_existing_flat_to_json(mock_make_suffix, documents):
 
         # Reset the make_suffix iterator back to original count since make_suffix will be called again
         # once for each invented table.
-        mock_make_suffix.side_effect = [f"sfx{i}" for i in range(1, 50)]
+        static_suffix.side_effect = itertools.count(start=1)
         rel_data.update_table_data("purchases", documents.get_table_data("purchases"))
 
     assert set(rel_data.list_all_tables(Scope.ALL)) == {

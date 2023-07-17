@@ -1,0 +1,4 @@
+[tool.pytest.ini_options]
+markers = [
+    "no_mock_suffix",
+]

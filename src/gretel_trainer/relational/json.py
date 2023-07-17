@@ -125,9 +125,7 @@ def generate_unique_table_name(s: str):
 
 
 def make_suffix():
-    # Dropping hyphens to save on space since max table/filename length is 128 and we do not need to comply with RFC 4122
-    drop_hyphens = str(uuid4()).split("-")
-    return "".join(drop_hyphens)
+    return uuid4().hex
 
 
 def jsonencode(df: pd.DataFrame, cols: list[str]) -> pd.DataFrame:
