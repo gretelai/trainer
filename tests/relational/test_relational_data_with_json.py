@@ -212,7 +212,6 @@ def test_invented_json_column_names_documents(documents):
 
 def test_invented_json_column_names_bball(bball):
     # If the source table does not have a primary key defined, one is created on the root invented table
-    # (bball_teams_invented_table is the root invented table)
     assert bball.get_table_columns(bball_root_invented_table) == [
         "~PRIMARY_KEY_ID~",
         "name",
@@ -1009,7 +1008,7 @@ def test_all_tables_are_present_in_debug_summary(documents):
 
 
 @pytest.mark.no_mock_suffix
-def test_invented_table_names_contain_uuid(documents):
+def test_invented_table_names_contain_uuid(documents: RelationalData):
     regex = re.compile(r"purchases_invented_[a-fA-F0-9]{32}")
     tables = documents.list_all_tables(Scope.INVENTED)
     assert len(tables) == 2

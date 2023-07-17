@@ -813,19 +813,14 @@ class RelationalData:
                 "foreign_keys": foreign_keys,
                 "is_invented_table": self._is_invented(table),
             }
-            if (
-                self.is_producer_of_invented_tables(table)
-                and (producer_metadata := self.get_producer_metadata(table)) is not None
-            ):
+            if (producer_metadata := self.get_producer_metadata(table)) is not None:
                 table_metadata["invented_table_details"] = {
                     "table_type": "producer",
                     "json_to_table_mappings": producer_metadata.table_name_mappings,
                 }
             elif (
-                self._is_invented(table)
-                and (invented_table_metadata := self.get_invented_table_metadata(table))
-                is not None
-            ):
+                invented_table_metadata := self.get_invented_table_metadata(table)
+            ) is not None:
                 table_metadata["invented_table_details"] = {
                     "table_type": "invented",
                     "json_breadcrumb_path": invented_table_metadata.json_breadcrumb_path,

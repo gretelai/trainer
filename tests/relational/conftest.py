@@ -82,27 +82,27 @@ def tmpfile():
 
 
 @pytest.fixture()
-def pets(tmpdir):
+def pets(tmpdir) -> Generator[RelationalData, None, None]:
     yield _rel_data_connector("pets").extract(storage_dir=tmpdir)
 
 
 @pytest.fixture()
-def ecom(tmpdir):
+def ecom(tmpdir) -> Generator[RelationalData, None, None]:
     yield _rel_data_connector("ecom").extract(storage_dir=tmpdir)
 
 
 @pytest.fixture()
-def mutagenesis(tmpdir):
+def mutagenesis(tmpdir) -> Generator[RelationalData, None, None]:
     yield _rel_data_connector("mutagenesis").extract(storage_dir=tmpdir)
 
 
 @pytest.fixture()
-def tpch(tmpdir):
+def tpch(tmpdir) -> Generator[RelationalData, None, None]:
     yield _rel_data_connector("tpch").extract(storage_dir=tmpdir)
 
 
 @pytest.fixture()
-def art(tmpdir):
+def art(tmpdir) -> Generator[RelationalData, None, None]:
     yield _rel_data_connector("art").extract(storage_dir=tmpdir)
 
 
@@ -112,7 +112,7 @@ def documents(tmpdir) -> Generator[RelationalData, None, None]:
 
 
 @pytest.fixture()
-def trips(tmpdir):
+def trips(tmpdir) -> Generator[RelationalData, None, None]:
     with tempfile.NamedTemporaryFile() as tmpfile:
         data = pd.DataFrame(
             data={
