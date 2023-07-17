@@ -11,6 +11,7 @@ from gretel_trainer.relational.backup import (
     BackupSyntheticsTrain,
     BackupTransformsTrain,
 )
+from tests.relational.conftest import get_invented_table_suffix
 
 
 def test_backup_relational_data(trips):
@@ -37,32 +38,37 @@ def test_backup_relational_data(trips):
 
 
 def test_backup_relational_data_with_json(documents):
+    purchases_root_invented_table = f"purchases_{get_invented_table_suffix(1)}"
+    purchases_data_years_invented_table = f"purchases_{get_invented_table_suffix(2)}"
+
     expected = BackupRelationalData(
         tables={
             "users": BackupRelationalDataTable(primary_key=["id"]),
             "purchases": BackupRelationalDataTable(
                 primary_key=["id"],
                 producer_metadata={
-                    "invented_root_table_name": "purchases-sfx",
+                    "invented_root_table_name": purchases_root_invented_table,
                     "table_name_mappings": {
-                        "purchases": "purchases-sfx",
-                        "purchases^data>years": "purchases-data-years-sfx",
+                        "purchases": purchases_root_invented_table,
+                        "purchases^data>years": purchases_data_years_invented_table,
                     },
                 },
             ),
-            "purchases-sfx": BackupRelationalDataTable(
+            purchases_root_invented_table: BackupRelationalDataTable(
                 primary_key=["id", "~PRIMARY_KEY_ID~"],
                 invented_table_metadata={
-                    "invented_root_table_name": "purchases-sfx",
+                    "invented_root_table_name": purchases_root_invented_table,
                     "original_table_name": "purchases",
+                    "json_breadcrumb_path": "purchases",
                     "empty": False,
                 },
             ),
-            "purchases-data-years-sfx": BackupRelationalDataTable(
+            purchases_data_years_invented_table: BackupRelationalDataTable(
                 primary_key=["~PRIMARY_KEY_ID~"],
                 invented_table_metadata={
-                    "invented_root_table_name": "purchases-sfx",
+                    "invented_root_table_name": purchases_root_invented_table,
                     "original_table_name": "purchases",
+                    "json_breadcrumb_path": "purchases^data>years",
                     "empty": False,
                 },
             ),
@@ -72,19 +78,19 @@ def test_backup_relational_data_with_json(documents):
             BackupForeignKey(
                 table="payments",
                 constrained_columns=["purchase_id"],
-                referred_table="purchases-sfx",
+                referred_table=purchases_root_invented_table,
                 referred_columns=["id"],
             ),
             BackupForeignKey(
-                table="purchases-sfx",
+                table=purchases_root_invented_table,
                 constrained_columns=["user_id"],
                 referred_table="users",
                 referred_columns=["id"],
             ),
             BackupForeignKey(
-                table="purchases-data-years-sfx",
+                table=purchases_data_years_invented_table,
                 constrained_columns=["purchases~id"],
-                referred_table="purchases-sfx",
+                referred_table=purchases_root_invented_table,
                 referred_columns=["~PRIMARY_KEY_ID~"],
             ),
         ],

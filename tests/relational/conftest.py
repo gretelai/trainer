@@ -1,6 +1,8 @@
+import itertools
 import sqlite3
 import tempfile
 from pathlib import Path
+from typing import Generator
 from unittest.mock import Mock, patch
 
 import pandas as pd
@@ -20,10 +22,19 @@ def extended_sdk():
 
 
 @pytest.fixture(autouse=True)
-def static_suffix():
-    with patch("gretel_trainer.relational.json.make_suffix") as make_suffix:
-        make_suffix.return_value = "sfx"
+def static_suffix(request):
+    if "no_mock_suffix" in request.keywords:
         yield
+        return
+    with patch("gretel_trainer.relational.json.make_suffix") as make_suffix:
+        # Each call to make_suffix must be unique or there will be table collisions
+        make_suffix.side_effect = itertools.count(start=1)
+        yield make_suffix
+
+
+# Doesn't work well as a fixture due to the need for an input param
+def get_invented_table_suffix(make_suffix_execution_number: int):
+    return f"invented_{str(make_suffix_execution_number)}"
 
 
 @pytest.fixture()
@@ -71,37 +82,37 @@ def tmpfile():
 
 
 @pytest.fixture()
-def pets(tmpdir):
+def pets(tmpdir) -> Generator[RelationalData, None, None]:
     yield _rel_data_connector("pets").extract(storage_dir=tmpdir)
 
 
 @pytest.fixture()
-def ecom(tmpdir):
+def ecom(tmpdir) -> Generator[RelationalData, None, None]:
     yield _rel_data_connector("ecom").extract(storage_dir=tmpdir)
 
 
 @pytest.fixture()
-def mutagenesis(tmpdir):
+def mutagenesis(tmpdir) -> Generator[RelationalData, None, None]:
     yield _rel_data_connector("mutagenesis").extract(storage_dir=tmpdir)
 
 
 @pytest.fixture()
-def tpch(tmpdir):
+def tpch(tmpdir) -> Generator[RelationalData, None, None]:
     yield _rel_data_connector("tpch").extract(storage_dir=tmpdir)
 
 
 @pytest.fixture()
-def art(tmpdir):
+def art(tmpdir) -> Generator[RelationalData, None, None]:
     yield _rel_data_connector("art").extract(storage_dir=tmpdir)
 
 
 @pytest.fixture()
-def documents(tmpdir):
+def documents(tmpdir) -> Generator[RelationalData, None, None]:
     yield _rel_data_connector("documents").extract(storage_dir=tmpdir)
 
 
 @pytest.fixture()
-def trips(tmpdir):
+def trips(tmpdir) -> Generator[RelationalData, None, None]:
     with tempfile.NamedTemporaryFile() as tmpfile:
         data = pd.DataFrame(
             data={
