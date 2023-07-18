@@ -8,5 +8,6 @@ from gretel_trainer.relational.connectors import (
     sqlite_conn,
 )
 from gretel_trainer.relational.core import RelationalData
+from gretel_trainer.relational.extractor import ExtractorConfig
 from gretel_trainer.relational.log import set_log_level
 from gretel_trainer.relational.multi_table import MultiTable
