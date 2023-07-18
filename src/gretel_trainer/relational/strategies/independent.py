@@ -52,7 +52,9 @@ class IndependentStrategy:
 
             pd.DataFrame(columns=use_columns).to_csv(path, index=False)
             source_path = rel_data.get_table_source(table)
-            for chunk in pd.read_csv(source_path, usecols=use_columns, chunksize=10_000):
+            for chunk in pd.read_csv(
+                source_path, usecols=use_columns, chunksize=10_000
+            ):
                 chunk.to_csv(path, index=False, mode="a", header=False)
 
         return table_paths
@@ -229,15 +231,22 @@ def _synthesize_primary_keys(
         elif len(primary_key) == 1:
             processed[table_name][primary_key[0]] = [i for i in range(synth_row_count)]
         else:
-            synthetic_pk_columns = common.make_composite_pk_columns(
+            synthetic_pk_columns = common.make_composite_pks(
                 table_name=table_name,
                 rel_data=rel_data,
                 primary_key=primary_key,
                 synth_row_count=synth_row_count,
-                record_size_ratio=record_size_ratio,
             )
-            for index, col in enumerate(primary_key):
-                processed[table_name][col] = synthetic_pk_columns[index]
+
+            # make_composite_pks may not have created as many unique keys as we have
+            # synthetic rows, so we truncate the table to avoid inserting NaN PKs.
+            processed[table_name] = pd.concat(
+                [
+                    processed[table_name].head(len(synthetic_pk_columns)),
+                    pd.DataFrame.from_records(synthetic_pk_columns),
+                ],
+                axis=1,
+            )
 
     return processed
 

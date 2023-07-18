@@ -242,7 +242,6 @@ class AncestralStrategy:
         """
         processed = synthetic_table
 
-        primary_key = rel_data.get_primary_key(table_name)
         multigenerational_primary_key = ancestry.get_multigenerational_primary_key(
             rel_data, table_name
         )
@@ -254,15 +253,24 @@ class AncestralStrategy:
                 i for i in range(len(synthetic_table))
             ]
         else:
-            synthetic_pk_columns = common.make_composite_pk_columns(
+            synthetic_pk_columns = common.make_composite_pks(
                 table_name=table_name,
                 rel_data=rel_data,
-                primary_key=primary_key,
+                primary_key=multigenerational_primary_key,
                 synth_row_count=len(synthetic_table),
-                record_size_ratio=record_size_ratio,
             )
-            for index, col in enumerate(multigenerational_primary_key):
-                processed[col] = synthetic_pk_columns[index]
+
+            # make_composite_pks may not have created as many unique keys as we have
+            # synthetic rows, so we truncate the table to avoid inserting NaN PKs.
+            processed = pd.concat(
+                [
+                    pd.DataFrame.from_records(synthetic_pk_columns),
+                    processed.drop(multigenerational_primary_key, axis="columns").head(
+                        len(synthetic_pk_columns)
+                    ),
+                ],
+                axis=1,
+            )
 
         for fk_map in ancestry.get_ancestral_foreign_key_maps(rel_data, table_name):
             fk_col, parent_pk_col = fk_map

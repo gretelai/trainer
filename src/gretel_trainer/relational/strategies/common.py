@@ -1,6 +1,5 @@
 import json
 import logging
-import math
 import random
 from pathlib import Path
 from typing import Optional
@@ -10,7 +9,7 @@ import smart_open
 from gretel_client.projects.models import Model
 from sklearn import preprocessing
 
-from gretel_trainer.relational.core import RelationalData
+from gretel_trainer.relational.core import MultiTableException, RelationalData
 from gretel_trainer.relational.sdk_extras import ExtendedGretelSDK
 
 logger = logging.getLogger(__name__)
@@ -107,28 +106,107 @@ def label_encode_keys(
     return tables
 
 
-def make_composite_pk_columns(
+def make_composite_pks(
     table_name: str,
     rel_data: RelationalData,
     primary_key: list[str],
     synth_row_count: int,
-    record_size_ratio: float,
-) -> list[tuple]:
-    source_pk_columns = rel_data.get_table_data(table_name)[primary_key]
-    unique_counts = source_pk_columns.nunique(axis=0)
-    new_key_columns_values = []
-    for col in primary_key:
-        synth_values_count = math.ceil(unique_counts[col] * record_size_ratio)
-        new_key_columns_values.append(range(synth_values_count))
+) -> list[dict]:
+    # Given the randomness involved in this process, it is possible for this function to generate
+    # fewer unique composite keys than desired to completely fill the dataframe (i.e. the length
+    # of the tuple values in the dictionary may be < synth_row_count). It is the client's
+    # responsibility to check for this and drop synthetic records if necessary to fit.
+    table_data = rel_data.get_table_data(table_name)
+    original_primary_key = rel_data.get_primary_key(table_name)
 
-    results = set()
-    while len(results) < synth_row_count:
-        key_combination = tuple(
-            [random.choice(vals) for vals in new_key_columns_values]
+    pk_component_frequencies = {
+        col: get_frequencies(table_data, [col]) for col in original_primary_key
+    }
+
+    # each key in new_cols is a column name, and each value is a list of
+    # column values. The values are a contiguous list of integers, with
+    # each integer value appearing 1-N times to match the frequencies of
+    # (original source) values' appearances in the source data.
+    new_cols: dict[str, list] = {}
+    for i, col in enumerate(primary_key):
+        freqs = pk_component_frequencies[original_primary_key[i]]
+        next_freq = 0
+        next_key = 0
+        new_col_values = []
+
+        while len(new_col_values) < synth_row_count:
+            for i in range(freqs[next_freq]):
+                new_col_values.append(next_key)
+            next_key += 1
+            next_freq += 1
+            if next_freq == len(freqs):
+                next_freq = 0
+
+        # A large frequency may have added more values than we need,
+        # so trim to synth_row_count
+        new_cols[col] = new_col_values[0:synth_row_count]
+
+    # Shuffle for realism
+    for col_name, col_values in new_cols.items():
+        random.shuffle(col_values)
+
+    # Zip the individual columns into a list of records.
+    # Each element in the list is a composite key dict.
+    composite_keys: list[dict] = []
+    for i in range(synth_row_count):
+        comp_key = {}
+        for col_name, col_values in new_cols.items():
+            comp_key[col_name] = col_values[i]
+        composite_keys.append(comp_key)
+
+    # The zip above may not have produced unique composite key dicts.
+    # Using the most unique column (to give us the most options), try
+    # changing a value to "resolve" candidate composite keys to unique combinations.
+    cant_resolve = 0
+    seen: set[str] = set()
+    final_synthetic_composite_keys: list[dict] = []
+    most_unique_column = _get_most_unique_column(primary_key, pk_component_frequencies)
+
+    for i in range(synth_row_count):
+        y = i + 1
+        if y == len(composite_keys):
+            y = 0
+
+        comp_key = composite_keys[i]
+
+        while str(comp_key) in seen and y != i:
+            last_val = new_cols[most_unique_column][y]
+            y += 1
+            if y == len(composite_keys):
+                y = 0
+            comp_key[most_unique_column] = last_val
+        if str(comp_key) in seen:
+            cant_resolve += 1
+        else:
+            final_synthetic_composite_keys.append(comp_key)
+            seen.add(str(comp_key))
+
+    return final_synthetic_composite_keys
+
+
+def _get_most_unique_column(pk: list[str], col_freqs: dict[str, list]) -> str:
+    most_unique = None
+    max_length = 0
+    for col, freqs in col_freqs.items():
+        if len(freqs) > max_length:
+            most_unique = col
+
+    if most_unique is None:
+        raise MultiTableException(
+            f"Failed to identify most unique column from column frequencies: {col_freqs}"
         )
-        results.add(key_combination)
 
-    return list(zip(*results))
+    # The keys in col_freqs are always the source column names from the original primary key.
+    # Meanwhile, `pk` could be either the same (independent strategy) or in multigenerational
+    # format (ancestral strategy). We need to return the column name in the format matching
+    # the rest of the synthetic data undergoing post-processing.
+    idx = list(col_freqs.keys()).index(most_unique)
+    return pk[idx]
 
 
 def get_frequencies(table_data: pd.DataFrame, cols: list[str]) -> list[int]:

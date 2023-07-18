@@ -18,31 +18,30 @@ def test_composite_pk_columns(tmpdir):
         data=df,
     )
 
-    result = common.make_composite_pk_columns(
+    result = common.make_composite_pks(
         table_name="table",
         rel_data=rel_data,
         primary_key=["letter", "number"],
         synth_row_count=8,
-        record_size_ratio=1.0,
     )
 
-    # There is a tuple of values for each primary key column
-    assert len(result) == 2
+    # Label-encoding turns the keys into zero-indexed contiguous integers.
+    # It is absolutely required that all composite keys returned are unique.
+    # We also ideally recreate the original data frequencies (in this case,
+    # two unique letters and four unique numbers).
+    expected_keys = [
+        {"letter": 0, "number": 0},
+        {"letter": 0, "number": 1},
+        {"letter": 0, "number": 2},
+        {"letter": 0, "number": 3},
+        {"letter": 1, "number": 0},
+        {"letter": 1, "number": 1},
+        {"letter": 1, "number": 2},
+        {"letter": 1, "number": 3},
+    ]
 
-    # Each tuple has enough values for the synthetic result
-    for t in result:
-        assert len(t) == 8
-
-    # Each combination is unique
-    synthetic_pks = set(zip(*result))
-    assert len(synthetic_pks) == 8
-
-    # The set of unique values in each synthetic column roughly matches
-    # the set of unique values in the source columns.
-    # In this example they match exactly because there are no other possible combinations,
-    # but in practice it's possible to randomly not-select some values.
-    assert len(set(result[0])) == 2
-    assert len(set(result[1])) == 4
+    for expected_key in expected_keys:
+        assert expected_key in result
 
 
 def test_composite_pk_columns_2(tmpdir):
@@ -59,28 +58,27 @@ def test_composite_pk_columns_2(tmpdir):
         data=df,
     )
 
-    result = common.make_composite_pk_columns(
+    result = common.make_composite_pks(
         table_name="table",
         rel_data=rel_data,
         primary_key=["letter", "number"],
         synth_row_count=8,
-        record_size_ratio=1.0,
     )
 
-    # There is a tuple of values for each primary key column
-    assert len(result) == 2
-
-    # Each tuple has enough values for the synthetic result
-    for t in result:
-        assert len(t) == 8
+    # We create as many keys as we need
+    assert len(result) == 8
 
     # Each combination is unique
-    synthetic_pks = set(zip(*result))
-    assert len(synthetic_pks) == 8
+    assert len(set([str(composite_key) for composite_key in result])) == 8
 
-    # The set of unique values in each synthetic column roughly matches
-    # the set of unique values in the source columns.
-    # In this example, there are more potential combinations than there are synthetic rows,
-    # so our assertions are not as strict.
-    assert len(set(result[0])) <= 2
-    assert len(set(result[1])) <= 8
+    # In this case, there are more potential unique combinations than there are synthetic rows,
+    # so we can't say for sure what the exact composite values will be. However, we do expect
+    # the original frequencies to be maintained.
+    synthetic_letters = [key["letter"] for key in result]
+    assert len(synthetic_letters) == 8
+    assert set(synthetic_letters) == {0, 1}
+    assert len([x for x in synthetic_letters if x != 0]) == 4
+
+    synthetic_numbers = [key["number"] for key in result]
+    assert len(synthetic_numbers) == 8
+    assert set(synthetic_numbers) == {0, 1, 2, 3, 4, 5, 6, 7}
