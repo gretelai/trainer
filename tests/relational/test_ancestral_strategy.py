@@ -528,16 +528,16 @@ def test_post_processing_individual_synthetic_result_composite_keys(tpch):
     strategy = AncestralStrategy()
     synth_lineitem = pd.DataFrame(
         data={
-            "self|l_partkey": [10, 20, 30, 40],
-            "self|l_suppkey": [10, 20, 30, 40],
-            "self|l_quantity": [42, 42, 42, 42],
-            "self.l_partkey+l_suppkey|ps_partkey": [2, 3, 4, 5],
-            "self.l_partkey+l_suppkey|ps_suppkey": [6, 7, 8, 9],
-            "self.l_partkey+l_suppkey|ps_availqty": [80, 80, 80, 80],
-            "self.l_partkey+l_suppkey.ps_partkey|p_partkey": [2, 3, 4, 5],
-            "self.l_partkey+l_suppkey.ps_partkey|p_name": ["a", "b", "c", "d"],
-            "self.l_partkey+l_suppkey.ps_suppkey|s_suppkey": [6, 7, 8, 9],
-            "self.l_partkey+l_suppkey.ps_suppkey|s_name": ["e", "f", "g", "h"],
+            "self|l_partkey": [10, 20, 30, 40] * 3,
+            "self|l_suppkey": [10, 20, 30, 40] * 3,
+            "self|l_quantity": [42, 42, 42, 42] * 3,
+            "self.l_partkey+l_suppkey|ps_partkey": [2, 3, 4, 5] * 3,
+            "self.l_partkey+l_suppkey|ps_suppkey": [6, 7, 8, 9] * 3,
+            "self.l_partkey+l_suppkey|ps_availqty": [80, 80, 80, 80] * 3,
+            "self.l_partkey+l_suppkey.ps_partkey|p_partkey": [2, 3, 4, 5] * 3,
+            "self.l_partkey+l_suppkey.ps_partkey|p_name": ["a", "b", "c", "d"] * 3,
+            "self.l_partkey+l_suppkey.ps_suppkey|s_suppkey": [6, 7, 8, 9] * 3,
+            "self.l_partkey+l_suppkey.ps_suppkey|s_name": ["e", "f", "g", "h"] * 3,
         }
     )
 
@@ -545,6 +545,60 @@ def test_post_processing_individual_synthetic_result_composite_keys(tpch):
         "lineitem", tpch, synth_lineitem, 1
     )
 
+    expected_post_processing = pd.DataFrame(
+        data={
+            "self|l_partkey": [2, 3, 4, 5] * 3,
+            "self|l_suppkey": [6, 7, 8, 9] * 3,
+            "self|l_quantity": [42, 42, 42, 42] * 3,
+            "self.l_partkey+l_suppkey|ps_partkey": [2, 3, 4, 5] * 3,
+            "self.l_partkey+l_suppkey|ps_suppkey": [6, 7, 8, 9] * 3,
+            "self.l_partkey+l_suppkey|ps_availqty": [80, 80, 80, 80] * 3,
+            "self.l_partkey+l_suppkey.ps_partkey|p_partkey": [2, 3, 4, 5] * 3,
+            "self.l_partkey+l_suppkey.ps_partkey|p_name": ["a", "b", "c", "d"] * 3,
+            "self.l_partkey+l_suppkey.ps_suppkey|s_suppkey": [6, 7, 8, 9] * 3,
+            "self.l_partkey+l_suppkey.ps_suppkey|s_name": ["e", "f", "g", "h"] * 3,
+        }
+    )
+
+    pdtest.assert_frame_equal(expected_post_processing, processed_lineitem)
+
+
+def test_post_processing_individual_composite_too_few_keys_created(tpch):
+    strategy = AncestralStrategy()
+    synth_lineitem = pd.DataFrame(
+        data={
+            "self|l_partkey": [10, 20, 30, 40] * 3,
+            "self|l_suppkey": [10, 20, 30, 40] * 3,
+            "self|l_quantity": [42, 42, 42, 42] * 3,
+            "self.l_partkey+l_suppkey|ps_partkey": [2, 3, 4, 5] * 3,
+            "self.l_partkey+l_suppkey|ps_suppkey": [6, 7, 8, 9] * 3,
+            "self.l_partkey+l_suppkey|ps_availqty": [80, 80, 80, 80] * 3,
+            "self.l_partkey+l_suppkey.ps_partkey|p_partkey": [2, 3, 4, 5] * 3,
+            "self.l_partkey+l_suppkey.ps_partkey|p_name": ["a", "b", "c", "d"] * 3,
+            "self.l_partkey+l_suppkey.ps_suppkey|s_suppkey": [6, 7, 8, 9] * 3,
+            "self.l_partkey+l_suppkey.ps_suppkey|s_name": ["e", "f", "g", "h"] * 3,
+        }
+    )
+
+    # Given inherent randomness, make_composite_pks can fail to produce enough
+    # unique composite keys to fill the entire synthetic dataframe. In such situations,
+    # the client drops records from the raw record handler output and the resulting
+    # synthetic table only has as many records as keys produced.
+    with patch(
+        "gretel_trainer.relational.strategies.ancestral.common.make_composite_pks"
+    ) as make_keys:
+        make_keys.return_value = [
+            {"self|l_partkey": 55, "self|l_suppkey": 55},
+            {"self|l_partkey": 66, "self|l_suppkey": 66},
+            {"self|l_partkey": 77, "self|l_suppkey": 77},
+            {"self|l_partkey": 88, "self|l_suppkey": 88},
+        ]
+        processed_lineitem = strategy.post_process_individual_synthetic_result(
+            "lineitem", tpch, synth_lineitem, 1
+        )
+
+    # make_composite_pks only created 4 unique keys, so the table is truncated.
+    # The values (2-5 and 6-9) come from the subsequent foreign key step.
     expected_post_processing = pd.DataFrame(
         data={
             "self|l_partkey": [2, 3, 4, 5],
