@@ -40,7 +40,7 @@ def df():
 
 @pytest.fixture()
 def project():
-    with patch("gretel_trainer.benchmark.comparison.create_project") as create_project:
+    with patch("gretel_trainer.benchmark.session.create_project") as create_project:
         project = Mock()
         create_project.return_value = project
         yield project
