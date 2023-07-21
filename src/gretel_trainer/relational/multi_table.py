@@ -924,7 +924,7 @@ class MultiTable:
             for table in self.relational_data.list_all_tables(Scope.ALL):
                 source_path = Path(self.relational_data.get_table_source(table))
                 filename = source_path.name
-                tar.add(source_path, arcname=filename)
+                tar.add(source_path, arcname=f"source_{filename}")
         self._artifact_collection.upload_source_archive(
             self._project, str(archive_path)
         )
