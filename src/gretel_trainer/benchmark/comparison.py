@@ -42,12 +42,12 @@ def compare(
     configure_session(api_key="prompt", cache="yes", validate=True)
 
     config.working_dir.mkdir(exist_ok=True)
-    datasets = [
+    standardized_datasets = [
         _standardize_dataset(dataset, config.working_dir) for dataset in datasets
     ]
 
     jobs = []
-    for dataset in datasets:
+    for dataset in standardized_datasets:
         for model in model_instances:
             jobs.append(JobSpec(dataset, model))
 

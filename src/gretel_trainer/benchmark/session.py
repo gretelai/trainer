@@ -111,7 +111,7 @@ class Session:
 
         data_source_map = {}
         for job in self._jobs:
-            if artifact_key := data_source_map.get(job.dataset.data_source) is None:
+            if (artifact_key := data_source_map.get(job.dataset.data_source)) is None:
                 # TODO: avoid upload for public datasets, when possible
                 artifact_key = _upload_dataset_to_project(
                     job.dataset.data_source,
