@@ -13,7 +13,8 @@ from gretel_trainer.benchmark.custom.datasets import CustomDataset
 from gretel_trainer.benchmark.custom.models import CustomModel
 from gretel_trainer.benchmark.gretel.datasets import GretelDataset
 from gretel_trainer.benchmark.gretel.models import GretelModel
-from gretel_trainer.benchmark.session import JobSpec, Session, launch, model_name
+from gretel_trainer.benchmark.job_spec import JobSpec, model_name
+from gretel_trainer.benchmark.session import Session, launch
 
 logger = logging.getLogger(__name__)
 

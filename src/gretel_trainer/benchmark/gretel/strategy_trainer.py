@@ -10,19 +10,18 @@ from gretel_trainer.benchmark.core import (
     run_out_path,
 )
 from gretel_trainer.benchmark.gretel.models import GretelModel
+from gretel_trainer.benchmark.job_spec import JobSpec
 
 
 class GretelTrainerStrategy:
     def __init__(
         self,
-        benchmark_model: GretelModel,
-        dataset: Dataset,
+        job_spec: JobSpec,
         run_identifier: str,
         project_name: str,
         config: BenchmarkConfig,
     ):
-        self.benchmark_model = benchmark_model
-        self.dataset = dataset
+        self.job_spec = job_spec
         self.run_identifier = run_identifier
         self.project_name = project_name
         self.config = config
@@ -30,6 +29,19 @@ class GretelTrainerStrategy:
         self.trainer: Optional[Trainer] = None
         self.train_timer: Optional[Timer] = None
         self.generate_timer: Optional[Timer] = None
+
+    @property
+    def dataset(self) -> Dataset:
+        return self.job_spec.dataset
+
+    @property
+    def benchmark_model(self) -> GretelModel:
+        if not isinstance(self.job_spec.model, GretelModel):
+            raise BenchmarkException(
+                "GretelSDKStrategy can only be used with GretelModel"
+            )
+
+        return self.job_spec.model
 
     def runnable(self) -> bool:
         return self.benchmark_model.runnable(self.dataset)

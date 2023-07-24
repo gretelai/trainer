@@ -1,3 +1,4 @@
+import logging
 from enum import Enum
 from typing import Optional, Protocol
 
@@ -102,7 +103,7 @@ class Executor:
             self.strategy.train()
             self._log("training completed successfully")
         except Exception as e:
-            self._log("training failed")
+            self._log("training failed", level=logging.ERROR, exc_info=e)
             self.status = Status.FailedTrain
             self.exception = e
 
@@ -113,7 +114,9 @@ class Executor:
             self.strategy.generate()
             self._log("synthetic data generation completed successfully")
         except Exception as e:
-            self._log("synthetic data generation failed")
+            self._log(
+                "synthetic data generation failed", level=logging.ERROR, exc_info=e
+            )
             self.status = Status.FailedGenerate
             self.exception = e
 
@@ -138,7 +141,7 @@ class Executor:
             self._log("evaluation completed successfully")
             self.status = Status.Complete
         except Exception as e:
-            self._log("evaluation failed")
+            self._log("evaluation failed", level=logging.ERROR, exc_info=e)
             self.status = Status.FailedEvaluate
             self.exception = e
         finally:
@@ -147,5 +150,7 @@ class Executor:
             except:
                 pass
 
-    def _log(self, msg: str) -> None:
-        log(self.run_identifier, msg)
+    def _log(
+        self, msg: str, level: int = logging.INFO, exc_info: Optional[Exception] = None
+    ) -> None:
+        log(self.run_identifier, msg, level, exc_info)

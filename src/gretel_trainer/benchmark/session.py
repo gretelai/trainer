@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import logging
 from concurrent.futures import Future, ThreadPoolExecutor
-from dataclasses import dataclass
 from typing import Any, Optional, Union
 
 import pandas as pd
@@ -10,13 +9,13 @@ from gretel_client.helpers import poll
 from gretel_client.projects import Project, create_project, search_projects
 from gretel_client.projects.jobs import Job
 
-from gretel_trainer.benchmark.core import BenchmarkConfig, BenchmarkException, Dataset
-from gretel_trainer.benchmark.custom.models import CustomModel
+from gretel_trainer.benchmark.core import BenchmarkConfig, BenchmarkException
 from gretel_trainer.benchmark.custom.strategy import CustomStrategy
 from gretel_trainer.benchmark.executor import Executor
 from gretel_trainer.benchmark.gretel.models import GretelAuto, GretelModel
 from gretel_trainer.benchmark.gretel.strategy_sdk import GretelSDKStrategy
 from gretel_trainer.benchmark.gretel.strategy_trainer import GretelTrainerStrategy
+from gretel_trainer.benchmark.job_spec import JobSpec, RunKey
 
 logger = logging.getLogger(__name__)
 
@@ -29,40 +28,7 @@ ALL_REPORT_SCORES = {
 }
 
 
-class RunKey(tuple[str, str]):
-    RUN_IDENTIFIER_SEPARATOR = "-"
-
-    @property
-    def model_name(self) -> str:
-        return self[0]
-
-    @property
-    def dataset_name(self) -> str:
-        return self[1]
-
-    @property
-    def identifier(self) -> str:
-        """Identifier returns a flat string identifying this run.
-
-        Returns:
-            A string identifying the run.
-        """
-        return self.RUN_IDENTIFIER_SEPARATOR.join(self)
-
-    def __repr__(self) -> str:
-        return f"({self.model_name}, {self.dataset_name})"
-
-
 FutureKeyT = Union[str, RunKey]
-
-
-@dataclass
-class JobSpec:
-    # TODO(pm): for simplicity just use Dataset instead of union
-    dataset: Dataset
-
-    # TODO(pm): for simplicity, we only allow storing instantiated models here, no Type[X]
-    model: Union[GretelModel, CustomModel]
 
 
 def launch(*, jobs: list[JobSpec], config: Optional[BenchmarkConfig] = None) -> Session:
@@ -122,12 +88,14 @@ class Session:
 
             if isinstance(job.model, GretelModel):
                 self._setup_gretel_run(
-                    job.dataset, job.model, artifact_key, _trainer_project_index
+                    job,
+                    artifact_key,
+                    _trainer_project_index,
                 )
                 _trainer_project_index += 1
 
             else:
-                self._setup_custom_run(job.dataset, job.model, artifact_key)
+                self._setup_custom_run(job, artifact_key)
 
         return self
 
@@ -225,16 +193,19 @@ class Session:
 
     def _setup_gretel_run(
         self,
-        dataset: Dataset,
-        model: GretelModel,
+        job: JobSpec,
         artifact_key: Optional[str],
         trainer_project_index: int,
     ) -> None:
-        run_key = _make_run_key(model, dataset)
+        if not isinstance(job.model, GretelModel):
+            raise BenchmarkException(
+                "_setup_gretel_run can only be used with GretelModel!"
+            )
+
+        run_key = job.make_run_key()
         run_identifier = run_key.identifier
         strategy = self._set_gretel_strategy(
-            benchmark_model=model,
-            dataset=dataset,
+            job=job,
             run_identifier=run_identifier,
             trainer_project_index=trainer_project_index,
             artifact_key=artifact_key,
@@ -249,15 +220,19 @@ class Session:
 
     def _setup_custom_run(
         self,
-        dataset: Dataset,
-        model: CustomModel,
+        job: JobSpec,
         artifact_key: Optional[str] = None,
     ) -> None:
-        run_key = _make_run_key(model, dataset)
+        if isinstance(job.model, GretelModel):
+            raise BenchmarkException(
+                "_setup_custom_run cannot be used with GretelModel!"
+            )
+
+        run_key = job.make_run_key()
         run_identifier = run_key.identifier
         strategy = CustomStrategy(
-            benchmark_model=model,
-            dataset=dataset,
+            benchmark_model=job.model,
+            dataset=job.dataset,
             run_identifier=run_identifier,
             config=self._config,
             artifact_key=artifact_key,
@@ -278,30 +253,38 @@ class Session:
         else:
             return "Running"
 
+    # TODO(pm): thoughts on renaming this to e.g. "_create_gretel_strategy()"?
+    #  From the name, I'd expect something to be set on the `self`, but it's returned,
+    #  so it's a bit confusing. Unless "set" means something else here.
     def _set_gretel_strategy(
         self,
-        benchmark_model: GretelModel,
-        dataset: Dataset,
+        job: JobSpec,
         run_identifier: str,
         trainer_project_index: int,
         artifact_key: Optional[str],
     ) -> Union[GretelSDKStrategy, GretelTrainerStrategy]:
+        # TODO(pm): this is to make typechecker happy, couldn't figure out a nicer way
+        #  to do this, without much refactoring.
+        #  Why I want to have job here? Because I needed to pass additional context
+        if not isinstance(job.model, GretelModel):
+            raise BenchmarkException(
+                "_setup_gretel_run can only be used with GretelModel!"
+            )
+
         if self._config.trainer:
             trainer_project_name = _trainer_project_name(
                 self._config, trainer_project_index
             )
             self._trainer_project_names[run_identifier] = trainer_project_name
             return GretelTrainerStrategy(
-                benchmark_model=benchmark_model,
-                dataset=dataset,
+                job_spec=job,
                 run_identifier=run_identifier,
                 project_name=trainer_project_name,
                 config=self._config,
             )
         else:
             return GretelSDKStrategy(
-                benchmark_model=benchmark_model,
-                dataset=dataset,
+                job_spec=job,
                 artifact_key=artifact_key,
                 run_identifier=run_identifier,
                 project=self._project,
@@ -348,13 +331,6 @@ def _validate_sdk_setup(gretel_models: list[GretelModel]) -> None:
         raise BenchmarkException("Invalid configuration")
 
 
-def model_name(model: Union[GretelModel, CustomModel]) -> str:
-    if isinstance(model, GretelModel):
-        return model.name
-    else:
-        return type(model).__name__
-
-
 def _trainer_project_name(config: BenchmarkConfig, index: int) -> str:
     prefix = config.project_display_name
     name = f"{prefix}-{index}"
@@ -368,7 +344,3 @@ def _upload_dataset_to_project(
         return None
 
     return project.upload_artifact(source)
-
-
-def _make_run_key(model: Union[GretelModel, CustomModel], dataset: Dataset) -> RunKey:
-    return RunKey((model_name(model), dataset.name))

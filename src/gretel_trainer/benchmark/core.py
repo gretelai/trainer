@@ -71,8 +71,13 @@ def run_out_path(working_dir: Path, run_identifier: str) -> Path:
     return working_dir / f"synth_{run_identifier}.csv"
 
 
-def log(run_identifier: str, msg: str) -> None:
-    logger.info(f"{run_identifier} - {msg}")
+def log(
+    run_identifier: str,
+    msg: str,
+    level: int = logging.INFO,
+    exc_info: Optional[Exception] = None,
+) -> None:
+    logger.log(level, f"{run_identifier} - {msg}", exc_info=exc_info)
 
 
 def get_data_shape(path: str, delimiter: str = ",") -> tuple[int, int]:
