@@ -28,15 +28,7 @@ ALL_REPORT_SCORES = {
     "PPL": "privacy_protection_level",
 }
 
-
 FutureKeyT = Union[str, RunKey]
-
-
-def launch(
-    *, jobs: list[JobSpec[AnyModelType]], config: Optional[BenchmarkConfig] = None
-) -> Session:
-    session = Session(jobs=jobs, config=config)
-    return session.prepare().execute()
 
 
 class Session:

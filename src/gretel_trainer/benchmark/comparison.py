@@ -6,7 +6,6 @@ from pathlib import Path
 from typing import Optional, Type, Union, cast
 
 import pandas as pd
-from gretel_client import configure_session
 
 from gretel_trainer.benchmark.core import BenchmarkConfig, BenchmarkException, Dataset
 from gretel_trainer.benchmark.custom.datasets import CustomDataset
@@ -14,10 +13,9 @@ from gretel_trainer.benchmark.custom.models import CustomModel
 from gretel_trainer.benchmark.gretel.datasets import GretelDataset
 from gretel_trainer.benchmark.gretel.models import GretelModel
 from gretel_trainer.benchmark.job_spec import JobSpec, model_name
-from gretel_trainer.benchmark.session import Session, launch
+from gretel_trainer.benchmark.session import Session
 
 logger = logging.getLogger(__name__)
-
 
 DatasetTypes = Union[CustomDataset, GretelDataset]
 ModelTypes = Union[
@@ -36,11 +34,8 @@ def compare(
 ) -> Session:
     config = config or BenchmarkConfig()
 
-    model_instances = _create_models(models)
+    model_instances = [_create_model(model) for model in models]
     _validate_compare(model_instances, datasets)
-
-    # TODO(pm): I think moving this outside of Session makes sense, so it can be configured externally
-    configure_session(api_key="prompt", cache="yes", validate=True)
 
     config.working_dir.mkdir(exist_ok=True)
     standardized_datasets = [
@@ -52,13 +47,31 @@ def compare(
         for model in model_instances:
             jobs.append(JobSpec(dataset, model))
 
-    return launch(jobs=jobs, config=config)
+    session = Session(jobs=jobs, config=config)
+    return session.prepare().execute()
 
 
-def _create_models(models: list[ModelTypes]) -> list[Union[GretelModel, CustomModel]]:
-    return [
-        cast(Union[GretelModel, CustomModel], m() if isclass(m) else m) for m in models
+def launch(
+    *,
+    jobs: list[tuple[DatasetTypes, ModelTypes]],
+    config: Optional[BenchmarkConfig] = None,
+) -> Session:
+    config = config or BenchmarkConfig()
+
+    config.working_dir.mkdir(exist_ok=True)
+    job_specs = [
+        JobSpec(
+            dataset=_standardize_dataset(dataset, config.working_dir),
+            model=_create_model(model),
+        )
+        for dataset, model in jobs
     ]
+    session = Session(jobs=job_specs, config=config)
+    return session.prepare().execute()
+
+
+def _create_model(model: ModelTypes) -> Union[GretelModel, CustomModel]:
+    return cast(Union[GretelModel, CustomModel], model() if isclass(model) else model)
 
 
 def _standardize_dataset(dataset: DatasetTypes, working_dir: Path) -> Dataset:
