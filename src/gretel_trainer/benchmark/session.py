@@ -2,12 +2,13 @@ from __future__ import annotations
 
 import logging
 from concurrent.futures import Future, ThreadPoolExecutor
-from typing import Any, Optional, Union, cast
+from typing import Any, Optional, Union
 
 import pandas as pd
 from gretel_client.helpers import poll
 from gretel_client.projects import Project, create_project, search_projects
 from gretel_client.projects.jobs import Job
+from typing_extensions import TypeGuard
 
 from gretel_trainer.benchmark.core import BenchmarkConfig, BenchmarkException
 from gretel_trainer.benchmark.custom.models import CustomModel
@@ -81,16 +82,13 @@ class Session:
                 )
                 data_source_map[job.dataset.data_source] = artifact_key
 
-            if isinstance(job.model, GretelModel):
-                self._setup_gretel_run(
-                    cast(JobSpec[GretelModel], job),
-                    artifact_key,
-                    _trainer_project_index,
-                )
+            if is_gretel_model(job):
+                self._setup_gretel_run(job, artifact_key, _trainer_project_index)
                 _trainer_project_index += 1
 
             else:
-                self._setup_custom_run(cast(JobSpec[CustomModel], job), artifact_key)
+                assert is_custom_model(job)
+                self._setup_custom_run(job, artifact_key)
 
         return self
 
@@ -264,6 +262,12 @@ class Session:
                 project=self._project,
                 config=self._config,
             )
+
+def is_gretel_model(job: JobSpec[AnyModelType]) -> TypeGuard[JobSpec[GretelModel]]:
+    return isinstance(job.model, GretelModel)
+
+def is_custom_model(job: JobSpec[AnyModelType]) -> TypeGuard[JobSpec[CustomModel]]:
+    return not isinstance(job.model, GretelModel)
 
 
 def _run_gretel(executor: Executor) -> None:

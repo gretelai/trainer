@@ -34,20 +34,19 @@ def compare(
 ) -> Session:
     config = config or BenchmarkConfig()
 
-    model_instances = [_create_model(model) for model in models]
-    _validate_compare(model_instances, datasets)
-
     config.working_dir.mkdir(exist_ok=True)
     standardized_datasets = [
         _standardize_dataset(dataset, config.working_dir) for dataset in datasets
     ]
 
-    jobs = []
+    job_specs = []
     for dataset in standardized_datasets:
-        for model in model_instances:
-            jobs.append(JobSpec(dataset, model))
+        for model in models:
+            job_specs.append(JobSpec(dataset=dataset, model=_create_model(model)))
 
-    session = Session(jobs=jobs, config=config)
+    _validate_compare(job_specs)
+
+    session = Session(jobs=job_specs, config=config)
     return session.prepare().execute()
 
 
@@ -91,13 +90,9 @@ def _standardize_dataset(dataset: DatasetTypes, working_dir: Path) -> Dataset:
     )
 
 
-def _validate_compare(
-    all_models: list[Union[GretelModel, CustomModel]], all_datasets: list[DatasetTypes]
-) -> None:
-    dataset_names = [d.name for d in all_datasets]
-    model_names = [model_name(m) for m in all_models]
-    _ensure_unique(dataset_names, "datasets")
-    _ensure_unique(model_names, "models")
+def _validate_compare(jobs: list[JobSpec]) -> None:
+    _ensure_unique([job.dataset.name for job in jobs], "datasets")
+    _ensure_unique([model_name(job.model) for job in jobs], "models")
 
 
 def _ensure_unique(col: list[str], kind: str) -> None:

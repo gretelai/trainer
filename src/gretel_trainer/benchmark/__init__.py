@@ -1,6 +1,6 @@
 import logging
 
-from gretel_trainer.benchmark.comparison import compare
+from gretel_trainer.benchmark.entrypoints import compare, launch
 from gretel_trainer.benchmark.core import BenchmarkConfig, Datatype
 from gretel_trainer.benchmark.custom.datasets import create_dataset, make_dataset
 from gretel_trainer.benchmark.gretel.datasets import GretelDatasetRepo
