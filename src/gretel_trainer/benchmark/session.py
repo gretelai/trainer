@@ -263,8 +263,10 @@ class Session:
                 config=self._config,
             )
 
+
 def is_gretel_model(job: JobSpec[AnyModelType]) -> TypeGuard[JobSpec[GretelModel]]:
     return isinstance(job.model, GretelModel)
+
 
 def is_custom_model(job: JobSpec[AnyModelType]) -> TypeGuard[JobSpec[CustomModel]]:
     return not isinstance(job.model, GretelModel)
@@ -280,7 +282,7 @@ def _run_custom(executors: list[Executor]) -> None:
 
 
 def _validate_jobs(config: BenchmarkConfig, jobs: list[JobSpec[AnyModelType]]) -> None:
-    gretel_models = [j.model for j in jobs if isinstance(j.model, GretelModel)]
+    gretel_models = [j.model for j in jobs if is_gretel_model(j)]
     if config.trainer:
         _validate_trainer_setup(gretel_models)
     else:
