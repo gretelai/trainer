@@ -23,7 +23,7 @@ from gretel_trainer.benchmark.sdk_extras import await_job
 class GretelSDKStrategy:
     def __init__(
         self,
-        job_spec: JobSpec,
+        job_spec: JobSpec[GretelModel],
         artifact_key: Optional[str],
         run_identifier: str,
         project: Project,
@@ -44,11 +44,6 @@ class GretelSDKStrategy:
 
     @property
     def benchmark_model(self) -> GretelModel:
-        if not isinstance(self.job_spec.model, GretelModel):
-            raise BenchmarkException(
-                "GretelSDKStrategy can only be used with GretelModel"
-            )
-
         return self.job_spec.model
 
     def _format_model_config(self) -> GretelModelConfig:

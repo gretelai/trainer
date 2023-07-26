@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import logging
 from concurrent.futures import Future, ThreadPoolExecutor
-from typing import Any, Optional, Union
+from typing import Any, Optional, Union, cast
 
 import pandas as pd
 from gretel_client.helpers import poll
@@ -10,12 +10,13 @@ from gretel_client.projects import Project, create_project, search_projects
 from gretel_client.projects.jobs import Job
 
 from gretel_trainer.benchmark.core import BenchmarkConfig, BenchmarkException
+from gretel_trainer.benchmark.custom.models import CustomModel
 from gretel_trainer.benchmark.custom.strategy import CustomStrategy
 from gretel_trainer.benchmark.executor import Executor
 from gretel_trainer.benchmark.gretel.models import GretelAuto, GretelModel
 from gretel_trainer.benchmark.gretel.strategy_sdk import GretelSDKStrategy
 from gretel_trainer.benchmark.gretel.strategy_trainer import GretelTrainerStrategy
-from gretel_trainer.benchmark.job_spec import JobSpec, RunKey
+from gretel_trainer.benchmark.job_spec import AnyModelType, JobSpec, RunKey
 
 logger = logging.getLogger(__name__)
 
@@ -31,7 +32,9 @@ ALL_REPORT_SCORES = {
 FutureKeyT = Union[str, RunKey]
 
 
-def launch(*, jobs: list[JobSpec], config: Optional[BenchmarkConfig] = None) -> Session:
+def launch(
+    *, jobs: list[JobSpec[AnyModelType]], config: Optional[BenchmarkConfig] = None
+) -> Session:
     session = Session(jobs=jobs, config=config)
     return session.prepare().execute()
 
@@ -40,7 +43,7 @@ class Session:
     def __init__(
         self,
         *,
-        jobs: list[JobSpec],
+        jobs: list[JobSpec[AnyModelType]],
         config: Optional[BenchmarkConfig] = None,
     ):
         self._jobs = jobs
@@ -88,14 +91,14 @@ class Session:
 
             if isinstance(job.model, GretelModel):
                 self._setup_gretel_run(
-                    job,
+                    cast(JobSpec[GretelModel], job),
                     artifact_key,
                     _trainer_project_index,
                 )
                 _trainer_project_index += 1
 
             else:
-                self._setup_custom_run(job, artifact_key)
+                self._setup_custom_run(cast(JobSpec[CustomModel], job), artifact_key)
 
         return self
 
@@ -193,18 +196,13 @@ class Session:
 
     def _setup_gretel_run(
         self,
-        job: JobSpec,
+        job: JobSpec[GretelModel],
         artifact_key: Optional[str],
         trainer_project_index: int,
     ) -> None:
-        if not isinstance(job.model, GretelModel):
-            raise BenchmarkException(
-                "_setup_gretel_run can only be used with GretelModel!"
-            )
-
         run_key = job.make_run_key()
         run_identifier = run_key.identifier
-        strategy = self._set_gretel_strategy(
+        strategy = self._create_gretel_strategy(
             job=job,
             run_identifier=run_identifier,
             trainer_project_index=trainer_project_index,
@@ -220,14 +218,9 @@ class Session:
 
     def _setup_custom_run(
         self,
-        job: JobSpec,
+        job: JobSpec[CustomModel],
         artifact_key: Optional[str] = None,
     ) -> None:
-        if isinstance(job.model, GretelModel):
-            raise BenchmarkException(
-                "_setup_custom_run cannot be used with GretelModel!"
-            )
-
         run_key = job.make_run_key()
         run_identifier = run_key.identifier
         strategy = CustomStrategy(
@@ -253,24 +246,13 @@ class Session:
         else:
             return "Running"
 
-    # TODO(pm): thoughts on renaming this to e.g. "_create_gretel_strategy()"?
-    #  From the name, I'd expect something to be set on the `self`, but it's returned,
-    #  so it's a bit confusing. Unless "set" means something else here.
-    def _set_gretel_strategy(
+    def _create_gretel_strategy(
         self,
-        job: JobSpec,
+        job: JobSpec[GretelModel],
         run_identifier: str,
         trainer_project_index: int,
         artifact_key: Optional[str],
     ) -> Union[GretelSDKStrategy, GretelTrainerStrategy]:
-        # TODO(pm): this is to make typechecker happy, couldn't figure out a nicer way
-        #  to do this, without much refactoring.
-        #  Why I want to have job here? Because I needed to pass additional context
-        if not isinstance(job.model, GretelModel):
-            raise BenchmarkException(
-                "_setup_gretel_run can only be used with GretelModel!"
-            )
-
         if self._config.trainer:
             trainer_project_name = _trainer_project_name(
                 self._config, trainer_project_index
@@ -301,7 +283,7 @@ def _run_custom(executors: list[Executor]) -> None:
         executor.run()
 
 
-def _validate_jobs(config: BenchmarkConfig, jobs: list[JobSpec]) -> None:
+def _validate_jobs(config: BenchmarkConfig, jobs: list[JobSpec[AnyModelType]]) -> None:
     gretel_models = [j.model for j in jobs if isinstance(j.model, GretelModel)]
     if config.trainer:
         _validate_trainer_setup(gretel_models)

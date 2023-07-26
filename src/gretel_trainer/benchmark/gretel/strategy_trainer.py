@@ -16,7 +16,7 @@ from gretel_trainer.benchmark.job_spec import JobSpec
 class GretelTrainerStrategy:
     def __init__(
         self,
-        job_spec: JobSpec,
+        job_spec: JobSpec[GretelModel],
         run_identifier: str,
         project_name: str,
         config: BenchmarkConfig,
@@ -36,11 +36,6 @@ class GretelTrainerStrategy:
 
     @property
     def benchmark_model(self) -> GretelModel:
-        if not isinstance(self.job_spec.model, GretelModel):
-            raise BenchmarkException(
-                "GretelSDKStrategy can only be used with GretelModel"
-            )
-
         return self.job_spec.model
 
     def runnable(self) -> bool:
