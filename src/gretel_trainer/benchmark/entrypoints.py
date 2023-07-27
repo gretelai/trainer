@@ -4,7 +4,7 @@ import logging
 import shutil
 from inspect import isclass
 from pathlib import Path
-from typing import Callable, Optional, Type, Union, cast
+from typing import Optional, Type, Union, cast
 
 import pandas as pd
 from gretel_client.config import get_session_config
@@ -14,7 +14,7 @@ from gretel_trainer.benchmark.custom.datasets import CustomDataset
 from gretel_trainer.benchmark.custom.models import CustomModel
 from gretel_trainer.benchmark.gretel.datasets import GretelDataset
 from gretel_trainer.benchmark.gretel.models import GretelModel
-from gretel_trainer.benchmark.job_spec import JobSpec, model_name
+from gretel_trainer.benchmark.job_spec import JobSpec
 from gretel_trainer.benchmark.session import Session, is_gretel_model
 
 logger = logging.getLogger(__name__)
@@ -122,6 +122,7 @@ def _standardize_dataset(dataset: DatasetTypes, working_dir: Path) -> Dataset:
 def _ensure_unique(col: list[str], kind: str) -> None:
     if len(set(col)) < len(col):
         raise BenchmarkException(f"{kind} must have unique names")
+
 
 def _model_name(model: ModelTypes):
     if isinstance(model, GretelModel):

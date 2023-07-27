@@ -12,9 +12,9 @@ IRIS = REPO.get_dataset("iris")
 
 
 @pytest.fixture(autouse=True)
-def patch_configure_session():
-    with patch("gretel_trainer.benchmark.entrypoints._verify_client_config"):
-        yield
+def patch_verify_config():
+    with patch("gretel_trainer.benchmark.entrypoints._verify_client_config") as p:
+        yield p
 
 
 @pytest.fixture(autouse=True)
