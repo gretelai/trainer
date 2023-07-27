@@ -13,9 +13,9 @@ def test_bad_session_exits_early(iris, tmp_path):
     should_not_be_created = tmp_path / "should_not_be_created"
 
     with patch(
-        "gretel_trainer.benchmark.comparison.configure_session"
-    ) as configure_session:
-        configure_session.side_effect = SomeException()
+        "gretel_trainer.benchmark.entrypoints._verify_client_config"
+    ) as verify_client_config:
+        verify_client_config.side_effect = SomeException()
 
         with pytest.raises(SomeException):
             compare(

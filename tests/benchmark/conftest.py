@@ -12,12 +12,6 @@ IRIS = REPO.get_dataset("iris")
 
 
 @pytest.fixture(autouse=True)
-def patch_configure_session():
-    with patch("gretel_trainer.benchmark.comparison.configure_session"):
-        yield
-
-
-@pytest.fixture(autouse=True)
 def sleepless():
     with patch("time.sleep"):
         yield

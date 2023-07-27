@@ -1,11 +1,13 @@
 from __future__ import annotations
 
 import logging
+import shutil
 from inspect import isclass
 from pathlib import Path
 from typing import Optional, Type, Union, cast
 
 import pandas as pd
+from gretel_client.config import get_session_config
 
 from gretel_trainer.benchmark.core import BenchmarkConfig, BenchmarkException, Dataset
 from gretel_trainer.benchmark.custom.datasets import CustomDataset
@@ -32,19 +34,30 @@ def compare(
     models: list[ModelTypes],
     config: Optional[BenchmarkConfig] = None,
 ) -> Session:
+    _verify_client_config()
     config = config or BenchmarkConfig()
 
-    config.working_dir.mkdir(exist_ok=True)
-    standardized_datasets = [
-        _standardize_dataset(dataset, config.working_dir) for dataset in datasets
-    ]
+    working_dir_cleanup = None
+    if not config.working_dir.exists():
+        # clean up working_dir if we fail to prepare jobs
+        working_dir_cleanup = lambda: shutil.rmtree(config.working_dir)
 
-    job_specs = []
-    for dataset in standardized_datasets:
-        for model in models:
-            job_specs.append(JobSpec(dataset=dataset, model=_create_model(model)))
+    try:
+        config.working_dir.mkdir(exist_ok=True)
+        standardized_datasets = [
+            _standardize_dataset(dataset, config.working_dir) for dataset in datasets
+        ]
 
-    _validate_compare(job_specs)
+        job_specs = []
+        for dataset in standardized_datasets:
+            for model in models:
+                job_specs.append(JobSpec(dataset=dataset, model=_create_model(model)))
+
+        _validate_compare(job_specs)
+    except Exception as e:
+        if working_dir_cleanup is not None:
+            working_dir_cleanup()
+        raise e
 
     session = Session(jobs=job_specs, config=config)
     return session.prepare().execute()
@@ -55,18 +68,42 @@ def launch(
     jobs: list[tuple[DatasetTypes, ModelTypes]],
     config: Optional[BenchmarkConfig] = None,
 ) -> Session:
+    _verify_client_config()
+
     config = config or BenchmarkConfig()
 
-    config.working_dir.mkdir(exist_ok=True)
-    job_specs = [
-        JobSpec(
-            dataset=_standardize_dataset(dataset, config.working_dir),
-            model=_create_model(model),
-        )
-        for dataset, model in jobs
-    ]
+    working_dir_cleanup = None
+    if not config.working_dir.exists():
+        # clean up working_dir if we fail to prepare jobs
+        working_dir_cleanup = lambda: shutil.rmtree(config.working_dir)
+
+    try:
+        config.working_dir.mkdir(exist_ok=True)
+        job_specs = [
+            JobSpec(
+                dataset=_standardize_dataset(dataset, config.working_dir),
+                model=_create_model(model),
+            )
+            for dataset, model in jobs
+        ]
+    except Exception as e:
+        if working_dir_cleanup is not None:
+            working_dir_cleanup()
+        raise e
+
     session = Session(jobs=job_specs, config=config)
     return session.prepare().execute()
+
+
+def _verify_client_config():
+    try:
+        current_user_email = get_session_config().email
+        logger.info(f"Using gretel client configured with {current_user_email}!r")
+    except Exception as e:
+        raise BenchmarkException(
+            "Invalid gretel client configuration, please make sure to configure the "
+            "client and try again."
+        ) from e
 
 
 def _create_model(model: ModelTypes) -> Union[GretelModel, CustomModel]:
