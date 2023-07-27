@@ -86,9 +86,13 @@ class Session:
                 self._setup_gretel_run(job, artifact_key, _trainer_project_index)
                 _trainer_project_index += 1
 
-            else:
-                assert is_custom_model(job)
+            elif is_custom_model(job):
                 self._setup_custom_run(job, artifact_key)
+
+            else:
+                raise BenchmarkException(
+                    f"Unexpected model class received: {job.model.__class__.__name__}!"
+                )
 
         return self
 
