@@ -35,11 +35,15 @@ def compare(
     config: Optional[BenchmarkConfig] = None,
 ) -> Session:
     cross_product: list[tuple[DatasetTypes, ModelTypes]] = []
+
+    _ensure_unique([d.name for d in datasets], "datasets")
+    _ensure_unique([_model_name(m) for m in models], "models")
+
     for dataset in datasets:
         for model in models:
             cross_product.append((dataset, model))
 
-    return _entrypoint(jobs=cross_product, config=config, validate=_validate_compare)
+    return _entrypoint(jobs=cross_product, config=config)
 
 
 def launch(
@@ -54,17 +58,16 @@ def _entrypoint(
     *,
     jobs: list[tuple[DatasetTypes, ModelTypes]],
     config: Optional[BenchmarkConfig] = None,
-    validate: Optional[Callable[[list[JobSpec]], None]] = None,
 ) -> Session:
     config = config or BenchmarkConfig()
 
-    working_dir_cleanup = None
+    working_dir_cleanup = lambda: None
     if not config.working_dir.exists():
-        # clean up working_dir if we fail to prepare jobs
+        # clean up working_dir if we create it and we fail to prepare jobs
         working_dir_cleanup = lambda: shutil.rmtree(config.working_dir)
+    config.working_dir.mkdir(exist_ok=True)
 
     try:
-        config.working_dir.mkdir(exist_ok=True)
         job_specs = [
             JobSpec(
                 dataset=_standardize_dataset(dataset, config.working_dir),
@@ -72,15 +75,12 @@ def _entrypoint(
             )
             for dataset, model in jobs
         ]
-        if validate is not None:
-            validate(job_specs)
 
         if any(is_gretel_model(job) for job in job_specs):
             _verify_client_config()
 
     except Exception as e:
-        if working_dir_cleanup is not None:
-            working_dir_cleanup()
+        working_dir_cleanup()
         raise e
 
     session = Session(jobs=job_specs, config=config)
@@ -119,11 +119,14 @@ def _standardize_dataset(dataset: DatasetTypes, working_dir: Path) -> Dataset:
     )
 
 
-def _validate_compare(jobs: list[JobSpec]) -> None:
-    _ensure_unique([job.dataset.name for job in jobs], "datasets")
-    _ensure_unique([model_name(job.model) for job in jobs], "models")
-
-
 def _ensure_unique(col: list[str], kind: str) -> None:
     if len(set(col)) < len(col):
         raise BenchmarkException(f"{kind} must have unique names")
+
+def _model_name(model: ModelTypes):
+    if isinstance(model, GretelModel):
+        return model.name
+    elif isclass(model):
+        return model.__name__
+    else:
+        return type(model).__name__
