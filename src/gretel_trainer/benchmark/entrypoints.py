@@ -4,7 +4,7 @@ import logging
 import shutil
 from inspect import isclass
 from pathlib import Path
-from typing import Optional, Type, Union, cast
+from typing import Callable, Optional, Type, Union, cast
 
 import pandas as pd
 from gretel_client.config import get_session_config
@@ -15,7 +15,7 @@ from gretel_trainer.benchmark.custom.models import CustomModel
 from gretel_trainer.benchmark.gretel.datasets import GretelDataset
 from gretel_trainer.benchmark.gretel.models import GretelModel
 from gretel_trainer.benchmark.job_spec import JobSpec, model_name
-from gretel_trainer.benchmark.session import Session
+from gretel_trainer.benchmark.session import Session, is_gretel_model
 
 logger = logging.getLogger(__name__)
 
@@ -34,33 +34,12 @@ def compare(
     models: list[ModelTypes],
     config: Optional[BenchmarkConfig] = None,
 ) -> Session:
-    _verify_client_config()
-    config = config or BenchmarkConfig()
+    cross_product: list[tuple[DatasetTypes, ModelTypes]] = []
+    for dataset in datasets:
+        for model in models:
+            cross_product.append((dataset, model))
 
-    working_dir_cleanup = None
-    if not config.working_dir.exists():
-        # clean up working_dir if we fail to prepare jobs
-        working_dir_cleanup = lambda: shutil.rmtree(config.working_dir)
-
-    try:
-        config.working_dir.mkdir(exist_ok=True)
-        standardized_datasets = [
-            _standardize_dataset(dataset, config.working_dir) for dataset in datasets
-        ]
-
-        job_specs = []
-        for dataset in standardized_datasets:
-            for model in models:
-                job_specs.append(JobSpec(dataset=dataset, model=_create_model(model)))
-
-        _validate_compare(job_specs)
-    except Exception as e:
-        if working_dir_cleanup is not None:
-            working_dir_cleanup()
-        raise e
-
-    session = Session(jobs=job_specs, config=config)
-    return session.prepare().execute()
+    return _entrypoint(jobs=cross_product, config=config, validate=_validate_compare)
 
 
 def launch(
@@ -68,8 +47,15 @@ def launch(
     jobs: list[tuple[DatasetTypes, ModelTypes]],
     config: Optional[BenchmarkConfig] = None,
 ) -> Session:
-    _verify_client_config()
+    return _entrypoint(jobs=jobs, config=config)
 
+
+def _entrypoint(
+    *,
+    jobs: list[tuple[DatasetTypes, ModelTypes]],
+    config: Optional[BenchmarkConfig] = None,
+    validate: Optional[Callable[[list[JobSpec]], None]] = None,
+) -> Session:
     config = config or BenchmarkConfig()
 
     working_dir_cleanup = None
@@ -86,6 +72,12 @@ def launch(
             )
             for dataset, model in jobs
         ]
+        if validate is not None:
+            validate(job_specs)
+
+        if any(is_gretel_model(job) for job in job_specs):
+            _verify_client_config()
+
     except Exception as e:
         if working_dir_cleanup is not None:
             working_dir_cleanup()

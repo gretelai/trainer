@@ -12,6 +12,12 @@ IRIS = REPO.get_dataset("iris")
 
 
 @pytest.fixture(autouse=True)
+def patch_configure_session():
+    with patch("gretel_trainer.benchmark.entrypoints._verify_client_config"):
+        yield
+
+
+@pytest.fixture(autouse=True)
 def sleepless():
     with patch("time.sleep"):
         yield
