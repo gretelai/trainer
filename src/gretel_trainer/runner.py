@@ -77,7 +77,6 @@ class GenPayload:
 @dataclass
 class RemoteDFPayload:
     partition: int
-    slot: int
     job_type: str
     uid: Optional[str]
     handler_uid: Optional[str]
@@ -634,11 +633,7 @@ class StrategyRunner:
                 "Not all partitions are completed, cannot fetch synthetic data from trained models"
             )
 
-        # We will have at least one column-wise DF, this holds
-        # one DF for each header cluster we have
-        df_chunks = {
-            i: pd.DataFrame() for i in range(0, self._strategy.header_cluster_count)
-        }
+        df = pd.DataFrame()
 
         pool = ThreadPoolExecutor()
         futures = []
@@ -648,7 +643,6 @@ class StrategyRunner:
             # ones they need to use.
             payload = RemoteDFPayload(
                 partition=partition.idx,
-                slot=partition.columns.idx,
                 job_type=job_type,
                 handler_uid=partition.ctx.get(HANDLER, {}).get(HANDLER_ID),
                 uid=partition.ctx.get(MODEL_ID),
@@ -662,12 +656,8 @@ class StrategyRunner:
         for future in futures:
             payload, this_df = future.result()
 
-            curr_df = df_chunks[payload.slot]
-            df_chunks[payload.slot] = pd.concat([curr_df, this_df]).reset_index(
-                drop=True
-            )
+            df = pd.concat([df, this_df]).reset_index(drop=True)
 
-        df = pd.concat(list(df_chunks.values()), axis=1)
         return df
 
     def _maybe_restore_df_headers(self, df) -> pd.DataFrame:

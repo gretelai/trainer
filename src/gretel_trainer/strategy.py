@@ -20,7 +20,6 @@ class RowPartition(BaseModel):
 class ColumnPartition(BaseModel):
     headers: Optional[List[str]]
     seed_headers: Optional[List[str]]
-    idx: int
 
 
 class Partition(BaseModel):
@@ -42,24 +41,13 @@ class Partition(BaseModel):
 @dataclass
 class PartitionConstraints:
     max_row_count: int
-    header_clusters: Optional[List[List[str]]] = None
     seed_headers: Optional[List[str]] = None
-
-    @property
-    def header_cluster_count(self) -> int:
-        if self.header_clusters is None:
-            return 1
-        return len(self.header_clusters)
 
 
 def _build_partitions(
     df: pd.DataFrame, constraints: PartitionConstraints
 ) -> List[Partition]:
     total_rows = len(df)
-
-    header_clusters = constraints.header_clusters
-    if header_clusters is None:
-        header_clusters = [list(df.columns)]
 
     partitions = []
     partition_idx = 0
@@ -77,20 +65,19 @@ def _build_partitions(
 
     curr_start = 0
     for chunk_size in chunks:
-        for idx, header_cluster in enumerate(header_clusters):
-            seed_headers = constraints.seed_headers if idx == 0 else None
-            partitions.append(
-                Partition(
-                    rows=RowPartition(
-                        start=curr_start, end=curr_start + chunk_size
-                    ),
-                    columns=ColumnPartition(
-                        headers=header_cluster, idx=idx, seed_headers=seed_headers
-                    ),
-                    idx=partition_idx,
-                )
+        seed_headers = constraints.seed_headers
+        partitions.append(
+            Partition(
+                rows=RowPartition(
+                    start=curr_start, end=curr_start + chunk_size
+                ),
+                columns=ColumnPartition(
+                    headers=list(df.columns), seed_headers=seed_headers
+                ),
+                idx=partition_idx,
             )
-            partition_idx += 1
+        )
+        partition_idx += 1
         curr_start += chunk_size
 
     return partitions
@@ -99,7 +86,6 @@ def _build_partitions(
 class PartitionStrategy(BaseModel):
     id: str
     partitions: List[Partition]
-    header_cluster_count: int
     original_headers: Optional[List[str]]
     status_counter: Optional[dict]
     _disk_location: Path = PrivateAttr(default=None)
@@ -112,7 +98,6 @@ class PartitionStrategy(BaseModel):
         return cls(
             id=id,
             partitions=partitions,
-            header_cluster_count=constraints.header_cluster_count,
             original_headers=list(df.columns),
             status_counter=None,
         )
@@ -135,7 +120,7 @@ class PartitionStrategy(BaseModel):
 
     @property
     def row_partition_count(self) -> int:
-        return math.ceil(len(self.partitions) / self.header_cluster_count)
+        return len(self.partitions)
 
     def save_to(self, dest: Union[Path, str], overwrite: bool = False):
         location = Path(dest)
