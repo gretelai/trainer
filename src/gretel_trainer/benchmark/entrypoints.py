@@ -10,22 +10,17 @@ import pandas as pd
 from gretel_client.config import get_session_config
 
 from gretel_trainer.benchmark.core import BenchmarkConfig, BenchmarkException, Dataset
-from gretel_trainer.benchmark.custom.datasets import CustomDataset
 from gretel_trainer.benchmark.custom.models import CustomModel
-from gretel_trainer.benchmark.gretel.datasets import GretelDataset
 from gretel_trainer.benchmark.gretel.models import GretelModel
-from gretel_trainer.benchmark.job_spec import JobSpec
+from gretel_trainer.benchmark.job_spec import (
+    DatasetTypes,
+    JobSpec,
+    ModelTypes,
+    model_name,
+)
 from gretel_trainer.benchmark.session import Session
 
 logger = logging.getLogger(__name__)
-
-DatasetTypes = Union[CustomDataset, GretelDataset]
-ModelTypes = Union[
-    CustomModel,
-    Type[CustomModel],
-    GretelModel,
-    Type[GretelModel],
-]
 
 
 def compare(
@@ -37,7 +32,7 @@ def compare(
     cross_product: list[tuple[DatasetTypes, ModelTypes]] = []
 
     _ensure_unique([d.name for d in datasets], "datasets")
-    _ensure_unique([_model_name(m) for m in models], "models")
+    _ensure_unique([model_name(m) for m in models], "models")
 
     for dataset in datasets:
         for model in models:
@@ -119,12 +114,3 @@ def _standardize_dataset(dataset: DatasetTypes, working_dir: Path) -> Dataset:
 def _ensure_unique(col: list[str], kind: str) -> None:
     if len(set(col)) < len(col):
         raise BenchmarkException(f"{kind} must have unique names")
-
-
-def _model_name(model: ModelTypes):
-    if isinstance(model, GretelModel):
-        return model.name
-    elif isclass(model):
-        return model.__name__
-    else:
-        return type(model).__name__

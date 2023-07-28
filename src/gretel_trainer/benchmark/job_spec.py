@@ -1,8 +1,11 @@
 from dataclasses import dataclass
-from typing import Any, Generic, Optional, TypeVar, Union
+from inspect import isclass
+from typing import Generic, Type, TypeVar, Union
 
 from gretel_trainer.benchmark.core import Dataset
+from gretel_trainer.benchmark.custom.datasets import CustomDataset
 from gretel_trainer.benchmark.custom.models import CustomModel
+from gretel_trainer.benchmark.gretel.datasets import GretelDataset
 from gretel_trainer.benchmark.gretel.models import GretelModel
 
 
@@ -48,18 +51,23 @@ class JobSpec(Generic[MODEL_BASE_TYPE]):
     Instance of a model that will be used.
     """
 
-    metadata: Optional[dict[str, Any]] = None
-    """
-    Arbitrary metadata that can be attached to the spec for context that may be used
-    by some implementation of executors/strategies.
-    """
-
     def make_run_key(self):
         return RunKey((model_name(self.model), self.dataset.name))
 
 
-def model_name(model: AnyModelType) -> str:
+DatasetTypes = Union[CustomDataset, GretelDataset]
+ModelTypes = Union[
+    CustomModel,
+    Type[CustomModel],
+    GretelModel,
+    Type[GretelModel],
+]
+
+
+def model_name(model: ModelTypes):
     if isinstance(model, GretelModel):
         return model.name
+    elif isclass(model):
+        return model.__name__
     else:
         return type(model).__name__
