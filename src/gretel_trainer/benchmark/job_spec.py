@@ -64,7 +64,7 @@ ModelTypes = Union[
 ]
 
 
-def model_name(model: ModelTypes):
+def model_name(model: ModelTypes) -> str:
     if isinstance(model, GretelModel):
         return model.name
     elif isclass(model):
