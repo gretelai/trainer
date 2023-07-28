@@ -15,6 +15,7 @@ from gretel_trainer.benchmark import (
     GretelLSTM,
     compare,
     create_dataset,
+    launch,
 )
 from tests.benchmark.mocks import (
     DoNothingModel,
@@ -32,7 +33,7 @@ def test_run_with_gretel_dataset(working_dir, project, evaluate_report_path, iri
     evaluate_model.get_artifact_link.return_value = evaluate_report_path
     project.create_model_obj.side_effect = [evaluate_model]
 
-    comparison = compare(
+    session = compare(
         datasets=[iris],
         models=[DoNothingModel],
         config=BenchmarkConfig(
@@ -40,8 +41,8 @@ def test_run_with_gretel_dataset(working_dir, project, evaluate_report_path, iri
         ),
     ).wait()
 
-    assert len(comparison.results) == 1
-    result = comparison.results.iloc[0]
+    assert len(session.results) == 1
+    result = session.results.iloc[0]
     _iris_shape = pd.read_csv(iris.data_source).shape
     assert result["Input data"] == "iris"
     assert result["Model"] == "DoNothingModel"
@@ -63,7 +64,7 @@ def test_run_with_custom_csv_dataset(working_dir, project, evaluate_report_path,
 
         dataset = create_dataset(f.name, datatype="tabular", name="pets")
 
-        comparison = compare(
+        session = compare(
             datasets=[dataset],
             models=[DoNothingModel],
             config=BenchmarkConfig(
@@ -71,8 +72,8 @@ def test_run_with_custom_csv_dataset(working_dir, project, evaluate_report_path,
             ),
         ).wait()
 
-    assert len(comparison.results) == 1
-    result = comparison.results.iloc[0]
+    assert len(session.results) == 1
+    result = session.results.iloc[0]
     assert result["Input data"] == "pets"
     assert result["Model"] == "DoNothingModel"
     assert result["Rows"] == 3
@@ -93,7 +94,7 @@ def test_run_with_custom_psv_dataset(working_dir, project, evaluate_report_path,
 
         dataset = create_dataset(f.name, datatype="tabular", name="pets", delimiter="|")
 
-        comparison = compare(
+        session = compare(
             datasets=[dataset],
             models=[DoNothingModel],
             config=BenchmarkConfig(
@@ -101,8 +102,8 @@ def test_run_with_custom_psv_dataset(working_dir, project, evaluate_report_path,
             ),
         ).wait()
 
-    assert len(comparison.results) == 1
-    result = comparison.results.iloc[0]
+    assert len(session.results) == 1
+    result = session.results.iloc[0]
     assert result["Input data"] == "pets"
     assert result["Model"] == "DoNothingModel"
     assert result["Rows"] == 3
@@ -122,7 +123,7 @@ def test_run_with_custom_dataframe_dataset(
 
     dataset = create_dataset(df, datatype="tabular", name="pets")
 
-    comparison = compare(
+    session = compare(
         datasets=[dataset],
         models=[DoNothingModel],
         config=BenchmarkConfig(
@@ -130,8 +131,8 @@ def test_run_with_custom_dataframe_dataset(
         ),
     ).wait()
 
-    assert len(comparison.results) == 1
-    result = comparison.results.iloc[0]
+    assert len(session.results) == 1
+    result = session.results.iloc[0]
     assert result["Input data"] == "pets"
     assert result["Model"] == "DoNothingModel"
     assert result["Rows"] == 3
@@ -173,7 +174,7 @@ def test_run_happy_path_gretel_sdk(
         "gretel_trainer.benchmark.gretel.strategy_sdk.GretelSDKStrategy._get_record_handler_data"
     ) as get:
         get.return_value = Mock(content=gzip.compress(b"synthetic,data\n1,3\n2,4"))
-        comparison = compare(
+        session = compare(
             datasets=[iris],
             models=[benchmark_model],
             config=BenchmarkConfig(
@@ -181,8 +182,8 @@ def test_run_happy_path_gretel_sdk(
             ),
         ).wait()
 
-    assert len(comparison.results) == 1
-    result = comparison.results.iloc[0]
+    assert len(session.results) == 1
+    result = session.results.iloc[0]
     model_name = benchmark_model.__name__
     assert result["Model"] == model_name
     assert result["Status"] == "Complete"
@@ -210,7 +211,7 @@ def test_sdk_model_failure(working_dir, iris, project):
 
     project.create_model_obj.side_effect = [model]
 
-    comparison = compare(
+    session = compare(
         datasets=[iris],
         models=[GretelLSTM],
         config=BenchmarkConfig(
@@ -218,8 +219,8 @@ def test_sdk_model_failure(working_dir, iris, project):
         ),
     ).wait()
 
-    assert len(comparison.results) == 1
-    result = comparison.results.iloc[0]
+    assert len(session.results) == 1
+    result = session.results.iloc[0]
     assert result["Model"] == "GretelLSTM"
     assert result["Status"] == "Failed (train)"
     assert result["SQS"] is None
@@ -229,7 +230,7 @@ def test_sdk_model_failure(working_dir, iris, project):
 
 
 def test_run_with_failures(working_dir, project, iris):
-    comparison = compare(
+    session = compare(
         datasets=[iris],
         models=[FailsToTrain, FailsToGenerate],
         config=BenchmarkConfig(
@@ -237,8 +238,8 @@ def test_run_with_failures(working_dir, project, iris):
         ),
     ).wait()
 
-    assert len(comparison.results) == 2
-    assert set(comparison.results["Status"]) == {"Failed (train)", "Failed (generate)"}
+    assert len(session.results) == 2
+    assert set(session.results["Status"]) == {"Failed (train)", "Failed (generate)"}
 
 
 def test_custom_gretel_model_configs_do_not_overwrite_each_other(
@@ -276,7 +277,7 @@ def test_gptx_skips_too_many_columns(working_dir, project):
         two_columns, datatype=Datatype.NATURAL_LANGUAGE, name="skippy"
     )
 
-    comparison = compare(
+    session = compare(
         datasets=[dataset],
         models=[GretelGPTX],
         config=BenchmarkConfig(
@@ -284,15 +285,15 @@ def test_gptx_skips_too_many_columns(working_dir, project):
         ),
     ).wait()
 
-    assert len(comparison.results) == 1
-    assert_is_skipped(comparison.results.iloc[0])
+    assert len(session.results) == 1
+    assert_is_skipped(session.results.iloc[0])
 
 
 def test_gptx_skips_non_natural_language_datatype(working_dir, project):
     tabular = pd.DataFrame(data={"foo": [1, 2, 3]})
     dataset = create_dataset(tabular, datatype=Datatype.TABULAR, name="skippy")
 
-    comparison = compare(
+    session = compare(
         datasets=[dataset],
         models=[GretelGPTX],
         config=BenchmarkConfig(
@@ -300,15 +301,15 @@ def test_gptx_skips_non_natural_language_datatype(working_dir, project):
         ),
     ).wait()
 
-    assert len(comparison.results) == 1
-    assert_is_skipped(comparison.results.iloc[0])
+    assert len(session.results) == 1
+    assert_is_skipped(session.results.iloc[0])
 
 
 def test_lstm_skips_datasets_with_over_150_columns(working_dir, project):
     jumbo = pd.DataFrame(columns=list(range(151)))
     dataset = create_dataset(jumbo, datatype=Datatype.TABULAR, name="skippy")
 
-    comparison = compare(
+    session = compare(
         datasets=[dataset],
         models=[GretelLSTM],
         config=BenchmarkConfig(
@@ -316,8 +317,41 @@ def test_lstm_skips_datasets_with_over_150_columns(working_dir, project):
         ),
     ).wait()
 
-    assert len(comparison.results) == 1
-    assert_is_skipped(comparison.results.iloc[0])
+    assert len(session.results) == 1
+    assert_is_skipped(session.results.iloc[0])
+
+
+def test_compare_creates_job_specs(working_dir, project, iris):
+    with patch("gretel_trainer.benchmark.entrypoints._entrypoint") as entrypoint:
+        dataset = create_dataset(
+            pd.DataFrame(data={"foo": [1, 2, 3]}),
+            datatype=Datatype.TABULAR,
+            name="skippy",
+        )
+
+        lstm = GretelLSTM()
+        compare(
+            datasets=[iris, dataset],
+            models=[DoNothingModel, lstm],
+            config=BenchmarkConfig(
+                working_dir=working_dir,
+            ),
+        )
+
+    assert entrypoint.call_count == 1
+    args, kwargs = entrypoint.call_args
+    assert args == ()
+
+    job_tuples = kwargs["jobs"]
+    assert len(job_tuples) == 4
+
+    lstm_jobs = [t for t in job_tuples if t[1] == lstm]
+    assert len(lstm_jobs) == 2
+    assert {d.name for d, m in lstm_jobs} == {"iris", "skippy"}
+
+    do_nothing_jobs = [t for t in job_tuples if t[1] == DoNothingModel]
+    assert len(do_nothing_jobs) == 2
+    assert {d.name for d, m in do_nothing_jobs} == {"iris", "skippy"}
 
 
 def assert_is_skipped(result):

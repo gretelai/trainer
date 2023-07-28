@@ -16,21 +16,20 @@ from gretel_trainer.benchmark.core import (
     run_out_path,
 )
 from gretel_trainer.benchmark.gretel.models import GretelModel, GretelModelConfig
+from gretel_trainer.benchmark.job_spec import JobSpec
 from gretel_trainer.benchmark.sdk_extras import await_job
 
 
 class GretelSDKStrategy:
     def __init__(
         self,
-        benchmark_model: GretelModel,
-        dataset: Dataset,
+        job_spec: JobSpec[GretelModel],
         artifact_key: Optional[str],
         run_identifier: str,
         project: Project,
         config: BenchmarkConfig,
     ):
-        self.benchmark_model = benchmark_model
-        self.dataset = dataset
+        self.job_spec = job_spec
         self.artifact_key = artifact_key
         self.run_identifier = run_identifier
         self.project = project
@@ -38,6 +37,14 @@ class GretelSDKStrategy:
 
         self.model: Optional[Model] = None
         self.record_handler: Optional[RecordHandler] = None
+
+    @property
+    def dataset(self) -> Dataset:
+        return self.job_spec.dataset
+
+    @property
+    def benchmark_model(self) -> GretelModel:
+        return self.job_spec.model
 
     def _format_model_config(self) -> GretelModelConfig:
         config = copy.deepcopy(read_model_config(self.benchmark_model.config))

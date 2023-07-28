@@ -2,25 +2,22 @@ from __future__ import annotations
 
 import logging
 from concurrent.futures import Future, ThreadPoolExecutor
-from inspect import isclass
-from pathlib import Path
-from typing import Any, Optional, Type, Union, cast
+from typing import Any, Optional, Union
 
 import pandas as pd
-from gretel_client import configure_session
 from gretel_client.helpers import poll
 from gretel_client.projects import Project, create_project, search_projects
 from gretel_client.projects.jobs import Job
+from typing_extensions import TypeGuard
 
-from gretel_trainer.benchmark.core import BenchmarkConfig, BenchmarkException, Dataset
-from gretel_trainer.benchmark.custom.datasets import CustomDataset
+from gretel_trainer.benchmark.core import BenchmarkConfig, BenchmarkException
 from gretel_trainer.benchmark.custom.models import CustomModel
 from gretel_trainer.benchmark.custom.strategy import CustomStrategy
 from gretel_trainer.benchmark.executor import Executor
-from gretel_trainer.benchmark.gretel.datasets import GretelDataset
 from gretel_trainer.benchmark.gretel.models import GretelAuto, GretelModel
 from gretel_trainer.benchmark.gretel.strategy_sdk import GretelSDKStrategy
 from gretel_trainer.benchmark.gretel.strategy_trainer import GretelTrainerStrategy
+from gretel_trainer.benchmark.job_spec import AnyModelType, JobSpec, RunKey
 
 logger = logging.getLogger(__name__)
 
@@ -32,94 +29,30 @@ ALL_REPORT_SCORES = {
     "PPL": "privacy_protection_level",
 }
 
-
-DatasetTypes = Union[CustomDataset, GretelDataset]
-ModelTypes = Union[
-    CustomModel,
-    Type[CustomModel],
-    GretelModel,
-    Type[GretelModel],
-]
-
-
-class RunKey(tuple[str, str]):
-    RUN_IDENTIFIER_SEPARATOR = "-"
-
-    @property
-    def model_name(self) -> str:
-        return self[0]
-
-    @property
-    def dataset_name(self) -> str:
-        return self[1]
-
-    @property
-    def identifier(self) -> str:
-        """Identifier returns a flat string identifying this run.
-
-        Returns:
-            A string identifying the run.
-        """
-        return self.RUN_IDENTIFIER_SEPARATOR.join(self)
-
-    def __repr__(self) -> str:
-        return f"({self.model_name}, {self.dataset_name})"
-
-
 FutureKeyT = Union[str, RunKey]
 
 
-def compare(
-    *,
-    datasets: list[DatasetTypes],
-    models: list[ModelTypes],
-    config: Optional[BenchmarkConfig] = None,
-) -> Comparison:
-    comparison = Comparison(
-        datasets=datasets,
-        models=models,
-        config=config,
-    )
-    return comparison.prepare().execute()
-
-
-class Comparison:
+class Session:
     def __init__(
         self,
         *,
-        datasets: list[DatasetTypes],
-        models: list[ModelTypes],
+        jobs: list[JobSpec[AnyModelType]],
         config: Optional[BenchmarkConfig] = None,
     ):
-        model_instances = [
-            cast(Union[GretelModel, CustomModel], m() if isclass(m) else m)
-            for m in models
-        ]
-        self.gretel_models = [m for m in model_instances if isinstance(m, GretelModel)]
-        self.custom_models = [
-            m for m in model_instances if not isinstance(m, GretelModel)
-        ]
+        self._jobs = jobs
+        self._config = config or BenchmarkConfig()
 
-        self.config = config or BenchmarkConfig()
+        _validate_jobs(self._config, jobs)
 
-        _validate_setup(self.config, self.gretel_models, self.custom_models, datasets)
-
-        configure_session(api_key="prompt", cache="yes", validate=True)
-
-        self.config.working_dir.mkdir(exist_ok=True)
-        self.datasets = [
-            _standardize_dataset(dataset, self.config.working_dir)
-            for dataset in datasets
-        ]
         self._gretel_executors: dict[RunKey, Executor] = {}
         self._custom_executors: dict[RunKey, Executor] = {}
-        self.trainer_project_names: dict[str, str] = {}
-        self.thread_pool = ThreadPoolExecutor(5)
-        self.futures: dict[FutureKeyT, Future] = {}
+        self._trainer_project_names: dict[str, str] = {}
+        self._thread_pool = ThreadPoolExecutor(5)
+        self._futures: dict[FutureKeyT, Future] = {}
 
         self._report_scores = {
             score_name: ALL_REPORT_SCORES[score_name]
-            for score_name in ["SQS"] + self.config.additional_report_scores
+            for score_name in ["SQS"] + self._config.additional_report_scores
         }
 
     @property
@@ -127,41 +60,48 @@ class Comparison:
         return self._gretel_executors | self._custom_executors
 
     def _make_project(self) -> Project:
-        display_name = self.config.project_display_name
-        if self.config.trainer:
+        display_name = self._config.project_display_name
+        if self._config.trainer:
             display_name = f"{display_name}-evaluate"
 
         return create_project(display_name=display_name)
 
-    def prepare(self) -> Comparison:
+    def prepare(self) -> Session:
         self._project = self._make_project()
 
         _trainer_project_index = 0
-        for dataset in self.datasets:
-            # TODO: avoid upload for public datasets, when possible
-            artifact_key = _upload_dataset_to_project(
-                dataset.data_source,
-                self._project,
-                self.config.trainer,
-            )
 
-            for model in self.gretel_models:
-                self._setup_gretel_run(
-                    dataset, model, artifact_key, _trainer_project_index
+        data_source_map = {}
+        for job in self._jobs:
+            if (artifact_key := data_source_map.get(job.dataset.data_source)) is None:
+                # TODO: avoid upload for public datasets, when possible
+                artifact_key = _upload_dataset_to_project(
+                    job.dataset.data_source,
+                    self._project,
+                    self._config.trainer,
                 )
+                data_source_map[job.dataset.data_source] = artifact_key
+
+            if is_gretel_model(job):
+                self._setup_gretel_run(job, artifact_key, _trainer_project_index)
                 _trainer_project_index += 1
 
-            for model in self.custom_models:
-                self._setup_custom_run(dataset, model, artifact_key)
+            elif is_custom_model(job):
+                self._setup_custom_run(job, artifact_key)
+
+            else:
+                raise BenchmarkException(
+                    f"Unexpected model class received: {job.model.__class__.__name__}!"
+                )
 
         return self
 
-    def execute(self) -> Comparison:
+    def execute(self) -> Session:
         for run_key, executor in self._gretel_executors.items():
-            self.futures[run_key] = self.thread_pool.submit(_run_gretel, executor)
+            self._futures[run_key] = self._thread_pool.submit(_run_gretel, executor)
 
         if len(self._custom_executors) > 0:
-            self.futures["custom"] = self.thread_pool.submit(
+            self._futures["custom"] = self._thread_pool.submit(
                 _run_custom, list(self._custom_executors.values())
             )
 
@@ -175,20 +115,21 @@ class Comparison:
     def export_results(self, destination: str) -> None:
         self.results.to_csv(destination, index=False)
 
-    def wait(self) -> Comparison:
-        [future.result() for future in self.futures.values()]
+    def wait(self) -> Session:
+        [future.result() for future in self._futures.values()]
         return self
 
     def whats_happening(self) -> dict[str, str]:
         return {
-            str(key): self._basic_status(future) for key, future in self.futures.items()
+            str(key): self._basic_status(future)
+            for key, future in self._futures.items()
         }
 
-    def poll_job(self, model: str, dataset: str, action: str):
+    def poll_job(self, model: str, dataset: str, action: str) -> None:
         job = self._get_gretel_job(model, dataset, action)
         poll(job)
 
-    def get_logs(self, model: str, dataset: str, action: str):
+    def get_logs(self, model: str, dataset: str, action: str) -> list:
         job = self._get_gretel_job(model, dataset, action)
         return job.logs
 
@@ -216,8 +157,8 @@ class Comparison:
     def cleanup(self) -> None:
         self._project.delete()
 
-        if self.config.trainer:
-            for project in search_projects(query=self.config.project_display_name):
+        if self._config.trainer:
+            for project in search_projects(query=self._config.project_display_name):
                 project.delete()
 
     def _result_dict(self, run_key: RunKey) -> dict[str, Any]:
@@ -249,16 +190,14 @@ class Comparison:
 
     def _setup_gretel_run(
         self,
-        dataset: Dataset,
-        model: GretelModel,
+        job: JobSpec[GretelModel],
         artifact_key: Optional[str],
         trainer_project_index: int,
     ) -> None:
-        run_key = _make_run_key(model, dataset)
+        run_key = job.make_run_key()
         run_identifier = run_key.identifier
-        strategy = self._set_gretel_strategy(
-            benchmark_model=model,
-            dataset=dataset,
+        strategy = self._create_gretel_strategy(
+            job=job,
             run_identifier=run_identifier,
             trainer_project_index=trainer_project_index,
             artifact_key=artifact_key,
@@ -267,30 +206,29 @@ class Comparison:
             strategy=strategy,
             run_identifier=run_identifier,
             evaluate_project=self._project,
-            config=self.config,
+            config=self._config,
         )
         self._gretel_executors[run_key] = executor
 
     def _setup_custom_run(
         self,
-        dataset: Dataset,
-        model: CustomModel,
+        job: JobSpec[CustomModel],
         artifact_key: Optional[str] = None,
     ) -> None:
-        run_key = _make_run_key(model, dataset)
+        run_key = job.make_run_key()
         run_identifier = run_key.identifier
         strategy = CustomStrategy(
-            benchmark_model=model,
-            dataset=dataset,
+            benchmark_model=job.model,
+            dataset=job.dataset,
             run_identifier=run_identifier,
-            config=self.config,
+            config=self._config,
             artifact_key=artifact_key,
         )
         executor = Executor(
             strategy=strategy,
             run_identifier=run_identifier,
             evaluate_project=self._project,
-            config=self.config,
+            config=self._config,
         )
         self._custom_executors[run_key] = executor
 
@@ -302,35 +240,40 @@ class Comparison:
         else:
             return "Running"
 
-    def _set_gretel_strategy(
+    def _create_gretel_strategy(
         self,
-        benchmark_model: GretelModel,
-        dataset: Dataset,
+        job: JobSpec[GretelModel],
         run_identifier: str,
         trainer_project_index: int,
         artifact_key: Optional[str],
     ) -> Union[GretelSDKStrategy, GretelTrainerStrategy]:
-        if self.config.trainer:
+        if self._config.trainer:
             trainer_project_name = _trainer_project_name(
-                self.config, trainer_project_index
+                self._config, trainer_project_index
             )
-            self.trainer_project_names[run_identifier] = trainer_project_name
+            self._trainer_project_names[run_identifier] = trainer_project_name
             return GretelTrainerStrategy(
-                benchmark_model=benchmark_model,
-                dataset=dataset,
+                job_spec=job,
                 run_identifier=run_identifier,
                 project_name=trainer_project_name,
-                config=self.config,
+                config=self._config,
             )
         else:
             return GretelSDKStrategy(
-                benchmark_model=benchmark_model,
-                dataset=dataset,
+                job_spec=job,
                 artifact_key=artifact_key,
                 run_identifier=run_identifier,
                 project=self._project,
-                config=self.config,
+                config=self._config,
             )
+
+
+def is_gretel_model(job: JobSpec[AnyModelType]) -> TypeGuard[JobSpec[GretelModel]]:
+    return isinstance(job.model, GretelModel)
+
+
+def is_custom_model(job: JobSpec[AnyModelType]) -> TypeGuard[JobSpec[CustomModel]]:
+    return not isinstance(job.model, GretelModel)
 
 
 def _run_gretel(executor: Executor) -> None:
@@ -342,47 +285,12 @@ def _run_custom(executors: list[Executor]) -> None:
         executor.run()
 
 
-def _standardize_dataset(dataset: DatasetTypes, working_dir: Path) -> Dataset:
-    source = dataset.data_source
-    if isinstance(source, pd.DataFrame):
-        csv_path = working_dir / f"{dataset.name}.csv"
-        source.to_csv(csv_path, index=False)
-        source = str(csv_path)
-
-    return Dataset(
-        name=dataset.name,
-        datatype=dataset.datatype,
-        row_count=dataset.row_count,
-        column_count=dataset.column_count,
-        data_source=source,
-        public=dataset.public,
-    )
-
-
-def _make_run_key(model: Union[GretelModel, CustomModel], dataset: Dataset) -> RunKey:
-    return RunKey((_model_name(model), dataset.name))
-
-
-def _validate_setup(
-    config: BenchmarkConfig,
-    gretel_models: list[GretelModel],
-    custom_models: list[CustomModel],
-    all_datasets: list[DatasetTypes],
-) -> None:
-    dataset_names = [d.name for d in all_datasets]
-    model_names = [_model_name(m) for m in (gretel_models + custom_models)]
-    _ensure_unique(dataset_names, "datasets")
-    _ensure_unique(model_names, "models")
-
+def _validate_jobs(config: BenchmarkConfig, jobs: list[JobSpec[AnyModelType]]) -> None:
+    gretel_models = [j.model for j in jobs if is_gretel_model(j)]
     if config.trainer:
         _validate_trainer_setup(gretel_models)
     else:
         _validate_sdk_setup(gretel_models)
-
-
-def _ensure_unique(col: list[str], kind: str) -> None:
-    if len(set(col)) < len(col):
-        raise BenchmarkException(f"{kind} must have unique names")
 
 
 def _validate_trainer_setup(gretel_models: list[GretelModel]) -> None:
@@ -405,13 +313,6 @@ def _validate_sdk_setup(gretel_models: list[GretelModel]) -> None:
             "Either remove it from this comparison, or configure this comparison to use Trainer (trainer=True)"
         )
         raise BenchmarkException("Invalid configuration")
-
-
-def _model_name(model: Union[GretelModel, CustomModel]) -> str:
-    if isinstance(model, GretelModel):
-        return model.name
-    else:
-        return type(model).__name__
 
 
 def _trainer_project_name(config: BenchmarkConfig, index: int) -> str:

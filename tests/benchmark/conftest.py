@@ -12,9 +12,9 @@ IRIS = REPO.get_dataset("iris")
 
 
 @pytest.fixture(autouse=True)
-def patch_configure_session():
-    with patch("gretel_trainer.benchmark.comparison.configure_session"):
-        yield
+def patch_verify_config():
+    with patch("gretel_trainer.benchmark.entrypoints._verify_client_config") as p:
+        yield p
 
 
 @pytest.fixture(autouse=True)
@@ -40,7 +40,7 @@ def df():
 
 @pytest.fixture()
 def project():
-    with patch("gretel_trainer.benchmark.comparison.create_project") as create_project:
+    with patch("gretel_trainer.benchmark.session.create_project") as create_project:
         project = Mock()
         create_project.return_value = project
         yield project
