@@ -354,14 +354,6 @@ def test_compare_creates_job_specs(working_dir, project, iris):
     assert {d.name for d, m in do_nothing_jobs} == {"iris", "skippy"}
 
 
-def test_custom_models_dont_verify_client_config(patch_verify_config, iris, project):
-    compare(datasets=[iris], models=[DoNothingModel])
-    assert patch_verify_config.call_count == 0
-
-    launch(jobs=[(iris, DoNothingModel)])
-    assert patch_verify_config.call_count == 0
-
-
 def assert_is_skipped(result):
     assert result["Status"] == "Skipped"
     assert result["SQS"] is None

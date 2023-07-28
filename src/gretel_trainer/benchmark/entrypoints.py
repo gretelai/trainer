@@ -15,7 +15,7 @@ from gretel_trainer.benchmark.custom.models import CustomModel
 from gretel_trainer.benchmark.gretel.datasets import GretelDataset
 from gretel_trainer.benchmark.gretel.models import GretelModel
 from gretel_trainer.benchmark.job_spec import JobSpec
-from gretel_trainer.benchmark.session import Session, is_gretel_model
+from gretel_trainer.benchmark.session import Session
 
 logger = logging.getLogger(__name__)
 
@@ -59,6 +59,7 @@ def _entrypoint(
     jobs: list[tuple[DatasetTypes, ModelTypes]],
     config: Optional[BenchmarkConfig] = None,
 ) -> Session:
+    _verify_client_config()
     config = config or BenchmarkConfig()
 
     working_dir_cleanup = lambda: None
@@ -75,10 +76,6 @@ def _entrypoint(
             )
             for dataset, model in jobs
         ]
-
-        if any(is_gretel_model(job) for job in job_specs):
-            _verify_client_config()
-
     except Exception as e:
         working_dir_cleanup()
         raise e
