@@ -1,155 +1,56 @@
+import csv
+import logging
 import time
-
 from dataclasses import dataclass, field
+from datetime import datetime
 from enum import Enum
-from multiprocessing.managers import DictProxy
-from typing import (
-    Callable,
-    ContextManager,
-    Generic,
-    List,
-    Optional,
-    Protocol,
-    TypeVar,
-    Union,
-)
+from pathlib import Path
+from typing import Optional, Union
 
-import pandas as pd
+import smart_open
 
-
-class Datatype(str, Enum):
-    TABULAR_MIXED = "tabular_mixed"
-    TABULAR_NUMERIC = "tabular_numeric"
-    TIME_SERIES = "time_series"
-    NATURAL_LANGUAGE = "natural_language"
-
-
-class DataSource(Protocol):
-    @property
-    def name(self) -> str:
-        ...
-
-    @property
-    def delimiter(self) -> str:
-        ...
-
-    @property
-    def row_count(self) -> int:
-        ...
-
-    @property
-    def column_count(self) -> int:
-        ...
-
-    @property
-    def datatype(self) -> Datatype:
-        ...
-
-    def unwrap(self) -> ContextManager[str]:
-        ...
-
-
-D = TypeVar("D", bound="DataSource")
-
-
-class Dataset(Protocol[D]):
-    def sources(self) -> List[D]:
-        ...
-
-
-class Model(Protocol):
-    def train(self, source: str, **kwargs) -> None:
-        ...
-
-    def generate(self, **kwargs) -> pd.DataFrame:
-        ...
-
-
-class Executor(Model, Protocol):
-    @property
-    def model_name(self) -> str:
-        ...
-
-    def runnable(self, source: DataSource) -> bool:
-        ...
-
-    def get_sqs_score(self, synthetic: pd.DataFrame, reference: str) -> int:
-        ...
-
-
-class Evaluator(Protocol):
-    def __call__(self, synthetic: pd.DataFrame, reference: str) -> int:
-        ...
-
-
-ModelFactory = Callable[[], Model]
-
-
-@dataclass
-class Completed:
-    sqs: int
-    train_secs: float
-    generate_secs: float
-    synthetic_data: pd.DataFrame = field(repr=False)
-
-    @property
-    def display(self) -> str:
-        return "Completed"
-
-
-@dataclass
-class NotStarted:
-    @property
-    def display(self) -> str:
-        return "Not started"
-
-
-@dataclass
-class Skipped:
-    @property
-    def display(self) -> str:
-        return "Skipped"
-
-
-@dataclass
-class InProgress:
-    stage: str
-    train_secs: Optional[float] = None
-    generate_secs: Optional[float] = None
-
-    @property
-    def display(self) -> str:
-        return f"In progress ({self.stage})"
-
-
-@dataclass
-class Failed:
-    during: str
-    error: Exception
-    train_secs: Optional[float] = None
-    generate_secs: Optional[float] = None
-    synthetic_data: Optional[pd.DataFrame] = field(default=None, repr=False)
-
-    @property
-    def display(self) -> str:
-        return f"Failed ({self.during})"
-
-
-RunStatus = Union[NotStarted, Skipped, InProgress, Completed, Failed]
-
-
-T = TypeVar("T", bound="Executor", covariant=True)
-
-
-@dataclass
-class Run(Generic[T]):
-    identifier: str
-    source: DataSource
-    executor: T
+logger = logging.getLogger(__name__)
 
 
 class BenchmarkException(Exception):
     pass
+
+
+class Datatype(str, Enum):
+    TABULAR = "tabular"
+    TIME_SERIES = "time_series"
+    NATURAL_LANGUAGE = "natural_language"
+
+
+@dataclass
+class Dataset:
+    name: str
+    datatype: Datatype
+    data_source: str
+    row_count: int
+    column_count: int
+    public: bool = field(default=False)
+
+
+def _default_name() -> str:
+    current_time = datetime.now().strftime("%Y%m%d%H%M%S")
+    return f"benchmark-{current_time}"
+
+
+class BenchmarkConfig:
+    def __init__(
+        self,
+        project_display_name: Optional[str] = None,
+        refresh_interval: int = 15,
+        trainer: bool = False,
+        working_dir: Optional[Union[str, Path]] = None,
+        additional_report_scores: Optional[list[str]] = None,
+    ):
+        self.project_display_name = project_display_name or _default_name()
+        self.working_dir = Path(working_dir or self.project_display_name)
+        self.refresh_interval = refresh_interval
+        self.trainer = trainer
+        self.additional_report_scores = additional_report_scores or []
 
 
 class Timer:
@@ -163,71 +64,27 @@ class Timer:
         self.total_time = time.time() - self.t
 
     def duration(self) -> float:
-        return round(self.total_time, 2)
+        return round(self.total_time, 3)
 
 
-TRAIN = "train"
-GENERATE = "generate"
-EVALUATE = "evaluate"
+def run_out_path(working_dir: Path, run_identifier: str) -> Path:
+    return working_dir / f"synth_{run_identifier}.csv"
 
 
-def execute(run: Run[Executor], results_dict: DictProxy) -> None:
-    def _set_status(status: RunStatus) -> None:
-        results_dict[run.identifier] = status
+def log(
+    run_identifier: str,
+    msg: str,
+    level: int = logging.INFO,
+    exc_info: Optional[Exception] = None,
+) -> None:
+    logger.log(level, f"{run_identifier} - {msg}", exc_info=exc_info)
 
-    if not run.executor.runnable(run.source):
-        _set_status(Skipped())
-        return None
 
-    with run.source.unwrap() as path:
-        _set_status(InProgress(stage=TRAIN))
-
-        train_time = Timer()
-        try:
-            with train_time:
-                run.executor.train(path, delimiter=run.source.delimiter)
-        except Exception as e:
-            _set_status(Failed(
-                during=TRAIN,
-                error=e,
-                train_secs=train_time.duration()
-            ))
-            return None
-
-        _set_status(InProgress(stage=GENERATE, train_secs=train_time.duration()))
-
-        generate_time = Timer()
-        try:
-            with generate_time:
-                synthetic_dataframe = run.executor.generate(
-                    training_row_count=run.source.row_count
-                )
-        except Exception as e:
-            _set_status(Failed(
-                during=GENERATE,
-                error=e,
-                train_secs=train_time.duration(),
-                generate_secs=generate_time.duration()
-            ))
-            return None
-
-        _set_status(InProgress(stage=EVALUATE, train_secs=train_time.duration(), generate_secs=generate_time.duration()))
-
-        try:
-            sqs_score = run.executor.get_sqs_score(synthetic_dataframe, path)
-        except Exception as e:
-            _set_status(Failed(
-                during=EVALUATE,
-                error=e,
-                train_secs=train_time.duration(),
-                generate_secs=generate_time.duration(),
-                synthetic_data=synthetic_dataframe
-            ))
-            return None
-
-    _set_status(Completed(
-        sqs=sqs_score,
-        train_secs=train_time.duration(),
-        generate_secs=generate_time.duration(),
-        synthetic_data=synthetic_dataframe
-    ))
+def get_data_shape(path: str, delimiter: str = ",") -> tuple[int, int]:
+    with smart_open.open(path) as f:
+        reader = csv.reader(f, delimiter=delimiter)
+        cols = len(next(reader))
+        # We just read the header row to get cols,
+        # so the remaining rows are all data
+        rows = sum(1 for _ in f)
+    return (rows, cols)
