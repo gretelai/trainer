@@ -2,7 +2,7 @@ import itertools
 import sqlite3
 import tempfile
 from pathlib import Path
-from typing import Generator
+from typing import Callable, Generator
 from unittest.mock import Mock, patch
 
 import pandas as pd
@@ -32,8 +32,12 @@ def static_suffix(request):
         yield make_suffix
 
 
-# Doesn't work well as a fixture due to the need for an input param
-def get_invented_table_suffix(make_suffix_execution_number: int):
+@pytest.fixture()
+def get_invented_table_suffix() -> Callable[[int], str]:
+    return _get_invented_table_suffix
+
+
+def _get_invented_table_suffix(make_suffix_execution_number: int):
     return f"invented_{str(make_suffix_execution_number)}"
 
 
