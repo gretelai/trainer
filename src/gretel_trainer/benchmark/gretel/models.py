@@ -6,17 +6,16 @@ from typing import Optional, Type, Union, cast
 from gretel_client.projects.exceptions import ModelConfigError
 from gretel_client.projects.models import read_model_config
 
-import gretel_trainer
-from gretel_trainer import models
+import gretel_trainer.models
 from gretel_trainer.benchmark.core import BenchmarkException, Dataset, Datatype
 
 GretelModelConfig = Union[str, Path, dict]
 
 
 TRAINER_MODEL_TYPE_CONSTRUCTORS = {
-    "actgan": models.GretelACTGAN,
-    "amplify": models.GretelAmplify,
-    "synthetics": models.GretelLSTM,
+    "actgan": gretel_trainer.models.GretelACTGAN,
+    "amplify": gretel_trainer.models.GretelAmplify,
+    "synthetics": gretel_trainer.models.GretelLSTM,
     # Benchmark GretelAuto sends None model_type to Trainer to trigger dynamic model selection
     "AUTO": lambda _: None,
 }

@@ -51,7 +51,7 @@ class GretelTrainerStrategy:
         self.trainer = Trainer(
             project_name=self.project_name,
             model_type=self.benchmark_model.trainer_model_type,
-            cache_file=self.config.working_dir / f"{self.run_identifier}.json",
+            cache_file=str(self.config.working_dir / f"{self.run_identifier}.json"),
         )
         self.train_timer = Timer()
         with self.train_timer:
