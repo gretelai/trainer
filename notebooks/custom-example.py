@@ -1,8 +1,6 @@
 from gretel_client import configure_session
-
 from gretel_trainer import Trainer
-from gretel_trainer.models import GretelLSTM, GretelACTGAN
-
+from gretel_trainer.models import GretelACTGAN, GretelLSTM
 
 # Configure Gretel credentials
 configure_session(api_key="prompt", cache="yes", validate=True)
@@ -13,7 +11,6 @@ dataset = "https://gretel-public-website.s3-us-west-2.amazonaws.com/datasets/USA
 # configs can be either a string, dict, or path
 model_type = GretelACTGAN(
     config="synthetics/tabular-actgan",
-    max_header_clusters=100,
     max_rows=50000
 )
 

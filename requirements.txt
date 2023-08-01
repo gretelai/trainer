@@ -1,7 +1,6 @@
 boto3~=1.20
-dask[complete]==2023.5.1
+dask[dataframe]==2023.5.1
 gretel-client>=0.16.0
-gretel-synthetics[utils]
 jinja2~=3.1
 networkx~=3.0
 numpy~=1.20

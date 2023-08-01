@@ -11,7 +11,6 @@ from typing import Optional
 import pandas as pd
 from gretel_client.config import get_session_config, RunnerMode
 from gretel_client.projects import create_or_get_unique_project
-from gretel_synthetics.utils.header_clusters import cluster
 
 from gretel_trainer import runner, strategy
 from gretel_trainer.models import _BaseConfig, determine_best_model
@@ -206,19 +205,7 @@ class Trainer:
 
         model_config = self.model_type.config
 
-        header_clusters = cluster(
-            df,
-            maxsize=self.model_type.max_header_clusters,
-            header_prefix=seed_fields,
-            plot=False,
-        )
-        logger.info(
-            f"Header clustering created {len(header_clusters)} cluster(s) "
-            f"of length(s) {[len(x) for x in header_clusters]}"
-        )
-
         constraints = strategy.PartitionConstraints(
-            header_clusters=header_clusters,
             max_row_count=self.model_type.max_rows,
             seed_headers=seed_fields,
         )

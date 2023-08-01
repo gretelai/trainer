@@ -1,11 +1,9 @@
 from pathlib import Path
 from typing import List
-from dataclasses import dataclass
 
 import pandas as pd
 import pytest
 
-from gretel_synthetics.utils.header_clusters import cluster
 from gretel_trainer.strategy import PartitionConstraints, PartitionStrategy
 
 
@@ -15,23 +13,8 @@ def test_df() -> pd.DataFrame:
 
 
 @pytest.fixture(scope="module")
-def header_clusters(test_df) -> List[List[str]]:
-    clusters = cluster(test_df)
-    assert len(clusters) == 2
-    return clusters
-
-
-@dataclass
-class ClusterData:
-    clusters: List[List[str]]
-    seeds: List[str]
-
-
-@pytest.fixture(scope="module")
-def header_clusters_seed(test_df) -> ClusterData:
-    seeds = ["goal", "goal_type", "goals"]
-    clusters = cluster(test_df, header_prefix=seeds)
-    return ClusterData(clusters=clusters, seeds=seeds)
+def test_seeds() -> List[str]:
+    return ["goal", "goal_type", "goals"]
 
 
 @pytest.mark.parametrize(
@@ -64,60 +47,17 @@ def test_strategy_all_columns(constraints: PartitionConstraints, test_df):
     assert compare.shape == test_df.shape
 
 
-@pytest.mark.parametrize(
-    "constraints",
-    [
-        PartitionConstraints(max_row_count=1000),
-        PartitionConstraints(max_row_count=100),
-    ],
-)
-def test_strategy_column_batches(
-    constraints: PartitionConstraints, test_df, header_clusters
-):
-    constraints.header_clusters = header_clusters
-
-    strategy = PartitionStrategy.from_dataframe("foo", test_df, constraints)
-    assert (
-        len(test_df) // constraints.max_row_count
-        <= strategy.partition_count / len(header_clusters)
-        <= len(test_df) // constraints.max_row_count + 1
-    )
-
-    # partitions are of roughly equal size
-    extracted_df_lengths = [len(partition.extract_df(test_df)) for partition in strategy.partitions]
-    assert max(extracted_df_lengths) - min(extracted_df_lengths) <= 1
-
-    part1 = pd.DataFrame()
-    part2 = pd.DataFrame()
-    for idx, partition in enumerate(strategy.partitions):
-        assert partition.idx == idx
-        tmp_df = partition.extract_df(test_df)
-        if list(tmp_df.columns) == header_clusters[0]:
-            part1 = pd.concat([part1, tmp_df]).reset_index(drop=True)
-        else:
-            part2 = pd.concat([part2, tmp_df]).reset_index(drop=True)
-
-    final = pd.concat([part1, part2], axis=1)
-    assert final.shape == test_df.shape
-
-
-def test_strategy_seeds(test_df, header_clusters_seed: ClusterData):
+def test_strategy_seeds(test_df, test_seeds):
     constraints = PartitionConstraints(max_row_count=100)
-    constraints.header_clusters = header_clusters_seed.clusters
-    constraints.seed_headers = header_clusters_seed.seeds
+    constraints.seed_headers = test_seeds
     strategy = PartitionStrategy.from_dataframe("foo", test_df, constraints)
     for partition in strategy.partitions:
-        if partition.columns.idx == 0:
-            assert partition.columns.seed_headers == header_clusters_seed.seeds
-        else:
-            assert not partition.columns.seed_headers
+        assert partition.columns.seed_headers == test_seeds
 
 
-def test_read_write(test_df, header_clusters, tmpdir):
+def test_read_write(test_df, tmpdir):
     save_location = Path(tmpdir) / "data.json"
-    constraints = PartitionConstraints(
-        max_row_count=100, header_clusters=header_clusters
-    )
+    constraints = PartitionConstraints(max_row_count=100)
     strategy = PartitionStrategy.from_dataframe("foo", test_df, constraints)
 
     # Inproper filename

@@ -49,24 +49,20 @@ class _BaseConfig:
     """
 
     """This should be overridden on concrete classes"""
-    _max_header_clusters_limit: int
     _max_rows_limit: int
     _model_slug: str
 
     # Should be set by concrete constructors
     config: dict
     max_rows: int
-    max_header_clusters: int
 
     def __init__(
         self,
         config: Union[str, dict],
         max_rows: int,
-        max_header_clusters: int,
     ):
         self.config = read_model_config(config)
         self.max_rows = max_rows
-        self.max_header_clusters = max_header_clusters
 
         self.validate()
 
@@ -89,11 +85,6 @@ class _BaseConfig:
                 f"max_rows must be less than {self._max_rows_limit} for this model type."
             )
 
-        if self.max_header_clusters > self._max_header_clusters_limit:
-            raise ValueError(
-                f"max_header_clusters must be less than {self._max_header_clusters_limit} for this model type."
-            )
-
     def _replace_nested_key(self, data, key, value) -> dict:
         """Replace nested keys"""
         if isinstance(data, dict):
@@ -114,10 +105,9 @@ class GretelLSTM(_BaseConfig):
     Args:
         config (str/dict, optional): Either a string representing the path to the config on the local filesystem, a string representing a path to the default Gretel configurations, or a dictionary containing the configurations. Default: "synthetics/tabular-lstm", a default Gretel configuration
         max_rows (int, optional): The number of rows of synthetic data to generate. Defaults to 50000
-        max_header_clusters (int, optional): Default: 20
+        max_header_clusters (int, optional): This parameter is deprecated and will be removed in a future release.
     """
 
-    _max_header_clusters_limit: int = 30
     _max_rows_limit: int = 5_000_000
     _model_slug: str = "synthetics"
 
@@ -125,12 +115,12 @@ class GretelLSTM(_BaseConfig):
         self,
         config="synthetics/tabular-lstm",
         max_rows=50_000,
-        max_header_clusters=20,
+        max_header_clusters=None,
     ):
+        _max_header_clusters_deprecation_warning(max_header_clusters)
         super().__init__(
             config=config,
             max_rows=max_rows,
-            max_header_clusters=max_header_clusters,
         )
 
 
@@ -143,10 +133,9 @@ class GretelACTGAN(_BaseConfig):
     Args:
         config (str/dict, optional): Either a string representing the path to the config on the local filesystem, a string representing a path to the default Gretel configurations, or a dictionary containing the configurations. Default: "synthetics/tabular-actgan", a default Gretel configuration
         max_rows (int, optional): The number of rows of synthetic data to generate. Defaults to 50000
-        max_header_clusters (int, optional): Default: 500
+        max_header_clusters (int, optional): This parameter is deprecated and will be removed in a future release.
     """
 
-    _max_header_clusters_limit: int = 5_000
     _max_rows_limit: int = 5_000_000
     _model_slug: str = "actgan"
 
@@ -154,12 +143,12 @@ class GretelACTGAN(_BaseConfig):
         self,
         config="synthetics/tabular-actgan",
         max_rows=1_000_000,
-        max_header_clusters=1_000,
+        max_header_clusters=None,
     ):
+        _max_header_clusters_deprecation_warning(max_header_clusters)
         super().__init__(
             config=config,
             max_rows=max_rows,
-            max_header_clusters=max_header_clusters,
         )
 
 
@@ -172,10 +161,9 @@ class GretelAmplify(_BaseConfig):
     Args:
         config (str/dict, optional): Either a string representing the path to the config on the local filesystem, a string representing a path to the default Gretel configurations, or a dictionary containing the configurations. Default: "synthetics/amplify", a default Gretel configuration for Amplify.
         max_rows (int, optional): The number of rows of synthetic data to generate. Defaults to 50000
-        max_header_clusters (int, optional): Default: 50
+        max_header_clusters (int, optional): This parameter is deprecated and will be removed in a future release.
     """
 
-    _max_header_clusters_limit: int = 1_000
     _max_rows_limit: int = 1_000_000_000
     _model_slug: str = "amplify"
 
@@ -183,10 +171,18 @@ class GretelAmplify(_BaseConfig):
         self,
         config="synthetics/amplify",
         max_rows=50_000,
-        max_header_clusters=500,
+        max_header_clusters=None,
     ):
+        _max_header_clusters_deprecation_warning(max_header_clusters)
         super().__init__(
             config=config,
             max_rows=max_rows,
-            max_header_clusters=max_header_clusters,
+        )
+
+
+def _max_header_clusters_deprecation_warning(value: Optional[int]) -> None:
+    if value is not None:
+        logger.warning(
+            "Trainer no longer performs header clustering. "
+            "The max_header_clusters parameter is deprecated and will be removed in a future release."
         )
