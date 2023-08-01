@@ -5,7 +5,6 @@ import pytest
 
 from gretel_trainer.relational.core import MultiTableException
 from gretel_trainer.relational.multi_table import MultiTable
-from tests.relational.conftest import get_invented_table_suffix
 
 
 # The assertions in this file are concerned with setting up the synthetics train
@@ -206,7 +205,9 @@ def test_train_synthetics_multiple_calls_additive(ecom, tmpdir):
     assert set(mt._synthetics_train.models.keys()) == {"products", "users"}
 
 
-def test_train_synthetics_models_for_dbs_with_invented_tables(documents, tmpdir):
+def test_train_synthetics_models_for_dbs_with_invented_tables(
+    documents, tmpdir, get_invented_table_suffix
+):
     mt = MultiTable(documents, project_display_name=tmpdir)
     mt.train_synthetics()
 

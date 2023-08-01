@@ -11,7 +11,6 @@ from gretel_trainer.relational.backup import (
     BackupSyntheticsTrain,
     BackupTransformsTrain,
 )
-from tests.relational.conftest import get_invented_table_suffix
 
 
 def test_backup_relational_data(trips):
@@ -37,7 +36,7 @@ def test_backup_relational_data(trips):
     assert BackupRelationalData.from_relational_data(trips) == expected
 
 
-def test_backup_relational_data_with_json(documents):
+def test_backup_relational_data_with_json(documents, get_invented_table_suffix):
     purchases_root_invented_table = f"purchases_{get_invented_table_suffix(1)}"
     purchases_data_years_invented_table = f"purchases_{get_invented_table_suffix(2)}"
 
