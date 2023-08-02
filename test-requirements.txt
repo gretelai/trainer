@@ -1,5 +1,3 @@
-black
-isort
 lxml
 pandas-stubs
 pyright==1.1.305
