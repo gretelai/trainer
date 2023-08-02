@@ -80,7 +80,8 @@ class ExtendedGretelSDK:
                     return field_dict["value"]
 
     def get_record_handler_data(self, record_handler: RecordHandler) -> pd.DataFrame:
-        return pd.read_csv(record_handler.get_artifact_link("data"), compression="gzip")
+        with smart_open.open(record_handler.get_artifact_link("data"), "rb") as data:
+            return pd.read_csv(data)
 
     def start_job_if_possible(
         self,
