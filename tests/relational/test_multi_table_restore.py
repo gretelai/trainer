@@ -148,7 +148,7 @@ def create_backup(
 
 def get_local_name(artifact_id):
     local_name = None
-    for key, pointers in ARTIFACTS.items():
+    for _, pointers in ARTIFACTS.items():
         if pointers["artifact_id"] == artifact_id:
             local_name = pointers["local_name"]
     if local_name is None:
@@ -161,6 +161,13 @@ def make_mock_get_artifact_link(setup_path: Path):
         return setup_path / get_local_name(artifact_id)
 
     return get_artifact_link
+
+
+def make_mock_get_artifact_handle(setup_path: Path):
+    def get_artifact_handle(artifact_id):
+        return open(setup_path / get_local_name(artifact_id), "rb")
+
+    return get_artifact_handle
 
 
 def make_mock_download_tar_artifact(setup_path: Path, working_path: Path):
@@ -193,6 +200,7 @@ def make_mock_model(
     model.model_id = name
     model.data_source = ARTIFACTS[f"train_{name}"]["artifact_id"]
     model.get_artifact_link = make_mock_get_artifact_link(setup_path)
+    model.get_artifact_handle = make_mock_get_artifact_handle(setup_path)
     model.get_record_handler.return_value = record_handler
     return model
 
@@ -329,6 +337,7 @@ def configure_mocks(
     models: dict[str, Mock] = {},
 ) -> None:
     project.get_artifact_link = make_mock_get_artifact_link(setup_path)
+    project.get_artifact_handle = make_mock_get_artifact_handle(setup_path)
     project.get_model = make_mock_get_model(models)
     download_tar_artifact.side_effect = make_mock_download_tar_artifact(
         setup_path,

@@ -52,11 +52,10 @@ class ExtendedGretelSDK:
         artifact_name: str,
         out_path: Union[str, Path],
     ) -> None:
-        download_link = gretel_object.get_artifact_link(artifact_name)
         try:
-            with smart_open.open(download_link, "rb") as src, smart_open.open(
-                out_path, "wb"
-            ) as dest:
+            with gretel_object.get_artifact_handle(
+                artifact_name
+            ) as src, smart_open.open(out_path, "wb") as dest:
                 shutil.copyfileobj(src, dest)
         except:
             logger.warning(f"Failed to download `{artifact_name}`")
@@ -80,7 +79,7 @@ class ExtendedGretelSDK:
                     return field_dict["value"]
 
     def get_record_handler_data(self, record_handler: RecordHandler) -> pd.DataFrame:
-        with smart_open.open(record_handler.get_artifact_link("data"), "rb") as data:
+        with record_handler.get_artifact_handle("data") as data:
             return pd.read_csv(data)
 
     def start_job_if_possible(
