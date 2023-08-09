@@ -713,6 +713,150 @@ def test_restore_with_empty_tables(bball, invented_tables):
     assert jimmy["suspensions"] == []
 
 
+@pytest.fixture
+def nested_listed_objects(tmpdir):
+    json = """
+{
+    "Records": [
+        {
+            "userAgent": "hello",
+            "responseElements": {
+                "accountAttributes": [
+                    {
+                        "attributeName": "duration",
+                        "attributeValues": [
+                            {
+                                "attributeValue": "45"
+                            }
+                        ]
+                    }
+                ]
+            }
+        }
+    ]
+}
+"""
+    json_df = pd.read_json(json)
+
+    rel_data = RelationalData(directory=tmpdir)
+    rel_data.add_table(name="demo", primary_key=None, data=json_df)
+
+    return rel_data
+
+
+def test_nested_listed_objects(nested_listed_objects):
+    output_tables = {
+        "demo_invented_1": pd.DataFrame(
+            data={
+                "~PRIMARY_KEY_ID~": [0, 1],
+                "Records>userAgent": ["abc", "def"],
+            }
+        ),
+        "demo_invented_2": pd.DataFrame(
+            data={
+                "~PRIMARY_KEY_ID~": [0, 1],
+                "demo~id": [0, 1],
+                "array~order": [0, 0],
+                "content>attributeName": ["duration", "duration"],
+            }
+        ),
+        "demo_invented_3": pd.DataFrame(
+            data={
+                "~PRIMARY_KEY_ID~": [0, 1],
+                "demo^Records>responseElements>accountAttributes~id": [0, 1],
+                "array~order": [0, 0],
+                "content>attributeValue": ["42", "43"],
+            }
+        ),
+    }
+
+    restored = nested_listed_objects.restore(output_tables)
+
+    pdtest.assert_frame_equal(
+        restored["demo"],
+        pd.DataFrame(
+            data={
+                "Records": [
+                    {
+                        "userAgent": "abc",
+                        "responseElements": {
+                            "accountAttributes": [
+                                {
+                                    "attributeName": "duration",
+                                    "attributeValues": [{"attributeValue": "42"}],
+                                }
+                            ]
+                        },
+                    },
+                    {
+                        "userAgent": "def",
+                        "responseElements": {
+                            "accountAttributes": [
+                                {
+                                    "attributeName": "duration",
+                                    "attributeValues": [{"attributeValue": "43"}],
+                                }
+                            ]
+                        },
+                    },
+                ]
+            }
+        ),
+    )
+
+
+# TODO: This test documents current behavior, but ideally we'd improve our handling of this scenario
+# to retain more synthetic data from "deeper" levels that trained and ran successfully.
+def test_handles_missing_interior_invented_tables(nested_listed_objects):
+    # Same setup as the test above except we omit demo_invented_2
+    # (simulating that table's model/rh erroring out)
+    output_tables = {
+        "demo_invented_1": pd.DataFrame(
+            data={
+                "~PRIMARY_KEY_ID~": [0, 1],
+                "Records>userAgent": ["abc", "def"],
+            }
+        ),
+
+        # Since demo_invented_2 is missing, Independent strategy post-processing
+        # will set all foreign key values on this table to None.
+        "demo_invented_3": pd.DataFrame(
+            data={
+                "~PRIMARY_KEY_ID~": [0, 1],
+                "demo^Records>responseElements>accountAttributes~id": [None, None],
+                "array~order": [0, 0],
+                "content>attributeValue": ["42", "43"],
+            }
+        ),
+    }
+
+    restored = nested_listed_objects.restore(output_tables)
+
+    pdtest.assert_frame_equal(
+        restored["demo"],
+        pd.DataFrame(
+            data={
+                "Records": [
+                    {
+                        "userAgent": "abc",
+                        "responseElements": {
+                            "accountAttributes": [
+                                # We lost the table at this level, and with it everything below.
+                            ]
+                        },
+                    },
+                    {
+                        "userAgent": "def",
+                        "responseElements": {
+                            "accountAttributes": []
+                        },
+                    },
+                ]
+            }
+        ),
+    )
+
+
 def test_flatten_and_restore_all_sorts_of_json(tmpdir, get_invented_table_suffix):
     json = """
 [

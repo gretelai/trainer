@@ -314,30 +314,48 @@ def _denormalize_json(
     table_name_mappings: dict[str, str],
     original_table_name: str,
 ) -> pd.DataFrame:
-    table_names = list(table_name_mappings.values())
+    # Throughout this function, "provenance name" refers to the json-breadcrumb-style name (e.g. foo^bar>baz)
+    # and "node name" refers to the table name as it appears in the RelationalData graph (e.g. foo_invented_{uuid})
+
+    # The provided `table_name_mappings` argument (from producer metadata) maps from provenance name to node name.
+    # `inverse_table_name_mappings` inverts that mapping (so: node name keys, provenance name values).
+    # `table_dict` replaces the keys (node namees) in `tables` with corresponding provenance names
+    table_node_names = list(table_name_mappings.values())
     inverse_table_name_mappings = {v: k for k, v in table_name_mappings.items()}
-    table_dict: dict = {inverse_table_name_mappings[k]: v for k, v in tables.items()}
-    for table_name in list(reversed(table_names)):
+    table_dict = {inverse_table_name_mappings[k]: v for k, v in tables.items()}
+
+    get_table = lambda node_name: _get_table(
+        rel_data, inverse_table_name_mappings, table_dict, node_name
+    )
+
+    for table_name in list(reversed(table_node_names)):
+        table_df = get_table(table_name)
         table_provenance_name = inverse_table_name_mappings[table_name]
-        empty_fallback = pd.DataFrame(
-            data={col: [] for col in rel_data.get_table_columns(table_name)},
-        )
-        table_df = table_dict.get(table_provenance_name, empty_fallback)
 
         if table_df.empty and _is_invented_child_table(table_name, rel_data):
-            p_name = rel_data.get_foreign_keys(table_name)[0].parent_table_name
-            parent_name = inverse_table_name_mappings[p_name]
+            # Mutate the parent dataframe by adding a column with empty lists
+
+            # We know invented child tables have exactly one foreign key
+            fk = rel_data.get_foreign_keys(table_name)[0]
+            parent_node_name = fk.parent_table_name
+            parent_provenance_name = inverse_table_name_mappings[parent_node_name]
             col_name = get_parent_column_name_from_child_table_name(
                 table_provenance_name
             )
-            kwargs = {col_name: table_dict[parent_name].apply(lambda x: [], axis=1)}
-            table_dict[parent_name] = table_dict[parent_name].assign(**kwargs)
+            parent_df = get_table(parent_node_name)
+            kwargs = {col_name: parent_df.apply(lambda x: [], axis=1)}
+            # Here's where we mutate the DF
+            table_dict[parent_provenance_name] = parent_df.assign(**kwargs)
         else:
+            # First, make a version of `table_df` with column names altered to send to `unflatten`
+            # See: https://github.com/dairiki/unflatten/#synopsis
             col_names = [col for col in table_df.columns if FIELD_SEPARATOR in col]
             new_col_names = [col.replace(FIELD_SEPARATOR, ".") for col in col_names]
             flat_df = table_df[col_names].rename(
                 columns=dict(zip(col_names, new_col_names))
             )
+
+            # Turn this dataframe into a dict to send to `unflatten`...
             flat_dict = {
                 k: {
                     k1: v1
@@ -346,19 +364,24 @@ def _denormalize_json(
                 }
                 for k, v in flat_df.to_dict("index").items()
             }
+            # ...and after unflattening, go back to a dataframe
             dict_df = nulls_to_empty_dicts(
                 pd.DataFrame.from_dict(
                     {k: unflatten(v) for k, v in flat_dict.items()}, orient="index"
                 )
             )
-            nested_df = table_df.join(dict_df).drop(columns=col_names)
+
+            # Join the flattened dict_df onto table_df.
+            # You might think we could drop the original non-nested columns at this point,
+            # but under certain JSON shapes (e.g. nested lists of objects) we still need them present.
+            nested_df = table_df.join(dict_df)
             if _is_invented_child_table(table_name, rel_data):
                 # we know there is exactly one foreign key on invented child tables...
                 fk = rel_data.get_foreign_keys(table_name)[0]
                 # ...with exactly one column
                 fk_col = fk.columns[0]
-                p_name = fk.parent_table_name
-                parent_name = inverse_table_name_mappings[p_name]
+                parent_node_name = fk.parent_table_name
+                parent_provenance_name = inverse_table_name_mappings[parent_node_name]
                 nested_df = (
                     nested_df.sort_values(ORDER_COLUMN)
                     .groupby(fk_col)[CONTENT_COLUMN]
@@ -367,14 +390,30 @@ def _denormalize_json(
                 col_name = get_parent_column_name_from_child_table_name(
                     table_provenance_name
                 )
-                table_dict[parent_name] = table_dict[parent_name].join(
-                    nested_df.rename(col_name)
-                )
-                table_dict[parent_name][col_name] = nulls_to_empty_lists(
-                    table_dict[parent_name][col_name]
-                )
+                parent_df = get_table(parent_node_name)
+                parent_df = parent_df.join(nested_df.rename(col_name))
+                parent_df[col_name] = nulls_to_empty_lists(parent_df[col_name])
+                table_dict[parent_provenance_name] = parent_df
             table_dict[table_provenance_name] = nested_df
     return table_dict[original_table_name]
+
+
+def _get_table(
+    rel_data: _RelationalData,
+    inverse_table_name_mappings: dict[str, str],
+    table_dict: dict[str, pd.DataFrame],
+    node_name: str,
+) -> pd.DataFrame:
+    """
+    Helper function used inside _denormalize_json to safely retrieve a table dataframe.
+    If `node_name` is not present in `table_dict` (e.g. because the Gretel Job failed),
+    return an empty dataframe with the expected columns.
+    """
+    empty_fallback = pd.DataFrame(
+        data={col: [] for col in rel_data.get_table_columns(node_name)},
+    )
+    provenance_name = inverse_table_name_mappings[node_name]
+    return table_dict.get(provenance_name, empty_fallback)
 
 
 def get_json_columns(df: pd.DataFrame) -> list[str]:
