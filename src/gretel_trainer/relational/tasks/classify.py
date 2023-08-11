@@ -151,8 +151,8 @@ class ClassifyTask:
 
         destpath = self.out_dir / filename
 
-        with smart_open.open(
-            job.get_artifact_link(artifact_name), "rb"
-        ) as src, smart_open.open(str(destpath), "wb") as dest:
+        with job.get_artifact_handle(artifact_name) as src, smart_open.open(
+            str(destpath), "wb"
+        ) as dest:
             shutil.copyfileobj(src, dest)
         self.result_filepaths.append(destpath)

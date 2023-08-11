@@ -40,9 +40,8 @@ def read_report_json_data(model: Model, report_path: Path) -> Optional[dict]:
 
 def _get_report_json(model: Model) -> Optional[dict]:
     try:
-        return json.loads(
-            smart_open.open(model.get_artifact_link("report_json")).read()
-        )
+        with model.get_artifact_handle("report_json") as report:
+            return json.loads(report.read())
     except:
         logger.warning("Failed to fetch model evaluation report JSON.")
         return None

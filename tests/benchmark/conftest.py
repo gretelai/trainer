@@ -48,12 +48,17 @@ def project():
 
 
 @pytest.fixture()
-def evaluate_report_path():
+def evaluate_report_handle():
     report = {"synthetic_data_quality_score": {"score": 95}}
     with tempfile.NamedTemporaryFile() as f:
         with open(f.name, "w") as j:
             json.dump(report, j)
-        yield f.name
+
+        ctxmgr = Mock()
+        ctxmgr.__enter__ = Mock(return_value=f)
+        ctxmgr.__exit__ = Mock(return_value=False)
+
+        yield ctxmgr
 
 
 @pytest.fixture()

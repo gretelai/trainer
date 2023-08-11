@@ -38,7 +38,6 @@ from random import choice
 from typing import List, Optional, Tuple, Union
 
 import pandas as pd
-import smart_open
 
 from gretel_client.projects import Project
 from gretel_client.projects.jobs import ACTIVE_STATES
@@ -213,9 +212,7 @@ class StrategyRunner:
                 report = current_model.peek_report()
 
                 if report is None:
-                    with smart_open.open(
-                        current_model.get_artifact_link("report_json")
-                    ) as fin:
+                    with current_model.get_artifact_handle("report_json") as fin:
                         report = json.loads(fin.read())
 
                 sqs = report["synthetic_data_quality_score"]["score"]

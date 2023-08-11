@@ -3,8 +3,6 @@ import time
 
 from typing import Any
 
-import smart_open
-
 from gretel_client.projects.jobs import (
     ACTIVE_STATES,
     END_STATES,
@@ -41,9 +39,8 @@ def run_evaluate(
     job_status = await_job(run_identifier, evaluate_model, "evaluation", wait)
     if job_status in END_STATES and job_status != Status.COMPLETED:
         raise BenchmarkException("Evaluate failed")
-    return json.loads(
-        smart_open.open(evaluate_model.get_artifact_link("report_json")).read()
-    )
+    with evaluate_model.get_artifact_handle("report_json") as report:
+        return json.loads(report.read())
 
 
 def _make_evaluate_config(run_identifier: str) -> dict:

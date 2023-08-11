@@ -81,11 +81,11 @@ class SharedDictLstm(GretelModel):
     }
 
 
-def test_run_with_gretel_dataset(working_dir, project, evaluate_report_path, iris):
+def test_run_with_gretel_dataset(working_dir, project, evaluate_report_handle, iris):
     evaluate_model = Mock(
         status=Status.COMPLETED,
     )
-    evaluate_model.get_artifact_link.return_value = evaluate_report_path
+    evaluate_model.get_artifact_handle.return_value = evaluate_report_handle
     project.create_model_obj.side_effect = [evaluate_model]
 
     session = compare(
@@ -107,11 +107,11 @@ def test_run_with_gretel_dataset(working_dir, project, evaluate_report_path, iri
     assert result["SQS"] == 95
 
 
-def test_run_with_custom_csv_dataset(working_dir, project, evaluate_report_path, df):
+def test_run_with_custom_csv_dataset(working_dir, project, evaluate_report_handle, df):
     evaluate_model = Mock(
         status=Status.COMPLETED,
     )
-    evaluate_model.get_artifact_link.return_value = evaluate_report_path
+    evaluate_model.get_artifact_handle.return_value = evaluate_report_handle
     project.create_model_obj.side_effect = [evaluate_model]
 
     with tempfile.NamedTemporaryFile() as f:
@@ -137,11 +137,11 @@ def test_run_with_custom_csv_dataset(working_dir, project, evaluate_report_path,
     assert result["SQS"] == 95
 
 
-def test_run_with_custom_psv_dataset(working_dir, project, evaluate_report_path, df):
+def test_run_with_custom_psv_dataset(working_dir, project, evaluate_report_handle, df):
     evaluate_model = Mock(
         status=Status.COMPLETED,
     )
-    evaluate_model.get_artifact_link.return_value = evaluate_report_path
+    evaluate_model.get_artifact_handle.return_value = evaluate_report_handle
     project.create_model_obj.side_effect = [evaluate_model]
 
     with tempfile.NamedTemporaryFile() as f:
@@ -168,12 +168,12 @@ def test_run_with_custom_psv_dataset(working_dir, project, evaluate_report_path,
 
 
 def test_run_with_custom_dataframe_dataset(
-    working_dir, project, evaluate_report_path, df
+    working_dir, project, evaluate_report_handle, df
 ):
     evaluate_model = Mock(
         status=Status.COMPLETED,
     )
-    evaluate_model.get_artifact_link.return_value = evaluate_report_path
+    evaluate_model.get_artifact_handle.return_value = evaluate_report_handle
     project.create_model_obj.side_effect = [evaluate_model]
 
     dataset = create_dataset(df, datatype="tabular", name="pets")
@@ -205,7 +205,7 @@ def test_run_with_custom_dataframe_dataset(
 
 @pytest.mark.parametrize("benchmark_model", [GretelLSTM, TailoredActgan])
 def test_run_happy_path_gretel_sdk(
-    benchmark_model, working_dir, iris, project, evaluate_report_path
+    benchmark_model, working_dir, iris, project, evaluate_report_handle
 ):
     record_handler = Mock(
         status=Status.COMPLETED,
@@ -221,7 +221,7 @@ def test_run_happy_path_gretel_sdk(
     evaluate_model = Mock(
         status=Status.COMPLETED,
     )
-    evaluate_model.get_artifact_link.return_value = evaluate_report_path
+    evaluate_model.get_artifact_handle.return_value = evaluate_report_handle
 
     project.create_model_obj.side_effect = [model, evaluate_model]
 
