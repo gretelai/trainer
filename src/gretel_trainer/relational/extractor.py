@@ -4,17 +4,19 @@ Extract database or data warehouse SQL tables to flat files with optional subset
 from __future__ import annotations
 
 import logging
+
 from contextlib import nullcontext
 from dataclasses import asdict, dataclass
 from enum import Enum
 from pathlib import Path
 from threading import Lock
-from typing import TYPE_CHECKING, Iterator, Optional
+from typing import Iterator, Optional, TYPE_CHECKING
 
 import dask.dataframe as dd
 import numpy as np
 import pandas as pd
-from sqlalchemy import MetaData, Table, func, inspect, select, tuple_
+
+from sqlalchemy import func, inspect, MetaData, select, Table, tuple_
 
 from gretel_trainer.relational.core import RelationalData
 

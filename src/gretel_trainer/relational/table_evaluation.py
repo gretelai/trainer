@@ -1,6 +1,7 @@
 import json
+
 from dataclasses import dataclass, field
-from typing import Literal, Optional, Union, overload
+from typing import Literal, Optional, overload, Union
 
 _SQS = "synthetic_data_quality_score"
 _PPL = "privacy_protection_level"

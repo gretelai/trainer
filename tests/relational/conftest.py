@@ -1,12 +1,14 @@
 import itertools
 import sqlite3
 import tempfile
+
 from pathlib import Path
 from typing import Callable, Generator
 from unittest.mock import Mock, patch
 
 import pandas as pd
 import pytest
+
 from sqlalchemy import create_engine
 
 from gretel_trainer.relational.connectors import Connector

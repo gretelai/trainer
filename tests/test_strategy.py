@@ -33,7 +33,9 @@ def test_strategy_all_columns(constraints: PartitionConstraints, test_df):
     )
 
     # partitions are of roughly equal size
-    extracted_df_lengths = [len(partition.extract_df(test_df)) for partition in strategy.partitions]
+    extracted_df_lengths = [
+        len(partition.extract_df(test_df)) for partition in strategy.partitions
+    ]
     assert max(extracted_df_lengths) - min(extracted_df_lengths) <= 1
 
     # re-assemble all partitions and compare

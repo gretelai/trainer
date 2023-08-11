@@ -6,8 +6,8 @@ from gretel_trainer.benchmark.core import (
     BenchmarkConfig,
     BenchmarkException,
     Dataset,
-    Timer,
     run_out_path,
+    Timer,
 )
 from gretel_trainer.benchmark.gretel.models import GretelModel
 from gretel_trainer.benchmark.job_spec import JobSpec

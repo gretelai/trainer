@@ -9,10 +9,7 @@ dataset = "https://gretel-public-website.s3-us-west-2.amazonaws.com/datasets/USA
 
 # Specify underlying model and config options.
 # configs can be either a string, dict, or path
-model_type = GretelACTGAN(
-    config="synthetics/tabular-actgan",
-    max_rows=50000
-)
+model_type = GretelACTGAN(config="synthetics/tabular-actgan", max_rows=50000)
 
 # Optionally update model parameters from a base config
 model_type.update_params({"epochs": 500})

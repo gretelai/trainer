@@ -1,10 +1,10 @@
 import logging
+
 from enum import Enum
 from typing import Optional, Protocol
 
 from gretel_client.projects.models import Model
 from gretel_client.projects.projects import Project
-
 from gretel_trainer.benchmark.core import BenchmarkConfig, Dataset, log, run_out_path
 from gretel_trainer.benchmark.sdk_extras import create_evaluate_model, run_evaluate
 

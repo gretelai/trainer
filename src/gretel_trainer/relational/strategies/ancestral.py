@@ -1,12 +1,14 @@
 import logging
+
 from pathlib import Path
 from typing import Any, Optional, Union
 
 import pandas as pd
-from gretel_client.projects.models import Model
 
 import gretel_trainer.relational.ancestry as ancestry
 import gretel_trainer.relational.strategies.common as common
+
+from gretel_client.projects.models import Model
 from gretel_trainer.relational.core import MultiTableException, RelationalData
 from gretel_trainer.relational.sdk_extras import ExtendedGretelSDK
 from gretel_trainer.relational.table_evaluation import TableEvaluation

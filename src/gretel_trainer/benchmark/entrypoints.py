@@ -2,21 +2,22 @@ from __future__ import annotations
 
 import logging
 import shutil
+
 from inspect import isclass
 from pathlib import Path
-from typing import Optional, Type, Union, cast
+from typing import cast, Optional, Type, Union
 
 import pandas as pd
-from gretel_client.config import get_session_config
 
+from gretel_client.config import get_session_config
 from gretel_trainer.benchmark.core import BenchmarkConfig, BenchmarkException, Dataset
 from gretel_trainer.benchmark.custom.models import CustomModel
 from gretel_trainer.benchmark.gretel.models import GretelModel
 from gretel_trainer.benchmark.job_spec import (
     DatasetTypes,
     JobSpec,
-    ModelTypes,
     model_name,
+    ModelTypes,
 )
 from gretel_trainer.benchmark.session import Session
 

@@ -1,4 +1,5 @@
 import logging
+
 from contextlib import contextmanager
 
 RELATIONAL = "gretel_trainer.relational"

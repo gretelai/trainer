@@ -1,5 +1,6 @@
 import logging
 import shutil
+
 from contextlib import suppress
 from pathlib import Path
 from typing import Any, Optional, Union
@@ -7,11 +8,11 @@ from typing import Any, Optional, Union
 import pandas as pd
 import requests
 import smart_open
+
 from gretel_client.projects.jobs import Job, Status
 from gretel_client.projects.models import Model
 from gretel_client.projects.projects import Project
 from gretel_client.projects.records import RecordHandler
-
 from gretel_trainer.relational.core import MultiTableException
 
 logger = logging.getLogger(__name__)

@@ -1,6 +1,7 @@
 import pandas as pd
 
 import gretel_trainer.relational.strategies.common as common
+
 from gretel_trainer.relational.core import RelationalData
 
 

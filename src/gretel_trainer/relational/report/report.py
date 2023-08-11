@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import datetime
+
 from dataclasses import dataclass
 from functools import cached_property
 from math import ceil
@@ -8,12 +9,13 @@ from pathlib import Path
 from typing import Optional
 
 import plotly.graph_objects as go
+
 from jinja2 import Environment, FileSystemLoader
 
 from gretel_trainer.relational.core import ForeignKey, RelationalData, Scope
 from gretel_trainer.relational.report.figures import (
-    PRIVACY_LEVEL_VALUES,
     gauge_and_needle_chart,
+    PRIVACY_LEVEL_VALUES,
 )
 from gretel_trainer.relational.table_evaluation import TableEvaluation
 

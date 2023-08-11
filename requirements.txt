@@ -9,7 +9,7 @@ plotly~=5.11
 pydantic~=1.9
 requests~=2.25
 scikit-learn~=1.0
-smart-open[s3]~=5.2
+smart_open[s3]~=5.2
 sqlalchemy~=1.4
-typing-extensions~=4.7
+typing_extensions~=4.7
 unflatten==0.1.1

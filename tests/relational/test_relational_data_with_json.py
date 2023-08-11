@@ -817,7 +817,6 @@ def test_handles_missing_interior_invented_tables(nested_lists_of_objects):
                 "Records>userAgent": ["abc", "def"],
             }
         ),
-
         # Since demo_invented_2 is missing, Independent strategy post-processing
         # will set all foreign key values on this table to None.
         "demo_invented_3": pd.DataFrame(
@@ -847,9 +846,7 @@ def test_handles_missing_interior_invented_tables(nested_lists_of_objects):
                     },
                     {
                         "userAgent": "def",
-                        "responseElements": {
-                            "accountAttributes": []
-                        },
+                        "responseElements": {"accountAttributes": []},
                     },
                 ]
             }

@@ -1,10 +1,12 @@
 from __future__ import annotations
 
 import json
+
 from functools import cached_property
 from typing import Optional, Union
 
 import boto3
+
 from botocore import UNSIGNED
 from botocore.client import Config
 

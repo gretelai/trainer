@@ -1,4 +1,5 @@
 import tempfile
+
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional, Union
@@ -7,13 +8,13 @@ from unittest.mock import Mock, patch
 import pandas as pd
 import pandas.testing as pdtest
 import pytest
+
 from gretel_client.projects.jobs import Status
 from gretel_client.projects.projects import Project
-
 from gretel_trainer.relational.core import RelationalData
 from gretel_trainer.relational.sdk_extras import (
-    MAX_PROJECT_ARTIFACTS,
     ExtendedGretelSDK,
+    MAX_PROJECT_ARTIFACTS,
 )
 from gretel_trainer.relational.strategies.ancestral import AncestralStrategy
 from gretel_trainer.relational.strategies.independent import IndependentStrategy

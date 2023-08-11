@@ -1,10 +1,10 @@
 import logging
 import time
+
 from typing import Protocol, Union
 
 from gretel_client.projects.jobs import Job, Status
 from gretel_client.projects.projects import Project
-
 from gretel_trainer.relational.core import RelationalData
 from gretel_trainer.relational.sdk_extras import ExtendedGretelSDK
 from gretel_trainer.relational.strategies.ancestral import AncestralStrategy

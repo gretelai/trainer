@@ -1,7 +1,8 @@
 from __future__ import annotations
 
 import logging
-from typing import TYPE_CHECKING, Union, Optional
+
+from typing import Optional, TYPE_CHECKING, Union
 
 if TYPE_CHECKING:
     import pandas as pd
@@ -17,11 +18,12 @@ LOW_RECORD_THRESHOLD = 1_000
 
 
 def _actgan_is_best(rows: int, cols: int) -> bool:
-    return \
-        rows > HIGH_RECORD_THRESHOLD or \
-        cols > HIGH_COLUMN_THRESHOLD or \
-        rows < LOW_RECORD_THRESHOLD or \
-        cols < LOW_COLUMN_THRESHOLD
+    return (
+        rows > HIGH_RECORD_THRESHOLD
+        or cols > HIGH_COLUMN_THRESHOLD
+        or rows < LOW_RECORD_THRESHOLD
+        or cols < LOW_COLUMN_THRESHOLD
+    )
 
 
 def determine_best_model(df: pd.DataFrame) -> _BaseConfig:

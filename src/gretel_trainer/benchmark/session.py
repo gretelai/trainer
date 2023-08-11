@@ -1,15 +1,17 @@
 from __future__ import annotations
 
 import logging
+
 from concurrent.futures import Future, ThreadPoolExecutor
 from typing import Any, Optional, Union
 
 import pandas as pd
-from gretel_client.helpers import poll
-from gretel_client.projects import Project, create_project, search_projects
-from gretel_client.projects.jobs import Job
+
 from typing_extensions import TypeGuard
 
+from gretel_client.helpers import poll
+from gretel_client.projects import create_project, Project, search_projects
+from gretel_client.projects.jobs import Job
 from gretel_trainer.benchmark.core import BenchmarkConfig, BenchmarkException
 from gretel_trainer.benchmark.custom.models import CustomModel
 from gretel_trainer.benchmark.custom.strategy import CustomStrategy

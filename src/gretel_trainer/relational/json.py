@@ -2,13 +2,15 @@ from __future__ import annotations
 
 import logging
 import re
+
 from dataclasses import dataclass
-from json import JSONDecodeError, dumps, loads
+from json import dumps, JSONDecodeError, loads
 from typing import Any, Optional, Protocol, Union
 from uuid import uuid4
 
 import numpy as np
 import pandas as pd
+
 from unflatten import unflatten
 
 logger = logging.getLogger(__name__)

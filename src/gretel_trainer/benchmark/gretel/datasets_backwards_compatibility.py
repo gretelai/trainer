@@ -2,6 +2,7 @@
 # It can be deleted completely once we fully remove these functions.
 
 import logging
+
 from typing import Optional, Union
 
 from gretel_trainer.benchmark import Datatype

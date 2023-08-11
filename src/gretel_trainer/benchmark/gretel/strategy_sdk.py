@@ -1,14 +1,15 @@
 import copy
 import gzip
+
 from pathlib import Path
 from typing import Optional
 
 import requests
+
 from gretel_client.projects.jobs import END_STATES, Job, RunnerMode, Status
 from gretel_client.projects.models import Model, read_model_config
 from gretel_client.projects.projects import Project
 from gretel_client.projects.records import RecordHandler
-
 from gretel_trainer.benchmark.core import (
     BenchmarkConfig,
     BenchmarkException,

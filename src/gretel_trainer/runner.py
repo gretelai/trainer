@@ -27,6 +27,7 @@ import logging
 import math
 import tempfile
 import time
+
 from collections import Counter
 from concurrent.futures import ALL_COMPLETED, ThreadPoolExecutor, wait
 from copy import deepcopy
@@ -38,13 +39,13 @@ from typing import List, Optional, Tuple, Union
 
 import pandas as pd
 import smart_open
+
 from gretel_client.projects import Project
 from gretel_client.projects.jobs import ACTIVE_STATES
 from gretel_client.projects.models import Model, Status
 from gretel_client.projects.records import RecordHandler
 from gretel_client.rest import ApiException
 from gretel_client.users.users import get_me
-
 from gretel_trainer.strategy import Partition, PartitionConstraints, PartitionStrategy
 
 MODEL_ID = "model_id"
@@ -84,7 +85,9 @@ class RemoteDFPayload:
     artifact_type: str
 
 
-def _remote_dataframe_fetcher(payload: RemoteDFPayload) -> Tuple[RemoteDFPayload, pd.DataFrame]:
+def _remote_dataframe_fetcher(
+    payload: RemoteDFPayload,
+) -> Tuple[RemoteDFPayload, pd.DataFrame]:
     # We need the model object no matter what
     model = Model(payload.project, model_id=payload.uid)
     job = model
@@ -405,7 +408,8 @@ class StrategyRunner:
                 }
 
         model = self._project.create_model_obj(
-            data_source=artifact.id, model_config=model_config,
+            data_source=artifact.id,
+            model_config=model_config,
         )
         model.name = artifact.id.split("_")[-1]
 
@@ -678,10 +682,7 @@ class StrategyRunner:
         return self._maybe_restore_df_headers(df)
 
     def get_sqs_information(self) -> List[dict]:
-        return [
-            partition.ctx[SQS]
-            for partition in self._strategy.partitions
-        ]
+        return [partition.ctx[SQS] for partition in self._strategy.partitions]
 
     def generate_data(
         self,
@@ -736,7 +737,9 @@ class StrategyRunner:
         # NOTE: This payload will be used to create a new payload object per
         # partition, so this will get passed in more as a template to the next
         # routine
-        partition_num_records = math.ceil(num_records / self._strategy.row_partition_count)
+        partition_num_records = math.ceil(
+            num_records / self._strategy.row_partition_count
+        )
         gen_payload = GenPayload(
             seed_df=seed_df, num_records=partition_num_records, max_invalid=max_invalid
         )

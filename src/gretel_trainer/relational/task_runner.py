@@ -1,10 +1,10 @@
 import logging
+
 from collections import defaultdict
 from typing import Protocol
 
 from gretel_client.projects.jobs import END_STATES, Job, Status
 from gretel_client.projects.projects import Project
-
 from gretel_trainer.relational.sdk_extras import ExtendedGretelSDK
 
 MAX_REFRESH_ATTEMPTS = 3

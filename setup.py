@@ -1,5 +1,6 @@
 import pathlib
-from setuptools import setup, find_packages
+
+from setuptools import find_packages, setup
 
 local_path = pathlib.Path(__file__).parent
 install_requires = (local_path / "requirements.txt").read_text().splitlines()

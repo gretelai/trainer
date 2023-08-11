@@ -1,5 +1,6 @@
 import sqlite3
 import tempfile
+
 from pathlib import Path
 from typing import Iterable
 
@@ -7,9 +8,9 @@ import pytest
 
 from gretel_trainer.relational.connectors import Connector, sqlite_conn
 from gretel_trainer.relational.extractor import (
+    _determine_sample_size,
     ExtractorConfig,
     TableExtractor,
-    _determine_sample_size,
 )
 
 

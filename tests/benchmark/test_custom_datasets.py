@@ -2,7 +2,7 @@ import tempfile
 
 import pytest
 
-from gretel_trainer.benchmark import Datatype, create_dataset
+from gretel_trainer.benchmark import create_dataset, Datatype
 from gretel_trainer.benchmark.core import BenchmarkException
 
 

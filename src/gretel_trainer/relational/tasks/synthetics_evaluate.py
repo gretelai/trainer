@@ -1,8 +1,8 @@
+import gretel_trainer.relational.tasks.common as common
+
 from gretel_client.projects.jobs import Job
 from gretel_client.projects.models import Model
 from gretel_client.projects.projects import Project
-
-import gretel_trainer.relational.tasks.common as common
 
 ACTION = "synthetic data evaluation"
 

@@ -1,21 +1,22 @@
 import gzip
 import os
 import tempfile
+
 from unittest.mock import Mock, patch
 
 import pandas as pd
 import pandas.testing as pdtest
 import pytest
+
 from gretel_client.projects.jobs import Status
 from gretel_client.projects.models import read_model_config
-
 from gretel_trainer.benchmark import (
     BenchmarkConfig,
+    compare,
+    create_dataset,
     Datatype,
     GretelGPTX,
     GretelLSTM,
-    compare,
-    create_dataset,
     launch,
 )
 from gretel_trainer.benchmark.core import Dataset

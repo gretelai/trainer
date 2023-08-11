@@ -1,12 +1,13 @@
 import copy
+
 from inspect import isclass
 from pathlib import Path
-from typing import Optional, Type, Union, cast
+from typing import cast, Optional, Type, Union
+
+import gretel_trainer.models
 
 from gretel_client.projects.exceptions import ModelConfigError
 from gretel_client.projects.models import read_model_config
-
-import gretel_trainer.models
 from gretel_trainer.benchmark.core import BenchmarkException, Dataset, Datatype
 
 GretelModelConfig = Union[str, Path, dict]

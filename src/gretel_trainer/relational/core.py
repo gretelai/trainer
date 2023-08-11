@@ -17,6 +17,7 @@ from __future__ import annotations
 import logging
 import shutil
 import tempfile
+
 from dataclasses import dataclass, replace
 from enum import Enum
 from pathlib import Path
@@ -24,10 +25,12 @@ from typing import Any, Optional, Union
 
 import networkx
 import pandas as pd
+
 from networkx.algorithms.dag import dag_longest_path_length, topological_sort
 from pandas.api.types import is_string_dtype
 
 import gretel_trainer.relational.json as relational_json
+
 from gretel_trainer.relational.json import (
     IngestResponseT,
     InventedTableMetadata,

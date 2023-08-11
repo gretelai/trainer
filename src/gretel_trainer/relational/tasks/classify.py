@@ -1,13 +1,15 @@
 import shutil
+
 from pathlib import Path
 
 import smart_open
+
+import gretel_trainer.relational.tasks.common as common
+
 from gretel_client.projects.jobs import Job
 from gretel_client.projects.models import Model
 from gretel_client.projects.projects import Project
 from gretel_client.projects.records import RecordHandler
-
-import gretel_trainer.relational.tasks.common as common
 from gretel_trainer.relational.workflow_state import Classify
 
 

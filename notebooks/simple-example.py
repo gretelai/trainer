@@ -13,5 +13,5 @@ print(model.generate())
 
 # Or, load and generate data from an existing model
 
-#model = Trainer.load()
-#model.generate(num_records=70)
+# model = Trainer.load()
+# model.generate(num_records=70)

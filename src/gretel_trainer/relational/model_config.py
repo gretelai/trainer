@@ -3,7 +3,6 @@ from typing import Any, Optional
 
 from gretel_client.projects.exceptions import ModelConfigError
 from gretel_client.projects.models import read_model_config
-
 from gretel_trainer.relational.core import (
     GretelModelConfig,
     MultiTableException,

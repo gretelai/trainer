@@ -1,6 +1,7 @@
 import csv
 import logging
 import time
+
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum

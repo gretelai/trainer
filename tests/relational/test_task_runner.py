@@ -1,8 +1,8 @@
-from unittest.mock import Mock, PropertyMock, patch
+from unittest.mock import Mock, patch, PropertyMock
 
 import pytest
-from gretel_client.projects.jobs import Job, Status
 
+from gretel_client.projects.jobs import Job, Status
 from gretel_trainer.relational.sdk_extras import MAX_PROJECT_ARTIFACTS
 from gretel_trainer.relational.task_runner import run_task
 

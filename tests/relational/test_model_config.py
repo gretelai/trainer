@@ -1,5 +1,4 @@
 from gretel_client.projects.models import read_model_config
-
 from gretel_trainer.relational.model_config import (
     get_model_key,
     make_evaluate_config,

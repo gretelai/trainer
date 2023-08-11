@@ -2,15 +2,16 @@ import os
 import shutil
 import tarfile
 import tempfile
+
 from pathlib import Path
 from unittest.mock import Mock
 
 import pytest
 
 from gretel_trainer.relational.artifacts import (
-    ArtifactCollection,
     archive_items,
     archive_nested_dir,
+    ArtifactCollection,
 )
 
 

@@ -1,4 +1,5 @@
 import math
+
 from typing import Optional
 
 import plotly.graph_objects as go

@@ -1,7 +1,7 @@
+import gretel_trainer.relational.tasks.common as common
+
 from gretel_client.projects.jobs import Job
 from gretel_client.projects.projects import Project
-
-import gretel_trainer.relational.tasks.common as common
 from gretel_trainer.relational.workflow_state import SyntheticsTrain
 
 ACTION = "synthetics model training"

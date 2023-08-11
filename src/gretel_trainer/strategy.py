@@ -68,9 +68,7 @@ def _build_partitions(
         seed_headers = constraints.seed_headers
         partitions.append(
             Partition(
-                rows=RowPartition(
-                    start=curr_start, end=curr_start + chunk_size
-                ),
+                rows=RowPartition(start=curr_start, end=curr_start + chunk_size),
                 columns=ColumnPartition(
                     headers=list(df.columns), seed_headers=seed_headers
                 ),

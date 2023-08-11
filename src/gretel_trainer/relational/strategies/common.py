@@ -1,14 +1,16 @@
 import json
 import logging
 import random
+
 from pathlib import Path
 from typing import Optional
 
 import pandas as pd
 import smart_open
-from gretel_client.projects.models import Model
+
 from sklearn import preprocessing
 
+from gretel_client.projects.models import Model
 from gretel_trainer.relational.core import MultiTableException, RelationalData
 from gretel_trainer.relational.sdk_extras import ExtendedGretelSDK
 

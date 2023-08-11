@@ -1,13 +1,15 @@
 import logging
+
 from pathlib import Path
 from typing import Optional
 
 import pandas as pd
+
+import gretel_trainer.relational.tasks.common as common
+
 from gretel_client.projects.jobs import ACTIVE_STATES, Job, Status
 from gretel_client.projects.projects import Project
 from gretel_client.projects.records import RecordHandler
-
-import gretel_trainer.relational.tasks.common as common
 from gretel_trainer.relational.workflow_state import SyntheticsRun, SyntheticsTrain
 
 logger = logging.getLogger(__name__)

@@ -2,7 +2,7 @@ from unittest.mock import patch
 
 import pytest
 
-from gretel_trainer.benchmark import GretelLSTM, compare
+from gretel_trainer.benchmark import compare, GretelLSTM
 from gretel_trainer.benchmark.core import BenchmarkConfig, BenchmarkException
 
 

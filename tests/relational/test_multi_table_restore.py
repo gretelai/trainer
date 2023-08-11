@@ -3,6 +3,7 @@ import os
 import shutil
 import tarfile
 import tempfile
+
 from pathlib import Path
 from typing import Optional
 from unittest.mock import Mock, patch
@@ -10,6 +11,7 @@ from unittest.mock import Mock, patch
 import pytest
 
 import gretel_trainer.relational.backup as b
+
 from gretel_trainer.relational.artifacts import ArtifactCollection
 from gretel_trainer.relational.core import MultiTableException, RelationalData
 from gretel_trainer.relational.multi_table import MultiTable, SyntheticsRun

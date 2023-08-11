@@ -1,6 +1,7 @@
 import json
 import os
 import tempfile
+
 from pathlib import Path
 from unittest.mock import Mock, patch
 
@@ -9,6 +10,7 @@ import pandas.testing as pdtest
 import pytest
 
 import gretel_trainer.relational.ancestry as ancestry
+
 from gretel_trainer.relational.core import MultiTableException
 from gretel_trainer.relational.strategies.ancestral import AncestralStrategy
 from gretel_trainer.relational.table_evaluation import TableEvaluation

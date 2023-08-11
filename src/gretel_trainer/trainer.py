@@ -5,13 +5,14 @@ from __future__ import annotations
 import json
 import logging
 import os.path
+
 from pathlib import Path
 from typing import Optional
 
 import pandas as pd
+
 from gretel_client.config import get_session_config, RunnerMode
 from gretel_client.projects import create_or_get_unique_project
-
 from gretel_trainer import runner, strategy
 from gretel_trainer.models import _BaseConfig, determine_best_model
 
@@ -22,11 +23,13 @@ DEFAULT_PROJECT = "trainer"
 DEFAULT_CACHE = f"{DEFAULT_PROJECT}-runner.json"
 
 _ACCEPTABLE_CHARS = set(
-    [chr(c) for c in range(ord("a"), ord("z")+1)] +
-    [chr(c) for c in range(ord("A"), ord("Z")+1)] +
-    [chr(c) for c in range(ord("0"), ord("9")+1)] +
-    ["-"]
+    [chr(c) for c in range(ord("a"), ord("z") + 1)]
+    + [chr(c) for c in range(ord("A"), ord("Z") + 1)]
+    + [chr(c) for c in range(ord("0"), ord("9") + 1)]
+    + ["-"]
 )
+
+
 def _sanitize_name(name: str):
     """Replace unacceptable characters for Gretel API project or model names."""
     # Does not account for the following requirements:
@@ -34,6 +37,7 @@ def _sanitize_name(name: str):
     # - must end with [a-zA-Z0-9]
     # - minimum and maximum length
     return "".join(c if c in _ACCEPTABLE_CHARS else "-" for c in name)
+
 
 class Trainer:
     """Automated model training and synthetic data generation tool
@@ -63,7 +67,9 @@ class Trainer:
 
         if self.overwrite:
             if self.model_type is None:
-                logger.debug("Deferring model configuration to optimize based on training data.")
+                logger.debug(
+                    "Deferring model configuration to optimize based on training data."
+                )
             else:
                 logger.debug(json.dumps(self.model_type.config, indent=2))
 
@@ -109,7 +115,11 @@ class Trainer:
         return trainer
 
     def train(
-        self, dataset_path: str, delimiter: str = ",", round_decimals: int = 4, seed_fields: Optional[list] = None,
+        self,
+        dataset_path: str,
+        delimiter: str = ",",
+        round_decimals: int = 4,
+        seed_fields: Optional[list] = None,
     ):
         """Train a model on the dataset
 
@@ -121,7 +131,9 @@ class Trainer:
         """
         self.dataset_path = Path(dataset_path)
         self.df = self._preprocess_data(
-            dataset_path=dataset_path, delimiter=delimiter, round_decimals=round_decimals
+            dataset_path=dataset_path,
+            delimiter=delimiter,
+            round_decimals=round_decimals,
         )
         self.run = self._initialize_run(
             df=self.df, overwrite=self.overwrite, seed_fields=seed_fields

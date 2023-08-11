@@ -11,6 +11,7 @@ import os
 import shutil
 import tarfile
 import tempfile
+
 from collections import defaultdict
 from contextlib import suppress
 from dataclasses import replace
@@ -20,15 +21,15 @@ from typing import Any, Optional, Union
 
 import pandas as pd
 import smart_open
-from gretel_client.config import RunnerMode, get_session_config
-from gretel_client.projects import Project, create_project, get_project
+
+from gretel_client.config import get_session_config, RunnerMode
+from gretel_client.projects import create_project, get_project, Project
 from gretel_client.projects.jobs import ACTIVE_STATES, END_STATES, Status
 from gretel_client.projects.records import RecordHandler
-
 from gretel_trainer.relational.artifacts import (
-    ArtifactCollection,
     archive_items,
     archive_nested_dir,
+    ArtifactCollection,
 )
 from gretel_trainer.relational.backup import (
     Backup,
@@ -43,8 +44,8 @@ from gretel_trainer.relational.core import (
     MultiTableException,
     RelationalData,
     Scope,
-    UserFriendlyDataT,
     skip_table,
+    UserFriendlyDataT,
 )
 from gretel_trainer.relational.json import InventedTableMetadata, ProducerMetadata
 from gretel_trainer.relational.log import silent_logs
