@@ -714,7 +714,7 @@ def test_restore_with_empty_tables(bball, invented_tables):
 
 
 @pytest.fixture
-def nested_listed_objects(tmpdir):
+def nested_lists_of_objects(tmpdir):
     json = """
 {
     "Records": [
@@ -744,7 +744,7 @@ def nested_listed_objects(tmpdir):
     return rel_data
 
 
-def test_nested_listed_objects(nested_listed_objects):
+def test_nested_lists_of_objects(nested_lists_of_objects):
     output_tables = {
         "demo_invented_1": pd.DataFrame(
             data={
@@ -770,7 +770,7 @@ def test_nested_listed_objects(nested_listed_objects):
         ),
     }
 
-    restored = nested_listed_objects.restore(output_tables)
+    restored = nested_lists_of_objects.restore(output_tables)
 
     pdtest.assert_frame_equal(
         restored["demo"],
@@ -807,7 +807,7 @@ def test_nested_listed_objects(nested_listed_objects):
 
 # TODO: This test documents current behavior, but ideally we'd improve our handling of this scenario
 # to retain more synthetic data from "deeper" levels that trained and ran successfully.
-def test_handles_missing_interior_invented_tables(nested_listed_objects):
+def test_handles_missing_interior_invented_tables(nested_lists_of_objects):
     # Same setup as the test above except we omit demo_invented_2
     # (simulating that table's model/rh erroring out)
     output_tables = {
@@ -830,7 +830,7 @@ def test_handles_missing_interior_invented_tables(nested_listed_objects):
         ),
     }
 
-    restored = nested_listed_objects.restore(output_tables)
+    restored = nested_lists_of_objects.restore(output_tables)
 
     pdtest.assert_frame_equal(
         restored["demo"],

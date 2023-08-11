@@ -319,12 +319,12 @@ def _denormalize_json(
 
     # The provided `table_name_mappings` argument (from producer metadata) maps from provenance name to node name.
     # `inverse_table_name_mappings` inverts that mapping (so: node name keys, provenance name values).
-    # `table_dict` replaces the keys (node namees) in `tables` with corresponding provenance names
+    # `table_dict` replaces the keys (node names) in `tables` with corresponding provenance names
     table_node_names = list(table_name_mappings.values())
     inverse_table_name_mappings = {v: k for k, v in table_name_mappings.items()}
     table_dict = {inverse_table_name_mappings[k]: v for k, v in tables.items()}
 
-    get_table = lambda node_name: _get_table(
+    get_table = lambda node_name: _get_table_or_empty_fallback(
         rel_data, inverse_table_name_mappings, table_dict, node_name
     )
 
@@ -342,10 +342,12 @@ def _denormalize_json(
             col_name = get_parent_column_name_from_child_table_name(
                 table_provenance_name
             )
+
             parent_df = get_table(parent_node_name)
-            kwargs = {col_name: parent_df.apply(lambda x: [], axis=1)}
-            # Here's where we mutate the DF
-            table_dict[parent_provenance_name] = parent_df.assign(**kwargs)
+
+            # Add the column of empty lists and "save" the modified df back to the dict for later use
+            parent_df[col_name] = [[] for _ in range(len(parent_df))]
+            table_dict[parent_provenance_name] = parent_df
         else:
             # First, make a version of `table_df` with column names altered to send to `unflatten`
             # See: https://github.com/dairiki/unflatten/#synopsis
@@ -398,7 +400,7 @@ def _denormalize_json(
     return table_dict[original_table_name]
 
 
-def _get_table(
+def _get_table_or_empty_fallback(
     rel_data: _RelationalData,
     inverse_table_name_mappings: dict[str, str],
     table_dict: dict[str, pd.DataFrame],
@@ -409,9 +411,7 @@ def _get_table(
     If `node_name` is not present in `table_dict` (e.g. because the Gretel Job failed),
     return an empty dataframe with the expected columns.
     """
-    empty_fallback = pd.DataFrame(
-        data={col: [] for col in rel_data.get_table_columns(node_name)},
-    )
+    empty_fallback = pd.DataFrame(columns=rel_data.get_table_columns(node_name))
     provenance_name = inverse_table_name_mappings[node_name]
     return table_dict.get(provenance_name, empty_fallback)
 
