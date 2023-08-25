@@ -1,4 +1,4 @@
-lxml==4.6.5
+lxml==4.9.1
 pandas-stubs~=1.5.3.230321
 pandas~=1.5
 pyright==1.1.305
