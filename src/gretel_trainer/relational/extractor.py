@@ -433,7 +433,7 @@ class TableExtractor:
             table_session = self._get_table_session(pk_values.table_name)
             nonlocal row_count
 
-            chunk_size = 15_000  # limit how many checks go into a WHERE clause
+            chunk_size = 150  # limit how many checks go into a WHERE clause
 
             for _, chunk_df in df.groupby(np.arange(len(df)) // chunk_size):
                 values_list = chunk_df.to_records(index=False).tolist()
@@ -556,6 +556,7 @@ class TableExtractor:
         if self._config.entire_table:
             logger.debug(f"Extracting entire table: {table_name}")
             with engine.connect() as conn:
+                # TODO: Add a loading percentage here?
                 df_iter = pd.read_sql_table(
                     table_name, conn, chunksize=self._chunk_size, schema=schema
                 )
