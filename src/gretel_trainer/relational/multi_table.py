@@ -1033,11 +1033,19 @@ class MultiTable:
             if table not in self.relational_data.list_all_tables(Scope.EVALUATABLE):
                 continue
 
-            evaluate_data = self._strategy.get_evaluate_model_data(
-                rel_data=self.relational_data,
-                table_name=table,
-                synthetic_tables=output_tables,
-            )
+            try:
+                evaluate_data = self._strategy.get_evaluate_model_data(
+                    rel_data=self.relational_data,
+                    table_name=table,
+                    synthetic_tables=output_tables,
+                )
+            except:
+                logger.error(
+                    "Error getting evaluate model data for table %s",
+                    table,
+                    exc_info=True,
+                )
+                evaluate_data = None
             if evaluate_data is None:
                 continue
 
