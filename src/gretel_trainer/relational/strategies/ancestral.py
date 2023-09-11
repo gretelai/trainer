@@ -24,11 +24,11 @@ class AncestralStrategy:
     # TODO: remove when `gretel_model` param is removed
     @property
     def supported_gretel_models(self) -> list[str]:
-        return ["amplify"]
+        return ["amplify", "actgan"]
 
     @property
     def supported_model_keys(self) -> list[str]:
-        return ["amplify"]
+        return ["amplify", "actgan"]
 
     def label_encode_keys(
         self, rel_data: RelationalData, tables: dict[str, pd.DataFrame]
