@@ -98,27 +98,11 @@ class MultiTable:
         relational_data: RelationalData,
         *,
         strategy: str = "independent",
-        gretel_model: Optional[str] = None,
         project_display_name: Optional[str] = None,
         refresh_interval: Optional[int] = None,
         backup: Optional[Backup] = None,
     ):
         self._strategy = _validate_strategy(strategy)
-        if gretel_model is not None:
-            if backup is None:
-                logger.warning(
-                    "The `gretel_model` argument is deprecated and will be removed in a future release. "
-                    "Going forward you should provide a config to `train_synthetics`."
-                )
-            model_name, model_config = self._validate_gretel_model(gretel_model)
-            self._gretel_model = model_name
-            self._model_config = model_config
-        else:
-            # Set these to the original default for backwards compatibility.
-            # When we completely remove the `gretel_model` init param, these attrs can be removed as well.
-            # We don't need to validate here because the default model (amplify) works with both strategies.
-            self._gretel_model = "amplify"
-            self._model_config = "synthetics/amplify"
         self._set_refresh_interval(refresh_interval)
         self.relational_data = relational_data
         self._artifact_collection = ArtifactCollection(hybrid=self._hybrid)
@@ -423,7 +407,6 @@ class MultiTable:
         return MultiTable(
             relational_data=RelationalData(directory=backup.working_dir),
             strategy=backup.strategy,
-            gretel_model=backup.gretel_model,
             refresh_interval=backup.refresh_interval,
             backup=backup,
         )
@@ -447,7 +430,6 @@ class MultiTable:
         backup = Backup(
             project_name=self._project.name,
             strategy=self._strategy.name,
-            gretel_model=self._gretel_model,
             working_dir=str(self._working_dir),
             refresh_interval=self._refresh_interval,
             artifact_collection=replace(self._artifact_collection),
@@ -531,7 +513,6 @@ class MultiTable:
         content = {
             "relational_data": self.relational_data.debug_summary(),
             "strategy": self._strategy.name,
-            "model": self._gretel_model,
         }
         with open(debug_summary_path, "w") as dbg:
             json.dump(content, dbg)
@@ -583,26 +564,6 @@ class MultiTable:
             self._transforms_train.models[table] = model
 
         self._backup()
-
-    def train_transform_models(self, configs: dict[str, GretelModelConfig]) -> None:
-        """
-        DEPRECATED: Please use `train_transforms` instead.
-        """
-        logger.warning(
-            "This method is deprecated and will be removed in a future release. "
-            "Please use `train_transforms` instead."
-        )
-        use_configs = {}
-        for table, config in configs.items():
-            for m_table in self.relational_data.get_modelable_table_names(table):
-                use_configs[m_table] = config
-
-        self._setup_transforms_train_state(use_configs)
-        task = TransformsTrainTask(
-            transforms_train=self._transforms_train,
-            multitable=self,
-        )
-        run_task(task, self._extended_sdk)
 
     def train_transforms(
         self,
@@ -800,30 +761,10 @@ class MultiTable:
                     self._extended_sdk,
                 )
 
-    def train(self) -> None:
-        """
-        DEPRECATED: Please use `train_synthetics` instead.
-        """
-        logger.warning(
-            "This method is deprecated and will be removed in a future release. "
-            "Please use `train_synthetics` instead."
-        )
-        # This method completely resets any existing SyntheticsTrain state,
-        # orphaning any existing models in the project.
-        self._synthetics_train = SyntheticsTrain()
-
-        # This method only supports using a single config
-        # (the blueprint config set at MultiTable initialization)
-        # and cannot omit any tables from training.
-        config = ingest(self._model_config)
-        configs = {table: config for table in self.relational_data.list_all_tables()}
-
-        self._train_synthetics_models(configs)
-
     def train_synthetics(
         self,
         *,
-        config: Optional[GretelModelConfig] = None,
+        config: GretelModelConfig,
         table_specific_configs: Optional[dict[str, GretelModelConfig]] = None,
         only: Optional[set[str]] = None,
         ignore: Optional[set[str]] = None,
@@ -868,21 +809,14 @@ class MultiTable:
                 f"{omitted_tables_with_overrides_specified}"
             )
 
-        # Validate the provided config
-        # Currently an optional argument for backwards compatibility; if None, fall back to the one configured
-        # on the MultiTable instance via the deprecated `gretel_model` parameter
-        if config is not None:
-            default_config_dict = self._validate_synthetics_config(config)
-        else:
-            logger.warning(
-                "Calling `train_synthetics` without specifying a `config` is deprecated; "
-                "in a future release, this argument will be required. "
-                "For now, falling back to the model configured on the MultiTable instance "
-                "(which is also deprecated and scheduled for removal)."
-            )
-            default_config_dict = ingest(self._model_config)
+        # This argument used to be hinted as Optional with a None default and would
+        # fall back to a removed attribute on the MultiTable instance. Out of an
+        # abundance of caution, verify the client isn't relying on that old behavior.
+        if config is None:
+            raise MultiTableException(f"Must provide a default model config.")
 
-        # Validate any table-specific configs
+        # Validate the provided configs
+        default_config_dict = self._validate_synthetics_config(config)
         table_specific_config_dicts = {
             table: self._validate_synthetics_config(conf)
             for table, conf in all_table_specific_configs.items()
@@ -901,22 +835,32 @@ class MultiTable:
         `RelationalData` instance. It should be used when initial training fails and source data
         needs to be altered, but progress on other tables can be left as-is.
         """
-        for table_name, table_data in tables.items():
-            self.relational_data.update_table_data(table_name, table_data)
-
-        self._upload_sources_to_project()
-
+        # The strategy determines the full set of tables that need to be retrained based on those provided.
         tables_to_retrain = self._strategy.tables_to_retrain(
             list(tables.keys()), self.relational_data
         )
 
+        # Grab the configs from the about-to-be-replaced models. If any can't be found,
+        # we have to abort because we don't know what model config to use with the new data.
+        configs = {}
         for table in tables_to_retrain:
-            with suppress(KeyError):
-                del self._synthetics_train.models[table]
+            if (old_model := self._synthetics_train.models.get(table)) is None:
+                raise MultiTableException(
+                    f"Could not find an existing model for table `{table}`. You may need to rerun all training via `train_synthetics`."
+                )
+            else:
+                configs[table] = old_model.model_config
 
-        config = ingest(self._model_config)
-        configs = {table: config for table in tables_to_retrain}
+        # Orphan the old models
+        for table in tables_to_retrain:
+            del self._synthetics_train.models[table]
 
+        # Update the source table data.
+        for table_name, table_data in tables.items():
+            self.relational_data.update_table_data(table_name, table_data)
+        self._upload_sources_to_project()
+
+        # Train new synthetics models for the subset of tables
         self._train_synthetics_models(configs)
 
     def _upload_sources_to_project(self) -> None:
@@ -1125,22 +1069,6 @@ class MultiTable:
 
         self._evaluations[table].individual_report_json = individual_report_json
         self._evaluations[table].cross_table_report_json = cross_table_report_json
-
-    def _validate_gretel_model(self, gretel_model: str) -> tuple[str, str]:
-        supported_models = self._strategy.supported_gretel_models
-        if gretel_model not in supported_models:
-            msg = f"Invalid gretel model requested: {gretel_model}. The selected strategy supports: {supported_models}."
-            logger.warning(msg)
-            raise MultiTableException(msg)
-
-        _BLUEPRINTS = {
-            "amplify": "synthetics/amplify",
-            "actgan": "synthetics/tabular-actgan",
-            "lstm": "synthetics/tabular-lstm",
-            "tabular-dp": "synthetics/tabular-differential-privacy",
-        }
-
-        return (gretel_model, _BLUEPRINTS[gretel_model])
 
     def _validate_synthetics_config(self, config: GretelModelConfig) -> dict[str, Any]:
         """

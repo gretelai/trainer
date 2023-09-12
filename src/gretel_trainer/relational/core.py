@@ -407,25 +407,6 @@ class RelationalData:
         else:
             return key
 
-    def add_foreign_key(self, *, foreign_key: str, referencing: str) -> None:
-        """
-        DEPRECATED: Please use `add_foreign_key_constraint` instead.
-
-        Format of both str arguments should be `table_name.column_name`
-        """
-        logger.warning(
-            "This method is deprecated and will be removed in a future release. "
-            "Please use `add_foreign_key_constraint` instead."
-        )
-        fk_table, fk_column = foreign_key.split(".")
-        referred_table, referred_column = referencing.split(".")
-        self.add_foreign_key_constraint(
-            table=fk_table,
-            constrained_columns=[fk_column],
-            referred_table=referred_table,
-            referred_columns=[referred_column],
-        )
-
     def add_foreign_key_constraint(
         self,
         *,
@@ -499,19 +480,6 @@ class RelationalData:
         edge["via"] = via
         self._clear_safe_ancestral_seed_columns(fk_delegate_table)
         self._clear_safe_ancestral_seed_columns(table)
-
-    def remove_foreign_key(self, foreign_key: str) -> None:
-        """
-        DEPRECATED: Please use `remove_foreign_key_constraint` instead.
-        """
-        logger.warning(
-            "This method is deprecated and will be removed in a future release. "
-            "Please use `remove_foreign_key_constraint` instead."
-        )
-        fk_table, fk_column = foreign_key.split(".")
-        self.remove_foreign_key_constraint(
-            table=fk_table, constrained_columns=[fk_column]
-        )
 
     def remove_foreign_key_constraint(
         self, table: str, constrained_columns: list[str]

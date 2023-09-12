@@ -73,7 +73,6 @@ def make_backup(
     backup = b.Backup(
         project_name="project_name",
         strategy="independent",
-        gretel_model="amplify",
         refresh_interval=60,
         working_dir=str(working_dir),
         artifact_collection=artifact_collection,

@@ -155,7 +155,6 @@ def test_backup():
     backup = Backup(
         project_name="my-project",
         strategy="independent",
-        gretel_model="amplify",
         working_dir="workdir",
         refresh_interval=120,
         artifact_collection=artifact_collection,

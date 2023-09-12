@@ -152,16 +152,6 @@ def test_adding_and_removing_foreign_keys(pets):
         pets.remove_foreign_key_constraint(table="pets", constrained_columns=["id"])
 
 
-def test_add_remove_foreign_key_shorthand(pets):
-    assert len(pets.get_foreign_keys("pets")) == 1
-
-    pets.remove_foreign_key("pets.human_id")
-    assert len(pets.get_foreign_keys("pets")) == 0
-
-    pets.add_foreign_key(foreign_key="pets.human_id", referencing="humans.id")
-    assert len(pets.get_foreign_keys("pets")) == 1
-
-
 def test_set_primary_key(ecom):
     assert ecom.get_primary_key("users") == ["id"]
 

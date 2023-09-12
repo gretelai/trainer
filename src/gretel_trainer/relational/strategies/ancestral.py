@@ -21,11 +21,6 @@ class AncestralStrategy:
     def name(self) -> str:
         return "ancestral"
 
-    # TODO: remove when `gretel_model` param is removed
-    @property
-    def supported_gretel_models(self) -> list[str]:
-        return ["amplify"]
-
     @property
     def supported_model_keys(self) -> list[str]:
         return ["amplify"]

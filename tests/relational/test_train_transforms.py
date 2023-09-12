@@ -95,17 +95,3 @@ def test_train_transforms_multiple_calls_overwrite(ecom, tmpdir, project):
     # calling a second time will create a new model for the table that overwrites the original
     mt.train_transforms("transform/default", only={"products"})
     assert mt._transforms_train.models["products"] == "m2"
-
-
-# The public method under test here is deprecated
-def test_train_transform_models(ecom, tmpdir):
-    mt = MultiTable(ecom, project_display_name=tmpdir)
-    mt.train_transform_models(
-        configs={
-            "events": "transform/default",
-            "users": "transform/default",
-        }
-    )
-    transforms_train = mt._transforms_train
-
-    assert set(transforms_train.models.keys()) == {"events", "users"}

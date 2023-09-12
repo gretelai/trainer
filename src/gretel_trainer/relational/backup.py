@@ -103,7 +103,6 @@ class BackupGenerate:
 class Backup:
     project_name: str
     strategy: str
-    gretel_model: str
     working_dir: str
     refresh_interval: int
     artifact_collection: ArtifactCollection
@@ -139,7 +138,6 @@ class Backup:
         backup = Backup(
             project_name=b["project_name"],
             strategy=b["strategy"],
-            gretel_model=b["gretel_model"],
             working_dir=b["working_dir"],
             refresh_interval=b["refresh_interval"],
             artifact_collection=ArtifactCollection(**b["artifact_collection"]),
