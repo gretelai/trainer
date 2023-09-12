@@ -4,20 +4,19 @@ Extract database or data warehouse SQL tables to flat files with optional subset
 
 from __future__ import annotations
 
+import itertools
 import logging
-
 from contextlib import nullcontext
 from dataclasses import asdict, dataclass
 from enum import Enum
 from pathlib import Path
 from threading import Lock
-from typing import Iterator, Optional, TYPE_CHECKING
+from typing import TYPE_CHECKING, Iterator, Optional
 
 import dask.dataframe as dd
 import numpy as np
 import pandas as pd
-
-from sqlalchemy import func, inspect, MetaData, select, Table, tuple_
+from sqlalchemy import MetaData, Table, and_, func, inspect, or_, select, tuple_
 
 from gretel_trainer.relational.core import RelationalData
 
@@ -391,7 +390,9 @@ class TableExtractor:
                     child_table_path = self._table_path(child_table_name)
 
                     tmp_ddf = dd.read_csv(  # pyright: ignore
-                        str(child_table_path), usecols=fk.columns
+                        str(child_table_path),
+                        usecols=fk.columns,
+                        dtype={key: "object" for key in fk.columns},
                     )
                     tmp_ddf = tmp_ddf.rename(columns=rename_map)
                     if values_ddf is None:
@@ -433,16 +434,21 @@ class TableExtractor:
             table_session = self._get_table_session(pk_values.table_name)
             nonlocal row_count
 
-            chunk_size = 150  # limit how many checks go into a WHERE clause
+            chunk_size = 15_000  # limit how many checks go into a WHERE clause
 
             for _, chunk_df in df.groupby(np.arange(len(df)) // chunk_size):
                 values_list = chunk_df.to_records(index=False).tolist()
-                query = table_session.table.select().where(
-                    tuple_(
-                        *[table_session.table.c[col] for col in pk_values.column_names]
-                    ).in_(values_list)
-                )
-
+                columns = [table_session.table.c[col] for col in pk_values.column_names]
+                # Produces a query that looks like
+                # SELECT * FROM TABLE WHERE (TABLE.A = 1 AND TABLE.B = 2) OR ...
+                column_comparisons = [
+                    and_(
+                        column == value
+                        for column, value in zip(itertools.cycle(columns), values)
+                    ).self_group()
+                    for values in values_list
+                ]
+                query = table_session.table.select().where(or_(*column_comparisons))
                 with table_session.engine.connect() as conn:
                     df_iter = pd.read_sql_query(query, conn, chunksize=self._chunk_size)
                     write_count = _stream_df_to_path(df_iter, table_path, lock=lock)
@@ -556,7 +562,6 @@ class TableExtractor:
         if self._config.entire_table:
             logger.debug(f"Extracting entire table: {table_name}")
             with engine.connect() as conn:
-                # TODO: Add a loading percentage here?
                 df_iter = pd.read_sql_table(
                     table_name, conn, chunksize=self._chunk_size, schema=schema
                 )
