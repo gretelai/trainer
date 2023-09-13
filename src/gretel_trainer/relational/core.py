@@ -807,18 +807,6 @@ class RelationalData:
         }
 
 
-def skip_table(
-    table: str, only: Optional[set[str]], ignore: Optional[set[str]]
-) -> bool:
-    skip = False
-    if only is not None and table not in only:
-        skip = True
-    if ignore is not None and table in ignore:
-        skip = True
-
-    return skip
-
-
 def _ok_for_train_and_seed(col: str, df: pd.DataFrame) -> bool:
     if _is_highly_nan(col, df):
         return False

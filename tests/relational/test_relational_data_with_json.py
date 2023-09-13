@@ -11,17 +11,6 @@ from gretel_trainer.relational.json import generate_unique_table_name, get_json_
 
 
 @pytest.fixture
-def invented_tables(get_invented_table_suffix) -> dict[str, str]:
-    return {
-        "purchases_root": f"purchases_{get_invented_table_suffix(1)}",
-        "purchases_data_years": f"purchases_{get_invented_table_suffix(2)}",
-        "bball_root": f"bball_{get_invented_table_suffix(1)}",
-        "bball_suspensions": f"bball_{get_invented_table_suffix(2)}",
-        "bball_teams": f"bball_{get_invented_table_suffix(3)}",
-    }
-
-
-@pytest.fixture
 def bball(tmpdir):
     bball_jsonl = """
     {"name": "LeBron James", "age": 38, "draft": {"year": 2003}, "teams": ["Cavaliers", "Heat", "Lakers"], "suspensions": []}

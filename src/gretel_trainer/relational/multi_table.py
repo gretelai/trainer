@@ -44,14 +44,13 @@ from gretel_trainer.relational.core import (
     MultiTableException,
     RelationalData,
     Scope,
-    skip_table,
     UserFriendlyDataT,
 )
 from gretel_trainer.relational.json import InventedTableMetadata, ProducerMetadata
 from gretel_trainer.relational.log import silent_logs
 from gretel_trainer.relational.model_config import (
+    assemble_configs,
     get_model_key,
-    ingest,
     make_classify_config,
     make_evaluate_config,
     make_synthetics_config,
@@ -569,17 +568,13 @@ class MultiTable:
         self,
         config: GretelModelConfig,
         *,
+        table_specific_configs: Optional[dict[str, GretelModelConfig]] = None,
         only: Optional[set[str]] = None,
         ignore: Optional[set[str]] = None,
     ) -> None:
-        only, ignore = self._get_only_and_ignore(only, ignore)
-
-        configs = {
-            table: config
-            for table in self.relational_data.list_all_tables()
-            if not skip_table(table, only, ignore)
-        }
-
+        configs = assemble_configs(
+            self.relational_data, config, table_specific_configs, only, ignore
+        )
         self._setup_transforms_train_state(configs)
         task = TransformsTrainTask(
             transforms_train=self._transforms_train,
@@ -689,31 +684,6 @@ class MultiTable:
         self._backup()
         self.transform_output_tables = reshaped_tables
 
-    def _get_only_and_ignore(
-        self, only: Optional[set[str]], ignore: Optional[set[str]]
-    ) -> tuple[Optional[set[str]], Optional[set[str]]]:
-        """
-        Accepts the `only` and `ignore` parameter values as provided by the user and:
-        - ensures both are not set (must provide one or the other, or neither)
-        - translates any JSON-source tables to the invented tables
-        """
-        if only is not None and ignore is not None:
-            raise MultiTableException("Cannot specify both `only` and `ignore`.")
-
-        modelable_tables = set()
-        for table in only or ignore or {}:
-            m_names = self.relational_data.get_modelable_table_names(table)
-            if len(m_names) == 0:
-                raise MultiTableException(f"Unrecognized table name: `{table}`")
-            modelable_tables.update(m_names)
-
-        if only is None:
-            return (None, modelable_tables)
-        elif ignore is None:
-            return (modelable_tables, None)
-        else:
-            return (None, None)
-
     def _train_synthetics_models(self, configs: dict[str, dict[str, Any]]) -> None:
         """
         Uses the configured strategy to prepare training data sources for each table,
@@ -773,59 +743,27 @@ class MultiTable:
         Train synthetic data models for the tables in the tableset,
         optionally scoped by either `only` or `ignore`.
         """
-        only, ignore = self._get_only_and_ignore(only, ignore)
-
-        include_tables: list[str] = []
-        omit_tables: list[str] = []
-        for table in self.relational_data.list_all_tables():
-            if skip_table(table, only, ignore):
-                omit_tables.append(table)
-            else:
-                include_tables.append(table)
-
-        # TODO: Ancestral strategy requires that for each table omitted from synthetics ("preserved"),
-        # all its ancestors must also be omitted. In the future, it'd be nice to either find a way to
-        # eliminate this requirement completely, or (less ideal) allow incremental training of tables,
-        # e.g. train a few in one "batch", then a few more before generating (perhaps with some logs
-        # along the way informing the user of which required tables are missing).
-        self._strategy.validate_preserved_tables(omit_tables, self.relational_data)
-
-        # Translate any JSON-source tables in table_specific_configs to invented tables
-        all_table_specific_configs = {}
-        for table, conf in (table_specific_configs or {}).items():
-            m_names = self.relational_data.get_modelable_table_names(table)
-            if len(m_names) == 0:
-                raise MultiTableException(f"Unrecognized table name: `{table}`")
-            all_table_specific_configs.update({m: conf for m in m_names})
-
-        # Ensure compatibility between only/ignore and table_specific_configs
-        omitted_tables_with_overrides_specified = []
-        for table in all_table_specific_configs:
-            if table in omit_tables:
-                omitted_tables_with_overrides_specified.append(table)
-        if len(omitted_tables_with_overrides_specified) > 0:
-            raise MultiTableException(
-                f"Cannot provide configs for tables that have been omitted from synthetics training: "
-                f"{omitted_tables_with_overrides_specified}"
-            )
-
         # This argument used to be hinted as Optional with a None default and would
         # fall back to a removed attribute on the MultiTable instance. Out of an
         # abundance of caution, verify the client isn't relying on that old behavior.
         if config is None:
             raise MultiTableException(f"Must provide a default model config.")
 
-        # Validate the provided configs
-        default_config_dict = self._validate_synthetics_config(config)
-        table_specific_config_dicts = {
-            table: self._validate_synthetics_config(conf)
-            for table, conf in all_table_specific_configs.items()
-        }
+        configs = assemble_configs(
+            self.relational_data, config, table_specific_configs, only, ignore
+        )
 
-        configs = {
-            table: table_specific_config_dicts.get(table, default_config_dict)
-            for table in include_tables
-        }
+        # validate table scope (preserved tables) against the strategy
+        excluded_tables = [
+            table
+            for table in self.relational_data.list_all_tables()
+            if table not in configs
+        ]
+        self._strategy.validate_preserved_tables(excluded_tables, self.relational_data)
+
+        # validate all provided model configs are supported by the strategy
+        for conf in configs.values():
+            self._validate_synthetics_config(conf)
 
         self._train_synthetics_models(configs)
 
@@ -1070,15 +1008,11 @@ class MultiTable:
         self._evaluations[table].individual_report_json = individual_report_json
         self._evaluations[table].cross_table_report_json = cross_table_report_json
 
-    def _validate_synthetics_config(self, config: GretelModelConfig) -> dict[str, Any]:
+    def _validate_synthetics_config(self, config_dict: dict[str, Any]) -> None:
         """
-        Validates that the provided config:
-        - has the general shape of a Gretel model config (or can be read into one, e.g. blueprints)
-        - is supported by the configured synthetics strategy
-
-        Returns the parsed config as read by read_model_config.
+        Validates that the provided config (in dict form)
+        is supported by the configured synthetics strategy
         """
-        config_dict = ingest(config)
         if (model_key := get_model_key(config_dict)) is None:
             raise MultiTableException("Invalid config")
         else:
@@ -1088,8 +1022,6 @@ class MultiTable:
                     f"Invalid gretel model requested: {model_key}. "
                     f"The selected strategy supports: {supported_models}."
                 )
-
-        return config_dict
 
 
 def _validate_strategy(strategy: str) -> Union[IndependentStrategy, AncestralStrategy]:

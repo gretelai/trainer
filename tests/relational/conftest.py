@@ -43,6 +43,17 @@ def _get_invented_table_suffix(make_suffix_execution_number: int):
     return f"invented_{str(make_suffix_execution_number)}"
 
 
+@pytest.fixture
+def invented_tables(get_invented_table_suffix) -> dict[str, str]:
+    return {
+        "purchases_root": f"purchases_{get_invented_table_suffix(1)}",
+        "purchases_data_years": f"purchases_{get_invented_table_suffix(2)}",
+        "bball_root": f"bball_{get_invented_table_suffix(1)}",
+        "bball_suspensions": f"bball_{get_invented_table_suffix(2)}",
+        "bball_teams": f"bball_{get_invented_table_suffix(3)}",
+    }
+
+
 @pytest.fixture()
 def project():
     with patch(

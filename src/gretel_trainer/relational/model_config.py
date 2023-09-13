@@ -93,3 +93,90 @@ def _passthrough_policy(columns: list[str]) -> dict[str, Any]:
             }
         ],
     }
+
+
+def assemble_configs(
+    rel_data: RelationalData,
+    config: GretelModelConfig,
+    table_specific_configs: Optional[dict[str, GretelModelConfig]],
+    only: Optional[set[str]],
+    ignore: Optional[set[str]],
+) -> dict[str, Any]:
+    only, ignore = _expand_only_and_ignore(rel_data, only, ignore)
+
+    tables_in_scope = [
+        table
+        for table in rel_data.list_all_tables()
+        if not _skip_table(table, only, ignore)
+    ]
+
+    # Standardize type of all provided models
+    config_dict = ingest(config)
+    table_specific_config_dicts = {
+        table: ingest(conf) for table, conf in (table_specific_configs or {}).items()
+    }
+
+    # Translate any JSON-source tables in table_specific_configs to invented tables
+    all_table_specific_config_dicts = {}
+    for table, conf in table_specific_config_dicts.items():
+        m_names = rel_data.get_modelable_table_names(table)
+        if len(m_names) == 0:
+            raise MultiTableException(f"Unrecognized table name: `{table}`")
+        for m_name in m_names:
+            all_table_specific_config_dicts[m_name] = table_specific_config_dicts.get(
+                m_name, conf
+            )
+
+    # Ensure compatibility between only/ignore and table_specific_configs
+    omitted_tables_with_overrides_specified = []
+    for table in all_table_specific_config_dicts:
+        if _skip_table(table, only, ignore):
+            omitted_tables_with_overrides_specified.append(table)
+    if len(omitted_tables_with_overrides_specified) > 0:
+        raise MultiTableException(
+            f"Cannot provide configs for tables that have been omitted from synthetics training: "
+            f"{omitted_tables_with_overrides_specified}"
+        )
+
+    return {
+        table: all_table_specific_config_dicts.get(table, config_dict)
+        for table in tables_in_scope
+    }
+
+
+def _expand_only_and_ignore(
+    rel_data: RelationalData, only: Optional[set[str]], ignore: Optional[set[str]]
+) -> tuple[Optional[set[str]], Optional[set[str]]]:
+    """
+    Accepts the `only` and `ignore` parameter values as provided by the user and:
+    - ensures both are not set (must provide one or the other, or neither)
+    - translates any JSON-source tables to the invented tables
+    """
+    if only is not None and ignore is not None:
+        raise MultiTableException("Cannot specify both `only` and `ignore`.")
+
+    modelable_tables = set()
+    for table in only or ignore or {}:
+        m_names = rel_data.get_modelable_table_names(table)
+        if len(m_names) == 0:
+            raise MultiTableException(f"Unrecognized table name: `{table}`")
+        modelable_tables.update(m_names)
+
+    if only is None:
+        return (None, modelable_tables)
+    elif ignore is None:
+        return (modelable_tables, None)
+    else:
+        return (None, None)
+
+
+def _skip_table(
+    table: str, only: Optional[set[str]], ignore: Optional[set[str]]
+) -> bool:
+    skip = False
+    if only is not None and table not in only:
+        skip = True
+    if ignore is not None and table in ignore:
+        skip = True
+
+    return skip
