@@ -734,7 +734,7 @@ class MultiTable:
     def train_synthetics(
         self,
         *,
-        config: GretelModelConfig,
+        config: Optional[GretelModelConfig] = None,
         table_specific_configs: Optional[dict[str, GretelModelConfig]] = None,
         only: Optional[set[str]] = None,
         ignore: Optional[set[str]] = None,
@@ -743,11 +743,8 @@ class MultiTable:
         Train synthetic data models for the tables in the tableset,
         optionally scoped by either `only` or `ignore`.
         """
-        # This argument used to be hinted as Optional with a None default and would
-        # fall back to a removed attribute on the MultiTable instance. Out of an
-        # abundance of caution, verify the client isn't relying on that old behavior.
         if config is None:
-            raise MultiTableException(f"Must provide a default model config.")
+            config = self._strategy.default_config
 
         configs = assemble_configs(
             self.relational_data, config, table_specific_configs, only, ignore

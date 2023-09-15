@@ -10,7 +10,7 @@ import gretel_trainer.relational.ancestry as ancestry
 import gretel_trainer.relational.strategies.common as common
 
 from gretel_client.projects.models import Model
-from gretel_trainer.relational.core import RelationalData
+from gretel_trainer.relational.core import GretelModelConfig, RelationalData
 from gretel_trainer.relational.sdk_extras import ExtendedGretelSDK
 from gretel_trainer.relational.table_evaluation import TableEvaluation
 
@@ -25,6 +25,10 @@ class IndependentStrategy:
     @property
     def supported_model_keys(self) -> list[str]:
         return ["amplify", "actgan", "synthetics", "tabular_dp"]
+
+    @property
+    def default_config(self) -> GretelModelConfig:
+        return "synthetics/tabular-actgan"
 
     def label_encode_keys(
         self, rel_data: RelationalData, tables: dict[str, pd.DataFrame]

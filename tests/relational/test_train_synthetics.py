@@ -29,6 +29,30 @@ def tmpdir(project):
         yield tmpdir
 
 
+class ModelConfigMatcher:
+    def __init__(self, model_key: str):
+        self.model_key = model_key
+
+    def __eq__(self, other):
+        return list(other["models"][0])[0] == self.model_key
+
+
+def test_train_synthetics_strategy_specific_default_configs(pets, tmpdir, project):
+    mt = MultiTable(pets, strategy="independent", project_display_name=tmpdir)
+    mt.train_synthetics()
+    project.create_model_obj.assert_called_with(
+        model_config=ModelConfigMatcher("actgan"),
+        data_source=f"{tmpdir}/synthetics_train_pets.csv",
+    )
+
+    mt = MultiTable(pets, strategy="ancestral", project_display_name=tmpdir)
+    mt.train_synthetics()
+    project.create_model_obj.assert_called_with(
+        model_config=ModelConfigMatcher("amplify"),
+        data_source=f"{tmpdir}/synthetics_train_pets.csv",
+    )
+
+
 def test_train_synthetics_defaults_to_training_all_tables(ecom, tmpdir):
     mt = MultiTable(ecom, project_display_name=tmpdir)
     mt.train_synthetics(config="synthetics/amplify")
