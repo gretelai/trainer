@@ -162,7 +162,8 @@ def _join_parents(
         left_on_cols = [f"{lineage}{_END_LINEAGE}{col}" for col in foreign_key.columns]
         right_on_cols = [f"{next_lineage}{_END_LINEAGE}{parent_col}" for parent_col in foreign_key.parent_columns]
         for left_col, right_col in zip(left_on_cols, right_on_cols):
-            df[left_col] = df[left_col].astype(parent_data[right_col].dtype) 
+            if parent_data[right_col].dtype == "object"
+                df[left_col] = df[left_col].astype(parent_data[right_col].dtype)
         
         df = df.merge(parent_data, how="left", left_on=left_on_cols, right_on=right_on_cols)
 
