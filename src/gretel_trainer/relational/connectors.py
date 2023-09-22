@@ -134,10 +134,8 @@ class Connector:
             tbl for tbl in ordered_source_tables if tbl in output_tables
         ]
 
-        logger.info()
-        logger.info("--- Executing SQL insertion for output tables ---")
+        logger.info("\n--- Executing SQL insertion for output tables ---")
         logger.info("Emptying output tables if they already exist.")
-        logger.info()
 
         # Traverse dependency graph from leaf up to parent
         for source_table_name in reversed(table_collection):
@@ -158,9 +156,7 @@ class Connector:
                     f"Table: {prefix}{source_table_name} - Does not exist in destination db. Skipping record deletion."
                 )
 
-        logger.info()
-        logger.info("Writing data to destination.")
-        logger.info()
+        logger.info("\nWriting data to destination.")
 
         # Traverse dependency graph from parent down to leaf
         for source_table_name in table_collection:
