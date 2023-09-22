@@ -15,9 +15,10 @@ from typing import Optional
 
 import pandas as pd
 
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, inspect
 from sqlalchemy.engine.base import Engine
 from sqlalchemy.exc import OperationalError
+from sqlalchemy.sql import text
 
 from gretel_trainer.relational.core import (
     DEFAULT_RELATIONAL_SOURCE_DIR,
@@ -114,10 +115,62 @@ class Connector:
 
         return extractor.relational_data
 
-    def save(self, tables: dict[str, pd.DataFrame], prefix: str = "") -> None:
-        for name, data in tables.items():
+    def save(
+        self,
+        output_tables: dict[str, pd.DataFrame],
+        prefix: str = "",
+        source_relational_data: Optional[RelationalData] = None,
+    ) -> None:
+        # Default to unsorted if source_relational_data isn't provided
+        ordered_source_tables = output_tables.keys()
+        if source_relational_data is not None:
+            # Depencencies can exist between tables due to foreign key constraints
+            # This topologically sorted dependency graph allows for deleting/writing tables in the proper order
+            ordered_source_tables = (
+                source_relational_data.list_tables_parents_before_children()
+            )
+        # Tables may not be in output_tables if they failed to train/generate
+        table_collection = [
+            tbl for tbl in ordered_source_tables if tbl in output_tables
+        ]
+
+        logger.info()
+        logger.info("--- Executing SQL insertion for output tables ---")
+        logger.info("Emptying output tables if they already exist.")
+        logger.info()
+
+        # Traverse dependency graph from leaf up to parent
+        for source_table_name in reversed(table_collection):
+            # Check that this table was not dropped with an "only" param
+            # and check if table exists in destination db.
+            if inspect(self.engine).has_table(f"{prefix}{source_table_name}"):
+                logger.info(
+                    f"Table: {prefix}{source_table_name} - Exists in destination db. Deleting all records from table."
+                )
+                # Not all SQL DBs support table truncation with FK constraints (ie. MSSQL)
+                self.engine.execute(
+                    text(f"delete from {prefix}{source_table_name}").execution_options(
+                        autocommit=True
+                    )
+                )
+            else:
+                logger.info(
+                    f"Table: {prefix}{source_table_name} - Does not exist in destination db. Skipping record deletion."
+                )
+
+        logger.info()
+        logger.info("Writing data to destination.")
+        logger.info()
+
+        # Traverse dependency graph from parent down to leaf
+        for source_table_name in table_collection:
+            logger.info(f"Table: {prefix}{source_table_name} - Writing data.")
+            data = output_tables[source_table_name]
             data.to_sql(
-                f"{prefix}{name}", con=self.engine, if_exists="replace", index=False
+                f"{prefix}{source_table_name}",
+                con=self.engine,
+                if_exists="append",
+                index=False,
             )
 
 
