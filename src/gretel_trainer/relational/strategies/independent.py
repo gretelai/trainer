@@ -2,17 +2,13 @@ import logging
 import random
 
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any
 
 import pandas as pd
 
-import gretel_trainer.relational.ancestry as ancestry
 import gretel_trainer.relational.strategies.common as common
 
-from gretel_client.projects.models import Model
 from gretel_trainer.relational.core import GretelModelConfig, RelationalData
-from gretel_trainer.relational.sdk_extras import ExtendedGretelSDK
-from gretel_trainer.relational.table_evaluation import TableEvaluation
 
 logger = logging.getLogger(__name__)
 
@@ -146,66 +142,6 @@ class IndependentStrategy:
         )
         synth_tables = _synthesize_foreign_keys(synth_tables, rel_data)
         return synth_tables
-
-    def update_evaluation_from_model(
-        self,
-        table_name: str,
-        evaluations: dict[str, TableEvaluation],
-        model: Model,
-        working_dir: Path,
-        extended_sdk: ExtendedGretelSDK,
-    ) -> None:
-        logger.info(f"Downloading individual evaluation reports for `{table_name}`.")
-        out_filepath = working_dir / f"synthetics_individual_evaluation_{table_name}"
-        common.download_artifacts(model, out_filepath, extended_sdk)
-
-        evaluation = evaluations[table_name]
-        evaluation.individual_report_json = common.read_report_json_data(
-            model, out_filepath
-        )
-
-    def get_evaluate_model_data(
-        self,
-        table_name: str,
-        rel_data: RelationalData,
-        synthetic_tables: dict[str, pd.DataFrame],
-    ) -> Optional[dict[str, pd.DataFrame]]:
-        missing_ancestors = [
-            ancestor
-            for ancestor in rel_data.get_ancestors(table_name)
-            if ancestor not in synthetic_tables
-        ]
-        if len(missing_ancestors) > 0:
-            logger.info(
-                f"Cannot run cross_table evaluations for `{table_name}` because no synthetic data exists for ancestor tables {missing_ancestors}."
-            )
-            return None
-
-        source_data = ancestry.get_table_data_with_ancestors(rel_data, table_name)
-        synthetic_data = ancestry.get_table_data_with_ancestors(
-            rel_data, table_name, synthetic_tables
-        )
-        return {
-            "source": source_data,
-            "synthetic": synthetic_data,
-        }
-
-    def update_evaluation_from_evaluate(
-        self,
-        table_name: str,
-        evaluations: dict[str, TableEvaluation],
-        evaluate_model: Model,
-        working_dir: Path,
-        extended_sdk: ExtendedGretelSDK,
-    ) -> None:
-        logger.info(f"Downloading cross table evaluation reports for `{table_name}`.")
-        out_filepath = working_dir / f"synthetics_cross_table_evaluation_{table_name}"
-        common.download_artifacts(evaluate_model, out_filepath, extended_sdk)
-
-        evaluation = evaluations[table_name]
-        evaluation.cross_table_report_json = common.read_report_json_data(
-            evaluate_model, out_filepath
-        )
 
 
 def _synthesize_primary_keys(

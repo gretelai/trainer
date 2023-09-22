@@ -22,6 +22,8 @@ from typing import Any, Optional, Union
 import pandas as pd
 import smart_open
 
+import gretel_trainer.relational.ancestry as ancestry
+
 from gretel_client.config import get_session_config, RunnerMode
 from gretel_client.projects import create_project, get_project, Project
 from gretel_client.projects.jobs import ACTIVE_STATES, END_STATES, Status
@@ -270,27 +272,10 @@ class MultiTable:
                 "Cannot restore while model training is actively in progress."
             )
 
-        training_succeeded = [
-            table
-            for table, model in self._synthetics_train.models.items()
-            if model.status == Status.COMPLETED
-        ]
-        for table in training_succeeded:
-            if table in self.relational_data.list_all_tables(Scope.EVALUATABLE):
-                model = self._synthetics_train.models[table]
-                with silent_logs():
-                    self._strategy.update_evaluation_from_model(
-                        table,
-                        self._evaluations,
-                        model,
-                        self._working_dir,
-                        self._extended_sdk,
-                    )
-
         training_failed = [
             table
             for table, model in self._synthetics_train.models.items()
-            if model.status in END_STATES and table not in training_succeeded
+            if model.status in END_STATES and model.status != Status.COMPLETED
         ]
         if len(training_failed) > 0:
             logger.info(
@@ -720,17 +705,6 @@ class MultiTable:
         )
         run_task(task, self._extended_sdk)
 
-        for table in task.completed:
-            if table in self.relational_data.list_all_tables(Scope.EVALUATABLE):
-                model = self._synthetics_train.models[table]
-                self._strategy.update_evaluation_from_model(
-                    table,
-                    self._evaluations,
-                    model,
-                    self._working_dir,
-                    self._extended_sdk,
-                )
-
     def train_synthetics(
         self,
         *,
@@ -901,7 +875,8 @@ class MultiTable:
         evaluate_project = create_project(
             display_name=f"evaluate-{self._project.display_name}"
         )
-        evaluate_models = {}
+        individual_evaluate_models = {}
+        cross_table_evaluate_models = {}
         for table, synth_df in output_tables.items():
             if table in self._synthetics_run.preserved:
                 continue
@@ -912,48 +887,42 @@ class MultiTable:
             if table not in self.relational_data.list_all_tables(Scope.EVALUATABLE):
                 continue
 
-            evaluate_data = self._strategy.get_evaluate_model_data(
-                rel_data=self.relational_data,
-                table_name=table,
+            # Create an evaluate model for individual SQS
+            individual_data = self._get_individual_evaluate_data(
+                table=table,
                 synthetic_tables=output_tables,
             )
-            if evaluate_data is None:
-                continue
-
-            evaluate_models[table] = evaluate_project.create_model_obj(
-                model_config=make_evaluate_config(table),
-                data_source=evaluate_data["synthetic"],
-                ref_data=evaluate_data["source"],
+            individual_sqs_job = evaluate_project.create_model_obj(
+                model_config=make_evaluate_config(table, "individual"),
+                data_source=individual_data["synthetic"],
+                ref_data=individual_data["source"],
             )
+            individual_evaluate_models[table] = individual_sqs_job
+
+            # Create an evaluate model for cross-table SQS (if we can/should)
+            cross_table_data = self._get_cross_table_evaluate_data(
+                table=table,
+                synthetic_tables=output_tables,
+            )
+            if cross_table_data is not None:
+                cross_table_sqs_job = evaluate_project.create_model_obj(
+                    model_config=make_evaluate_config(table, "cross_table"),
+                    data_source=cross_table_data["synthetic"],
+                    ref_data=cross_table_data["source"],
+                )
+                cross_table_evaluate_models[table] = cross_table_sqs_job
 
         synthetics_evaluate_task = SyntheticsEvaluateTask(
-            evaluate_models=evaluate_models,
+            individual_evaluate_models=individual_evaluate_models,
+            cross_table_evaluate_models=cross_table_evaluate_models,
             project=evaluate_project,
+            run_dir=run_dir,
+            evaluations=self._evaluations,
             multitable=self,
         )
         run_task(synthetics_evaluate_task, self._extended_sdk)
 
-        # Tables passed to task were already scoped to evaluatable tables
-        for table in synthetics_evaluate_task.completed:
-            self._strategy.update_evaluation_from_evaluate(
-                table_name=table,
-                evaluate_model=evaluate_models[table],
-                evaluations=self._evaluations,
-                working_dir=self._working_dir,
-                extended_sdk=self._extended_sdk,
-            )
-
         evaluate_project.delete()
-
-        for table_name in output_tables:
-            for eval_type in ["individual", "cross_table"]:
-                for ext in ["html", "json"]:
-                    filename = f"synthetics_{eval_type}_evaluation_{table_name}.{ext}"
-                    with suppress(FileNotFoundError):
-                        shutil.copyfile(
-                            src=self._working_dir / filename,
-                            dst=run_dir / filename,
-                        )
 
         logger.info("Creating relational report")
         self.create_relational_report(
@@ -974,6 +943,66 @@ class MultiTable:
         )
         self.synthetic_output_tables = reshaped_tables
         self._backup()
+
+    def _get_individual_evaluate_data(
+        self, table: str, synthetic_tables: dict[str, pd.DataFrame]
+    ) -> dict[str, pd.DataFrame]:
+        """
+        Returns a dictionary containing source and synthetic versions of a table,
+        to be used in an Evaluate job.
+
+        Removes all key columns to avoid artificially deflating the score
+        (key types may not match, and key values carry no semantic meaning).
+        """
+        all_cols = self.relational_data.get_table_columns(table)
+        key_cols = self.relational_data.get_all_key_columns(table)
+        use_cols = [c for c in all_cols if c not in key_cols]
+
+        return {
+            "source": self.relational_data.get_table_data(table, usecols=use_cols),
+            "synthetic": synthetic_tables[table].drop(columns=key_cols),
+        }
+
+    def _get_cross_table_evaluate_data(
+        self, table: str, synthetic_tables: dict[str, pd.DataFrame]
+    ) -> Optional[dict[str, pd.DataFrame]]:
+        """
+        Returns a dictionary containing source and synthetic versions of a table
+        with ancestral data attached, to be used in an Evaluate job for cross-table SQS.
+
+        Removes all key columns to avoid artificially deflating the score
+        (key types may not match, and key values carry no semantic meaning).
+
+        Returns None if a cross-table SQS job cannot or should not be performed.
+        """
+        # Exit early if table does not have parents (no need for cross-table evaluation)
+        if len(self.relational_data.get_parents(table)) == 0:
+            return None
+
+        # Exit early if we can't create synthetic cross-table data
+        # (e.g. parent data missing due to job failure)
+        missing_ancestors = [
+            ancestor
+            for ancestor in self.relational_data.get_ancestors(table)
+            if ancestor not in synthetic_tables
+        ]
+        if len(missing_ancestors) > 0:
+            logger.info(
+                f"Cannot run cross_table evaluations for `{table}` because no synthetic data exists for ancestor tables {missing_ancestors}."
+            )
+            return None
+
+        source_data = ancestry.get_table_data_with_ancestors(
+            self.relational_data, table
+        )
+        synthetic_data = ancestry.get_table_data_with_ancestors(
+            self.relational_data, table, synthetic_tables
+        )
+        key_cols = ancestry.get_all_key_columns(self.relational_data, table)
+        return {
+            "source": source_data.drop(columns=key_cols),
+            "synthetic": synthetic_data.drop(columns=key_cols),
+        }
 
     def create_relational_report(self, run_identifier: str, target_dir: Path) -> None:
         presenter = ReportPresenter(

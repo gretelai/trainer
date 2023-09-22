@@ -1,50 +1,15 @@
-import json
 import logging
 import random
 
-from pathlib import Path
 from typing import Optional
 
 import pandas as pd
-import smart_open
 
 from sklearn import preprocessing
 
-from gretel_client.projects.models import Model
 from gretel_trainer.relational.core import MultiTableException, RelationalData
-from gretel_trainer.relational.sdk_extras import ExtendedGretelSDK
 
 logger = logging.getLogger(__name__)
-
-
-def download_artifacts(
-    model: Model, out_filepath: Path, extended_sdk: ExtendedGretelSDK
-) -> None:
-    """
-    Downloads all model artifacts to a subdirectory in the working directory.
-    """
-    legend = {"html": "report", "json": "report_json"}
-
-    for filetype, artifact_name in legend.items():
-        out_path = f"{out_filepath}.{filetype}"
-        extended_sdk.download_file_artifact(model, artifact_name, out_path)
-
-
-def read_report_json_data(model: Model, report_path: Path) -> Optional[dict]:
-    full_path = f"{report_path}.json"
-    try:
-        return json.loads(smart_open.open(full_path).read())
-    except:
-        return _get_report_json(model)
-
-
-def _get_report_json(model: Model) -> Optional[dict]:
-    try:
-        with model.get_artifact_handle("report_json") as report:
-            return json.loads(report.read())
-    except:
-        logger.warning("Failed to fetch model evaluation report JSON.")
-        return None
 
 
 def label_encode_keys(

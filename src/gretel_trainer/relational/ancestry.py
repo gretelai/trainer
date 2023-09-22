@@ -21,6 +21,13 @@ def get_multigenerational_primary_key(
     ]
 
 
+def get_all_key_columns(rel_data: RelationalData, table: str) -> list[str]:
+    tableset = _empty_data_tableset(rel_data)
+    return list(
+        get_table_data_with_ancestors(rel_data, table, tableset, keys_only=True).columns
+    )
+
+
 def get_ancestral_foreign_key_maps(
     rel_data: RelationalData, table: str
 ) -> list[tuple[str, str]]:
@@ -59,6 +66,13 @@ def get_ancestral_foreign_key_maps(
     ]
 
 
+def _empty_data_tableset(rel_data: RelationalData) -> dict[str, pd.DataFrame]:
+    return {
+        table: pd.DataFrame(columns=list(rel_data.get_table_columns(table)))
+        for table in rel_data.list_all_tables()
+    }
+
+
 def get_seed_safe_multigenerational_columns(
     rel_data: RelationalData,
 ) -> dict[str, list[str]]:
@@ -68,10 +82,7 @@ def get_seed_safe_multigenerational_columns(
     a significantly faster / less resource-intensive way to get just the column names
     from the results of `get_table_data_with_ancestors` for all tables.
     """
-    tableset = {
-        table: pd.DataFrame(columns=list(rel_data.get_table_columns(table)))
-        for table in rel_data.list_all_tables()
-    }
+    tableset = _empty_data_tableset(rel_data)
     return {
         table: list(
             get_table_data_with_ancestors(
@@ -87,6 +98,7 @@ def get_table_data_with_ancestors(
     table: str,
     tableset: Optional[dict[str, pd.DataFrame]] = None,
     ancestral_seeding: bool = False,
+    keys_only: bool = False,
 ) -> pd.DataFrame:
     """
     Returns a data frame with all ancestral data joined to each record.
@@ -96,14 +108,26 @@ def get_table_data_with_ancestors(
     separated by periods.
 
     If `tableset` is provided, use it in place of the source data in `self.graph`.
+
+    If `ancestral_seeding` is True, the returned dataframe only includes columns
+    that can be used as conditional seeds.
+
+    If `keys_only` is True, the returned dataframe only includes columns that are primary
+    or foreign keys.
     """
-    lineage = _START_LINEAGE
     if tableset is not None:
         df = tableset[table]
     else:
         df = rel_data.get_table_data(table)
+
+    if keys_only:
+        df = df[rel_data.get_all_key_columns(table)]
+
+    lineage = _START_LINEAGE
     df = df.add_prefix(f"{_START_LINEAGE}{_END_LINEAGE}")
-    return _join_parents(rel_data, df, table, lineage, tableset, ancestral_seeding)
+    return _join_parents(
+        rel_data, df, table, lineage, tableset, ancestral_seeding, keys_only
+    )
 
 
 def _join_parents(
@@ -113,6 +137,7 @@ def _join_parents(
     lineage: str,
     tableset: Optional[dict[str, pd.DataFrame]],
     ancestral_seeding: bool,
+    keys_only: bool,
 ) -> pd.DataFrame:
     for foreign_key in rel_data.get_foreign_keys(table):
         fk_lineage = _COL_DELIMITER.join(foreign_key.columns)
@@ -122,6 +147,8 @@ def _join_parents(
 
         if ancestral_seeding:
             usecols = list(rel_data.get_safe_ancestral_seed_columns(parent_table_name))
+        elif keys_only:
+            usecols = rel_data.get_all_key_columns(parent_table_name)
         else:
             usecols = rel_data.get_table_columns(parent_table_name)
 
@@ -141,7 +168,13 @@ def _join_parents(
         )
 
         df = _join_parents(
-            rel_data, df, parent_table_name, next_lineage, tableset, ancestral_seeding
+            rel_data,
+            df,
+            parent_table_name,
+            next_lineage,
+            tableset,
+            ancestral_seeding,
+            keys_only,
         )
     return df
 

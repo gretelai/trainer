@@ -139,6 +139,43 @@ def test_primary_key_in_multigenerational_format(mutagenesis):
     ]
 
 
+def test_get_all_key_columns(ecom, mutagenesis):
+    assert set(ancestry.get_all_key_columns(ecom, "distribution_center")) == {"self|id"}
+    assert set(ancestry.get_all_key_columns(ecom, "events")) == {
+        "self|id",
+        "self|user_id",
+        "self.user_id|id",
+    }
+    assert set(ancestry.get_all_key_columns(ecom, "inventory_items")) == {
+        "self|id",
+        "self|product_id",
+        "self|product_distribution_center_id",
+        "self.product_id|id",
+        "self.product_id|distribution_center_id",
+        "self.product_distribution_center_id|id",
+        "self.product_id.distribution_center_id|id",
+    }
+
+    assert set(ancestry.get_all_key_columns(mutagenesis, "molecule")) == {
+        "self|molecule_id"
+    }
+    assert set(ancestry.get_all_key_columns(mutagenesis, "atom")) == {
+        "self|atom_id",
+        "self|molecule_id",
+        "self.molecule_id|molecule_id",
+    }
+    assert set(ancestry.get_all_key_columns(mutagenesis, "bond")) == {
+        "self|atom1_id",
+        "self|atom2_id",
+        "self.atom1_id|atom_id",
+        "self.atom1_id|molecule_id",
+        "self.atom1_id.molecule_id|molecule_id",
+        "self.atom2_id|atom_id",
+        "self.atom2_id|molecule_id",
+        "self.atom2_id.molecule_id|molecule_id",
+    }
+
+
 def test_ancestral_foreign_key_maps(ecom):
     events_afk_maps = ancestry.get_ancestral_foreign_key_maps(ecom, "events")
     assert events_afk_maps == [("self|user_id", "self.user_id|id")]

@@ -124,7 +124,7 @@ def test_runs_post_processing_when_table_completes(pets, tmpdir):
         "gretel_trainer.relational.sdk_extras.ExtendedGretelSDK.get_record_handler_data"
     ) as get_rh_data:
         get_rh_data.return_value = raw_df
-        task.handle_completed("table", Mock())
+        task.handle_completed("table", Mock(ref_data=Mock(values=[])))
 
     post_processed = task.working_tables["table"]
     assert post_processed is not None

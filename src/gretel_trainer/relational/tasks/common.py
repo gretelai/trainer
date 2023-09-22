@@ -62,4 +62,4 @@ def log_lost_contact(table_name: str) -> None:
 
 
 def cleanup(sdk: ExtendedGretelSDK, project: Project, job: Job) -> None:
-    sdk.delete_data_source(project, job)
+    sdk.delete_data_sources(project, job)

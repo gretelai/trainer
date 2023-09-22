@@ -493,23 +493,14 @@ def test_restore_training_complete(
     mt = MultiTable.restore(backup_file)
 
     # Backup + Debug summary + Source archive + (2) Source CSVs
-    # + Training archive + (2) Train CSVs + (4) Reports from models
-    assert len(os.listdir(working_dir)) == 12
+    # + Training archive + (2) Train CSVs
+    assert len(os.listdir(working_dir)) == 8
 
     # Training state is restored
     assert os.path.exists(local_file(working_dir, "synthetics_training_archive"))
     assert os.path.exists(local_file(working_dir, "train_humans"))
-    assert os.path.exists(working_dir / "synthetics_individual_evaluation_humans.json")
-    assert os.path.exists(working_dir / "synthetics_individual_evaluation_humans.html")
     assert os.path.exists(local_file(working_dir, "train_pets"))
-    assert os.path.exists(working_dir / "synthetics_individual_evaluation_pets.json")
-    assert os.path.exists(working_dir / "synthetics_individual_evaluation_pets.html")
     assert len(mt._synthetics_train.models) == 2
-
-    assert mt.evaluations["humans"].individual_sqs == 95
-    assert mt.evaluations["humans"].cross_table_sqs is None
-    assert mt.evaluations["pets"].individual_sqs == 95
-    assert mt.evaluations["pets"].cross_table_sqs is None
 
 
 def test_restore_training_one_failed(
@@ -547,31 +538,15 @@ def test_restore_training_one_failed(
     mt = MultiTable.restore(backup_file)
 
     # Backup + Debug summary + Source archive + (2) Source CSVs
-    # Training archive + (2) Train CSVs + (2) Reports from model
-    assert len(os.listdir(working_dir)) == 10
+    # Training archive + (2) Train CSVs
+    assert len(os.listdir(working_dir)) == 8
 
     # Training state is restored
     assert os.path.exists(local_file(working_dir, "synthetics_training_archive"))
-    ## We do expect the training CSV to be present, extracted from the training archive...
     assert os.path.exists(local_file(working_dir, "train_humans"))
-    ## ...but we should not see evaluation reports because the table failed to train.
-
-    assert not os.path.exists(
-        working_dir / "synthetics_individual_evaluation_humans.json"
-    )
-    assert not os.path.exists(
-        working_dir / "synthetics_individual_evaluation_humans.html"
-    )
-
     assert os.path.exists(local_file(working_dir, "train_pets"))
-    assert os.path.exists(working_dir / "synthetics_individual_evaluation_pets.json")
-    assert os.path.exists(working_dir / "synthetics_individual_evaluation_pets.html")
-    assert len(mt._synthetics_train.models) == 2
 
-    assert mt.evaluations["humans"].individual_sqs is None
-    assert mt.evaluations["humans"].cross_table_sqs is None
-    assert mt.evaluations["pets"].individual_sqs == 95
-    assert mt.evaluations["pets"].cross_table_sqs is None
+    assert len(mt._synthetics_train.models) == 2
 
 
 def test_restore_generate_completed(
@@ -619,9 +594,9 @@ def test_restore_generate_completed(
     mt = MultiTable.restore(backup_file)
 
     # Backup + Debug summary + Source archive + (2) Source CSVs
-    # + Training archive + (2) Train CSVs + (4) Reports from models
+    # + Training archive + (2) Train CSVs
     # + Outputs archive + Previous run subdirectory
-    assert len(os.listdir(working_dir)) == 14
+    assert len(os.listdir(working_dir)) == 10
 
     # Generate state is restored
     assert os.path.exists(working_dir / "run-id" / "synth_humans.csv")
@@ -631,12 +606,24 @@ def test_restore_generate_completed(
     assert os.path.exists(
         working_dir / "run-id" / "synthetics_cross_table_evaluation_humans.html"
     )
+    assert os.path.exists(
+        working_dir / "run-id" / "synthetics_individual_evaluation_humans.json"
+    )
+    assert os.path.exists(
+        working_dir / "run-id" / "synthetics_individual_evaluation_humans.html"
+    )
     assert os.path.exists(working_dir / "run-id" / "synth_pets.csv")
     assert os.path.exists(
         working_dir / "run-id" / "synthetics_cross_table_evaluation_pets.json"
     )
     assert os.path.exists(
         working_dir / "run-id" / "synthetics_cross_table_evaluation_pets.html"
+    )
+    assert os.path.exists(
+        working_dir / "run-id" / "synthetics_individual_evaluation_pets.json"
+    )
+    assert os.path.exists(
+        working_dir / "run-id" / "synthetics_individual_evaluation_pets.html"
     )
     assert mt._synthetics_run is not None
     assert len(mt.synthetic_output_tables) == 2
@@ -691,8 +678,8 @@ def test_restore_generate_in_progress(
     mt = MultiTable.restore(backup_file)
 
     # Backup + Debug summary + Source archive + (2) Source CSVs
-    # + Training archive + (2) Train CSVs + (4) Reports from models
-    assert len(os.listdir(working_dir)) == 12
+    # + Training archive + (2) Train CSVs
+    assert len(os.listdir(working_dir)) == 8
 
     # Generate state is partially restored
     assert mt._synthetics_run == SyntheticsRun(
@@ -703,10 +690,6 @@ def test_restore_generate_in_progress(
         record_handlers=synthetics_record_handlers,
     )
     assert len(mt.synthetic_output_tables) == 0
-    assert mt.evaluations["humans"].individual_sqs == 95
-    assert mt.evaluations["humans"].cross_table_sqs is None
-    assert mt.evaluations["pets"].individual_sqs == 95
-    assert mt.evaluations["pets"].cross_table_sqs is None
 
 
 def test_restore_hybrid_run(project, pets, report_json_dict, working_dir):

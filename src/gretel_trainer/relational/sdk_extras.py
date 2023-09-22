@@ -32,9 +32,12 @@ class ExtendedGretelSDK:
         else:
             raise MultiTableException("Unexpected job object")
 
-    def delete_data_source(self, project: Project, job: Job) -> None:
-        if not self._hybrid and job.data_source is not None:
-            project.delete_artifact(job.data_source)
+    def delete_data_sources(self, project: Project, job: Job) -> None:
+        if not self._hybrid:
+            if job.data_source is not None:
+                project.delete_artifact(job.data_source)
+            for ref_data in job.ref_data.values:
+                project.delete_artifact(ref_data)
 
     def cautiously_refresh_status(
         self, job: Job, key: str, refresh_attempts: dict[str, int]

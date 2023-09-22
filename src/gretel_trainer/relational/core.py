@@ -754,7 +754,7 @@ class RelationalData:
         all_key_cols.extend(self.get_primary_key(table))
         for fk in self.get_foreign_keys(table):
             all_key_cols.extend(fk.columns)
-        return all_key_cols
+        return sorted(list(set(all_key_cols)))
 
     def debug_summary(self) -> dict[str, Any]:
         max_depth = dag_longest_path_length(self.graph)

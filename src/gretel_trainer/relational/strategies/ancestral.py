@@ -1,21 +1,18 @@
 import logging
 
 from pathlib import Path
-from typing import Any, Optional, Union
+from typing import Any, Union
 
 import pandas as pd
 
 import gretel_trainer.relational.ancestry as ancestry
 import gretel_trainer.relational.strategies.common as common
 
-from gretel_client.projects.models import Model
 from gretel_trainer.relational.core import (
     GretelModelConfig,
     MultiTableException,
     RelationalData,
 )
-from gretel_trainer.relational.sdk_extras import ExtendedGretelSDK
-from gretel_trainer.relational.table_evaluation import TableEvaluation
 
 logger = logging.getLogger(__name__)
 
@@ -297,51 +294,6 @@ class AncestralStrategy:
             table_name: ancestry.drop_ancestral_data(df)
             for table_name, df in synth_tables.items()
         }
-
-    def update_evaluation_from_model(
-        self,
-        table_name: str,
-        evaluations: dict[str, TableEvaluation],
-        model: Model,
-        working_dir: Path,
-        extended_sdk: ExtendedGretelSDK,
-    ) -> None:
-        logger.info(f"Downloading cross_table evaluation reports for `{table_name}`.")
-        out_filepath = working_dir / f"synthetics_cross_table_evaluation_{table_name}"
-        common.download_artifacts(model, out_filepath, extended_sdk)
-
-        evaluation = evaluations[table_name]
-        evaluation.cross_table_report_json = common.read_report_json_data(
-            model, out_filepath
-        )
-
-    def get_evaluate_model_data(
-        self,
-        table_name: str,
-        rel_data: RelationalData,
-        synthetic_tables: dict[str, pd.DataFrame],
-    ) -> Optional[dict[str, pd.DataFrame]]:
-        return {
-            "source": rel_data.get_table_data(table_name),
-            "synthetic": synthetic_tables[table_name],
-        }
-
-    def update_evaluation_from_evaluate(
-        self,
-        table_name: str,
-        evaluations: dict[str, TableEvaluation],
-        evaluate_model: Model,
-        working_dir: Path,
-        extended_sdk: ExtendedGretelSDK,
-    ) -> None:
-        logger.info(f"Downloading individual evaluation reports for `{table_name}`.")
-        out_filepath = working_dir / f"synthetics_individual_evaluation_{table_name}"
-        common.download_artifacts(evaluate_model, out_filepath, extended_sdk)
-
-        evaluation = evaluations[table_name]
-        evaluation.individual_report_json = common.read_report_json_data(
-            evaluate_model, out_filepath
-        )
 
 
 def _add_artifical_rows_for_seeding(

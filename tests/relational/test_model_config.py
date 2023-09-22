@@ -23,9 +23,9 @@ def test_get_model_key():
     assert get_model_key({"models": ["wrong type"]}) is None
 
 
-def test_evaluate_config_prepends_workflow():
-    config = make_evaluate_config("users")
-    assert config["name"] == "evaluate-users"
+def test_evaluate_config_prepends_evaluation_type():
+    config = make_evaluate_config("users", "individual")
+    assert config["name"] == "individual-users"
 
 
 def test_synthetics_config_prepends_workflow():
