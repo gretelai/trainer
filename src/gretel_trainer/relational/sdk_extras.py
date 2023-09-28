@@ -17,7 +17,7 @@ from gretel_trainer.relational.core import MultiTableException
 
 logger = logging.getLogger(__name__)
 
-MAX_PROJECT_ARTIFACTS = 50
+MAX_PROJECT_ARTIFACTS = 10_000
 
 
 class ExtendedGretelSDK:
