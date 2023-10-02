@@ -589,6 +589,7 @@ class TableExtractor:
 
         table_data = {}
         for table_name in self.table_order:
+            logger.info("Processing table %s", table_name)
             child_tables = self._relational_data.get_descendants(table_name)
             meta = self._sample_table(table_name, child_tables=child_tables)
             table_data[table_name] = meta
