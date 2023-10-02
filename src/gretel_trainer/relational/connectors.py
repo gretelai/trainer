@@ -88,7 +88,6 @@ class Connector:
                 see the `ExtractorConfig` docs for more details.
             storage_dir: The output directory where extracted data is stored.
         """
-        logging.getLogger("sqlalchemy.engine").setLevel(logging.INFO)
         if only is not None and ignore is not None:
             raise MultiTableException("Cannot specify both `only` and `ignore`.")
 

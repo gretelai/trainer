@@ -434,6 +434,7 @@ class TableExtractor:
                     and_(
                         column == value
                         for column, value in zip(itertools.cycle(columns), values)
+                        if not pd.isnull(value)
                     ).self_group()
                     for values in values_list
                 ]
