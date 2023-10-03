@@ -55,23 +55,25 @@ class ExtendedGretelSDK:
         gretel_object: Union[Project, Model],
         artifact_name: str,
         out_path: Union[str, Path],
-    ) -> None:
+    ) -> bool:
         try:
             with gretel_object.get_artifact_handle(
                 artifact_name
             ) as src, smart_open.open(out_path, "wb") as dest:
                 shutil.copyfileobj(src, dest)
+            return True
         except:
             logger.warning(f"Failed to download `{artifact_name}`")
+            return False
 
     def download_tar_artifact(
-        self, project: Project, artifact_name: str, out_path: Path
+        self, project: Project, artifact_name: str, out_path: str
     ) -> None:
         download_link = project.get_artifact_link(artifact_name)
         try:
             response = requests.get(download_link)
             if response.status_code == 200:
-                with open(out_path, "wb") as out:
+                with smart_open.open(out_path, "wb") as out:
                     out.write(response.content)
         except:
             logger.warning(f"Failed to download `{artifact_name}`")

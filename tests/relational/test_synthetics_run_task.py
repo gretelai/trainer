@@ -1,5 +1,3 @@
-import tempfile
-
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional, Union
@@ -12,6 +10,7 @@ import pytest
 from gretel_client.projects.jobs import Status
 from gretel_client.projects.projects import Project
 from gretel_trainer.relational.core import RelationalData
+from gretel_trainer.relational.output_handler import OutputHandler
 from gretel_trainer.relational.sdk_extras import (
     ExtendedGretelSDK,
     MAX_PROJECT_ARTIFACTS,
@@ -34,15 +33,9 @@ class MockMultiTable:
         pass
 
 
-@pytest.fixture(autouse=True)
-def tmpdir():
-    with tempfile.TemporaryDirectory() as tmpdir:
-        yield Path(tmpdir)
-
-
 def make_task(
     rel_data: RelationalData,
-    run_dir: Path,
+    output_handler: OutputHandler,
     preserved: Optional[list[str]] = None,
     failed: Optional[list[str]] = None,
     omitted: Optional[list[str]] = None,
@@ -72,13 +65,14 @@ def make_task(
                 if table not in (omitted or [])
             },
         ),
-        run_dir=run_dir,
+        output_handler=output_handler,
+        subdir="run-identifier",
         multitable=multitable,
     )
 
 
-def test_ignores_preserved_tables(pets, tmpdir):
-    task = make_task(pets, tmpdir, preserved=["pets"])
+def test_ignores_preserved_tables(pets, output_handler):
+    task = make_task(pets, output_handler, preserved=["pets"])
 
     # Source data is used
     assert task.working_tables["pets"] is not None
@@ -87,8 +81,8 @@ def test_ignores_preserved_tables(pets, tmpdir):
     assert "pets" not in task.synthetics_run.record_handlers
 
 
-def test_ignores_tables_that_were_omitted_from_training(pets, tmpdir):
-    task = make_task(pets, tmpdir, omitted=["pets"])
+def test_ignores_tables_that_were_omitted_from_training(pets, output_handler):
+    task = make_task(pets, output_handler, omitted=["pets"])
 
     # Source data is used
     assert task.working_tables["pets"] is not None
@@ -97,8 +91,8 @@ def test_ignores_tables_that_were_omitted_from_training(pets, tmpdir):
     assert "pets" not in task.synthetics_run.record_handlers
 
 
-def test_ignores_tables_that_failed_during_training(pets, tmpdir):
-    task = make_task(pets, tmpdir, failed=["pets"])
+def test_ignores_tables_that_failed_during_training(pets, output_handler):
+    task = make_task(pets, output_handler, failed=["pets"])
 
     # We set tables that failed to explicit None
     assert task.working_tables["pets"] is None
@@ -107,8 +101,8 @@ def test_ignores_tables_that_failed_during_training(pets, tmpdir):
     assert "pets" not in task.synthetics_run.record_handlers
 
 
-def test_runs_post_processing_when_table_completes(pets, tmpdir):
-    task = make_task(pets, tmpdir)
+def test_runs_post_processing_when_table_completes(pets, output_handler):
+    task = make_task(pets, output_handler)
 
     raw_df = pd.DataFrame(data={"col1": [1, 2], "col2": [3, 4]})
 
@@ -131,8 +125,8 @@ def test_runs_post_processing_when_table_completes(pets, tmpdir):
     pdtest.assert_frame_equal(post_processed, raw_df.head(1))
 
 
-def test_starts_jobs_for_ready_tables(pets, tmpdir):
-    task = make_task(pets, tmpdir)
+def test_starts_jobs_for_ready_tables(pets, output_handler):
+    task = make_task(pets, output_handler)
 
     assert len(task.synthetics_run.record_handlers) == 0
 
@@ -146,8 +140,8 @@ def test_starts_jobs_for_ready_tables(pets, tmpdir):
     task.synthetics_run.record_handlers["humans"].submit.assert_called_once()
 
 
-def test_defers_jobs_if_no_room(pets, tmpdir):
-    task = make_task(pets, tmpdir)
+def test_defers_jobs_if_no_room(pets, output_handler):
+    task = make_task(pets, output_handler)
     task.multitable._project.artifacts = ["art"] * MAX_PROJECT_ARTIFACTS
 
     assert len(task.synthetics_run.record_handlers) == 0
@@ -166,8 +160,8 @@ def test_defers_jobs_if_no_room(pets, tmpdir):
     task.synthetics_run.record_handlers["humans"].submit.assert_not_called()
 
 
-def test_does_not_restart_existing_deferred_jobs(pets, tmpdir):
-    task = make_task(pets, tmpdir)
+def test_does_not_restart_existing_deferred_jobs(pets, output_handler):
+    task = make_task(pets, output_handler)
     task.multitable._project.artifacts = ["art"] * MAX_PROJECT_ARTIFACTS
 
     assert len(task.synthetics_run.record_handlers) == 0

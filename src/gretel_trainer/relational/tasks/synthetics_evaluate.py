@@ -1,7 +1,7 @@
 import json
 import logging
 
-from pathlib import Path
+from collections import defaultdict
 from typing import Optional
 
 import smart_open
@@ -11,6 +11,7 @@ import gretel_trainer.relational.tasks.common as common
 from gretel_client.projects.jobs import Job
 from gretel_client.projects.models import Model
 from gretel_client.projects.projects import Project
+from gretel_trainer.relational.output_handler import OutputHandler
 from gretel_trainer.relational.sdk_extras import ExtendedGretelSDK
 from gretel_trainer.relational.table_evaluation import TableEvaluation
 
@@ -25,7 +26,8 @@ class SyntheticsEvaluateTask:
         individual_evaluate_models: dict[str, Model],
         cross_table_evaluate_models: dict[str, Model],
         project: Project,
-        run_dir: Path,
+        subdir: str,
+        output_handler: OutputHandler,
         evaluations: dict[str, TableEvaluation],
         multitable: common._MultiTable,
     ):
@@ -35,11 +37,28 @@ class SyntheticsEvaluateTask:
         for table, model in cross_table_evaluate_models.items():
             self.jobs[f"cross_table-{table}"] = model
         self.project = project
-        self.run_dir = run_dir
+        self.subdir = subdir
+        self.output_handler = output_handler
         self.evaluations = evaluations
         self.multitable = multitable
         self.completed = []
         self.failed = []
+        # Nested dict organizing by table > sqs_type > file_type, e.g.
+        # {
+        #     "users": {
+        #         "individual": {
+        #             "json": "/path/to/report.json",
+        #             "html": "/path/to/report.html",
+        #         },
+        #         "cross_table": {
+        #             "json": "/path/to/report.json",
+        #             "html": "/path/to/report.html",
+        #         },
+        #     },
+        # }
+        self.report_filepaths: dict[str, dict[str, dict[str, str]]] = defaultdict(
+            lambda: defaultdict(dict)
+        )
 
     def action(self, job: Job) -> str:
         return ACTION
@@ -69,20 +88,35 @@ class SyntheticsEvaluateTask:
         common.log_success(table, ACTION)
 
         model = self.get_job(table)
-        if table.startswith("individual-"):
-            table_name = table.removeprefix("individual-")
-            out_filepath = (
-                self.run_dir / f"synthetics_individual_evaluation_{table_name}"
-            )
-            data = _get_reports(model, out_filepath, self.multitable._extended_sdk)
-            self.evaluations[table_name].individual_report_json = data
+        sqs_type, table_name = table.split("-", 1)
+        if sqs_type == "individual":
+            evaluation_to_set = self.evaluations[table_name].individual_report_json
         else:
-            table_name = table.removeprefix("cross_table-")
-            out_filepath = (
-                self.run_dir / f"synthetics_cross_table_evaluation_{table_name}"
-            )
-            data = _get_reports(model, out_filepath, self.multitable._extended_sdk)
-            self.evaluations[table_name].cross_table_report_json = data
+            evaluation_to_set = self.evaluations[table_name].cross_table_report_json
+
+        filename_stem = _filename_stem(sqs_type, table_name)
+
+        # JSON
+        json_filepath = self.output_handler.filepath_for(
+            f"{filename_stem}.json", subdir=self.subdir
+        )
+        json_ok = self.multitable._extended_sdk.download_file_artifact(
+            model, "report_json", json_filepath
+        )
+        json_data = _read_json_report(model, json_filepath)
+        evaluation_to_set = json_data
+        if json_ok:
+            self.report_filepaths[table_name][sqs_type]["json"] = json_filepath
+
+        # HTML
+        html_filepath = self.output_handler.filepath_for(
+            f"{filename_stem}.html", subdir=self.subdir
+        )
+        html_ok = self.multitable._extended_sdk.download_file_artifact(
+            model, "report", html_filepath
+        )
+        if html_ok:
+            self.report_filepaths[table_name][sqs_type]["html"] = html_filepath
 
         common.cleanup(sdk=self.multitable._extended_sdk, project=self.project, job=job)
 
@@ -103,36 +137,15 @@ class SyntheticsEvaluateTask:
         pass
 
 
-def _get_reports(
-    model: Model, out_filepath: Path, extended_sdk: ExtendedGretelSDK
-) -> Optional[dict]:
-    _download_reports(model, out_filepath, extended_sdk)
-    return _read_json_report(model, out_filepath)
-
-
-def _download_reports(
-    model: Model, out_filepath: Path, extended_sdk: ExtendedGretelSDK
-) -> None:
-    """
-    Downloads model reports to the provided path.
-    """
-    legend = {"html": "report", "json": "report_json"}
-
-    for filetype, artifact_name in legend.items():
-        out_path = f"{out_filepath}.{filetype}"
-        extended_sdk.download_file_artifact(model, artifact_name, out_path)
-
-
-def _read_json_report(model: Model, out_filepath: Path) -> Optional[dict]:
+def _read_json_report(model: Model, json_report_filepath: str) -> Optional[dict]:
     """
     Reads the JSON report data in to a dictionary to be appended to the MultiTable
     evaluations property. First try reading the file we just downloaded to the run
     directory. If that fails, try reading the data remotely from the model. If that
     also fails, log a warning and give up gracefully.
     """
-    full_path = f"{out_filepath}.json"
     try:
-        return json.loads(smart_open.open(full_path).read())
+        return json.loads(smart_open.open(json_report_filepath).read())
     except:
         try:
             with model.get_artifact_handle("report_json") as report:
@@ -140,3 +153,7 @@ def _read_json_report(model: Model, out_filepath: Path) -> Optional[dict]:
         except:
             logger.warning("Failed to fetch model evaluation report JSON.")
             return None
+
+
+def _filename_stem(sqs_type: str, table_name: str) -> str:
+    return f"synthetics_{sqs_type}_evaluation_{table_name}"

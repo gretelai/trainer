@@ -1,6 +1,5 @@
 import logging
 
-from pathlib import Path
 from typing import Optional
 
 import pandas as pd
@@ -10,6 +9,7 @@ import gretel_trainer.relational.tasks.common as common
 from gretel_client.projects.jobs import ACTIVE_STATES, Job, Status
 from gretel_client.projects.projects import Project
 from gretel_client.projects.records import RecordHandler
+from gretel_trainer.relational.output_handler import OutputHandler
 from gretel_trainer.relational.workflow_state import SyntheticsRun, SyntheticsTrain
 
 logger = logging.getLogger(__name__)
@@ -22,12 +22,14 @@ class SyntheticsRunTask:
         self,
         synthetics_run: SyntheticsRun,
         synthetics_train: SyntheticsTrain,
-        run_dir: Path,
+        subdir: str,
+        output_handler: OutputHandler,
         multitable: common._MultiTable,
     ):
         self.synthetics_run = synthetics_run
         self.synthetics_train = synthetics_train
-        self.run_dir = run_dir
+        self.subdir = subdir
+        self.output_handler = output_handler
         self.multitable = multitable
         self.working_tables = self._setup_working_tables()
 
@@ -146,7 +148,8 @@ class SyntheticsRunTask:
                 self.multitable.relational_data,
                 self.synthetics_run.record_size_ratio,
                 present_working_tables,
-                self.run_dir,
+                self.subdir,
+                self.output_handler,
             )
             model = self.synthetics_train.models[table_name]
             record_handler = model.create_record_handler_obj(**table_job)

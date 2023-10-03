@@ -21,10 +21,11 @@ import tempfile
 from dataclasses import dataclass, replace
 from enum import Enum
 from pathlib import Path
-from typing import Any, Optional, Union
+from typing import Any, Optional, Protocol, Union
 
 import networkx
 import pandas as pd
+import smart_open
 
 from networkx.algorithms.dag import dag_longest_path_length, topological_sort
 from pandas.api.types import is_string_dtype
@@ -96,7 +97,7 @@ class Scope(str, Enum):
 @dataclass
 class TableMetadata:
     primary_key: list[str]
-    source: Path
+    source: str
     columns: list[str]
     invented_table_metadata: Optional[InventedTableMetadata] = None
     producer_metadata: Optional[ProducerMetadata] = None
@@ -105,10 +106,62 @@ class TableMetadata:
 
 @dataclass
 class _RemovedTableMetadata:
-    source: Path
+    source: str
     primary_key: list[str]
     fks_to_parents: list[ForeignKey]
     fks_from_children: list[ForeignKey]
+
+
+class SourceDataHandler(Protocol):
+    def resolve_data_location(self, data: Union[str, Path]) -> str:
+        """
+        Returns a string handle that can be used with smart_open to read source data.
+        """
+        ...
+
+    def put_source(self, name: str, data: UserFriendlyDataT) -> str:
+        """
+        Ensures source data exists in a preferred, accessible internal location.
+        Returns a string handle to the data that can be used with smart_open.
+        """
+        ...
+
+    def put_invented_table_source(self, name: str, data: pd.DataFrame) -> str:
+        """
+        Ensures invented table data exists in a preferred, accessible internal location.
+        Returns a string handle to the data that can be used with smart_open.
+        """
+        ...
+
+
+class SDKSourceDataHandler:
+    def __init__(self, directory: Union[str, Path]):
+        self.dir = Path(directory)
+        self.dir.mkdir(parents=True, exist_ok=True)
+
+    def resolve_data_location(self, data: Union[str, Path]) -> str:
+        """
+        Returns the provided data location as a string. May be a relative path.
+        """
+        return str(data)
+
+    def put_source(self, name: str, data: UserFriendlyDataT) -> str:
+        """
+        Writes (or copies) the provided data to a CSV file in the local working directory.
+        """
+        source_path = self.dir / f"{name}.csv"
+        if isinstance(data, pd.DataFrame):
+            data.to_csv(source_path, index=False)
+        elif isinstance(data, (str, Path)):
+            shutil.copyfile(data, source_path)
+
+        return str(source_path)
+
+    def put_invented_table_source(self, name: str, data: pd.DataFrame) -> str:
+        """
+        Writes invented table data to the local working directory.
+        """
+        return self.put_source(name, data)
 
 
 class RelationalData:
@@ -127,9 +180,14 @@ class RelationalData:
     See the specific method docstrings for details on each method.
     """
 
-    def __init__(self, directory: Optional[Union[str, Path]] = None):
-        self.dir = Path(directory or DEFAULT_RELATIONAL_SOURCE_DIR)
-        self.dir.mkdir(parents=True, exist_ok=True)
+    def __init__(
+        self,
+        directory: Optional[Union[str, Path]] = None,
+        source_data_handler: Optional[SourceDataHandler] = None,
+    ):
+        self.source_data_handler = source_data_handler or SDKSourceDataHandler(
+            directory=Path(directory or DEFAULT_RELATIONAL_SOURCE_DIR)
+        )
         self.graph = networkx.DiGraph()
 
     @property
@@ -197,21 +255,22 @@ class RelationalData:
         the table includes nested JSON data.
         """
         primary_key = self._format_key_column(primary_key)
-        source_path = Path(f"{self.dir}/{name}.csv")
 
         # Preview data to get list of columns and determine if there is any JSON
         if isinstance(data, pd.DataFrame):
             preview_df = data.head(PREVIEW_ROW_COUNT)
         elif isinstance(data, (str, Path)):
-            preview_df = pd.read_csv(data, nrows=PREVIEW_ROW_COUNT)
+            data_location = self.source_data_handler.resolve_data_location(data)
+            with smart_open.open(data_location, "rb") as d:
+                preview_df = pd.read_csv(d, nrows=PREVIEW_ROW_COUNT)
         columns = list(preview_df.columns)
         json_cols = relational_json.get_json_columns(preview_df)
 
         # Write/copy source to preferred internal location
+        data_to_write = data
         if isinstance(data, pd.DataFrame):
-            relational_json.jsonencode(data, json_cols).to_csv(source_path, index=False)
-        elif isinstance(data, (str, Path)):
-            shutil.copyfile(data, source_path)
+            data_to_write = relational_json.jsonencode(data, json_cols)
+        source = self.source_data_handler.put_source(name, data_to_write)
 
         # If we found JSON in preview above, run JSON ingestion on full data
         rj_ingest = None
@@ -222,19 +281,20 @@ class RelationalData:
             if isinstance(data, pd.DataFrame):
                 df = data
             elif isinstance(data, (str, Path)):
-                df = pd.read_csv(data)
+                with smart_open.open(data, "rb") as d:
+                    df = pd.read_csv(d)
             rj_ingest = relational_json.ingest(name, primary_key, df, json_cols)
 
         # Add the table(s)
         if rj_ingest is not None:
             self._add_producer_and_invented_tables(
-                name, primary_key, source_path, columns, rj_ingest
+                name, primary_key, source, columns, rj_ingest
             )
         else:
             self._add_single_table(
                 name=name,
                 primary_key=primary_key,
-                source=source_path,
+                source=source,
                 columns=columns,
             )
 
@@ -242,7 +302,7 @@ class RelationalData:
         self,
         table: str,
         primary_key: list[str],
-        source: Path,
+        source: str,
         columns: list[str],
         rj_ingest: IngestResponseT,
     ) -> None:
@@ -261,13 +321,12 @@ class RelationalData:
         # Add the invented tables
         for tbl in tables:
             name = tbl["name"]
-            source_path = Path(f"{self.dir}/{name}.csv")
             df = tbl["data"]
-            df.to_csv(source_path, index=False)
+            tbl_source = self.source_data_handler.put_invented_table_source(name, df)
             self._add_single_table(
                 name=name,
                 primary_key=tbl["primary_key"],
-                source=source_path,
+                source=tbl_source,
                 columns=list(df.columns),
                 invented_table_metadata=tbl["invented_table_metadata"],
             )
@@ -279,17 +338,21 @@ class RelationalData:
         *,
         name: str,
         primary_key: UserFriendlyPrimaryKeyT,
-        source: Path,
+        source: str,
         columns: Optional[list[str]] = None,
         invented_table_metadata: Optional[InventedTableMetadata] = None,
         producer_metadata: Optional[ProducerMetadata] = None,
     ) -> None:
         primary_key = self._format_key_column(primary_key)
-        columns = columns or list(pd.read_csv(source, nrows=1).columns)
+        if columns is not None:
+            cols = columns
+        else:
+            with smart_open.open(source, "rb") as src:
+                cols = list(pd.read_csv(src, nrows=1).columns)
         metadata = TableMetadata(
             primary_key=primary_key,
             source=source,
-            columns=columns,
+            columns=cols,
             invented_table_metadata=invented_table_metadata,
             producer_metadata=producer_metadata,
         )
@@ -522,7 +585,7 @@ class RelationalData:
             removal_metadata = self._remove_producer(table)
         else:
             removal_metadata = _RemovedTableMetadata(
-                source=Path(),  # we don't care about the old data
+                source="",  # we don't care about the old data
                 primary_key=self.get_primary_key(table),
                 fks_to_parents=self.get_foreign_keys(table),
                 fks_from_children=self._get_user_defined_fks_to_table(table),
@@ -676,7 +739,7 @@ class RelationalData:
         """
         return self._get_table_metadata(table).primary_key
 
-    def get_table_source(self, table: str) -> Path:
+    def get_table_source(self, table: str) -> str:
         return self._get_table_metadata(table).source
 
     def get_table_data(
@@ -687,7 +750,8 @@ class RelationalData:
         """
         source = self.get_table_source(table)
         usecols = usecols or self.get_table_columns(table)
-        return pd.read_csv(source, usecols=usecols)
+        with smart_open.open(source, "rb") as src:
+            return pd.read_csv(src, usecols=usecols)
 
     def get_table_columns(self, table: str) -> list[str]:
         """

@@ -1,7 +1,5 @@
 import shutil
 
-from pathlib import Path
-
 import smart_open
 
 import gretel_trainer.relational.tasks.common as common
@@ -10,6 +8,7 @@ from gretel_client.projects.jobs import Job
 from gretel_client.projects.models import Model
 from gretel_client.projects.projects import Project
 from gretel_client.projects.records import RecordHandler
+from gretel_trainer.relational.output_handler import OutputHandler
 from gretel_trainer.relational.workflow_state import Classify
 
 
@@ -20,19 +19,19 @@ class ClassifyTask:
         data_sources: dict[str, str],
         all_rows: bool,
         multitable: common._MultiTable,
-        out_dir: Path,
+        output_handler: OutputHandler,
     ):
         self.classify = classify
         self.data_sources = data_sources
         self.all_rows = all_rows
         self.multitable = multitable
-        self.out_dir = out_dir
+        self.output_handler = output_handler
         self.classify_record_handlers: dict[str, RecordHandler] = {}
         self.completed_models = []
         self.failed_models = []
         self.completed_record_handlers = []
         self.failed_record_handlers = []
-        self.result_filepaths: list[Path] = []
+        self.result_filepaths: dict[str, str] = {}
 
     def action(self, job: Job) -> str:
         if self.all_rows:
@@ -149,10 +148,10 @@ class ClassifyTask:
             filename = f"classify_all_rows_{table}.gz"
             artifact_name = "data"
 
-        destpath = self.out_dir / filename
+        destpath = self.output_handler.filepath_for(filename)
 
         with job.get_artifact_handle(artifact_name) as src, smart_open.open(
             str(destpath), "wb"
         ) as dest:
             shutil.copyfileobj(src, dest)
-        self.result_filepaths.append(destpath)
+        self.result_filepaths[table] = destpath

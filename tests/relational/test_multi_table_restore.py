@@ -64,7 +64,6 @@ ARTIFACTS = {
 
 def make_backup(
     rel_data: RelationalData,
-    working_dir: Path,
     artifact_collection: ArtifactCollection,
     transforms_models: dict[str, Mock] = {},
     synthetics_models: dict[str, Mock] = {},
@@ -74,7 +73,6 @@ def make_backup(
         project_name="project_name",
         strategy="independent",
         refresh_interval=60,
-        working_dir=str(working_dir),
         artifact_collection=artifact_collection,
         relational_data=b.BackupRelationalData.from_relational_data(rel_data),
     )
@@ -138,12 +136,16 @@ def create_backup(
 
     backup = make_backup(
         rel_data,
-        working_dir,
         artifact_collection,
         transforms_models,
         synthetics_models,
         synthetics_record_handlers,
     )
+
+    # Clear everything (i.e. original RelationalData source files) from the working directory so that
+    # we start the restore process with the dir containing just the backup file and nothing else.
+    shutil.rmtree(working_dir)
+    working_dir.mkdir(parents=True, exist_ok=True)
     return write_backup(backup, working_dir)
 
 
@@ -327,9 +329,6 @@ def create_standin_project_artifacts(
             tar.add(f"{runtar}.tar.gz", arcname="run-id.tar.gz")
 
 
-# For non-archive files, we patch Project#get_artifact_link to return paths to files
-# in the test setup dir in place of HTTPS links (smart_open can treat these identically).
-# For tar files, though, which require using requests, we patch the entire download_tar_artifact function
 def configure_mocks(
     project: Mock,
     download_tar_artifact: Mock,
@@ -337,13 +336,21 @@ def configure_mocks(
     working_path: Path,
     models: dict[str, Mock] = {},
 ) -> None:
+    # For non-archive files, we patch Project#get_artifact_link to return paths to files
+    # in the test setup dir in place of HTTPS links (smart_open can treat these identically).
     project.get_artifact_link = make_mock_get_artifact_link(setup_path)
     project.get_artifact_handle = make_mock_get_artifact_handle(setup_path)
     project.get_model = make_mock_get_model(models)
+
+    # For tar files, though, which require using requests, we patch the entire download_tar_artifact function
     download_tar_artifact.side_effect = make_mock_download_tar_artifact(
         setup_path,
         working_path,
     )
+
+    # The working directory is always named after the project. In these tests we need the name to
+    # match the working path that we've configured our other mock artifacts and handlers to use.
+    project.name = str(working_path)
 
 
 @pytest.fixture(autouse=True)
@@ -355,9 +362,8 @@ def download_tar_artifact():
 
 
 @pytest.fixture(autouse=True)
-def working_dir():
-    with tempfile.TemporaryDirectory() as working_dir:
-        yield Path(working_dir)
+def working_dir(output_handler):
+    return output_handler._working_dir
 
 
 @pytest.fixture(autouse=True)
@@ -731,7 +737,6 @@ def test_restore_hybrid_run(project, pets, report_json_dict, working_dir):
 
     backup_object = make_backup(
         rel_data=pets,
-        working_dir=working_dir,
         artifact_collection=ArtifactCollection(hybrid=True),
         transforms_models={},
         synthetics_models=synthetics_models,

@@ -11,8 +11,10 @@ import pytest
 
 from sqlalchemy import create_engine
 
+from gretel_trainer.relational.artifacts import ArtifactCollection
 from gretel_trainer.relational.connectors import Connector
 from gretel_trainer.relational.core import RelationalData
+from gretel_trainer.relational.output_handler import SDKOutputHandler
 from gretel_trainer.relational.sdk_extras import ExtendedGretelSDK
 
 EXAMPLE_DBS = Path(__file__).parent.resolve() / "example_dbs"
@@ -52,6 +54,16 @@ def invented_tables(get_invented_table_suffix) -> dict[str, str]:
         "bball_suspensions": f"bball_{get_invented_table_suffix(2)}",
         "bball_teams": f"bball_{get_invented_table_suffix(3)}",
     }
+
+
+@pytest.fixture()
+def output_handler(tmpdir, project):
+    return SDKOutputHandler(
+        workdir=tmpdir,
+        project=project,
+        hybrid=False,
+        artifact_collection=ArtifactCollection(hybrid=False),
+    )
 
 
 @pytest.fixture()

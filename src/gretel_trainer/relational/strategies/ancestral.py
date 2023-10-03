@@ -1,9 +1,9 @@
 import logging
 
-from pathlib import Path
 from typing import Any, Union
 
 import pandas as pd
+import smart_open
 
 import gretel_trainer.relational.ancestry as ancestry
 import gretel_trainer.relational.strategies.common as common
@@ -13,6 +13,7 @@ from gretel_trainer.relational.core import (
     MultiTableException,
     RelationalData,
 )
+from gretel_trainer.relational.output_handler import OutputHandler
 
 logger = logging.getLogger(__name__)
 
@@ -36,8 +37,8 @@ class AncestralStrategy:
         return common.label_encode_keys(rel_data, tables)
 
     def prepare_training_data(
-        self, rel_data: RelationalData, table_paths: dict[str, Path]
-    ) -> dict[str, Path]:
+        self, rel_data: RelationalData, table_paths: dict[str, str]
+    ) -> dict[str, str]:
         """
         Writes tables' training data to provided paths.
         Training data has:
@@ -72,7 +73,8 @@ class AncestralStrategy:
                 tableset=altered_tableset,
                 ancestral_seeding=True,
             )
-            data.to_csv(path, index=False)
+            with smart_open.open(path, "wb") as dest:
+                data.to_csv(dest, index=False)
 
         return table_paths
 
@@ -140,7 +142,8 @@ class AncestralStrategy:
         rel_data: RelationalData,
         record_size_ratio: float,
         output_tables: dict[str, pd.DataFrame],
-        target_dir: Path,
+        subdir: str,
+        output_handler: OutputHandler,
     ) -> dict[str, Any]:
         """
         Returns kwargs for creating a record handler job via the Gretel SDK.
@@ -158,8 +161,11 @@ class AncestralStrategy:
             seed_df = self._build_seed_data_for_table(
                 table, output_tables, rel_data, synth_size
             )
-            seed_path = target_dir / f"synthetics_seed_{table}.csv"
-            seed_df.to_csv(seed_path, index=False)
+            seed_path = output_handler.filepath_for(
+                f"synthetics_seed_{table}.csv", subdir=subdir
+            )
+            with smart_open.open(seed_path, "wb") as dest:
+                seed_df.to_csv(dest, index=False)
             return {"data_source": str(seed_path)}
 
     def _build_seed_data_for_table(

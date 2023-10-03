@@ -1,14 +1,15 @@
 import logging
 import random
 
-from pathlib import Path
 from typing import Any
 
 import pandas as pd
+import smart_open
 
 import gretel_trainer.relational.strategies.common as common
 
 from gretel_trainer.relational.core import GretelModelConfig, RelationalData
+from gretel_trainer.relational.output_handler import OutputHandler
 
 logger = logging.getLogger(__name__)
 
@@ -32,8 +33,8 @@ class IndependentStrategy:
         return common.label_encode_keys(rel_data, tables)
 
     def prepare_training_data(
-        self, rel_data: RelationalData, table_paths: dict[str, Path]
-    ) -> dict[str, Path]:
+        self, rel_data: RelationalData, table_paths: dict[str, str]
+    ) -> dict[str, str]:
         """
         Writes tables' training data to provided paths.
         Training data has primary and foreign key columns removed.
@@ -47,12 +48,13 @@ class IndependentStrategy:
             all_columns = rel_data.get_table_columns(table)
             use_columns = [col for col in all_columns if col not in columns_to_drop]
 
-            pd.DataFrame(columns=use_columns).to_csv(path, index=False)
             source_path = rel_data.get_table_source(table)
-            for chunk in pd.read_csv(
-                source_path, usecols=use_columns, chunksize=10_000
-            ):
-                chunk.to_csv(path, index=False, mode="a", header=False)
+            with smart_open.open(source_path, "rb") as src, smart_open.open(
+                path, "wb"
+            ) as dest:
+                pd.DataFrame(columns=use_columns).to_csv(dest, index=False)
+                for chunk in pd.read_csv(src, usecols=use_columns, chunksize=10_000):
+                    chunk.to_csv(dest, index=False, mode="a", header=False)
 
         return table_paths
 
@@ -101,7 +103,8 @@ class IndependentStrategy:
         rel_data: RelationalData,
         record_size_ratio: float,
         output_tables: dict[str, pd.DataFrame],
-        target_dir: Path,
+        subdir: str,
+        output_handler: OutputHandler,
     ) -> dict[str, Any]:
         """
         Returns kwargs for a record handler job requesting an output record

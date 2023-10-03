@@ -3,7 +3,7 @@ import tempfile
 
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Optional
+from typing import Optional, Union
 
 from gretel_client.projects import Project
 
@@ -57,7 +57,7 @@ class ArtifactCollection:
         return latest
 
 
-def archive_items(targz: Path, items: list[Path]) -> None:
+def archive_items(targz: Path, items: list[Union[str, Path]]) -> None:
     with tempfile.TemporaryDirectory() as tmpdir:
         for item in items:
             shutil.copy(item, tmpdir)

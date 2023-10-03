@@ -399,17 +399,19 @@ def test_table_generation_readiness(ecom):
     )
 
 
-def test_generation_job(pets):
+def test_generation_job(pets, output_handler):
+    def _num_objects_in_run_dir():
+        return len(os.listdir(output_handler._working_dir / "run-id"))
+
     strategy = AncestralStrategy()
+    output_handler.make_subdirectory("run-id")
 
     # Table with no ancestors
-    with tempfile.TemporaryDirectory() as tmp:
-        working_dir = Path(tmp)
-        parent_table_job = strategy.get_generation_job(
-            "humans", pets, 2.0, {}, working_dir
-        )
-        assert len(os.listdir(working_dir)) == 0
-        assert parent_table_job == {"params": {"num_records": 10}}
+    parent_table_job = strategy.get_generation_job(
+        "humans", pets, 2.0, {}, "run-id", output_handler
+    )
+    assert _num_objects_in_run_dir() == 0
+    assert parent_table_job == {"params": {"num_records": 10}}
 
     # Table with ancestors
     synthetic_humans = pd.DataFrame(
@@ -432,15 +434,13 @@ def test_generation_job(pets):
         }
     )
     output_tables = {"humans": synthetic_humans}
-    with tempfile.TemporaryDirectory() as tmp:
-        working_dir = Path(tmp)
-        child_table_job = strategy.get_generation_job(
-            "pets", pets, 2.0, output_tables, working_dir
-        )
+    child_table_job = strategy.get_generation_job(
+        "pets", pets, 2.0, output_tables, "run-id", output_handler
+    )
 
-        assert len(os.listdir(working_dir)) == 1
-        assert set(child_table_job.keys()) == {"data_source"}
-        child_table_seed_df = pd.read_csv(child_table_job["data_source"])
+    assert _num_objects_in_run_dir() == 1
+    assert set(child_table_job.keys()) == {"data_source"}
+    child_table_seed_df = pd.read_csv(child_table_job["data_source"])
 
     # `self.human_id|name` should not be present in seed because it was
     # excluded from training data (highly-unique categorical field)
@@ -468,7 +468,9 @@ def test_generation_job(pets):
     assert set(output_tables["humans"].columns) == {"self|name", "self|city", "self|id"}
 
 
-def test_generation_job_seeds_go_back_multiple_generations(source_nba, synthetic_nba):
+def test_generation_job_seeds_go_back_multiple_generations(
+    source_nba, synthetic_nba, output_handler
+):
     source_nba = source_nba[0]
     synthetic_nba = synthetic_nba[0]
     output_tables = {
@@ -477,17 +479,17 @@ def test_generation_job_seeds_go_back_multiple_generations(source_nba, synthetic
     }
 
     strategy = AncestralStrategy()
+    output_handler.make_subdirectory("run-id")
 
-    with tempfile.TemporaryDirectory() as tmp:
-        working_dir = Path(tmp)
-        job = strategy.get_generation_job(
-            "teams",
-            source_nba,
-            1.0,
-            output_tables,
-            working_dir,
-        )
-        seed_df = pd.read_csv(job["data_source"])
+    job = strategy.get_generation_job(
+        "teams",
+        source_nba,
+        1.0,
+        output_tables,
+        "run-id",
+        output_handler,
+    )
+    seed_df = pd.read_csv(job["data_source"])
 
     expected_seed_df_columns = {
         "self.city_id|id",
