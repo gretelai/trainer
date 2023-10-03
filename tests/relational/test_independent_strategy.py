@@ -3,8 +3,7 @@ import os
 import tempfile
 
 from collections import defaultdict
-from pathlib import Path
-from unittest.mock import Mock, patch
+from unittest.mock import patch
 
 import pandas as pd
 import pandas.testing as pdtest
@@ -21,7 +20,7 @@ def test_preparing_training_data_does_not_mutate_source_data(pets):
 
     with tempfile.NamedTemporaryFile() as pets_dest, tempfile.NamedTemporaryFile() as humans_dest:
         strategy.prepare_training_data(
-            pets, {"pets": Path(pets_dest.name), "humans": Path(humans_dest.name)}
+            pets, {"pets": pets_dest.name, "humans": humans_dest.name}
         )
 
     for table in pets.list_all_tables():
@@ -33,7 +32,7 @@ def test_prepare_training_data_removes_primary_and_foreign_keys(pets):
 
     with tempfile.NamedTemporaryFile() as pets_dest, tempfile.NamedTemporaryFile() as humans_dest:
         training_data = strategy.prepare_training_data(
-            pets, {"pets": Path(pets_dest.name), "humans": Path(humans_dest.name)}
+            pets, {"pets": pets_dest.name, "humans": humans_dest.name}
         )
         train_pets = pd.read_csv(training_data["pets"])
 
@@ -45,7 +44,7 @@ def test_prepare_training_data_subset_of_tables(pets):
 
     with tempfile.NamedTemporaryFile() as pets_dest, tempfile.NamedTemporaryFile() as humans_dest:
         training_data = strategy.prepare_training_data(
-            pets, {"humans": Path(humans_dest.name)}
+            pets, {"humans": humans_dest.name}
         )
         assert not pd.read_csv(training_data["humans"]).empty
         assert os.stat(pets_dest.name).st_size == 0

@@ -1,9 +1,7 @@
-import json
 import os
 import tempfile
 
-from pathlib import Path
-from unittest.mock import Mock, patch
+from unittest.mock import patch
 
 import pandas as pd
 import pandas.testing as pdtest
@@ -24,7 +22,7 @@ def test_preparing_training_data_does_not_mutate_source_data(pets):
 
     with tempfile.NamedTemporaryFile() as pets_dest, tempfile.NamedTemporaryFile() as humans_dest:
         strategy.prepare_training_data(
-            pets, {"pets": Path(pets_dest.name), "humans": Path(humans_dest.name)}
+            pets, {"pets": pets_dest.name, "humans": humans_dest.name}
         )
 
     for table in pets.list_all_tables():
@@ -36,9 +34,7 @@ def test_prepare_training_data_subset_of_tables(pets):
 
     with tempfile.NamedTemporaryFile() as pets_dest, tempfile.NamedTemporaryFile() as humans_dest:
         # We aren't synthesizing the "humans" table, so it is not in this list argument...
-        training_data = strategy.prepare_training_data(
-            pets, {"pets": Path(pets_dest.name)}
-        )
+        training_data = strategy.prepare_training_data(pets, {"pets": pets_dest.name})
 
         train_pets = pd.read_csv(training_data["pets"])
 
@@ -59,7 +55,7 @@ def test_prepare_training_data_returns_multigenerational_data(pets):
 
     with tempfile.NamedTemporaryFile() as pets_dest, tempfile.NamedTemporaryFile() as humans_dest:
         training_data = strategy.prepare_training_data(
-            pets, {"pets": Path(pets_dest.name), "humans": Path(humans_dest.name)}
+            pets, {"pets": pets_dest.name, "humans": humans_dest.name}
         )
         train_pets = pd.read_csv(training_data["pets"])
 
@@ -92,8 +88,8 @@ def test_prepare_training_data_drops_highly_unique_categorical_ancestor_fields(a
         training_data = strategy.prepare_training_data(
             art,
             {
-                "artists": Path(artists_dest.name),
-                "paintings": Path(paintings_dest.name),
+                "artists": artists_dest.name,
+                "paintings": paintings_dest.name,
             },
         )
         train_paintings = pd.read_csv(training_data["paintings"])
@@ -139,8 +135,8 @@ def test_prepare_training_data_drops_highly_nan_ancestor_fields(art):
         training_data = strategy.prepare_training_data(
             art,
             {
-                "artists": Path(artists_dest.name),
-                "paintings": Path(paintings_dest.name),
+                "artists": artists_dest.name,
+                "paintings": paintings_dest.name,
             },
         )
         train_paintings = pd.read_csv(training_data["paintings"])
@@ -163,8 +159,8 @@ def test_prepare_training_data_translates_alphanumeric_keys_and_adds_min_max_rec
         training_data = strategy.prepare_training_data(
             art,
             {
-                "artists": Path(artists_dest.name),
-                "paintings": Path(paintings_dest.name),
+                "artists": artists_dest.name,
+                "paintings": paintings_dest.name,
             },
         )
         train_artists = pd.read_csv(training_data["artists"])
@@ -199,10 +195,10 @@ def test_prepare_training_data_with_composite_keys(tpch):
         training_data = strategy.prepare_training_data(
             tpch,
             {
-                "supplier": Path(supplier_dest.name),
-                "part": Path(part_dest.name),
-                "partsupp": Path(partsupp_dest.name),
-                "lineitem": Path(lineitem_dest.name),
+                "supplier": supplier_dest.name,
+                "part": part_dest.name,
+                "partsupp": partsupp_dest.name,
+                "lineitem": lineitem_dest.name,
             },
         )
 
