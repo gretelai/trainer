@@ -10,12 +10,13 @@ from dataclasses import asdict, dataclass
 from enum import Enum
 from pathlib import Path
 from threading import Lock
+from time import sleep
 from typing import TYPE_CHECKING, Iterator, Optional
 
 import dask.dataframe as dd
 import numpy as np
 import pandas as pd
-from sqlalchemy import MetaData, Table, and_, func, inspect, or_, select, tuple_
+from sqlalchemy import MetaData, Table, and_, func, inspect, or_, select
 
 from gretel_trainer.relational.core import RelationalData
 
@@ -312,9 +313,13 @@ class TableExtractor:
         # actual table contents stored on the Graph. This means that
         # after this runs the `RelationalData` object will not have
         # any relationships that may exist from embedded JSON.
-
-        self._relational_data = self._create_rel_data()
-
+        for i in range(3):
+            try:
+                self._relational_data = self._create_rel_data()
+                break
+            except Exception as e:
+                print(e)
+            sleep(5)
         # Set the table processing order for extraction
         self.table_order = list(
             reversed(self._relational_data.list_tables_parents_before_children())
