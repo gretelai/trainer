@@ -1,6 +1,7 @@
       html,
       body {
         font-size: 16px;
+        color: #25212B;
         margin: 0;
         padding: 0;
         background-color: #fafafa;
@@ -50,12 +51,14 @@
         background-color: #0c0c0d;
       }
       h1 {
+        color: #25212B;
         font-size: 3rem;
         font-weight: 500;
         line-height: 1.2;
         margin-bottom: 0.5em;
       }
       h2 {
+        color: #25212B;
         margin: 0;
         page-break-after: avoid;
       }
