@@ -283,9 +283,12 @@ def _synthesize_foreign_keys(
                 original_table_data, foreign_key.columns
             )
 
-            new_fk_values = _collect_values(
-                synth_pk_values, fk_frequencies, len(out_df)
-            )
+            if len(fk_frequencies) == 0:
+                new_fk_values = [[None] * len(foreign_key.columns)] * len(out_df)
+            else:
+                new_fk_values = _collect_values(
+                    synth_pk_values, fk_frequencies, len(out_df)
+                )
 
             out_df[foreign_key.columns] = new_fk_values
 
