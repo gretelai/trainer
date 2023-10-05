@@ -190,8 +190,14 @@ class AncestralStrategy:
             parent_indices_to_use_as_fks = []
             while len(parent_indices_to_use_as_fks) < synth_size:
                 parent_index_to_use = parent_indices[p]
-                for _ in range(freqs[f]):
-                    parent_indices_to_use_as_fks.append(parent_index_to_use)
+                try:
+                    for _ in range(freqs[f]):
+                        parent_indices_to_use_as_fks.append(parent_index_to_use)
+                except IndexError as e:
+                    logger.warn("Error adding in frequencies", exc_info=e)
+                    logger.warn(f"Freqs: {freqs}")
+                    logger.warn(f"Index: {f}")
+                    break
                 p = _safe_inc(p, parent_indices)
                 f = _safe_inc(f, freqs)
 

@@ -309,10 +309,14 @@ def _collect_values(
     new_values = []
     while len(new_values) < total:
         fk_value = values[v]
-
-        for _ in range(freqs[f]):
-            new_values.append(fk_value)
-
+        try:
+            for _ in range(freqs[f]):
+                new_values.append(fk_value)
+        except IndexError as e:
+            logger.warn("Error adding in frequencies", exc_info=e)
+            logger.warn(f"Freqs: {freqs}")
+            logger.warn(f"Index: {f}")
+            break
         v = _safe_inc(v, values)
         f = _safe_inc(f, freqs)
 
