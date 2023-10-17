@@ -1,11 +1,9 @@
 from dataclasses import dataclass
-from pathlib import Path
 from typing import Optional, Union
 from unittest.mock import Mock, patch
 
 import pandas as pd
 import pandas.testing as pdtest
-import pytest
 
 from gretel_client.projects.jobs import Status
 from gretel_client.projects.projects import Project

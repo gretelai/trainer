@@ -12,7 +12,6 @@ from gretel_client.projects.jobs import Job
 from gretel_client.projects.models import Model
 from gretel_client.projects.projects import Project
 from gretel_trainer.relational.output_handler import OutputHandler
-from gretel_trainer.relational.sdk_extras import ExtendedGretelSDK
 from gretel_trainer.relational.table_evaluation import TableEvaluation
 
 logger = logging.getLogger(__name__)
@@ -89,10 +88,6 @@ class SyntheticsEvaluateTask:
 
         model = self.get_job(table)
         sqs_type, table_name = table.split("-", 1)
-        if sqs_type == "individual":
-            evaluation_to_set = self.evaluations[table_name].individual_report_json
-        else:
-            evaluation_to_set = self.evaluations[table_name].cross_table_report_json
 
         filename_stem = _filename_stem(sqs_type, table_name)
 
@@ -103,10 +98,14 @@ class SyntheticsEvaluateTask:
         json_ok = self.multitable._extended_sdk.download_file_artifact(
             model, "report_json", json_filepath
         )
-        json_data = _read_json_report(model, json_filepath)
-        evaluation_to_set = json_data
         if json_ok:
             self.report_filepaths[table_name][sqs_type]["json"] = json_filepath
+        # Set json data on local evaluations object for use in report
+        json_data = _read_json_report(model, json_filepath)
+        if sqs_type == "individual":
+            self.evaluations[table_name].individual_report_json = json_data
+        else:
+            self.evaluations[table_name].cross_table_report_json = json_data
 
         # HTML
         html_filepath = self.output_handler.filepath_for(
