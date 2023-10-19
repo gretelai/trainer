@@ -201,7 +201,8 @@ def _synthesize_foreign_keys(
     being referenced.
     """
     processed = {}
-    for table_name, synth_data in synth_tables.items():
+    for table_name in rel_data.list_tables_parents_before_children():
+        synth_data = synth_tables.get(table_name)
         out_df = synth_data.copy()
         for foreign_key in rel_data.get_foreign_keys(table_name):
             parent_synth_table = synth_tables.get(foreign_key.parent_table_name)
