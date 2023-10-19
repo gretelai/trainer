@@ -212,6 +212,14 @@ def _synthesize_foreign_keys(
                 # pointers, set the entire column to None.
                 synth_pk_values = [None] * len(foreign_key.parent_columns)
             else:
+                for key in foreign_key.parent_columns:
+                    if key not in parent_synth_table:
+                        logger.error(
+                            "Column %s not found in table %s",
+                            key,
+                            foreign_key.parent_table_name,
+                        )
+                        continue
                 synth_pk_values = parent_synth_table[
                     foreign_key.parent_columns
                 ].values.tolist()
