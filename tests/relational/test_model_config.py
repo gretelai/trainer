@@ -38,6 +38,23 @@ def test_synthetics_config_handles_noncompliant_table_names():
     assert config["name"] == "synthetics-hello__world"
 
 
+def test_transform_requires_valid_config(mutagenesis):
+    with pytest.raises(MultiTableException):
+        make_transform_config(mutagenesis, "atom", "synthetics/amplify")
+
+
+def test_transform_v2_config_is_unaltered(mutagenesis):
+    tv2_config = {
+        "schema_version": "1.0",
+        "name": "original-name",
+        "models": [{"transform_v2": {"some": "Tv2 config"}}],
+    }
+    config = make_transform_config(mutagenesis, "atom", tv2_config)
+    assert config["name"] == "transforms-atom"
+    assert config["schema_version"] == tv2_config["schema_version"]
+    assert config["models"] == tv2_config["models"]
+
+
 def test_transforms_config_prepends_workflow(mutagenesis):
     config = make_transform_config(mutagenesis, "atom", "transform/default")
     assert config["name"] == "transforms-atom"

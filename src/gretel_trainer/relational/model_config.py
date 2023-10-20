@@ -9,6 +9,8 @@ from gretel_trainer.relational.core import (
     RelationalData,
 )
 
+TRANSFORM_MODEL_KEYS = ["transform", "transforms", "transform_v2"]
+
 
 def get_model_key(config_dict: dict[str, Any]) -> Optional[str]:
     try:
@@ -56,20 +58,20 @@ def make_transform_config(
     tailored_config = ingest(config)
     tailored_config["name"] = _model_name("transforms", table)
 
+    model_key, model = next(iter(tailored_config["models"][0].items()))
+
+    # Ensure we have a transform config
+    if model_key not in TRANSFORM_MODEL_KEYS:
+        raise MultiTableException("Invalid transform config")
+
+    # Tv2 configs pass through unaltered (except for name, above)
+    if model_key == "transform_v2":
+        return tailored_config
+
+    # We add a passthrough policy to Tv1 configs to avoid transforming PK/FK columns
     key_columns = rel_data.get_all_key_columns(table)
     if len(key_columns) > 0:
-        try:
-            model = tailored_config["models"][0]
-            try:
-                model_key = "transform"
-                xform = model[model_key]
-            except KeyError:
-                model_key = "transforms"
-                xform = model[model_key]
-            policies = xform["policies"]
-        except KeyError:
-            raise MultiTableException("Invalid transform config")
-
+        policies = model["policies"]
         passthrough_policy = _passthrough_policy(key_columns)
         adjusted_policies = [passthrough_policy] + policies
 
