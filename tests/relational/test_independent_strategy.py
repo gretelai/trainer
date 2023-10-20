@@ -1,4 +1,3 @@
-import json
 import os
 import tempfile
 
@@ -8,6 +7,7 @@ from unittest.mock import patch
 import pandas as pd
 import pandas.testing as pdtest
 
+from gretel_trainer.relational.core import RelationalData
 from gretel_trainer.relational.strategies.independent import IndependentStrategy
 
 
@@ -110,8 +110,7 @@ def test_post_processing_one_to_one(pets):
     }
 
     # Normally we shuffle synthesized keys for realism, but for deterministic testing we sort instead
-    with patch("random.shuffle") as shuffle:
-        shuffle = sorted
+    with patch("random.shuffle", wraps=sorted):
         processed = strategy.post_process_synthetic_results(
             raw_synth_tables, [], pets, 1
         )
@@ -169,3 +168,79 @@ def test_post_processing_foreign_keys_with_skewed_frequencies_and_different_size
     fk_value_counts = sorted(list(fk_value_counts.values()))
 
     assert fk_value_counts == [5, 5, 15, 30, 35, 60]
+
+
+# In this scenario, a table (shipping_notifications) has a FK (customer_id) pointing to
+# a column that is itself a FK but *not* a PK (orders.customer_id).
+# (No, this is not a "perfectly normalized" schema, but it can happen in the wild.)
+# We need to ensure tables have FKs synthesized in parent->child order to avoid blowing up
+# due to missing columns.
+def test_post_processing_fks_to_non_pks(tmpdir):
+    rel_data = RelationalData(directory=tmpdir)
+
+    rel_data.add_table(
+        name="customers",
+        primary_key="id",
+        data=pd.DataFrame(data={"id": [1, 2], "name": ["Xavier", "Yesenia"]}),
+    )
+    rel_data.add_table(
+        name="orders",
+        primary_key="id",
+        data=pd.DataFrame(
+            data={
+                "id": [1, 2],
+                "customer_id": [1, 2],
+                "total": [42, 43],
+            }
+        ),
+    )
+    rel_data.add_table(
+        name="shipping_notifications",
+        primary_key="id",
+        data=pd.DataFrame(
+            data={
+                "id": [1, 2],
+                "order_id": [1, 2],
+                "customer_id": [1, 2],
+                "service": ["FedEx", "USPS"],
+            }
+        ),
+    )
+
+    # Add FKs. The third one is the critical one for this test.
+    rel_data.add_foreign_key_constraint(
+        table="orders",
+        constrained_columns=["customer_id"],
+        referred_table="customers",
+        referred_columns=["id"],
+    )
+    rel_data.add_foreign_key_constraint(
+        table="shipping_notifications",
+        constrained_columns=["order_id"],
+        referred_table="orders",
+        referred_columns=["id"],
+    )
+    rel_data.add_foreign_key_constraint(
+        table="shipping_notifications",
+        constrained_columns=["customer_id"],
+        referred_table="orders",
+        referred_columns=["customer_id"],
+    )
+
+    strategy = IndependentStrategy()
+
+    # This dict is deliberately ordered child->parent for this unit test.
+    # Were it not for logic in the strategy (processing tables in parent->child order),
+    # this setup would cause an exception.
+    raw_synth_tables = {
+        "shipping_notifications": pd.DataFrame(data={"service": ["FedEx", "USPS"]}),
+        "orders": pd.DataFrame(data={"total": [55, 56]}),
+        "customers": pd.DataFrame(data={"name": ["Alice", "Bob"]}),
+    }
+
+    processed = strategy.post_process_synthetic_results(
+        raw_synth_tables, [], rel_data, 1
+    )
+
+    for table in rel_data.list_all_tables():
+        assert set(processed[table].columns) == set(rel_data.get_table_columns(table))

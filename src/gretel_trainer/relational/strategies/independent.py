@@ -201,18 +201,26 @@ def _synthesize_foreign_keys(
     being referenced.
     """
     processed = {}
-    for table_name, synth_data in synth_tables.items():
-        out_df = synth_data.copy()
+    for table_name in rel_data.list_tables_parents_before_children():
+        out_df = synth_tables.get(table_name)
+        if out_df is None:
+            continue
         for foreign_key in rel_data.get_foreign_keys(table_name):
-            parent_synth_table = synth_tables.get(foreign_key.parent_table_name)
+            # We pull the parent from `processed` instead of from `synth_tables` because "this" table
+            # (`table_name` / `out_df`) may have a FK pointing to a parent column that _is itself_ a FK to some third table.
+            # We want to ensure the synthetic values we're using to populate "this" table's FK column are
+            # the final output values we've produced for its parent table.
+            # We are synthesizing foreign keys in parent->child order, so the parent table
+            # should(*) already exist in the processed dict with its final synthetic values...
+            parent_synth_table = processed.get(foreign_key.parent_table_name)
             if parent_synth_table is None:
-                # Parent table generation job may have failed and therefore not be present in synth_tables.
-                # The synthetic data for this table may still be useful, but we do not have valid synthetic
-                # primary key values to set in this table's foreign key column. Instead of introducing dangling
+                # (*)...BUT the parent table generation job may have failed and therefore not be present in either `processed` or `synth_tables`.
+                # The synthetic data for "this" table may still be useful, but we do not have valid/any synthetic
+                # values from the parent to set in "this" table's foreign key column. Instead of introducing dangling
                 # pointers, set the entire column to None.
-                synth_pk_values = [None] * len(foreign_key.parent_columns)
+                synth_parent_values = [None] * len(foreign_key.parent_columns)
             else:
-                synth_pk_values = parent_synth_table[
+                synth_parent_values = parent_synth_table[
                     foreign_key.parent_columns
                 ].values.tolist()
 
@@ -222,7 +230,7 @@ def _synthesize_foreign_keys(
             )
 
             new_fk_values = _collect_values(
-                synth_pk_values, fk_frequencies, len(out_df)
+                synth_parent_values, fk_frequencies, len(out_df)
             )
 
             out_df[foreign_key.columns] = new_fk_values
