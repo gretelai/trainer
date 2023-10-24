@@ -324,42 +324,6 @@ def test_custom_gretel_model_configs_do_not_overwrite_each_other(
     assert set(model_names) == {"SharedDictLstm-iris", "SharedDictLstm-pets"}
 
 
-def test_gptx_skips_too_many_columns(working_dir, project):
-    two_columns = pd.DataFrame(
-        data={"english": ["hello", "world"], "spanish": ["hola", "mundo"]}
-    )
-    dataset = create_dataset(
-        two_columns, datatype=Datatype.NATURAL_LANGUAGE, name="skippy"
-    )
-
-    session = compare(
-        datasets=[dataset],
-        models=[GretelGPTX],
-        config=BenchmarkConfig(
-            working_dir=working_dir,
-        ),
-    ).wait()
-
-    assert len(session.results) == 1
-    assert_is_skipped(session.results.iloc[0])
-
-
-def test_gptx_skips_non_natural_language_datatype(working_dir, project):
-    tabular = pd.DataFrame(data={"foo": [1, 2, 3]})
-    dataset = create_dataset(tabular, datatype=Datatype.TABULAR, name="skippy")
-
-    session = compare(
-        datasets=[dataset],
-        models=[GretelGPTX],
-        config=BenchmarkConfig(
-            working_dir=working_dir,
-        ),
-    ).wait()
-
-    assert len(session.results) == 1
-    assert_is_skipped(session.results.iloc[0])
-
-
 def test_lstm_skips_datasets_with_over_150_columns(working_dir, project):
     jumbo = pd.DataFrame(columns=list(range(151)))
     dataset = create_dataset(jumbo, datatype=Datatype.TABULAR, name="skippy")

@@ -51,11 +51,6 @@ class GretelModel:
     def runnable(self, dataset: Dataset) -> bool:
         if self.model_key == "synthetics":
             return dataset.column_count <= 150
-        elif self.model_key == "gpt_x":
-            return (
-                dataset.column_count == 1
-                and dataset.datatype == Datatype.NATURAL_LANGUAGE
-            )
         else:
             return True
 
@@ -85,6 +80,10 @@ class GretelGPTX(GretelModel):
 
 class GretelDGAN(GretelModel):
     config = "synthetics/time-series"
+
+
+class GretelTabularDP(GretelModel):
+    config = "synthetics/tabular-differential-privacy"
 
 
 class _GretelModelWithOverrides(GretelModel):
