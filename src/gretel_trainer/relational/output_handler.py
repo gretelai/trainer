@@ -72,7 +72,7 @@ class OutputHandler(Protocol):
         self,
         tables: dict[str, str],
         table_reports: dict[str, dict[str, dict[str, str]]],
-        relational_report: str,
+        relational_report: Optional[str],
         run_subdir: str,
     ) -> None:
         """
@@ -211,7 +211,7 @@ class SDKOutputHandler:
         self,
         tables: dict[str, str],
         table_reports: dict[str, dict[str, dict[str, str]]],
-        relational_report: str,
+        relational_report: Optional[str],
         run_subdir: str,
     ) -> None:
         """

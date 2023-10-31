@@ -28,6 +28,7 @@ import pandas as pd
 import smart_open
 
 from networkx.algorithms.dag import dag_longest_path_length, topological_sort
+from networkx.classes.function import number_of_edges
 from pandas.api.types import is_string_dtype
 
 import gretel_trainer.relational.json as relational_json
@@ -819,6 +820,9 @@ class RelationalData:
         for fk in self.get_foreign_keys(table):
             all_key_cols.extend(fk.columns)
         return sorted(list(set(all_key_cols)))
+
+    def any_table_relationships(self) -> bool:
+        return number_of_edges(self.graph) > 0
 
     def debug_summary(self) -> dict[str, Any]:
         max_depth = dag_longest_path_length(self.graph)

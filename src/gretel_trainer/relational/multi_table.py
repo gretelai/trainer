@@ -943,14 +943,16 @@ class MultiTable:
 
         evaluate_project.delete()
 
-        logger.info("Creating relational report")
-        relational_report_filepath = self._output_handler.filepath_for(
-            "relational_report.html", subdir=run_subdir
-        )
-        self.create_relational_report(
-            run_identifier=self._synthetics_run.identifier,
-            filepath=relational_report_filepath,
-        )
+        relational_report_filepath = None
+        if self.relational_data.any_table_relationships():
+            logger.info("Creating relational report")
+            relational_report_filepath = self._output_handler.filepath_for(
+                "relational_report.html", subdir=run_subdir
+            )
+            self.create_relational_report(
+                run_identifier=self._synthetics_run.identifier,
+                filepath=relational_report_filepath,
+            )
 
         self._output_handler.save_synthetics_outputs(
             tables=synthetic_table_filepaths,
