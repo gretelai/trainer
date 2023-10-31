@@ -890,9 +890,6 @@ class MultiTable:
                 )
             synthetic_table_filepaths[table] = synth_csv_path
 
-        evaluate_project = create_project(
-            display_name=f"evaluate-{self._project.display_name}"
-        )
         individual_evaluate_models = {}
         cross_table_evaluate_models = {}
         for table, synth_df in output_tables.items():
@@ -910,7 +907,7 @@ class MultiTable:
                 table=table,
                 synthetic_tables=output_tables,
             )
-            individual_sqs_job = evaluate_project.create_model_obj(
+            individual_sqs_job = self._project.create_model_obj(
                 model_config=make_evaluate_config(table, "individual"),
                 data_source=individual_data["synthetic"],
                 ref_data=individual_data["source"],
@@ -923,7 +920,7 @@ class MultiTable:
                 synthetic_tables=output_tables,
             )
             if cross_table_data is not None:
-                cross_table_sqs_job = evaluate_project.create_model_obj(
+                cross_table_sqs_job = self._project.create_model_obj(
                     model_config=make_evaluate_config(table, "cross_table"),
                     data_source=cross_table_data["synthetic"],
                     ref_data=cross_table_data["source"],
@@ -933,15 +930,13 @@ class MultiTable:
         synthetics_evaluate_task = SyntheticsEvaluateTask(
             individual_evaluate_models=individual_evaluate_models,
             cross_table_evaluate_models=cross_table_evaluate_models,
-            project=evaluate_project,
+            project=self._project,
             subdir=run_subdir,
             output_handler=self._output_handler,
             evaluations=self._evaluations,
             multitable=self,
         )
         run_task(synthetics_evaluate_task, self._extended_sdk)
-
-        evaluate_project.delete()
 
         relational_report_filepath = None
         if self.relational_data.any_table_relationships():

@@ -42,7 +42,7 @@ def make_classify_config(table: str, config: GretelModelConfig) -> dict[str, Any
 
 def make_evaluate_config(table: str, sqs_type: str) -> dict[str, Any]:
     tailored_config = ingest("evaluate/default")
-    tailored_config["name"] = _model_name(sqs_type, table)
+    tailored_config["name"] = f"evaluate-{_model_name(sqs_type, table)}"
     return tailored_config
 
 

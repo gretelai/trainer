@@ -25,7 +25,7 @@ def test_get_model_key():
 
 def test_evaluate_config_prepends_evaluation_type():
     config = make_evaluate_config("users", "individual")
-    assert config["name"] == "individual-users"
+    assert config["name"] == "evaluate-individual-users"
 
 
 def test_synthetics_config_prepends_workflow():
