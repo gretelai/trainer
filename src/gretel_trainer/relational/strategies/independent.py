@@ -8,7 +8,7 @@ import smart_open
 
 import gretel_trainer.relational.strategies.common as common
 
-from gretel_trainer.relational.core import GretelModelConfig, RelationalData
+from gretel_trainer.relational.core import ForeignKey, GretelModelConfig, RelationalData
 from gretel_trainer.relational.output_handler import OutputHandler
 
 logger = logging.getLogger(__name__)
@@ -225,12 +225,12 @@ def _synthesize_foreign_keys(
                 ].values.tolist()
 
             original_table_data = rel_data.get_table_data(table_name)
-            fk_frequencies = common.get_frequencies(
+            fk_frequency_data = common.FrequencyData.for_columns(
                 original_table_data, foreign_key.columns
             )
 
-            new_fk_values = _collect_values(
-                synth_parent_values, fk_frequencies, len(out_df)
+            new_fk_values = _collect_fk_values(
+                synth_parent_values, fk_frequency_data, len(out_df), foreign_key
             )
 
             out_df[foreign_key.columns] = new_fk_values
@@ -240,10 +240,51 @@ def _synthesize_foreign_keys(
     return processed
 
 
+def _collect_fk_values(
+    values: list,
+    freq_data: common.FrequencyData,
+    total: int,
+    foreign_key: ForeignKey,
+) -> list:
+    # Support for and restrictions on null values in composite foreign keys varies
+    # across database dialects. The simplest and safest thing to do here is
+    # exclusively produce composite foreign key values that contain no NULLs.
+    if foreign_key.is_composite():
+        return _collect_values(values, freq_data.not_null_frequencies, total, [])
+
+    # Here, the foreign key is a single column. Start by adding an appropriate
+    # amount of NULL values.
+    num_nulls = round(freq_data.null_percentages[0] * total)
+    new_values = [(None,)] * num_nulls
+
+    # Dedupe repeated values and discard None if present.
+    # 1. Duplicates should not exist, because foreign keys are required to reference
+    # columns with unique values. If the referred column is a PRIMARY KEY, there
+    # *will not* be duplicates given how we synthesize primary keys. However, the
+    # foreign key could be referencing a non-PK column with a UNIQUE constraint;
+    # in that case, our model will not have known about the UNIQUE consraint and
+    # may have produced non-unique values.
+    # 2. Nulls are already accounted for above; we don't want to synthesize more.
+    def _unique_not_null_values(values: list) -> list:
+        unique_values = {tuple(v) for v in values}
+        unique_values.discard((None,))
+        return list(unique_values)
+
+    # Collect final output values by adding non-null values to `new_values`
+    # (which has the requisite number of nulls already).
+    return _collect_values(
+        _unique_not_null_values(values),
+        freq_data.not_null_frequencies,
+        total,
+        new_values,
+    )
+
+
 def _collect_values(
     values: list,
     frequencies: list[int],
     total: int,
+    new_values: list,
 ) -> list:
     freqs = sorted(frequencies)
 
@@ -252,7 +293,6 @@ def _collect_values(
     # to the output collection
     v = 0
     f = 0
-    new_values = []
     while len(new_values) < total:
         fk_value = values[v]
 

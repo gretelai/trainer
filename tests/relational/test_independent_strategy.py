@@ -244,3 +244,125 @@ def test_post_processing_fks_to_non_pks(tmpdir):
 
     for table in rel_data.list_all_tables():
         assert set(processed[table].columns) == set(rel_data.get_table_columns(table))
+
+
+def test_post_processing_null_foreign_key(tmpdir):
+    rel_data = RelationalData(directory=tmpdir)
+
+    rel_data.add_table(
+        name="customers",
+        primary_key="id",
+        data=pd.DataFrame(data={"id": [1, 2], "name": ["Xavier", "Yesenia"]}),
+    )
+    rel_data.add_table(
+        name="events",
+        primary_key="id",
+        data=pd.DataFrame(
+            data={
+                "id": [1, 2],
+                "customer_id": [1, None],
+                "total": [42, 43],
+            }
+        ),
+    )
+    rel_data.add_foreign_key_constraint(
+        table="events",
+        constrained_columns=["customer_id"],
+        referred_table="customers",
+        referred_columns=["id"],
+    )
+
+    strategy = IndependentStrategy()
+
+    raw_synth_tables = {
+        "events": pd.DataFrame(data={"total": [55, 56, 57, 58]}),
+        "customers": pd.DataFrame(
+            data={"name": ["Alice", "Bob", "Christina", "David"]}
+        ),
+    }
+
+    # Patch shuffle for deterministic testing, but don't swap in `sorted`
+    # because that function doesn't cooperate with `None` (raises TypeError)
+    with patch("random.shuffle", wraps=lambda x: x):
+        processed = strategy.post_process_synthetic_results(
+            raw_synth_tables, [], rel_data, 2
+        )
+
+    # Given 50% of source FKs are null and record_size_ratio=2,
+    # we expect 2/4 customer_ids to be null
+    pdtest.assert_frame_equal(
+        processed["events"],
+        pd.DataFrame(
+            data={
+                "total": [55, 56, 57, 58],
+                "id": [0, 1, 2, 3],
+                "customer_id": [None, None, 0, 1],
+            }
+        ),
+    )
+
+
+def test_post_processing_null_composite_foreign_key(tmpdir):
+    rel_data = RelationalData(directory=tmpdir)
+
+    rel_data.add_table(
+        name="customers",
+        primary_key="id",
+        data=pd.DataFrame(
+            data={
+                "id": [1, 2],
+                "first": ["Albert", "Betsy"],
+                "last": ["Anderson", "Bond"],
+            }
+        ),
+    )
+    rel_data.add_table(
+        name="events",
+        primary_key="id",
+        data=pd.DataFrame(
+            data={
+                "id": [1, 2, 3, 4, 5],
+                "customer_first": ["Albert", "Betsy", None, "Betsy", None],
+                "customer_last": ["Anderson", "Bond", None, None, "Bond"],
+                "total": [42, 43, 44, 45, 46],
+            }
+        ),
+    )
+    rel_data.add_foreign_key_constraint(
+        table="events",
+        constrained_columns=["customer_first", "customer_last"],
+        referred_table="customers",
+        referred_columns=["first", "last"],
+    )
+
+    strategy = IndependentStrategy()
+
+    raw_synth_tables = {
+        "events": pd.DataFrame(data={"total": [55, 56, 57, 58, 59]}),
+        "customers": pd.DataFrame(
+            data={
+                "first": ["Herbert", "Isabella", "Jack", "Kevin", "Louise"],
+                "last": ["Hoover", "Irvin", "Johnson", "Knight", "Lane"],
+            }
+        ),
+    }
+
+    # Patch shuffle for deterministic testing
+    with patch("random.shuffle", wraps=sorted):
+        processed = strategy.post_process_synthetic_results(
+            raw_synth_tables, [], rel_data, 1
+        )
+
+    # We do not create composite foreign key values with nulls,
+    # even if some existed in the source data.
+    pdtest.assert_frame_equal(
+        processed["events"],
+        pd.DataFrame(
+            data={
+                "total": [55, 56, 57, 58, 59],
+                "id": [0, 1, 2, 3, 4],
+                "customer_first": ["Herbert", "Isabella", "Jack", "Kevin", "Louise"],
+                "customer_last": ["Hoover", "Irvin", "Johnson", "Knight", "Lane"],
+            }
+        ),
+    )

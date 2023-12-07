@@ -1,6 +1,7 @@
 import logging
 import random
 
+from dataclasses import dataclass
 from typing import Optional
 
 import pandas as pd
@@ -177,3 +178,30 @@ def _get_most_unique_column(pk: list[str], col_freqs: dict[str, list]) -> str:
 
 def get_frequencies(table_data: pd.DataFrame, cols: list[str]) -> list[int]:
     return list(table_data.groupby(cols).size().reset_index()[0])
+
+
+# Frequency metadata for a list of columns (typically a foreign key).
+#
+# Example: pd.DataFrame(data={
+#   "col_1": ["a", "a", "b"],
+#   "col_2": [100, 100, None],
+# })
+#
+# null_percentages: [0.0, 0.33333]
+#   (col_1 has no null values; col_2 is 1/3 null)
+# not_null_frequencies: [2]
+#   (["a", 100] occurs twice; there are no other non-null values)
+@dataclass
+class FrequencyData:
+    null_percentages: list[float]
+    not_null_frequencies: list[int]
+
+    @classmethod
+    def for_columns(cls, table_data: pd.DataFrame, cols: list[str]):
+        null_percentages = (table_data[cols].isnull().sum() / len(table_data)).tolist()
+        not_null_frequencies = table_data.groupby(cols).size().tolist()
+
+        return FrequencyData(
+            null_percentages=null_percentages,
+            not_null_frequencies=not_null_frequencies,
+        )

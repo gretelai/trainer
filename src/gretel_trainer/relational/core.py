@@ -59,6 +59,9 @@ class ForeignKey:
     parent_table_name: str
     parent_columns: list[str]
 
+    def is_composite(self) -> bool:
+        return len(self.columns) > 1
+
 
 UserFriendlyDataT = Union[pd.DataFrame, str, Path]
 UserFriendlyPrimaryKeyT = Optional[Union[str, list[str]]]
