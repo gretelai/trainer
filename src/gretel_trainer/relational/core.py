@@ -27,6 +27,7 @@ import networkx
 import pandas as pd
 import smart_open
 
+from networkx.algorithms.cycles import simple_cycles
 from networkx.algorithms.dag import dag_longest_path_length, topological_sort
 from networkx.classes.function import number_of_edges
 from pandas.api.types import is_string_dtype
@@ -201,6 +202,13 @@ class RelationalData:
         any table information.
         """
         return not self.graph.number_of_nodes() > 0
+
+    @property
+    def foreign_key_cycles(self) -> list[list[str]]:
+        """
+        Returns lists of tables that have cyclic foreign key relationships.
+        """
+        return list(simple_cycles(self.graph))
 
     def restore(self, tableset: dict[str, pd.DataFrame]) -> dict[str, pd.DataFrame]:
         """Restores a given tableset (presumably output from some MultiTable workflow,
@@ -828,7 +836,10 @@ class RelationalData:
         return number_of_edges(self.graph) > 0
 
     def debug_summary(self) -> dict[str, Any]:
-        max_depth = dag_longest_path_length(self.graph)
+        if len(self.foreign_key_cycles) > 0:
+            max_depth = "indeterminate (cycles in foreign keys)"
+        else:
+            max_depth = dag_longest_path_length(self.graph)
         public_table_count = len(self.list_all_tables(Scope.PUBLIC))
         invented_table_count = len(self.list_all_tables(Scope.INVENTED))
 

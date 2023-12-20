@@ -108,6 +108,13 @@ class MultiTable:
                 "or set `project` to run in an existing project."
             )
 
+        if len(cycles := relational_data.foreign_key_cycles) > 0:
+            logger.warning(
+                f"Detected cyclic foreign key relationships in schema: {cycles}. "
+                "Support for cyclic table dependencies is limited. "
+                "You may need to remove some foreign keys to ensure no cycles exist."
+            )
+
         self._strategy = _validate_strategy(strategy)
         self._set_refresh_interval(refresh_interval)
         self.relational_data = relational_data
@@ -611,6 +618,11 @@ class MultiTable:
                 an additional level of privacy at the cost of referential integrity between transformed and
                 original data.
         """
+        if encode_keys and len(self.relational_data.foreign_key_cycles) > 0:
+            raise MultiTableException(
+                "Cannot encode keys when schema includes cyclic foreign key relationships."
+            )
+
         if data is not None:
             unrunnable_tables = [
                 table
@@ -735,6 +747,11 @@ class MultiTable:
         Train synthetic data models for the tables in the tableset,
         optionally scoped by either `only` or `ignore`.
         """
+        if len(self.relational_data.foreign_key_cycles) > 0:
+            raise MultiTableException(
+                "Cyclic foreign key relationships are not supported by relational synthetics."
+            )
+
         if config is None:
             config = self._strategy.default_config
 

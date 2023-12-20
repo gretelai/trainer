@@ -193,6 +193,31 @@ def test_list_tables_parents_before_children(ecom):
     assert in_order(tables, "users", "order_items")
 
 
+def test_detect_cycles(ecom):
+    assert ecom.foreign_key_cycles == []
+
+    ecom.add_foreign_key_constraint(
+        table="users",
+        constrained_columns=["first_name"],
+        referred_table="users",
+        referred_columns=["last_name"],
+    )
+    ecom.debug_summary()
+
+    assert ecom.foreign_key_cycles == [["users"]]
+    assert "indeterminate" in ecom.debug_summary()["max_depth"]
+
+    ecom.add_foreign_key_constraint(
+        table="users",
+        constrained_columns=["first_name"],
+        referred_table="events",
+        referred_columns=["user_id"],
+    )
+
+    sorted_cycles = sorted([sorted(cycle) for cycle in ecom.foreign_key_cycles])
+    assert sorted_cycles == [["events", "users"], ["users"]]
+
+
 def test_debug_summary(ecom, mutagenesis):
     assert ecom.debug_summary() == {
         "foreign_key_count": 6,
