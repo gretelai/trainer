@@ -4,10 +4,10 @@ import random
 from typing import Any
 
 import pandas as pd
-import smart_open
 
 import gretel_trainer.relational.strategies.common as common
 
+from gretel_client.projects.artifact_handlers import open_artifact
 from gretel_trainer.relational.core import ForeignKey, GretelModelConfig, RelationalData
 from gretel_trainer.relational.output_handler import OutputHandler
 
@@ -49,7 +49,7 @@ class IndependentStrategy:
             use_columns = [col for col in all_columns if col not in columns_to_drop]
 
             source_path = rel_data.get_table_source(table)
-            with smart_open.open(source_path, "rb") as src, smart_open.open(
+            with open_artifact(source_path, "rb") as src, open_artifact(
                 path, "wb"
             ) as dest:
                 pd.DataFrame(columns=use_columns).to_csv(dest, index=False)

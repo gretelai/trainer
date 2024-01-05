@@ -7,8 +7,8 @@ from typing import Any, Optional, Union
 
 import pandas as pd
 import requests
-import smart_open
 
+from gretel_client.projects.artifact_handlers import open_artifact
 from gretel_client.projects.jobs import Job, Status
 from gretel_client.projects.models import Model
 from gretel_client.projects.projects import Project
@@ -57,9 +57,9 @@ class ExtendedGretelSDK:
         out_path: Union[str, Path],
     ) -> bool:
         try:
-            with gretel_object.get_artifact_handle(
-                artifact_name
-            ) as src, smart_open.open(out_path, "wb") as dest:
+            with gretel_object.get_artifact_handle(artifact_name) as src, open_artifact(
+                out_path, "wb"
+            ) as dest:
                 shutil.copyfileobj(src, dest)
             return True
         except:
@@ -73,7 +73,7 @@ class ExtendedGretelSDK:
         try:
             response = requests.get(download_link)
             if response.status_code == 200:
-                with smart_open.open(out_path, "wb") as out:
+                with open_artifact(out_path, "wb") as out:
                     out.write(response.content)
         except:
             logger.warning(f"Failed to download `{artifact_name}`")

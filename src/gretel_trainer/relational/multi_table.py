@@ -25,6 +25,7 @@ import gretel_trainer.relational.ancestry as ancestry
 
 from gretel_client.config import get_session_config, RunnerMode
 from gretel_client.projects import create_project, get_project, Project
+from gretel_client.projects.artifact_handlers import open_artifact
 from gretel_client.projects.jobs import ACTIVE_STATES, END_STATES, Status
 from gretel_client.projects.records import RecordHandler
 from gretel_trainer.relational.artifacts import ArtifactCollection
@@ -651,7 +652,7 @@ class MultiTable:
             if isinstance(data_source, pd.DataFrame):
                 data_source.to_csv(transforms_run_path, index=False)
             else:
-                with smart_open.open(data_source, "rb") as src, smart_open.open(
+                with open_artifact(data_source, "rb") as src, open_artifact(
                     transforms_run_path, "wb"
                 ) as dest:
                     shutil.copyfileobj(src, dest)
@@ -690,7 +691,10 @@ class MultiTable:
         for table, df in reshaped_tables.items():
             filename = f"transformed_{table}.csv"
             out_path = self._output_handler.filepath_for(filename, subdir=run_subdir)
-            with smart_open.open(out_path, "wb") as dest:
+            with open_artifact(
+                out_path,
+                "wb",
+            ) as dest:
                 df.to_csv(
                     dest,
                     index=False,
@@ -899,7 +903,7 @@ class MultiTable:
             synth_csv_path = self._output_handler.filepath_for(
                 f"synth_{table}.csv", subdir=run_subdir
             )
-            with smart_open.open(synth_csv_path, "wb") as dest:
+            with open_artifact(synth_csv_path, "wb") as dest:
                 synth_df.to_csv(
                     dest,
                     index=False,
@@ -1042,7 +1046,7 @@ class MultiTable:
             now=datetime.utcnow(),
             run_identifier=run_identifier,
         )
-        with smart_open.open(filepath, "w") as report:
+        with open_artifact(filepath, "w") as report:
             html_content = ReportRenderer().render(presenter)
             report.write(html_content)
 
@@ -1054,8 +1058,8 @@ class MultiTable:
             f"synthetics_cross_table_evaluation_{table}.json", subdir=run_id
         )
 
-        individual_report_json = json.loads(smart_open.open(individual_path).read())
-        cross_table_report_json = json.loads(smart_open.open(cross_table_path).read())
+        individual_report_json = json.loads(open_artifact(individual_path).read())
+        cross_table_report_json = json.loads(open_artifact(cross_table_path).read())
 
         self._evaluations[table].individual_report_json = individual_report_json
         self._evaluations[table].cross_table_report_json = cross_table_report_json

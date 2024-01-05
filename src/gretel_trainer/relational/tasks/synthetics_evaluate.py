@@ -8,6 +8,7 @@ import smart_open
 
 import gretel_trainer.relational.tasks.common as common
 
+from gretel_client.projects.artifact_handlers import open_artifact
 from gretel_client.projects.jobs import Job
 from gretel_client.projects.models import Model
 from gretel_client.projects.projects import Project
@@ -144,7 +145,7 @@ def _read_json_report(model: Model, json_report_filepath: str) -> Optional[dict]
     also fails, log a warning and give up gracefully.
     """
     try:
-        return json.loads(smart_open.open(json_report_filepath).read())
+        return json.loads(open_artifact(json_report_filepath).read())
     except:
         try:
             with model.get_artifact_handle("report_json") as report:

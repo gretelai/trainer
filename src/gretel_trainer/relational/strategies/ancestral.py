@@ -3,11 +3,11 @@ import logging
 from typing import Any, Union
 
 import pandas as pd
-import smart_open
 
 import gretel_trainer.relational.ancestry as ancestry
 import gretel_trainer.relational.strategies.common as common
 
+from gretel_client.projects.artifact_handlers import open_artifact
 from gretel_trainer.relational.core import (
     GretelModelConfig,
     MultiTableException,
@@ -73,7 +73,7 @@ class AncestralStrategy:
                 tableset=altered_tableset,
                 ancestral_seeding=True,
             )
-            with smart_open.open(path, "wb") as dest:
+            with open_artifact(path, "wb") as dest:
                 data.to_csv(dest, index=False)
 
         return table_paths
@@ -164,7 +164,7 @@ class AncestralStrategy:
             seed_path = output_handler.filepath_for(
                 f"synthetics_seed_{table}.csv", subdir=subdir
             )
-            with smart_open.open(seed_path, "wb") as dest:
+            with open_artifact(seed_path, "wb") as dest:
                 seed_df.to_csv(dest, index=False)
             return {"data_source": str(seed_path)}
 

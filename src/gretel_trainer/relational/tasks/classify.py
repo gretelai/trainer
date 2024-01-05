@@ -1,9 +1,8 @@
 import shutil
 
-import smart_open
-
 import gretel_trainer.relational.tasks.common as common
 
+from gretel_client.projects.artifact_handlers import open_artifact
 from gretel_client.projects.jobs import Job
 from gretel_client.projects.models import Model
 from gretel_client.projects.projects import Project
@@ -150,7 +149,7 @@ class ClassifyTask:
 
         destpath = self.output_handler.filepath_for(filename)
 
-        with job.get_artifact_handle(artifact_name) as src, smart_open.open(
+        with job.get_artifact_handle(artifact_name) as src, open_artifact(
             str(destpath), "wb"
         ) as dest:
             shutil.copyfileobj(src, dest)

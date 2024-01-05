@@ -25,7 +25,6 @@ from typing import Any, Optional, Protocol, Union
 
 import networkx
 import pandas as pd
-import smart_open
 
 from networkx.algorithms.cycles import simple_cycles
 from networkx.algorithms.dag import dag_longest_path_length, topological_sort
@@ -34,6 +33,7 @@ from pandas.api.types import is_string_dtype
 
 import gretel_trainer.relational.json as relational_json
 
+from gretel_client.projects.artifact_handlers import open_artifact
 from gretel_trainer.relational.json import (
     IngestResponseT,
     InventedTableMetadata,
@@ -273,7 +273,7 @@ class RelationalData:
             preview_df = data.head(PREVIEW_ROW_COUNT)
         elif isinstance(data, (str, Path)):
             data_location = self.source_data_handler.resolve_data_location(data)
-            with smart_open.open(data_location, "rb") as d:
+            with open_artifact(data_location, "rb") as d:
                 preview_df = pd.read_csv(d, nrows=PREVIEW_ROW_COUNT)
         columns = list(preview_df.columns)
         json_cols = relational_json.get_json_columns(preview_df)
@@ -293,7 +293,7 @@ class RelationalData:
             if isinstance(data, pd.DataFrame):
                 df = data
             elif isinstance(data, (str, Path)):
-                with smart_open.open(data, "rb") as d:
+                with open_artifact(data, "rb") as d:
                     df = pd.read_csv(d)
             rj_ingest = relational_json.ingest(name, primary_key, df, json_cols)
 
@@ -359,7 +359,7 @@ class RelationalData:
         if columns is not None:
             cols = columns
         else:
-            with smart_open.open(source, "rb") as src:
+            with open_artifact(source, "rb") as src:
                 cols = list(pd.read_csv(src, nrows=1).columns)
         metadata = TableMetadata(
             primary_key=primary_key,
@@ -762,7 +762,7 @@ class RelationalData:
         """
         source = self.get_table_source(table)
         usecols = usecols or self.get_table_columns(table)
-        with smart_open.open(source, "rb") as src:
+        with open_artifact(source, "rb") as src:
             return pd.read_csv(src, usecols=usecols)
 
     def get_table_columns(self, table: str) -> list[str]:
