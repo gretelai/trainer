@@ -19,6 +19,7 @@ class TransformsTrain:
 class SyntheticsTrain:
     models: dict[str, Model] = field(default_factory=dict)
     lost_contact: list[str] = field(default_factory=list)
+    bypass: list[str] = field(default_factory=list)
 
 
 @dataclass

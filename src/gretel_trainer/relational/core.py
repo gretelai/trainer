@@ -771,6 +771,14 @@ class RelationalData:
         """
         return self._get_table_metadata(table).columns
 
+    def get_table_row_count(self, table: str) -> int:
+        """
+        Return the number of rows in the table.
+        """
+        source = self.get_table_source(table)
+        with open_artifact(source, "rb") as src:
+            return sum(1 for line in src) - 1
+
     def get_safe_ancestral_seed_columns(self, table: str) -> set[str]:
         safe_columns = self._get_table_metadata(table).safe_ancestral_seed_columns
         if safe_columns is None:

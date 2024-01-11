@@ -38,6 +38,16 @@ class SyntheticsRunTask:
         all_tables = self.multitable.relational_data.list_all_tables()
 
         for table in all_tables:
+            if table in self.synthetics_train.bypass:
+                source_row_count = self.multitable.relational_data.get_table_row_count(
+                    table
+                )
+                out_row_count = int(
+                    source_row_count * self.synthetics_run.record_size_ratio
+                )
+                working_tables[table] = pd.DataFrame(index=range(out_row_count))
+                continue
+
             model = self.synthetics_train.models.get(table)
 
             # Table was either omitted from training or marked as to-be-preserved during generation
@@ -45,10 +55,12 @@ class SyntheticsRunTask:
                 working_tables[table] = self.multitable._strategy.get_preserved_data(
                     table, self.multitable.relational_data
                 )
+                continue
 
             # Table was included in training, but failed at that step
-            elif model.status != Status.COMPLETED:
+            if model.status != Status.COMPLETED:
                 working_tables[table] = None
+                continue
 
         return working_tables
 

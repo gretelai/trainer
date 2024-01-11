@@ -43,6 +43,11 @@ def test_mutagenesis_relational_data(mutagenesis):
     assert set(mutagenesis.get_all_key_columns("atom")) == {"atom_id", "molecule_id"}
 
 
+def test_row_count(art):
+    assert art.get_table_row_count("artists") == 4
+    assert art.get_table_row_count("paintings") == 7
+
+
 def test_column_metadata(pets, tmpfile):
     assert pets.get_table_columns("humans") == ["id", "name", "city"]
 

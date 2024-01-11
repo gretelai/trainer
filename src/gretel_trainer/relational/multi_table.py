@@ -19,7 +19,6 @@ from pathlib import Path
 from typing import Any, cast, Optional, Union
 
 import pandas as pd
-import smart_open
 
 import gretel_trainer.relational.ancestry as ancestry
 
@@ -719,9 +718,16 @@ class MultiTable:
             for table in configs
         }
 
-        self._strategy.prepare_training_data(self.relational_data, training_paths)
+        training_paths = self._strategy.prepare_training_data(
+            self.relational_data, training_paths
+        )
 
         for table_name, config in configs.items():
+            if table_name not in training_paths:
+                logger.info(f"Bypassing model training for table `{table_name}`")
+                self._synthetics_train.bypass.append(table_name)
+                continue
+
             synthetics_config = make_synthetics_config(table_name, config)
             model = self._project.create_model_obj(
                 model_config=synthetics_config,
@@ -859,6 +865,7 @@ class MultiTable:
                     table
                     for table in self.relational_data.list_all_tables()
                     if table not in self._synthetics_train.models
+                    and table not in self._synthetics_train.bypass
                 ]
             )
             self._strategy.validate_preserved_tables(

@@ -39,6 +39,8 @@ class IndependentStrategy:
         Writes tables' training data to provided paths.
         Training data has primary and foreign key columns removed.
         """
+        prepared_tables = {}
+
         for table, path in table_paths.items():
             columns_to_drop = set()
             columns_to_drop.update(rel_data.get_primary_key(table))
@@ -48,6 +50,17 @@ class IndependentStrategy:
             all_columns = rel_data.get_table_columns(table)
             use_columns = [col for col in all_columns if col not in columns_to_drop]
 
+            # It's possible for *all columns* on a table to be part of a PK or FK,
+            # leaving no columns to send to a model for training. We omit such tables
+            # from the returned dictionary, indicating to MultiTable that it should
+            # "bypass" training and running a model for that table and instead leave
+            # it alone until post-processing (synthesizing key columns).
+            if len(use_columns) == 0:
+                logger.info(
+                    f"All columns in table `{table}` are associated with key constraints"
+                )
+                continue
+
             source_path = rel_data.get_table_source(table)
             with open_artifact(source_path, "rb") as src, open_artifact(
                 path, "wb"
@@ -55,8 +68,9 @@ class IndependentStrategy:
                 pd.DataFrame(columns=use_columns).to_csv(dest, index=False)
                 for chunk in pd.read_csv(src, usecols=use_columns, chunksize=10_000):
                     chunk.to_csv(dest, index=False, mode="a", header=False)
+            prepared_tables[table] = path
 
-        return table_paths
+        return prepared_tables
 
     def tables_to_retrain(
         self, tables: list[str], rel_data: RelationalData
@@ -268,7 +282,9 @@ def _collect_fk_values(
     def _unique_not_null_values(values: list) -> list:
         unique_values = {tuple(v) for v in values}
         unique_values.discard((None,))
-        return list(unique_values)
+        vals = list(unique_values)
+        random.shuffle(vals)
+        return vals
 
     # Collect final output values by adding non-null values to `new_values`
     # (which has the requisite number of nulls already).

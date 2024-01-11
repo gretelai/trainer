@@ -136,6 +136,11 @@ def art(tmpdir) -> Generator[RelationalData, None, None]:
 
 
 @pytest.fixture()
+def insurance(tmpdir) -> Generator[RelationalData, None, None]:
+    yield _rel_data_connector("insurance").extract(storage_dir=tmpdir)
+
+
+@pytest.fixture()
 def documents(tmpdir) -> Generator[RelationalData, None, None]:
     yield _rel_data_connector("documents").extract(storage_dir=tmpdir)
 

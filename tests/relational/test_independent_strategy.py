@@ -50,6 +50,22 @@ def test_prepare_training_data_subset_of_tables(pets):
         assert os.stat(pets_dest.name).st_size == 0
 
 
+def test_prepare_training_data_join_table(insurance):
+    strategy = IndependentStrategy()
+
+    with tempfile.NamedTemporaryFile() as beneficiary_dest, tempfile.NamedTemporaryFile() as policies_dest:
+        training_data = strategy.prepare_training_data(
+            insurance,
+            {
+                "beneficiary": beneficiary_dest.name,
+                "insurance_policies": policies_dest.name,
+            },
+        )
+        assert set(training_data.keys()) == {"beneficiary"}
+        assert not pd.read_csv(training_data["beneficiary"]).empty
+        assert os.stat(policies_dest.name).st_size == 0
+
+
 def test_retraining_a_set_of_tables_only_retrains_those_tables(ecom):
     strategy = IndependentStrategy()
     assert set(strategy.tables_to_retrain(["users"], ecom)) == {"users"}
@@ -363,6 +379,49 @@ def test_post_processing_null_composite_foreign_key(tmpdir):
                 "id": [0, 1, 2, 3, 4],
                 "customer_first": ["Herbert", "Isabella", "Jack", "Kevin", "Louise"],
                 "customer_last": ["Hoover", "Irvin", "Johnson", "Knight", "Lane"],
+            }
+        ),
+    )
+
+
+def test_post_processing_with_bypass_table(insurance):
+    strategy = IndependentStrategy()
+
+    raw_synth_tables = {
+        "beneficiary": pd.DataFrame(
+            data={
+                "name": ["Adam", "Beth", "Chris", "Demi", "Eric"],
+            }
+        ),
+        "insurance_policies": pd.DataFrame(index=range(5)),
+    }
+
+    # Normally we shuffle synthesized keys for realism, but for deterministic testing we sort instead
+    with patch("random.shuffle", wraps=sorted):
+        processed = strategy.post_process_synthetic_results(
+            raw_synth_tables, [], insurance, 1
+        )
+
+    pdtest.assert_frame_equal(
+        processed["beneficiary"],
+        pd.DataFrame(
+            data={
+                "name": ["Adam", "Beth", "Chris", "Demi", "Eric"],
+                "id": [0, 1, 2, 3, 4],
+            }
+        ),
+    )
+    # Given the particular values in this unit test and the patching of random.shuffle to use
+    # sorted instead, we deterministically get the beneficiary ID values below. In production
+    # use, we shuffle values to produce more realistic results (though it is still possible to
+    # get "unusual" results like primary_ and secondary_ pointing to the same beneficiary record).
+    pdtest.assert_frame_equal(
+        processed["insurance_policies"],
+        pd.DataFrame(
+            data={
+                "id": [0, 1, 2, 3, 4],
+                "primary_beneficiary": [2, 2, 4, 4, 1],
+                "secondary_beneficiary": [2, 2, 4, 4, 1],
             }
         ),
     )
