@@ -393,35 +393,38 @@ def test_post_processing_with_bypass_table(insurance):
                 "name": ["Adam", "Beth", "Chris", "Demi", "Eric"],
             }
         ),
-        "insurance_policies": pd.DataFrame(index=range(5)),
+        "insurance_policies": pd.DataFrame(index=range(40)),
     }
 
-    # Normally we shuffle synthesized keys for realism, but for deterministic testing we sort instead
-    with patch("random.shuffle", wraps=sorted):
-        processed = strategy.post_process_synthetic_results(
-            raw_synth_tables, [], insurance, 1
-        )
+    processed = strategy.post_process_synthetic_results(
+        raw_synth_tables, [], insurance, 1
+    )
 
+    beneficiary_ids = [0, 1, 2, 3, 4]
     pdtest.assert_frame_equal(
         processed["beneficiary"],
         pd.DataFrame(
             data={
                 "name": ["Adam", "Beth", "Chris", "Demi", "Eric"],
-                "id": [0, 1, 2, 3, 4],
+                "id": beneficiary_ids,
             }
         ),
     )
-    # Given the particular values in this unit test and the patching of random.shuffle to use
-    # sorted instead, we deterministically get the beneficiary ID values below. In production
-    # use, we shuffle values to produce more realistic results (though it is still possible to
-    # get "unusual" results like primary_ and secondary_ pointing to the same beneficiary record).
-    pdtest.assert_frame_equal(
-        processed["insurance_policies"],
-        pd.DataFrame(
-            data={
-                "id": [0, 1, 2, 3, 4],
-                "primary_beneficiary": [2, 2, 4, 4, 1],
-                "secondary_beneficiary": [2, 2, 4, 4, 1],
-            }
-        ),
+    assert set(processed["insurance_policies"].columns) == {
+        "id",
+        "primary_beneficiary",
+        "secondary_beneficiary",
+    }
+    assert list(processed["insurance_policies"]["id"].values) == list(range(40))
+    assert all(
+        [
+            v in beneficiary_ids
+            for v in processed["insurance_policies"]["primary_beneficiary"].values
+        ]
+    )
+    assert all(
+        [
+            v in beneficiary_ids
+            for v in processed["insurance_policies"]["secondary_beneficiary"].values
+        ]
     )
