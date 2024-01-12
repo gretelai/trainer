@@ -567,9 +567,7 @@ class MultiTable:
 
         self._output_handler.save_classify_outputs(task.result_filepaths)
 
-    def _setup_transforms_train_state(
-        self, configs: dict[str, GretelModelConfig]
-    ) -> None:
+    def _setup_transforms_train_state(self, configs: dict[str, dict]) -> None:
         for table, config in configs.items():
             model = self._project.create_model_obj(
                 model_config=make_transform_config(self.relational_data, table, config),
@@ -578,6 +576,41 @@ class MultiTable:
             self._transforms_train.models[table] = model
 
         self._backup()
+
+    def transform_v2(
+        self,
+        config: GretelModelConfig,
+        *,
+        table_specific_configs: Optional[dict[str, GretelModelConfig]] = None,
+        only: Optional[set[str]] = None,
+        ignore: Optional[set[str]] = None,
+        encode_keys: bool = False,
+        in_place: bool = False,
+        identifier: Optional[str] = None,
+    ) -> None:
+        configs = assemble_configs(
+            self.relational_data, config, table_specific_configs, only, ignore
+        )
+        _validate_all_transform_v2_configs(configs)
+
+        self._setup_transforms_train_state(configs)
+        task = TransformsTrainTask(
+            transforms_train=self._transforms_train,
+            multitable=self,
+        )
+        run_task(task, self._extended_sdk)
+
+        output_tables = {}
+        for table, model in self._transforms_train.models.items():
+            with model.get_artifact_handle("data_preview") as data_preview:
+                output_tables[table] = pd.read_csv(data_preview)
+
+        self._post_process_transformed_tables(
+            output_tables=output_tables,
+            identifier=identifier or f"transforms_{_timestamp()}",
+            encode_keys=encode_keys,
+            in_place=in_place,
+        )
 
     def train_transforms(
         self,
@@ -672,10 +705,23 @@ class MultiTable:
         )
         run_task(task, self._extended_sdk)
 
-        output_tables = task.output_tables
+        self._post_process_transformed_tables(
+            output_tables=task.output_tables,
+            identifier=identifier,
+            encode_keys=encode_keys,
+            in_place=in_place,
+        )
+
+    def _post_process_transformed_tables(
+        self,
+        output_tables: dict[str, pd.DataFrame],
+        identifier: str,
+        encode_keys: bool,
+        in_place: bool,
+    ) -> None:
         if encode_keys:
             output_tables = self._strategy.label_encode_keys(
-                self.relational_data, task.output_tables
+                self.relational_data, output_tables
             )
 
         if in_place:
@@ -1098,6 +1144,20 @@ def _validate_strategy(strategy: str) -> Union[IndependentStrategy, AncestralStr
         msg = f"Unrecognized strategy requested: {strategy}. Supported strategies are `independent` and `ancestral`."
         logger.warning(msg)
         raise MultiTableException(msg)
+
+
+def _validate_all_transform_v2_configs(configs: dict[str, dict]) -> None:
+    invalid = 0
+    for table, config in configs.items():
+        model_key = get_model_key(config)
+        if model_key is None or model_key != "transform_v2":
+            logger.warning(
+                f"Invalid model config for `{table}`, expected `transform_v2` model type, got `{model_key}`"
+            )
+            invalid += 1
+
+    if invalid > 0:
+        raise MultiTableException(f"Received {invalid} invalid model configs.")
 
 
 def _table_trained_successfully(train_state: TransformsTrain, table: str) -> bool:

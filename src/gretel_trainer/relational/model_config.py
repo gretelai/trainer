@@ -103,7 +103,7 @@ def assemble_configs(
     table_specific_configs: Optional[dict[str, GretelModelConfig]],
     only: Optional[set[str]],
     ignore: Optional[set[str]],
-) -> dict[str, Any]:
+) -> dict[str, dict]:
     only, ignore = _expand_only_and_ignore(rel_data, only, ignore)
 
     tables_in_scope = [
