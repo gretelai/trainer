@@ -602,8 +602,9 @@ class MultiTable:
 
         output_tables = {}
         for table, model in self._transforms_train.models.items():
-            with model.get_artifact_handle("data_preview") as data_preview:
-                output_tables[table] = pd.read_csv(data_preview)
+            if table in task.completed:
+                with model.get_artifact_handle("data_preview") as data_preview:
+                    output_tables[table] = pd.read_csv(data_preview)
 
         self._post_process_transformed_tables(
             output_tables=output_tables,
