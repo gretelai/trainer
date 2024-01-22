@@ -1,70 +1,27 @@
 import json
 import os
 import shutil
-import tarfile
 import tempfile
 
 from pathlib import Path
 from typing import Optional
-from unittest.mock import Mock, patch
+from unittest.mock import Mock
 
 import pytest
+import smart_open
 
 import gretel_trainer.relational.backup as b
 
-from gretel_trainer.relational.artifacts import ArtifactCollection
 from gretel_trainer.relational.core import MultiTableException, RelationalData
 from gretel_trainer.relational.multi_table import MultiTable, SyntheticsRun
 
-DEBUG_SUMMARY_CONTENT = {"debug": "summary"}
-
-ARTIFACTS = {
-    "debug_summary": {
-        "artifact_id": "gretel_abc__gretel_debug_summary.json",
-        "local_name": "_gretel_debug_summary.json",
-    },
-    "source_archive": {
-        "artifact_id": "gretel_abc_source_tables.tar.gz",
-        "local_name": "source_tables.tar.gz",
-    },
-    "train_humans": {
-        "artifact_id": "gretel_abc_train_humans.csv",
-        "local_name": "synthetics_train_humans.csv",
-    },
-    "train_pets": {
-        "artifact_id": "gretel_abc_train_pets.csv",
-        "local_name": "synthetics_train_pets.csv",
-    },
-    "synthetics_training_archive": {
-        "artifact_id": "gretel_abc_synthetics_training.tar.gz",
-        "local_name": "synthetics_training.tar.gz",
-    },
-    "synthetics_outputs_archive": {
-        "artifact_id": "gretel_abc_synthetics_outputs.tar.gz",
-        "local_name": "synthetics_outputs.tar.gz",
-    },
-    "report_humans": {
-        "artifact_id": "report",
-        "local_name": "synthetics_individual_evaluation_humans.html",
-    },
-    "report_json_humans": {
-        "artifact_id": "report_json",
-        "local_name": "synthetics_individual_evaluation_humans.json",
-    },
-    "report_pets": {
-        "artifact_id": "report",
-        "local_name": "synthetics_individual_evaluation_pets.html",
-    },
-    "report_json_pets": {
-        "artifact_id": "report_json",
-        "local_name": "synthetics_individual_evaluation_pets.json",
-    },
-}
+SOURCE_ARCHIVE_ARTIFACT_ID = "gretel_abc_source_tables.tar.gz"
+SOURCE_ARCHIVE_LOCAL_FILENAME = "source_tables.tar.gz"
 
 
 def make_backup(
     rel_data: RelationalData,
-    artifact_collection: ArtifactCollection,
+    source_archive: Optional[str],
     transforms_models: dict[str, Mock] = {},
     synthetics_models: dict[str, Mock] = {},
     synthetics_record_handlers: dict[str, Mock] = {},
@@ -73,7 +30,7 @@ def make_backup(
         project_name="project_name",
         strategy="independent",
         refresh_interval=60,
-        artifact_collection=artifact_collection,
+        source_archive=source_archive,
         relational_data=b.BackupRelationalData.from_relational_data(rel_data),
     )
     if len(transforms_models) > 0:
@@ -116,27 +73,11 @@ def create_backup(
     working_dir: Path,
     synthetics_models: dict[str, Mock] = {},
     synthetics_record_handlers: dict[str, Mock] = {},
-    training_archive_present: bool = False,
-    output_archive_present: bool = False,
     transforms_models: dict[str, Mock] = {},
 ) -> str:
-    artifact_collection = ArtifactCollection(
-        gretel_debug_summary=ARTIFACTS["debug_summary"]["artifact_id"],
-        source_archive=ARTIFACTS["source_archive"]["artifact_id"],
-        hybrid=False,
-    )
-    if training_archive_present:
-        artifact_collection.synthetics_training_archive = ARTIFACTS[
-            "synthetics_training_archive"
-        ]["artifact_id"]
-    if output_archive_present:
-        artifact_collection.synthetics_outputs_archive = ARTIFACTS[
-            "synthetics_outputs_archive"
-        ]["artifact_id"]
-
     backup = make_backup(
         rel_data,
-        artifact_collection,
+        SOURCE_ARCHIVE_ARTIFACT_ID,
         transforms_models,
         synthetics_models,
         synthetics_record_handlers,
@@ -149,39 +90,14 @@ def create_backup(
     return write_backup(backup, working_dir)
 
 
-def get_local_name(artifact_id):
-    local_name = None
-    for _, pointers in ARTIFACTS.items():
-        if pointers["artifact_id"] == artifact_id:
-            local_name = pointers["local_name"]
-    if local_name is None:
-        raise ValueError
-    return local_name
-
-
-def make_mock_get_artifact_link(setup_path: Path):
-    def get_artifact_link(artifact_id):
-        return setup_path / get_local_name(artifact_id)
-
-    return get_artifact_link
-
-
 def make_mock_get_artifact_handle(setup_path: Path):
     def get_artifact_handle(artifact_id):
-        return open(setup_path / get_local_name(artifact_id), "rb")
+        if artifact_id == SOURCE_ARCHIVE_ARTIFACT_ID:
+            return smart_open.open(setup_path / SOURCE_ARCHIVE_LOCAL_FILENAME, "rb")
+        else:
+            raise ValueError(f"unexpected artifact_id: {artifact_id}")
 
     return get_artifact_handle
-
-
-def make_mock_download_tar_artifact(setup_path: Path, working_path: Path):
-    def download_tar_artifact(project, name, out_path):
-        local_name = get_local_name(name)
-
-        src = setup_path / local_name
-        dest = working_path / local_name
-        shutil.copyfile(src, dest)
-
-    return download_tar_artifact
 
 
 def make_mock_get_model(models: dict[str, Mock]):
@@ -196,13 +112,10 @@ def make_mock_model(
     status: str,
     setup_path: Path,
     record_handler: Optional[Mock] = None,
-    report_json: Optional[dict] = None,
 ) -> Mock:
     model = Mock()
     model.status = status
     model.model_id = name
-    model.data_source = ARTIFACTS[f"train_{name}"]["artifact_id"]
-    model.get_artifact_link = make_mock_get_artifact_link(setup_path)
     model.get_artifact_handle = make_mock_get_artifact_handle(setup_path)
     model.get_record_handler.return_value = record_handler
     return model
@@ -212,153 +125,34 @@ def make_mock_record_handler(name: str, status: str) -> Mock:
     record_handler = Mock()
     record_handler.status = status
     record_handler.record_id = name
-    record_handler.data_source = None
     return record_handler
 
 
-def local_file(path: Path, identifier: str) -> Path:
-    return path / ARTIFACTS[identifier]["local_name"]
-
-
-# This is a little gory. Pytest has deprecated importing and calling fixtures directly.
-# We want a realistic json blob to use as our backed up report. This copies the blob
-# in conftest.py.
-_report_json_dict = {
-    "synthetic_data_quality_score": {
-        "raw_score": 95.86666666666667,
-        "grade": "Excellent",
-        "score": 95,
-    },
-    "field_correlation_stability": {
-        "raw_score": 0.017275336944403048,
-        "grade": "Excellent",
-        "score": 94,
-    },
-    "principal_component_stability": {
-        "raw_score": 0.07294532166881013,
-        "grade": "Excellent",
-        "score": 100,
-    },
-    "field_distribution_stability": {
-        "raw_score": 0.05111941886313614,
-        "grade": "Excellent",
-        "score": 94,
-    },
-    "privacy_protection_level": {
-        "grade": "Good",
-        "raw_score": 2,
-        "score": 2,
-        "outlier_filter": "Medium",
-        "similarity_filter": "Disabled",
-        "overfitting_protection": "Enabled",
-        "differential_privacy": "Disabled",
-    },
-    "fatal_error": False,
-    "summary": [
-        {"field": "synthetic_data_quality_score", "value": 95},
-        {"field": "field_correlation_stability", "value": 94},
-        {"field": "principal_component_stability", "value": 100},
-        {"field": "field_distribution_stability", "value": 94},
-        {"field": "privacy_protection_level", "value": 2},
-    ],
-}
-
-
-# Create various files in the temporary setup path that stand in for project artifacts in Gretel Cloud
-def create_standin_project_artifacts(
+# Creates a source_archive.tar.gz in the temporary setup path (standing in for Gretel Cloud)
+def create_standin_source_archive_artifact(
     rel_data: RelationalData, setup_path: Path
 ) -> None:
-    # Debug summary
-    with open(local_file(setup_path, "debug_summary"), "w") as dbg:
-        json.dump(DEBUG_SUMMARY_CONTENT, dbg)
-
-    # Source archive
-    with tarfile.open(local_file(setup_path, "source_archive"), "w:gz") as tar:
-        for table in rel_data.list_all_tables():
-            table_path = setup_path / f"source_{table}.csv"
-            rel_data.get_table_data(table).to_csv(table_path, index=False)
-            tar.add(table_path, arcname=f"source_{table}.csv")
-
-    # Synthetics training archive
-    with tarfile.open(
-        local_file(setup_path, "synthetics_training_archive"), "w:gz"
-    ) as tar:
-        for table in rel_data.list_all_tables():
-            table_path = setup_path / f"synthetics_train_{table}.csv"
-            rel_data.get_table_data(table).to_csv(table_path, index=False)
-            tar.add(table_path, arcname=f"synthetics_train_{table}.csv")
-
-    # Reports
-    for table in rel_data.list_all_tables():
-        for kind in ["individual", "cross_table"]:
-            html_filename = f"synthetics_{kind}_evaluation_{table}.html"
-            html_path = setup_path / html_filename
-            with open(html_path, "w") as f:
-                f.write("<html></html>")
-            json_filename = f"synthetics_{kind}_evaluation_{table}.json"
-            json_path = setup_path / json_filename
-            with open(json_path, "w") as f:
-                json.dump(_report_json_dict, f)
-
-    # Synthetics output archive
-    # Create a subdirectory with the run outputs
-    setup_run_path = setup_path / "run-id"
-    os.makedirs(setup_run_path)
-    for table in rel_data.list_all_tables():
-        table_path = setup_run_path / f"synth_{table}.csv"
-        rel_data.get_table_data(table).to_csv(table_path, index=False)
-        for kind in ["individual", "cross_table"]:
-            html_filename = f"synthetics_{kind}_evaluation_{table}.html"
-            json_filename = f"synthetics_{kind}_evaluation_{table}.json"
-            shutil.copy(setup_path / html_filename, setup_run_path / html_filename)
-            shutil.copy(setup_path / json_filename, setup_run_path / json_filename)
-
-    with tempfile.TemporaryDirectory() as tmpdir:
-        runtar = Path(tmpdir) / "run-id"
-        # Create the archive for this run...
-        shutil.make_archive(
-            base_name=str(runtar),
-            format="gztar",
-            root_dir=setup_run_path,
-        )
-
-        # ...and add it to the outputs archive
-        with tarfile.open(
-            local_file(setup_path, "synthetics_outputs_archive"), "w:gz"
-        ) as tar:
-            tar.add(f"{runtar}.tar.gz", arcname="run-id.tar.gz")
+    shutil.make_archive(
+        base_name=str(setup_path / SOURCE_ARCHIVE_LOCAL_FILENAME).removesuffix(
+            ".tar.gz"
+        ),
+        format="gztar",
+        root_dir=rel_data.source_data_handler.dir,  # type: ignore
+    )
 
 
 def configure_mocks(
     project: Mock,
-    download_tar_artifact: Mock,
     setup_path: Path,
     working_path: Path,
     models: dict[str, Mock] = {},
 ) -> None:
-    # For non-archive files, we patch Project#get_artifact_link to return paths to files
-    # in the test setup dir in place of HTTPS links (smart_open can treat these identically).
-    project.get_artifact_link = make_mock_get_artifact_link(setup_path)
-    project.get_artifact_handle = make_mock_get_artifact_handle(setup_path)
-    project.get_model = make_mock_get_model(models)
-
-    # For tar files, though, which require using requests, we patch the entire download_tar_artifact function
-    download_tar_artifact.side_effect = make_mock_download_tar_artifact(
-        setup_path,
-        working_path,
-    )
-
     # The working directory is always named after the project. In these tests we need the name to
     # match the working path that we've configured our other mock artifacts and handlers to use.
     project.name = str(working_path)
-
-
-@pytest.fixture(autouse=True)
-def download_tar_artifact():
-    with patch(
-        "gretel_trainer.relational.sdk_extras.ExtendedGretelSDK.download_tar_artifact"
-    ) as download_tar_artifact:
-        yield download_tar_artifact
+    project.get_artifact_handle = make_mock_get_artifact_handle(setup_path)
+    project.get_model = make_mock_get_model(models)
+    project.artifacts = []
 
 
 @pytest.fixture(autouse=True)
@@ -372,34 +166,25 @@ def testsetup_dir():
         yield Path(testsetup_dir)
 
 
-def test_restore_not_yet_trained(
-    project, pets, download_tar_artifact, working_dir, testsetup_dir
-):
-    create_standin_project_artifacts(pets, testsetup_dir)
-    configure_mocks(project, download_tar_artifact, testsetup_dir, working_dir)
+def test_restore_initial_state(project, pets, working_dir, testsetup_dir):
+    create_standin_source_archive_artifact(pets, testsetup_dir)
+    configure_mocks(project, testsetup_dir, working_dir)
     backup_file = create_backup(pets, working_dir)
 
     # Restore a MultiTable instance, starting with only the backup file present in working_dir
     assert os.listdir(working_dir) == ["_gretel_backup.json"]
     mt = MultiTable.restore(backup_file)
 
-    # Backup + Debug summary + Source archive + (2) Source CSVs
-    assert len(os.listdir(working_dir)) == 5
-
-    # Debug summary is restored
-    assert os.path.exists(local_file(working_dir, "debug_summary"))
-    with open(local_file(working_dir, "debug_summary"), "r") as dbg:
-        assert json.load(dbg) == DEBUG_SUMMARY_CONTENT
+    # Backup + Source archive + (2) Source CSVs
+    assert len(os.listdir(working_dir)) == 4
 
     # RelationalData is restored
-    assert os.path.exists(working_dir / "source_humans.csv")
-    assert os.path.exists(working_dir / "source_pets.csv")
+    assert os.path.exists(working_dir / "humans.csv")
+    assert os.path.exists(working_dir / "pets.csv")
     assert mt.relational_data.debug_summary() == pets.debug_summary()
 
 
-def test_restore_transforms(
-    project, pets, download_tar_artifact, working_dir, testsetup_dir
-):
+def test_restore_transforms(project, pets, working_dir, testsetup_dir):
     transforms_models = {
         "humans": make_mock_model(
             name="humans",
@@ -413,10 +198,9 @@ def test_restore_transforms(
         ),
     }
 
-    create_standin_project_artifacts(pets, testsetup_dir)
+    create_standin_source_archive_artifact(pets, testsetup_dir)
     configure_mocks(
         project,
-        download_tar_artifact,
         testsetup_dir,
         working_dir,
         transforms_models,
@@ -425,16 +209,13 @@ def test_restore_transforms(
 
     mt = MultiTable.restore(backup_file)
 
-    # Backup + Debug summary + Source archive + (2) Source CSVs
-    assert len(os.listdir(working_dir)) == 5
-
     # Transforms state is restored
     assert len(mt._transforms_train.models) == 2
     assert len(mt._transforms_train.lost_contact) == 0
 
 
 def test_restore_synthetics_training_still_in_progress(
-    project, pets, download_tar_artifact, working_dir, testsetup_dir
+    project, pets, working_dir, testsetup_dir
 ):
     synthetics_models = {
         "humans": make_mock_model(
@@ -449,10 +230,9 @@ def test_restore_synthetics_training_still_in_progress(
         ),
     }
 
-    create_standin_project_artifacts(pets, testsetup_dir)
+    create_standin_source_archive_artifact(pets, testsetup_dir)
     configure_mocks(
         project,
-        download_tar_artifact,
         testsetup_dir,
         working_dir,
         synthetics_models,
@@ -463,28 +243,23 @@ def test_restore_synthetics_training_still_in_progress(
         MultiTable.restore(backup_file)
 
 
-def test_restore_training_complete(
-    project, pets, report_json_dict, download_tar_artifact, working_dir, testsetup_dir
-):
+def test_restore_training_complete(project, pets, working_dir, testsetup_dir):
     synthetics_models = {
         "humans": make_mock_model(
             name="humans",
             status="completed",
             setup_path=testsetup_dir,
-            report_json=report_json_dict,
         ),
         "pets": make_mock_model(
             name="pets",
             status="completed",
             setup_path=testsetup_dir,
-            report_json=report_json_dict,
         ),
     }
 
-    create_standin_project_artifacts(pets, testsetup_dir)
+    create_standin_source_archive_artifact(pets, testsetup_dir)
     configure_mocks(
         project,
-        download_tar_artifact,
         testsetup_dir,
         working_dir,
         synthetics_models,
@@ -493,25 +268,15 @@ def test_restore_training_complete(
         pets,
         working_dir,
         synthetics_models=synthetics_models,
-        training_archive_present=True,
     )
 
     mt = MultiTable.restore(backup_file)
 
-    # Backup + Debug summary + Source archive + (2) Source CSVs
-    # + Training archive + (2) Train CSVs
-    assert len(os.listdir(working_dir)) == 8
-
     # Training state is restored
-    assert os.path.exists(local_file(working_dir, "synthetics_training_archive"))
-    assert os.path.exists(local_file(working_dir, "train_humans"))
-    assert os.path.exists(local_file(working_dir, "train_pets"))
     assert len(mt._synthetics_train.models) == 2
 
 
-def test_restore_training_one_failed(
-    project, pets, report_json_dict, download_tar_artifact, working_dir, testsetup_dir
-):
+def test_restore_training_one_failed(project, pets, working_dir, testsetup_dir):
     synthetics_models = {
         "humans": make_mock_model(
             name="humans",
@@ -522,14 +287,12 @@ def test_restore_training_one_failed(
             name="pets",
             status="completed",
             setup_path=testsetup_dir,
-            report_json=report_json_dict,
         ),
     }
 
-    create_standin_project_artifacts(pets, testsetup_dir)
+    create_standin_source_archive_artifact(pets, testsetup_dir)
     configure_mocks(
         project,
-        download_tar_artifact,
         testsetup_dir,
         working_dir,
         synthetics_models,
@@ -538,26 +301,15 @@ def test_restore_training_one_failed(
         pets,
         working_dir,
         synthetics_models=synthetics_models,
-        training_archive_present=True,
     )
 
     mt = MultiTable.restore(backup_file)
 
-    # Backup + Debug summary + Source archive + (2) Source CSVs
-    # Training archive + (2) Train CSVs
-    assert len(os.listdir(working_dir)) == 8
-
     # Training state is restored
-    assert os.path.exists(local_file(working_dir, "synthetics_training_archive"))
-    assert os.path.exists(local_file(working_dir, "train_humans"))
-    assert os.path.exists(local_file(working_dir, "train_pets"))
-
     assert len(mt._synthetics_train.models) == 2
 
 
-def test_restore_generate_completed(
-    project, pets, report_json_dict, download_tar_artifact, working_dir, testsetup_dir
-):
+def test_restore_generate_completed(project, pets, working_dir, testsetup_dir):
     synthetics_record_handlers = {
         "humans": make_mock_record_handler(name="humans", status="completed"),
         "pets": make_mock_record_handler(name="pets", status="completed"),
@@ -569,21 +321,18 @@ def test_restore_generate_completed(
             status="completed",
             setup_path=testsetup_dir,
             record_handler=synthetics_record_handlers["humans"],
-            report_json=report_json_dict,
         ),
         "pets": make_mock_model(
             name="pets",
             status="completed",
             setup_path=testsetup_dir,
             record_handler=synthetics_record_handlers["pets"],
-            report_json=report_json_dict,
         ),
     }
 
-    create_standin_project_artifacts(pets, testsetup_dir)
+    create_standin_source_archive_artifact(pets, testsetup_dir)
     configure_mocks(
         project,
-        download_tar_artifact,
         testsetup_dir,
         working_dir,
         synthetics_models,
@@ -593,101 +342,11 @@ def test_restore_generate_completed(
         working_dir,
         synthetics_models=synthetics_models,
         synthetics_record_handlers=synthetics_record_handlers,
-        training_archive_present=True,
-        output_archive_present=True,
     )
 
     mt = MultiTable.restore(backup_file)
 
-    # Backup + Debug summary + Source archive + (2) Source CSVs
-    # + Training archive + (2) Train CSVs
-    # + Outputs archive + Previous run subdirectory
-    assert len(os.listdir(working_dir)) == 10
-
-    # Generate state is restored
-    assert os.path.exists(working_dir / "run-id" / "synth_humans.csv")
-    assert os.path.exists(
-        working_dir / "run-id" / "synthetics_cross_table_evaluation_humans.json"
-    )
-    assert os.path.exists(
-        working_dir / "run-id" / "synthetics_cross_table_evaluation_humans.html"
-    )
-    assert os.path.exists(
-        working_dir / "run-id" / "synthetics_individual_evaluation_humans.json"
-    )
-    assert os.path.exists(
-        working_dir / "run-id" / "synthetics_individual_evaluation_humans.html"
-    )
-    assert os.path.exists(working_dir / "run-id" / "synth_pets.csv")
-    assert os.path.exists(
-        working_dir / "run-id" / "synthetics_cross_table_evaluation_pets.json"
-    )
-    assert os.path.exists(
-        working_dir / "run-id" / "synthetics_cross_table_evaluation_pets.html"
-    )
-    assert os.path.exists(
-        working_dir / "run-id" / "synthetics_individual_evaluation_pets.json"
-    )
-    assert os.path.exists(
-        working_dir / "run-id" / "synthetics_individual_evaluation_pets.html"
-    )
-    assert mt._synthetics_run is not None
-    assert len(mt.synthetic_output_tables) == 2
-    assert mt.evaluations["humans"].individual_sqs == 95
-    assert mt.evaluations["humans"].cross_table_sqs == 95
-    assert mt.evaluations["pets"].individual_sqs == 95
-    assert mt.evaluations["pets"].cross_table_sqs == 95
-
-
-def test_restore_generate_in_progress(
-    project, pets, report_json_dict, download_tar_artifact, working_dir, testsetup_dir
-):
-    synthetics_record_handlers = {
-        "humans": make_mock_record_handler(name="humans", status="completed"),
-        "pets": make_mock_record_handler(name="pets", status="completed"),
-    }
-
-    synthetics_models = {
-        "humans": make_mock_model(
-            name="humans",
-            status="completed",
-            setup_path=testsetup_dir,
-            record_handler=synthetics_record_handlers["humans"],
-            report_json=report_json_dict,
-        ),
-        "pets": make_mock_model(
-            name="pets",
-            status="completed",
-            setup_path=testsetup_dir,
-            record_handler=synthetics_record_handlers["pets"],
-            report_json=report_json_dict,
-        ),
-    }
-
-    create_standin_project_artifacts(pets, testsetup_dir)
-    configure_mocks(
-        project,
-        download_tar_artifact,
-        testsetup_dir,
-        working_dir,
-        synthetics_models,
-    )
-    backup_file = create_backup(
-        pets,
-        working_dir,
-        synthetics_models=synthetics_models,
-        synthetics_record_handlers=synthetics_record_handlers,
-        training_archive_present=True,
-        output_archive_present=False,
-    )
-
-    mt = MultiTable.restore(backup_file)
-
-    # Backup + Debug summary + Source archive + (2) Source CSVs
-    # + Training archive + (2) Train CSVs
-    assert len(os.listdir(working_dir)) == 8
-
-    # Generate state is partially restored
+    # Generate task state is restored
     assert mt._synthetics_run == SyntheticsRun(
         identifier="run-id",
         preserved=[],
@@ -695,68 +354,9 @@ def test_restore_generate_in_progress(
         lost_contact=[],
         record_handlers=synthetics_record_handlers,
     )
+    # but note we don't (re)set synthetic_output_tables or evaluations
     assert len(mt.synthetic_output_tables) == 0
-
-
-def test_restore_hybrid_run(project, pets, report_json_dict, working_dir):
-    # In hybrid contexts, the ArtifactCollection does not track or upload anything to the project.
-    # We are entirely reliant upon the local directory for those artifacts.
-    # For testing, this means we set up everything in the working directory already.
-
-    synthetics_record_handlers = {
-        "humans": make_mock_record_handler(name="humans", status="completed"),
-        "pets": make_mock_record_handler(name="pets", status="completed"),
-    }
-
-    synthetics_models = {
-        "humans": make_mock_model(
-            name="humans",
-            status="completed",
-            setup_path=working_dir,
-            record_handler=synthetics_record_handlers["humans"],
-            report_json=report_json_dict,
-        ),
-        "pets": make_mock_model(
-            name="pets",
-            status="completed",
-            setup_path=working_dir,
-            record_handler=synthetics_record_handlers["pets"],
-            report_json=report_json_dict,
-        ),
-    }
-
-    create_standin_project_artifacts(pets, working_dir)
-    download_tar_artifact = Mock()
-    configure_mocks(
-        project,
-        download_tar_artifact,
-        working_dir,
-        working_dir,
-        synthetics_models,
-    )
-
-    backup_object = make_backup(
-        rel_data=pets,
-        artifact_collection=ArtifactCollection(hybrid=True),
-        transforms_models={},
-        synthetics_models=synthetics_models,
-        synthetics_record_handlers=synthetics_record_handlers,
-    )
-    backup_file = write_backup(backup_object, working_dir)
-
-    mt = MultiTable.restore(backup_file)
-
-    # No need to assert artifacts are present in working_dir because we set it up that way
-    # and hybrid restore would not work otherwise.
-
-    assert len(mt._synthetics_train.models) == 2
-    assert mt._synthetics_run is not None
-    assert len(mt.synthetic_output_tables) == 2
-    assert mt.evaluations["humans"].individual_sqs == 95
-    assert mt.evaluations["humans"].cross_table_sqs == 95
-    assert mt.evaluations["pets"].individual_sqs == 95
-    assert mt.evaluations["pets"].cross_table_sqs == 95
-
-    # The ArtifactCollection will not have uploaded any archive files,
-    # so restore will not try to download any.
-    download_tar_artifact.assert_not_called()
+    assert mt.evaluations["humans"].individual_sqs is None
+    assert mt.evaluations["humans"].cross_table_sqs is None
+    assert mt.evaluations["pets"].individual_sqs is None
+    assert mt.evaluations["pets"].cross_table_sqs is None

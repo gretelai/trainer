@@ -6,7 +6,6 @@ from pathlib import Path
 from typing import Any, Optional, Union
 
 import pandas as pd
-import requests
 
 from gretel_client.projects.artifact_handlers import open_artifact
 from gretel_client.projects.jobs import Job, Status
@@ -65,18 +64,6 @@ class ExtendedGretelSDK:
         except:
             logger.warning(f"Failed to download `{artifact_name}`")
             return False
-
-    def download_tar_artifact(
-        self, project: Project, artifact_name: str, out_path: str
-    ) -> None:
-        download_link = project.get_artifact_link(artifact_name)
-        try:
-            response = requests.get(download_link)
-            if response.status_code == 200:
-                with open_artifact(out_path, "wb") as out:
-                    out.write(response.content)
-        except:
-            logger.warning(f"Failed to download `{artifact_name}`")
 
     def sqs_score_from_full_report(self, report: dict[str, Any]) -> Optional[int]:
         with suppress(KeyError):

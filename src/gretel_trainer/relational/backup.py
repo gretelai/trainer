@@ -3,7 +3,6 @@ from __future__ import annotations
 from dataclasses import asdict, dataclass
 from typing import Any, Optional, Union
 
-from gretel_trainer.relational.artifacts import ArtifactCollection
 from gretel_trainer.relational.core import ForeignKey, RelationalData, Scope
 from gretel_trainer.relational.json import InventedTableMetadata, ProducerMetadata
 
@@ -104,7 +103,7 @@ class Backup:
     project_name: str
     strategy: str
     refresh_interval: int
-    artifact_collection: ArtifactCollection
+    source_archive: Optional[str]
     relational_data: BackupRelationalData
     classify: Optional[BackupClassify] = None
     transforms_train: Optional[BackupTransformsTrain] = None
@@ -134,11 +133,16 @@ class Backup:
             ],
         )
 
+        # source_archive previously was stored under artifact_collection
+        source_archive = b.get(
+            "source_archive", b.get("artifact_collection", {}).get("source_archive")
+        )
+
         backup = Backup(
             project_name=b["project_name"],
             strategy=b["strategy"],
             refresh_interval=b["refresh_interval"],
-            artifact_collection=ArtifactCollection(**b["artifact_collection"]),
+            source_archive=source_archive,
             relational_data=brd,
         )
 

@@ -7,13 +7,9 @@ from __future__ import annotations
 
 import json
 import logging
-import os
 import shutil
-import tarfile
-import tempfile
 
 from collections import defaultdict
-from dataclasses import replace
 from datetime import datetime
 from pathlib import Path
 from typing import Any, cast, Optional, Union
@@ -27,7 +23,6 @@ from gretel_client.projects import create_project, get_project, Project
 from gretel_client.projects.artifact_handlers import open_artifact
 from gretel_client.projects.jobs import ACTIVE_STATES, END_STATES, Status
 from gretel_client.projects.records import RecordHandler
-from gretel_trainer.relational.artifacts import ArtifactCollection
 from gretel_trainer.relational.backup import (
     Backup,
     BackupClassify,
@@ -118,7 +113,6 @@ class MultiTable:
         self._strategy = _validate_strategy(strategy)
         self._set_refresh_interval(refresh_interval)
         self.relational_data = relational_data
-        self._artifact_collection = ArtifactCollection(hybrid=self._hybrid)
         self._extended_sdk = ExtendedGretelSDK(hybrid=self._hybrid)
         self._latest_backup: Optional[Backup] = None
         self._classify = Classify()
@@ -154,16 +148,18 @@ class MultiTable:
             logger.info(
                 f"Created project `{self._project.display_name}` with unique name `{self._project.name}`."
             )
-        self._set_output_handler(output_handler)
-        self._create_debug_summary()
+        self._set_output_handler(output_handler, None)
+        self._output_handler.save_debug_summary(self.relational_data.debug_summary())
         self._upload_sources_to_project()
 
-    def _set_output_handler(self, output_handler: Optional[OutputHandler]) -> None:
+    def _set_output_handler(
+        self, output_handler: Optional[OutputHandler], source_archive: Optional[str]
+    ) -> None:
         self._output_handler = output_handler or SDKOutputHandler(
             workdir=self._project.name,
             project=self._project,
             hybrid=self._hybrid,
-            artifact_collection=self._artifact_collection,
+            source_archive=source_archive,
         )
 
     def _complete_init_from_backup(self, backup: Backup) -> None:
@@ -172,29 +168,31 @@ class MultiTable:
         logger.info(
             f"Connected to existing project `{self._project.display_name}` with unique name `{self._project.name}`."
         )
-        self._artifact_collection = backup.artifact_collection
-        self._set_output_handler(None)
+        self._set_output_handler(None, backup.source_archive)
         # We currently only support restoring from backup via the SDK, so we know the concrete type of the output handler
         # (and set it here so pyright doesn't complain about us peeking in to a private attribute).
         self._output_handler = cast(SDKOutputHandler, self._output_handler)
 
         # RelationalData
         source_archive_path = self._output_handler.filepath_for("source_tables.tar.gz")
-        source_archive_id = backup.artifact_collection.source_archive
+        source_archive_id = self._output_handler.get_source_archive()
         if source_archive_id is not None:
-            self._extended_sdk.download_tar_artifact(
-                self._project,
-                source_archive_id,
-                source_archive_path,
+            self._extended_sdk.download_file_artifact(
+                gretel_object=self._project,
+                artifact_name=source_archive_id,
+                out_path=source_archive_path,
             )
         if not Path(source_archive_path).exists():
             raise MultiTableException(
                 "Cannot restore from backup: source archive is missing."
             )
-        with tarfile.open(source_archive_path, "r:gz") as tar:
-            tar.extractall(path=self._output_handler._working_dir)
+        shutil.unpack_archive(
+            filename=source_archive_path,
+            extract_dir=self._output_handler._working_dir,
+            format="gztar",
+        )
         for table_name, table_backup in backup.relational_data.tables.items():
-            source_data = self._output_handler.filepath_for(f"source_{table_name}.csv")
+            source_data = self._output_handler.filepath_for(f"{table_name}.csv")
             invented_table_metadata = None
             producer_metadata = None
             if (imeta := table_backup.invented_table_metadata) is not None:
@@ -216,33 +214,7 @@ class MultiTable:
                 referred_columns=fk_backup.referred_columns,
             )
 
-        # Debug summary
-        debug_summary_id = backup.artifact_collection.gretel_debug_summary
-        if debug_summary_id is not None:
-            self._extended_sdk.download_file_artifact(
-                self._project,
-                debug_summary_id,
-                self._output_handler.filepath_for("_gretel_debug_summary.json"),
-            )
-
         # Classify
-        ## First, download the outputs archive if present and extract the data.
-        classify_outputs_archive_path = self._output_handler.filepath_for(
-            "classify_outputs.tar.gz"
-        )
-        if (
-            classify_outputs_archive_id := backup.artifact_collection.classify_outputs_archive
-        ) is not None:
-            self._extended_sdk.download_tar_artifact(
-                self._project,
-                classify_outputs_archive_id,
-                classify_outputs_archive_path,
-            )
-        if Path(classify_outputs_archive_path).exists():
-            with tarfile.open(classify_outputs_archive_path, "r:gz") as tar:
-                tar.extractall(path=self._output_handler._working_dir)
-
-        ## Then, restore model state if present
         backup_classify = backup.classify
         if backup_classify is None:
             logger.info("No classify data found in backup.")
@@ -267,28 +239,10 @@ class MultiTable:
         # Synthetics Train
         backup_synthetics_train = backup.synthetics_train
         if backup_synthetics_train is None:
-            logger.info(
-                "No synthetics training data found in backup. From here, your next step is to call `train`."
-            )
+            logger.info("No synthetics training data found in backup.")
             return None
 
         logger.info("Restoring synthetics models")
-
-        synthetics_training_archive_path = self._output_handler.filepath_for(
-            "synthetics_training.tar.gz"
-        )
-        synthetics_training_archive_id = (
-            self._artifact_collection.synthetics_training_archive
-        )
-        if synthetics_training_archive_id is not None:
-            self._extended_sdk.download_tar_artifact(
-                self._project,
-                synthetics_training_archive_id,
-                synthetics_training_archive_path,
-            )
-        if Path(synthetics_training_archive_path).exists():
-            with tarfile.open(synthetics_training_archive_path, "r:gz") as tar:
-                tar.extractall(path=self._output_handler._working_dir)
 
         self._synthetics_train.lost_contact = backup_synthetics_train.lost_contact
         self._synthetics_train.models = {
@@ -303,10 +257,12 @@ class MultiTable:
         ]
         if len(still_in_progress) > 0:
             logger.warning(
-                f"Training still in progress for tables `{still_in_progress}`. From here, your next step is to wait for training to finish, and re-attempt restoring from backup once all models have completed training. You can view training progress in the Console in the `{self._project.display_name} ({self._project.name})` project."
+                f"Cannot restore at this time: model training still in progress for tables `{still_in_progress}`. "
+                "Please wait for training to finish, and re-attempt restoring from backup once all models have completed training. "
+                f"You can view training progress in the Console here: {self._project.get_console_url()}"
             )
             raise MultiTableException(
-                "Cannot restore while model training is actively in progress."
+                "Cannot restore while model training is actively in progress. Wait for training to finish and try again."
             )
 
         training_failed = [
@@ -316,50 +272,16 @@ class MultiTable:
         ]
         if len(training_failed) > 0:
             logger.info(
-                f"Training failed for tables: {training_failed}. From here, your next step is to try retraining them with modified data by calling `retrain_tables`."
+                f"Training failed for tables: {training_failed}. You may try retraining them with modified data by calling `retrain_tables`."
             )
             return None
 
         # Synthetics Generate
-        ## First, download the outputs archive if present and extract the data.
-        synthetics_output_archive_path = self._output_handler.filepath_for(
-            "synthetics_outputs.tar.gz"
-        )
-        synthetics_outputs_archive_id = (
-            self._artifact_collection.synthetics_outputs_archive
-        )
-        any_outputs = False
-        if synthetics_outputs_archive_id is not None:
-            self._extended_sdk.download_tar_artifact(
-                self._project,
-                synthetics_outputs_archive_id,
-                synthetics_output_archive_path,
-            )
-        if Path(synthetics_output_archive_path).exists():
-            any_outputs = True
-            # Extract the nested archives to a temporary directory, and then
-            # extract the contents of each run archive to a subdir in the working directory
-            with tarfile.open(
-                synthetics_output_archive_path, "r:gz"
-            ) as tar, tempfile.TemporaryDirectory() as tmpdir:
-                tar.extractall(path=tmpdir)
-                for run_tar in os.listdir(tmpdir):
-                    with tarfile.open(f"{tmpdir}/{run_tar}", "r:gz") as rt:
-                        rt.extractall(
-                            path=self._output_handler._working_dir
-                            / run_tar.removesuffix(".tar.gz")
-                        )
-
-        ## Then, restore latest, potentially in-progress run data if present
         backup_generate = backup.generate
         if backup_generate is None:
-            if any_outputs:
-                # We shouldn't ever encounter this branch in the wild, but we define some guidance to log just in case.
-                msg = "Backup included synthetics outputs archive but no latest run detail. Review previous runs' outputs (see CSVs and reports in the local directory), or start a new one by calling `generate`."
-            else:
-                # This branch is definitely possible / more likely.
-                msg = "No generation jobs had been started in previous instance. From here, your next step is to call `generate`."
-            logger.info(msg)
+            logger.info(
+                "No synthetic generation jobs had been started in previous instance."
+            )
             return None
 
         record_handlers = {
@@ -374,55 +296,17 @@ class MultiTable:
             record_handlers=record_handlers,
         )
 
+        artifact_keys = [artifact["key"] for artifact in self._project.artifacts]
         latest_run_id = self._synthetics_run.identifier
-        dir_contents = os.listdir(self._output_handler._working_dir)
-        if latest_run_id in dir_contents:
-            # Latest backup was taken at a stable point (nothing actively in progress).
-            for table in self.relational_data.list_all_tables():
-                try:
-                    self.synthetic_output_tables[table] = pd.read_csv(
-                        self._output_handler.filepath_for(
-                            f"synth_{table}.csv", subdir=latest_run_id
-                        )
-                    )
-                except FileNotFoundError:
-                    logger.info(
-                        f"Could not find synthetic CSV for table `{table}` in run outputs."
-                    )
-
-                try:
-                    self._attach_existing_reports(latest_run_id, table)
-                except FileNotFoundError:
-                    logger.info(
-                        f"Could not find report data for table `{table}` in run outputs."
-                    )
+        if any(latest_run_id in artifact_key for artifact_key in artifact_keys):
             logger.info(
-                f"All tasks for generation run `{latest_run_id}` finished prior to backup. From here, you can review your synthetic data in CSV format along with the relational report in the local working directory."
+                f"Results of most recent run `{latest_run_id}` can be reviewed by downloading the output archive from the project; visit {self._project.get_console_url()}"
             )
-            return None
         else:
-            # Latest run was still in progress. Download any seeds we may have previously created.
-            for table, rh in record_handlers.items():
-                data_source = rh.data_source
-                if data_source is not None:
-                    out_path = self._output_handler.filepath_for(
-                        f"synthetics_seed_{table}.csv",
-                        subdir=backup_generate.identifier,
-                    )
-                    try:
-                        self._extended_sdk.download_file_artifact(
-                            self._project,
-                            data_source,
-                            out_path,
-                        )
-                    except:
-                        logger.warning(
-                            f"Could not download seed CSV data source for `{table}`. It may have already been deleted."
-                        )
             logger.info(
-                f"At time of last backup, generation run `{latest_run_id}` was still in progress. From here, you can attempt to resume that generate job via `generate(resume=True)`, or restart generation from scratch via a regular call to `generate`."
+                f"At time of last backup, generation run `{latest_run_id}` was still in progress. "
+                "You can attempt to resume that generate job via `generate(resume=True)`, or restart generation from scratch via a regular call to `generate`."
             )
-            return None
 
     @classmethod
     def restore(cls, backup_file: str) -> MultiTable:
@@ -455,7 +339,7 @@ class MultiTable:
             project_name=self._project.name,
             strategy=self._strategy.name,
             refresh_interval=self._refresh_interval,
-            artifact_collection=replace(self._artifact_collection),
+            source_archive=self._output_handler.get_source_archive(),
             relational_data=BackupRelationalData.from_relational_data(
                 self.relational_data
             ),
@@ -530,13 +414,6 @@ class MultiTable:
                 self._refresh_interval = 30
             else:
                 self._refresh_interval = interval
-
-    def _create_debug_summary(self) -> None:
-        content = {
-            "relational_data": self.relational_data.debug_summary(),
-            "strategy": self._strategy.name,
-        }
-        self._output_handler.save_debug_summary(content)
 
     def classify(self, config: GretelModelConfig, all_rows: bool = False) -> None:
         classify_data_sources = {}
@@ -781,8 +658,6 @@ class MultiTable:
                 data_source=training_paths[table_name],
             )
             self._synthetics_train.models[table_name] = model
-
-        self._output_handler.save_synthetics_training_files(training_paths)
 
         self._backup()
 
@@ -1103,20 +978,6 @@ class MultiTable:
         with open_artifact(filepath, "w") as report:
             html_content = ReportRenderer().render(presenter)
             report.write(html_content)
-
-    def _attach_existing_reports(self, run_id: str, table: str) -> None:
-        individual_path = self._output_handler.filepath_for(
-            f"synthetics_individual_evaluation_{table}.json", subdir=run_id
-        )
-        cross_table_path = self._output_handler.filepath_for(
-            f"synthetics_cross_table_evaluation_{table}.json", subdir=run_id
-        )
-
-        individual_report_json = json.loads(open_artifact(individual_path).read())
-        cross_table_report_json = json.loads(open_artifact(cross_table_path).read())
-
-        self._evaluations[table].individual_report_json = individual_report_json
-        self._evaluations[table].cross_table_report_json = cross_table_report_json
 
     def _validate_synthetics_config(self, config_dict: dict[str, Any]) -> None:
         """
