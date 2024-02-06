@@ -551,6 +551,9 @@ class TableExtractor:
         if self._config.entire_table:
             logger.debug(f"Extracting entire table: {table_name}")
             with engine.connect() as conn:
+                if schema:
+                    # prepend schema if not in the name
+                    table_name = f"{schema}.{table_name}"
                 df_iter = pd.read_sql_table(
                     table_name, conn, chunksize=self._chunk_size
                 )
