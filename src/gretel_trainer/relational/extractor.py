@@ -555,7 +555,7 @@ class TableExtractor:
                     # prepend schema if not in the name
                     table_name = f"{schema}.{table_name}"
                 df_iter = pd.read_sql_table(
-                    table_name, conn, chunksize=self._chunk_size
+                    table_name, conn, chunksize=self._chunk_size, schema=schema
                 )
                 sampled_count = _stream_df_to_path(df_iter, table_path)
 
