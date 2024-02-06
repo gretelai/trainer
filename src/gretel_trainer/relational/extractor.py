@@ -1,6 +1,7 @@
 """
 Extract database or data warehouse SQL tables to flat files with optional subsetting.
 """
+
 from __future__ import annotations
 
 import logging
@@ -242,9 +243,11 @@ class TableExtractor:
         self.table_order = []
         self._chunk_size = 50_000
 
-    def _get_table_session(self, table_name: str) -> _TableSession:
+    def _get_table_session(
+        self, table_name: str, schema: Optional[str] = None
+    ) -> _TableSession:
         metadata = MetaData()
-        metadata.reflect(only=[table_name], bind=self._connector.engine)
+        metadata.reflect(only=[table_name], bind=self._connector.engine, schema=schema)
         table = metadata.tables[table_name]
         return _TableSession(table=table, engine=self._connector.engine)
 
@@ -515,13 +518,16 @@ class TableExtractor:
         )
 
     def _sample_table(
-        self, table_name: str, child_tables: Optional[list[str]] = None
+        self,
+        table_name: str,
+        child_tables: Optional[list[str]] = None,
+        schema: Optional[str] = None,
     ) -> TableMetadata:
         if self._relational_data.is_empty:
             self._extract_schema()
 
         table_path = self._table_path(table_name)
-        table_session = self._get_table_session(table_name)
+        table_session = self._get_table_session(table_name, schema=schema)
         engine = self._connector.engine
 
         # First we'll create our table file on disk and bootstrap
@@ -573,7 +579,7 @@ class TableExtractor:
             column_count=table_session.total_column_count,
         )
 
-    def sample_tables(self) -> dict[str, TableMetadata]:
+    def sample_tables(self, schema: Optional[str] = None) -> dict[str, TableMetadata]:
         """
         Extract database tables according to the `ExtractorConfig.` Tables will be stored in the
         configured storage directory that is configured on the `ExtractorConfig` object.
@@ -584,7 +590,9 @@ class TableExtractor:
         table_data = {}
         for table_name in self.table_order:
             child_tables = self._relational_data.get_descendants(table_name)
-            meta = self._sample_table(table_name, child_tables=child_tables)
+            meta = self._sample_table(
+                table_name, child_tables=child_tables, schema=schema
+            )
             table_data[table_name] = meta
 
         return table_data

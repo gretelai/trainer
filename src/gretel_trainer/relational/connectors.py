@@ -103,7 +103,7 @@ class Connector:
         extractor = TableExtractor(
             config=config, connector=self, storage_dir=storage_dir_path
         )
-        extractor.sample_tables()
+        extractor.sample_tables(schema=schema)
 
         # We ensure to re-create RelationalData after extraction so
         # we can account for any embedded JSON. This also loads
