@@ -248,6 +248,9 @@ class TableExtractor:
     ) -> _TableSession:
         metadata = MetaData()
         metadata.reflect(only=[table_name], bind=self._connector.engine, schema=schema)
+        if table_name not in metadata.tables and schema:
+            # prepend schema if not in the name
+            table_name = f"{schema}.{table_name}"
         table = metadata.tables[table_name]
         return _TableSession(table=table, engine=self._connector.engine)
 
