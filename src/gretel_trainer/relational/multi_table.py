@@ -18,7 +18,7 @@ import pandas as pd
 
 import gretel_trainer.relational.ancestry as ancestry
 
-from gretel_client.config import get_session_config, RunnerMode
+from gretel_client.config import add_session_context, ClientConfig, RunnerMode
 from gretel_client.projects import create_project, get_project, Project
 from gretel_client.projects.artifact_handlers import open_artifact
 from gretel_client.projects.jobs import ACTIVE_STATES, END_STATES, Status
@@ -69,6 +69,8 @@ from gretel_trainer.relational.workflow_state import (
     TransformsTrain,
 )
 
+RELATIONAL_SESSION_METADATA = {"trainer_relational": "1"}
+
 logger = logging.getLogger(__name__)
 
 
@@ -95,6 +97,7 @@ class MultiTable:
         refresh_interval: Optional[int] = None,
         backup: Optional[Backup] = None,
         output_handler: Optional[OutputHandler] = None,
+        session: Optional[ClientConfig] = None,
     ):
         if project_display_name is not None and project is not None:
             raise MultiTableException(
@@ -110,6 +113,7 @@ class MultiTable:
                 "You may need to remove some foreign keys to ensure no cycles exist."
             )
 
+        self._session = _configure_session(project, session)
         self._strategy = _validate_strategy(strategy)
         self._set_refresh_interval(refresh_interval)
         self.relational_data = relational_data
@@ -141,13 +145,17 @@ class MultiTable:
         project: Optional[Project],
         output_handler: Optional[OutputHandler],
     ) -> None:
-        self._project = project or create_project(
-            display_name=project_display_name or "multi-table"
-        )
         if project is None:
+            self._project = create_project(
+                display_name=project_display_name or "multi-table",
+                session=self._session,
+            )
             logger.info(
                 f"Created project `{self._project.display_name}` with unique name `{self._project.name}`."
             )
+        else:
+            self._project = project.with_session(self._session)
+
         self._set_output_handler(output_handler, None)
         self._output_handler.save_debug_summary(self.relational_data.debug_summary())
         self._upload_sources_to_project()
@@ -164,7 +172,7 @@ class MultiTable:
 
     def _complete_init_from_backup(self, backup: Backup) -> None:
         # Raises GretelProjectEror if not found
-        self._project = get_project(name=backup.project_name)
+        self._project = get_project(name=backup.project_name, session=self._session)
         logger.info(
             f"Connected to existing project `{self._project.display_name}` with unique name `{self._project.name}`."
         )
@@ -309,7 +317,11 @@ class MultiTable:
             )
 
     @classmethod
-    def restore(cls, backup_file: str) -> MultiTable:
+    def restore(
+        cls,
+        backup_file: str,
+        session: Optional[ClientConfig] = None,
+    ) -> MultiTable:
         """
         Create a `MultiTable` instance from a backup file.
         """
@@ -322,6 +334,7 @@ class MultiTable:
             strategy=backup.strategy,
             refresh_interval=backup.refresh_interval,
             backup=backup,
+            session=session,
         )
 
     def _backup(self) -> None:
@@ -391,7 +404,7 @@ class MultiTable:
 
     @property
     def _hybrid(self) -> bool:
-        return get_session_config().default_runner == RunnerMode.HYBRID
+        return self._session.default_runner == RunnerMode.HYBRID
 
     @property
     def evaluations(self) -> dict[str, TableEvaluation]:
@@ -993,6 +1006,17 @@ class MultiTable:
                     f"Invalid gretel model requested: {model_key}. "
                     f"The selected strategy supports: {supported_models}."
                 )
+
+
+def _configure_session(
+    project: Optional[Project], session: Optional[ClientConfig]
+) -> ClientConfig:
+    if session is None and project is not None:
+        session = project.session
+
+    return add_session_context(
+        session=session, client_metrics=RELATIONAL_SESSION_METADATA
+    )
 
 
 def _validate_strategy(strategy: str) -> Union[IndependentStrategy, AncestralStrategy]:

@@ -5,11 +5,11 @@ import shutil
 
 from inspect import isclass
 from pathlib import Path
-from typing import cast, Optional, Type, Union
+from typing import cast, Optional, Union
 
 import pandas as pd
 
-from gretel_client.config import get_session_config
+from gretel_client.config import add_session_context, ClientConfig
 from gretel_trainer.benchmark.core import BenchmarkConfig, BenchmarkException, Dataset
 from gretel_trainer.benchmark.custom.models import CustomModel
 from gretel_trainer.benchmark.gretel.models import GretelModel
@@ -23,12 +23,15 @@ from gretel_trainer.benchmark.session import Session
 
 logger = logging.getLogger(__name__)
 
+BENCHMARK_SESSION_METADATA = {"trainer_benchmark": "1"}
+
 
 def compare(
     *,
     datasets: list[DatasetTypes],
     models: list[ModelTypes],
     config: Optional[BenchmarkConfig] = None,
+    session: Optional[ClientConfig] = None,
 ) -> Session:
     cross_product: list[tuple[DatasetTypes, ModelTypes]] = []
 
@@ -39,23 +42,28 @@ def compare(
         for model in models:
             cross_product.append((dataset, model))
 
-    return _entrypoint(jobs=cross_product, config=config)
+    return _entrypoint(jobs=cross_product, config=config, session=session)
 
 
 def launch(
     *,
     jobs: list[tuple[DatasetTypes, ModelTypes]],
     config: Optional[BenchmarkConfig] = None,
+    session: Optional[ClientConfig] = None,
 ) -> Session:
-    return _entrypoint(jobs=jobs, config=config)
+    return _entrypoint(jobs=jobs, config=config, session=session)
 
 
 def _entrypoint(
     *,
     jobs: list[tuple[DatasetTypes, ModelTypes]],
-    config: Optional[BenchmarkConfig] = None,
+    config: Optional[BenchmarkConfig],
+    session: Optional[ClientConfig],
 ) -> Session:
-    _verify_client_config()
+    session = add_session_context(
+        session=session, client_metrics=BENCHMARK_SESSION_METADATA
+    )
+    _verify_client_config(session)
     config = config or BenchmarkConfig()
 
     working_dir_cleanup = lambda: None
@@ -76,13 +84,13 @@ def _entrypoint(
         working_dir_cleanup()
         raise e
 
-    session = Session(jobs=job_specs, config=config)
+    session = Session(jobs=job_specs, config=config, session=session)
     return session.prepare().execute()
 
 
-def _verify_client_config():
+def _verify_client_config(session: ClientConfig):
     try:
-        current_user_email = get_session_config().email
+        current_user_email = session.email
         logger.info(f"Using gretel client configured with {current_user_email}!r")
     except Exception as e:
         raise BenchmarkException(

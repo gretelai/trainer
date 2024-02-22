@@ -9,6 +9,7 @@ import pandas as pd
 
 from typing_extensions import TypeGuard
 
+from gretel_client.config import ClientConfig
 from gretel_client.helpers import poll
 from gretel_client.projects import create_project, Project, search_projects
 from gretel_client.projects.jobs import Job
@@ -39,10 +40,12 @@ class Session:
         self,
         *,
         jobs: list[JobSpec[AnyModelType]],
-        config: Optional[BenchmarkConfig] = None,
+        config: BenchmarkConfig,
+        session: ClientConfig,
     ):
         self._jobs = jobs
-        self._config = config or BenchmarkConfig()
+        self._config = config
+        self._session = session
 
         _validate_jobs(self._config, jobs)
 
@@ -66,7 +69,7 @@ class Session:
         if self._config.trainer:
             display_name = f"{display_name}-evaluate"
 
-        return create_project(display_name=display_name)
+        return create_project(display_name=display_name, session=self._session)
 
     def prepare(self) -> Session:
         self._project = self._make_project()
@@ -160,7 +163,9 @@ class Session:
         self._project.delete()
 
         if self._config.trainer:
-            for project in search_projects(query=self._config.project_display_name):
+            for project in search_projects(
+                query=self._config.project_display_name, session=self._session
+            ):
                 project.delete()
 
     def _result_dict(self, run_key: RunKey) -> dict[str, Any]:

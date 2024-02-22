@@ -11,7 +11,7 @@ from typing import Optional
 
 import pandas as pd
 
-from gretel_client.config import get_session_config, RunnerMode
+from gretel_client.config import add_session_context, ClientConfig, RunnerMode
 from gretel_client.projects import create_or_get_unique_project
 from gretel_trainer import runner, strategy
 from gretel_trainer.models import _BaseConfig, determine_best_model
@@ -28,6 +28,8 @@ _ACCEPTABLE_CHARS = set(
     + [chr(c) for c in range(ord("0"), ord("9") + 1)]
     + ["-"]
 )
+
+TRAINER_SESSION_METADATA = {"trainer_partitioning": "1"}
 
 
 def _sanitize_name(name: str):
@@ -55,11 +57,17 @@ class Trainer:
         model_type: Optional[_BaseConfig] = None,
         cache_file: Optional[str] = None,
         overwrite: bool = True,
+        session: Optional[ClientConfig] = None,
     ):
         self.dataset_path: Optional[Path] = None
         self.run = None
         self.project_name = project_name
-        self.project = create_or_get_unique_project(name=project_name)
+        self.session = add_session_context(
+            session=session, client_metrics=TRAINER_SESSION_METADATA
+        )
+        self.project = create_or_get_unique_project(
+            name=project_name, session=self.session
+        )
         self.overwrite = overwrite
         cache_file = cache_file or f"{project_name}-runner.json"
         self.cache_file = self._get_cache_file(cache_file)
@@ -75,7 +83,10 @@ class Trainer:
 
     @classmethod
     def load(
-        cls, cache_file: str = DEFAULT_CACHE, project_name: str = DEFAULT_PROJECT
+        cls,
+        cache_file: str = DEFAULT_CACHE,
+        project_name: str = DEFAULT_PROJECT,
+        session: Optional[ClientConfig] = None,
     ) -> Trainer:
         """Load an existing project from a cache.
 
@@ -90,9 +101,17 @@ class Trainer:
             raise ValueError(
                 f"Unable to find `{cache_file}`. Please specify a valid cache_file."
             )
+        session = add_session_context(
+            session=session, client_metrics=TRAINER_SESSION_METADATA
+        )
 
-        project = create_or_get_unique_project(name=project_name)
-        trainer = cls(cache_file=cache_file, project_name=project_name, overwrite=False)
+        create_or_get_unique_project(name=project_name, session=session)
+        trainer = cls(
+            cache_file=cache_file,
+            project_name=project_name,
+            overwrite=False,
+            session=session,
+        )
 
         # Cache file does not store all the data needed to fully rehydrate a StrategyRunner, but
         # 1) we don't need all the attributes to generate data from existing trained models, and
@@ -183,7 +202,7 @@ class Trainer:
 
     @property
     def _hybrid(self) -> bool:
-        return get_session_config().default_runner == RunnerMode.HYBRID
+        return self.session.default_runner == RunnerMode.HYBRID
 
     def _preprocess_data(
         self, dataset_path: str, delimiter: str, round_decimals: int = 4

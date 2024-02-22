@@ -1,6 +1,7 @@
 from pathlib import Path
 from typing import Optional
 
+from gretel_client.config import ClientConfig
 from gretel_trainer import Trainer
 from gretel_trainer.benchmark.core import (
     BenchmarkConfig,
@@ -20,11 +21,13 @@ class GretelTrainerStrategy:
         run_identifier: str,
         project_name: str,
         config: BenchmarkConfig,
+        session: ClientConfig,
     ):
         self.job_spec = job_spec
         self.run_identifier = run_identifier
         self.project_name = project_name
         self.config = config
+        self.session = session
 
         self.trainer: Optional[Trainer] = None
         self.train_timer: Optional[Timer] = None
@@ -52,6 +55,7 @@ class GretelTrainerStrategy:
             project_name=self.project_name,
             model_type=self.benchmark_model.trainer_model_type,
             cache_file=str(self.config.working_dir / f"{self.run_identifier}.json"),
+            session=self.session,
         )
         self.train_timer = Timer()
         with self.train_timer:
