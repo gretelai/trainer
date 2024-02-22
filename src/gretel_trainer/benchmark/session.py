@@ -264,6 +264,7 @@ class Session:
                 run_identifier=run_identifier,
                 project_name=trainer_project_name,
                 config=self._config,
+                session=self._session,
             )
         else:
             return GretelSDKStrategy(
