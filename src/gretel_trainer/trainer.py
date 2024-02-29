@@ -15,6 +15,7 @@ from gretel_client.config import add_session_context, ClientConfig, RunnerMode
 from gretel_client.projects import create_or_get_unique_project
 from gretel_trainer import runner, strategy
 from gretel_trainer.models import _BaseConfig, determine_best_model
+from gretel_trainer.version import get_trainer_version
 
 logger = logging.getLogger(__name__)
 logger.setLevel("DEBUG")
@@ -29,7 +30,7 @@ _ACCEPTABLE_CHARS = set(
     + ["-"]
 )
 
-TRAINER_SESSION_METADATA = {"trainer_partitioning": "1"}
+TRAINER_SESSION_METADATA = {"trainer_partitioning": get_trainer_version()}
 
 
 def _sanitize_name(name: str):

@@ -68,8 +68,9 @@ from gretel_trainer.relational.workflow_state import (
     SyntheticsTrain,
     TransformsTrain,
 )
+from gretel_trainer.version import get_trainer_version
 
-RELATIONAL_SESSION_METADATA = {"trainer_relational": "1"}
+RELATIONAL_SESSION_METADATA = {"trainer_relational": get_trainer_version()}
 
 logger = logging.getLogger(__name__)
 

@@ -20,10 +20,11 @@ from gretel_trainer.benchmark.job_spec import (
     ModelTypes,
 )
 from gretel_trainer.benchmark.session import Session
+from gretel_trainer.version import get_trainer_version
 
 logger = logging.getLogger(__name__)
 
-BENCHMARK_SESSION_METADATA = {"trainer_benchmark": "1"}
+BENCHMARK_SESSION_METADATA = {"trainer_benchmark": get_trainer_version()}
 
 
 def compare(
