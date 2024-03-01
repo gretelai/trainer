@@ -4,7 +4,8 @@ from collections import defaultdict
 from unittest.mock import Mock
 
 from gretel_trainer.relational.table_evaluation import TableEvaluation
-from gretel_trainer.relational.tasks import SyntheticsEvaluateTask
+from gretel_trainer.relational.task_runner import TaskContext
+from gretel_trainer.relational.tasks.synthetics_evaluate import SyntheticsEvaluateTask
 
 
 def test_sets_json_data_on_evaluations(output_handler, project):
@@ -19,16 +20,21 @@ def test_sets_json_data_on_evaluations(output_handler, project):
     evaluations = defaultdict(lambda: TableEvaluation())
     ext_sdk = Mock()
     ext_sdk.download_file_artifact.side_effect = mock_download_file_artifact
-    multitable = Mock(_extended_sdk=ext_sdk)
+    context = TaskContext(
+        in_flight_jobs=0,
+        refresh_interval=0,
+        project=project,
+        extended_sdk=ext_sdk,
+        backup=lambda: None,
+    )
 
     task = SyntheticsEvaluateTask(
         individual_evaluate_models={"users": ind_users_model},
         cross_table_evaluate_models={},
-        project=project,
         subdir="run",
         output_handler=output_handler,
         evaluations=evaluations,
-        multitable=multitable,
+        ctx=context,
     )
 
     output_handler.make_subdirectory("run")

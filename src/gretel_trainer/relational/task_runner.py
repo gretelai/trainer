@@ -1,7 +1,10 @@
 import logging
 
 from collections import defaultdict
-from typing import Protocol
+from dataclasses import dataclass
+from typing import Callable, Protocol
+
+import gretel_trainer.relational.tasks.common as common
 
 from gretel_client.projects.jobs import END_STATES, Job, Status
 from gretel_client.projects.projects import Project
@@ -12,7 +15,29 @@ MAX_REFRESH_ATTEMPTS = 3
 logger = logging.getLogger(__name__)
 
 
+@dataclass
+class TaskContext:
+    in_flight_jobs: int
+    refresh_interval: int
+    project: Project
+    extended_sdk: ExtendedGretelSDK
+    backup: Callable[[], None]
+
+    def maybe_start_job(self, job: Job, table_name: str, action: str) -> None:
+        self.in_flight_jobs += self.extended_sdk.start_job_if_possible(
+            job=job,
+            table_name=table_name,
+            action=action,
+            project=self.project,
+            in_flight_jobs=self.in_flight_jobs,
+        )
+
+
 class Task(Protocol):
+    @property
+    def ctx(self) -> TaskContext:
+        ...
+
     def action(self, job: Job) -> str:
         ...
 
@@ -20,18 +45,7 @@ class Task(Protocol):
     def table_collection(self) -> list[str]:
         ...
 
-    @property
-    def artifacts_per_job(self) -> int:
-        ...
-
-    @property
-    def project(self) -> Project:
-        ...
-
     def more_to_do(self) -> bool:
-        ...
-
-    def wait(self) -> None:
         ...
 
     def is_finished(self, table: str) -> bool:
@@ -64,7 +78,7 @@ def run_task(task: Task, extended_sdk: ExtendedGretelSDK) -> None:
         if first_pass:
             first_pass = False
         else:
-            task.wait()
+            common.wait(task.ctx.refresh_interval)
 
         for table_name in task.table_collection:
             if task.is_finished(table_name):
@@ -72,12 +86,8 @@ def run_task(task: Task, extended_sdk: ExtendedGretelSDK) -> None:
 
             job = task.get_job(table_name)
             if extended_sdk.get_job_id(job) is None:
-                extended_sdk.start_job_if_possible(
-                    job=job,
-                    table_name=table_name,
-                    action=task.action(job),
-                    project=task.project,
-                    number_of_artifacts=task.artifacts_per_job,
+                task.ctx.maybe_start_job(
+                    job=job, table_name=table_name, action=task.action(job)
                 )
                 continue
 
@@ -86,12 +96,15 @@ def run_task(task: Task, extended_sdk: ExtendedGretelSDK) -> None:
             )
 
             if refresh_attempts[table_name] >= MAX_REFRESH_ATTEMPTS:
+                task.ctx.in_flight_jobs -= 1
                 task.handle_lost_contact(table_name, job)
                 continue
 
             if status == Status.COMPLETED:
+                task.ctx.in_flight_jobs -= 1
                 task.handle_completed(table_name, job)
             elif status in END_STATES:
+                task.ctx.in_flight_jobs -= 1
                 task.handle_failed(table_name, job)
             else:
                 task.handle_in_progress(table_name, job)

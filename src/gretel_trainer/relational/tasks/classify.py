@@ -5,9 +5,9 @@ import gretel_trainer.relational.tasks.common as common
 from gretel_client.projects.artifact_handlers import open_artifact
 from gretel_client.projects.jobs import Job
 from gretel_client.projects.models import Model
-from gretel_client.projects.projects import Project
 from gretel_client.projects.records import RecordHandler
 from gretel_trainer.relational.output_handler import OutputHandler
+from gretel_trainer.relational.task_runner import TaskContext
 from gretel_trainer.relational.workflow_state import Classify
 
 
@@ -17,13 +17,13 @@ class ClassifyTask:
         classify: Classify,
         data_sources: dict[str, str],
         all_rows: bool,
-        multitable: common._MultiTable,
+        ctx: TaskContext,
         output_handler: OutputHandler,
     ):
         self.classify = classify
         self.data_sources = data_sources
         self.all_rows = all_rows
-        self.multitable = multitable
+        self.ctx = ctx
         self.output_handler = output_handler
         self.classify_record_handlers: dict[str, RecordHandler] = {}
         self.completed_models = []
@@ -42,14 +42,6 @@ class ClassifyTask:
             return "classification"
 
     @property
-    def project(self) -> Project:
-        return self.multitable._project
-
-    @property
-    def artifacts_per_job(self) -> int:
-        return 1
-
-    @property
     def table_collection(self) -> list[str]:
         return list(self.classify.models.keys())
 
@@ -64,13 +56,6 @@ class ClassifyTask:
             return any_unfinished_models or any_unfinished_record_handlers
         else:
             return any_unfinished_models
-
-    def wait(self) -> None:
-        if self.all_rows:
-            duration = self.multitable._refresh_interval
-        else:
-            duration = 15
-        common.wait(duration)
 
     @property
     def _finished_models(self) -> list[str]:
@@ -103,18 +88,14 @@ class ClassifyTask:
                     data_source=self.data_sources[table]
                 )
                 self.classify_record_handlers[table] = record_handler
-                self.multitable._extended_sdk.start_job_if_possible(
-                    job=record_handler,
-                    table_name=table,
-                    action=self.action(record_handler),
-                    project=self.project,
-                    number_of_artifacts=self.artifacts_per_job,
+                self.ctx.maybe_start_job(
+                    job=record_handler, table_name=table, action=self.action(job)
                 )
         elif isinstance(job, RecordHandler):
             self.completed_record_handlers.append(table)
             common.log_success(table, self.action(job))
         self._write_results(job=job, table=table)
-        common.cleanup(sdk=self.multitable._extended_sdk, project=self.project, job=job)
+        common.cleanup(sdk=self.ctx.extended_sdk, project=self.ctx.project, job=job)
 
     def handle_failed(self, table: str, job: Job) -> None:
         if isinstance(job, Model):
@@ -122,7 +103,7 @@ class ClassifyTask:
         elif isinstance(job, RecordHandler):
             self.failed_record_handlers.append(table)
         common.log_failed(table, self.action(job))
-        common.cleanup(sdk=self.multitable._extended_sdk, project=self.project, job=job)
+        common.cleanup(sdk=self.ctx.extended_sdk, project=self.ctx.project, job=job)
 
     def handle_lost_contact(self, table: str, job: Job) -> None:
         if isinstance(job, Model):
@@ -130,14 +111,13 @@ class ClassifyTask:
         elif isinstance(job, RecordHandler):
             self.failed_record_handlers.append(table)
         common.log_lost_contact(table)
-        common.cleanup(sdk=self.multitable._extended_sdk, project=self.project, job=job)
+        common.cleanup(sdk=self.ctx.extended_sdk, project=self.ctx.project, job=job)
 
     def handle_in_progress(self, table: str, job: Job) -> None:
-        action = self.action(job)
-        common.log_in_progress(table, job.status, action)
+        common.log_in_progress(table, job.status, self.action(job))
 
     def each_iteration(self) -> None:
-        self.multitable._backup()
+        self.ctx.backup()
 
     def _write_results(self, job: Job, table: str) -> None:
         if isinstance(job, Model):

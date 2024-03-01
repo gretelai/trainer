@@ -53,15 +53,13 @@ from gretel_trainer.relational.sdk_extras import ExtendedGretelSDK
 from gretel_trainer.relational.strategies.ancestral import AncestralStrategy
 from gretel_trainer.relational.strategies.independent import IndependentStrategy
 from gretel_trainer.relational.table_evaluation import TableEvaluation
-from gretel_trainer.relational.task_runner import run_task
-from gretel_trainer.relational.tasks import (
-    ClassifyTask,
-    SyntheticsEvaluateTask,
-    SyntheticsRunTask,
-    SyntheticsTrainTask,
-    TransformsRunTask,
-    TransformsTrainTask,
-)
+from gretel_trainer.relational.task_runner import run_task, TaskContext
+from gretel_trainer.relational.tasks.classify import ClassifyTask
+from gretel_trainer.relational.tasks.synthetics_evaluate import SyntheticsEvaluateTask
+from gretel_trainer.relational.tasks.synthetics_run import SyntheticsRunTask
+from gretel_trainer.relational.tasks.synthetics_train import SyntheticsTrainTask
+from gretel_trainer.relational.tasks.transforms_run import TransformsRunTask
+from gretel_trainer.relational.tasks.transforms_train import TransformsTrainTask
 from gretel_trainer.relational.workflow_state import (
     Classify,
     SyntheticsRun,
@@ -451,7 +449,7 @@ class MultiTable:
             classify=self._classify,
             data_sources=classify_data_sources,
             all_rows=all_rows,
-            multitable=self,
+            ctx=self._new_task_context(),
             output_handler=self._output_handler,
         )
         run_task(task, self._extended_sdk)
@@ -487,7 +485,7 @@ class MultiTable:
         self._setup_transforms_train_state(configs)
         task = TransformsTrainTask(
             transforms_train=self._transforms_train,
-            multitable=self,
+            ctx=self._new_task_context(),
         )
         run_task(task, self._extended_sdk)
 
@@ -518,7 +516,7 @@ class MultiTable:
         self._setup_transforms_train_state(configs)
         task = TransformsTrainTask(
             transforms_train=self._transforms_train,
-            multitable=self,
+            ctx=self._new_task_context(),
         )
         run_task(task, self._extended_sdk)
 
@@ -593,7 +591,7 @@ class MultiTable:
 
         task = TransformsRunTask(
             record_handlers=transforms_record_handlers,
-            multitable=self,
+            ctx=self._new_task_context(),
         )
         run_task(task, self._extended_sdk)
 
@@ -677,7 +675,7 @@ class MultiTable:
 
         task = SyntheticsTrainTask(
             synthetics_train=self._synthetics_train,
-            multitable=self,
+            ctx=self._new_task_context(),
         )
         run_task(task, self._extended_sdk)
 
@@ -828,7 +826,9 @@ class MultiTable:
             synthetics_train=self._synthetics_train,
             subdir=run_subdir,
             output_handler=self._output_handler,
-            multitable=self,
+            ctx=self._new_task_context(),
+            rel_data=self.relational_data,
+            strategy=self._strategy,
         )
         run_task(task, self._extended_sdk)
 
@@ -894,11 +894,10 @@ class MultiTable:
         synthetics_evaluate_task = SyntheticsEvaluateTask(
             individual_evaluate_models=individual_evaluate_models,
             cross_table_evaluate_models=cross_table_evaluate_models,
-            project=self._project,
             subdir=run_subdir,
             output_handler=self._output_handler,
             evaluations=self._evaluations,
-            multitable=self,
+            ctx=self._new_task_context(),
         )
         run_task(synthetics_evaluate_task, self._extended_sdk)
 
@@ -992,6 +991,15 @@ class MultiTable:
         with open_artifact(filepath, "w") as report:
             html_content = ReportRenderer().render(presenter)
             report.write(html_content)
+
+    def _new_task_context(self) -> TaskContext:
+        return TaskContext(
+            in_flight_jobs=0,
+            refresh_interval=self._refresh_interval,
+            project=self._project,
+            extended_sdk=self._extended_sdk,
+            backup=self._backup,
+        )
 
     def _validate_synthetics_config(self, config_dict: dict[str, Any]) -> None:
         """

@@ -1,34 +1,24 @@
-from dataclasses import dataclass
-from typing import Optional, Union
+from typing import Optional
 from unittest.mock import Mock, patch
 
 import pandas as pd
 import pandas.testing as pdtest
 
 from gretel_client.projects.jobs import Status
-from gretel_client.projects.projects import Project
 from gretel_trainer.relational.core import RelationalData
 from gretel_trainer.relational.output_handler import OutputHandler
-from gretel_trainer.relational.sdk_extras import (
-    ExtendedGretelSDK,
-    MAX_PROJECT_ARTIFACTS,
-)
+from gretel_trainer.relational.sdk_extras import ExtendedGretelSDK, MAX_IN_FLIGHT_JOBS
 from gretel_trainer.relational.strategies.ancestral import AncestralStrategy
-from gretel_trainer.relational.strategies.independent import IndependentStrategy
-from gretel_trainer.relational.tasks import SyntheticsRunTask
+from gretel_trainer.relational.task_runner import TaskContext
+from gretel_trainer.relational.tasks.synthetics_run import SyntheticsRunTask
 from gretel_trainer.relational.workflow_state import SyntheticsRun, SyntheticsTrain
 
 
-@dataclass
-class MockMultiTable:
-    relational_data: RelationalData
-    _refresh_interval: int = 0
-    _project: Project = Mock(artifacts=[])
-    _strategy: Union[AncestralStrategy, IndependentStrategy] = AncestralStrategy()
-    _extended_sdk: ExtendedGretelSDK = ExtendedGretelSDK(hybrid=False)
-
-    def _backup(self) -> None:
-        pass
+class MockStrategy(AncestralStrategy):
+    def post_process_individual_synthetic_result(
+        self, table_name, rel_data, synthetic_table, record_size_ratio
+    ):
+        return synthetic_table.head(1)
 
 
 def make_task(
@@ -44,7 +34,13 @@ def make_task(
         else:
             return Status.COMPLETED
 
-    multitable = MockMultiTable(relational_data=rel_data)
+    context = TaskContext(
+        in_flight_jobs=0,
+        refresh_interval=0,
+        project=Mock(),
+        extended_sdk=ExtendedGretelSDK(hybrid=False),
+        backup=lambda: None,
+    )
     return SyntheticsRunTask(
         synthetics_run=SyntheticsRun(
             identifier="generate",
@@ -65,7 +61,9 @@ def make_task(
         ),
         output_handler=output_handler,
         subdir="run-identifier",
-        multitable=multitable,
+        ctx=context,
+        strategy=MockStrategy(),
+        rel_data=rel_data,
     )
 
 
@@ -104,14 +102,6 @@ def test_runs_post_processing_when_table_completes(pets, output_handler):
 
     raw_df = pd.DataFrame(data={"col1": [1, 2], "col2": [3, 4]})
 
-    class MockStrategy:
-        def post_process_individual_synthetic_result(
-            self, table_name, rel_data, synthetic_table, record_size_ratio
-        ):
-            return synthetic_table.head(1)
-
-    task.multitable._strategy = MockStrategy()  # type:ignore
-
     with patch(
         "gretel_trainer.relational.sdk_extras.ExtendedGretelSDK.get_record_handler_data"
     ) as get_rh_data:
@@ -138,44 +128,45 @@ def test_starts_jobs_for_ready_tables(pets, output_handler):
     task.synthetics_run.record_handlers["humans"].submit.assert_called_once()
 
 
-def test_defers_jobs_if_no_room(pets, output_handler):
+def test_defers_job_submission_if_max_jobs(pets, output_handler):
     task = make_task(pets, output_handler)
-    task.multitable._project.artifacts = ["art"] * MAX_PROJECT_ARTIFACTS
 
     assert len(task.synthetics_run.record_handlers) == 0
 
+    humans_model = task.synthetics_train.models["humans"]
+
+    # If we already have the max number of jobs in flight...
+    task.ctx.in_flight_jobs = MAX_IN_FLIGHT_JOBS
+
     task.each_iteration()
 
-    # We create the record handler, but defer submitting it because the project has no room
-    # Note: the `humans` table is a parent table and ordinarily does not have a data source,
-    # and therefore wouldn't be deferred; in this context, though, the record handler object
-    # is a Mock and calling the `data_source` property returns another mock object, not None
+    # ...the record handler is created, but not submitted
     assert len(task.synthetics_run.record_handlers) == 1
     assert "humans" in task.synthetics_run.record_handlers
-    task.synthetics_train.models[
-        "humans"
-    ].create_record_handler_obj.assert_called_once()
-    task.synthetics_run.record_handlers["humans"].submit.assert_not_called()
+    humans_model.create_record_handler_obj.assert_called_once()
+    humans_record_handler = task.synthetics_run.record_handlers["humans"]
+    humans_record_handler.submit.assert_not_called()
 
-
-def test_does_not_restart_existing_deferred_jobs(pets, output_handler):
-    task = make_task(pets, output_handler)
-    task.multitable._project.artifacts = ["art"] * MAX_PROJECT_ARTIFACTS
-
-    assert len(task.synthetics_run.record_handlers) == 0
-
+    # Subsequent passes through the task loop will neither submit the job,
+    # nor recreate a new record handler instance.
+    humans_model.reset_mock()
+    task.ctx.maybe_start_job(
+        job=humans_record_handler,
+        table_name="humans",
+        action=task.action(humans_record_handler),
+    )
     task.each_iteration()
+    humans_model.create_record_handler_obj.assert_not_called()
+    humans_record_handler.submit.assert_not_called()
 
-    # We create the record handler, but defer submitting it
-    assert len(task.synthetics_run.record_handlers) == 1
-    assert "humans" in task.synthetics_run.record_handlers
-    task.synthetics_train.models[
-        "humans"
-    ].create_record_handler_obj.assert_called_once()
-    task.synthetics_run.record_handlers["humans"].submit.assert_not_called()
+    # Once there is room again for more jobs...
+    task.ctx.in_flight_jobs = 0
 
-    task.synthetics_train.models["humans"].reset_mock()
-
-    # On next iteration, we do not *re-create* a record handler object for humans
-    task.each_iteration()
-    task.synthetics_train.models["humans"].create_record_handler_obj.assert_not_called()
+    # ...the next pass through submits the record handler since there is now room for another job.
+    task.ctx.maybe_start_job(
+        job=humans_record_handler,
+        table_name="humans",
+        action=task.action(humans_record_handler),
+    )
+    humans_record_handler.submit.assert_called_once()
+    assert task.ctx.in_flight_jobs == 1

@@ -1,10 +1,12 @@
-from unittest.mock import Mock, patch, PropertyMock
+from typing import Optional
+from unittest.mock import Mock, patch
 
 import pytest
 
 from gretel_client.projects.jobs import Job, Status
-from gretel_trainer.relational.sdk_extras import MAX_PROJECT_ARTIFACTS
-from gretel_trainer.relational.task_runner import run_task
+from gretel_client.rest import ApiException
+from gretel_trainer.relational.sdk_extras import ExtendedGretelSDK
+from gretel_trainer.relational.task_runner import run_task, TaskContext
 
 
 class MockTask:
@@ -15,17 +17,16 @@ class MockTask:
         self.completed = []
         self.failed = []
         self.lost_contact = []
+        self.ctx = TaskContext(
+            in_flight_jobs=0,
+            refresh_interval=0,
+            project=project,
+            extended_sdk=ExtendedGretelSDK(hybrid=False),
+            backup=lambda: None,
+        )
 
     def action(self, job: Job) -> str:
         return "mock task"
-
-    @property
-    def artifacts_per_job(self) -> int:
-        return 3
-
-    @property
-    def multitable(self):
-        return Mock()
 
     @property
     def table_collection(self) -> list[str]:
@@ -33,9 +34,6 @@ class MockTask:
 
     def more_to_do(self) -> bool:
         return len(self.completed + self.failed + self.lost_contact) < len(self.models)
-
-    def wait(self) -> None:
-        pass
 
     def is_finished(self, table: str) -> bool:
         return table in (self.completed + self.failed + self.lost_contact)
@@ -59,147 +57,187 @@ class MockTask:
         self.iteration_count += 1
 
 
+class MockModel:
+    def __init__(self, statuses: list[Optional[str]], fail_n_times: int = 0):
+        self.identifier = None
+
+        self._statuses = statuses
+        self.status = None
+
+        self._fail_n_times = fail_n_times
+        self._fail_count = 0
+
+    def submit(self):
+        if self._fail_count < self._fail_n_times:
+            self._fail_count += 1
+            raise ApiException("Maximum number of...")
+        self.identifier = "identifier"
+
+    def refresh(self):
+        next_status = self._statuses.pop(0)
+        if next_status is None:
+            raise Exception()
+        self.status = next_status
+
+
 @pytest.fixture(autouse=True)
-def get_job_id():
-    with patch(
-        "gretel_trainer.relational.sdk_extras.ExtendedGretelSDK.get_job_id"
-    ) as _get_job_id:
-        yield _get_job_id
+def mock_extended_sdk():
+    def _get_job_id(mock_model):
+        return mock_model.identifier
+
+    extended_sdk = ExtendedGretelSDK(hybrid=False)
+    extended_sdk.get_job_id = _get_job_id  # type:ignore
+    return extended_sdk
 
 
-def test_one_successful_model(get_job_id, extended_sdk):
-    get_job_id.side_effect = [None, "id"]
-
-    project = Mock(artifacts=[])
-    model = Mock(status=Status.COMPLETED)
-    models = {"table": model}
+def test_one_successful_model(mock_extended_sdk):
+    models = {
+        "table": MockModel(statuses=[Status.COMPLETED]),
+    }
 
     task = MockTask(
-        project=project,
+        project=Mock(),
         models=models,
     )
-    run_task(task, extended_sdk)
+    run_task(task, mock_extended_sdk)
 
     assert task.iteration_count == 2
     assert task.completed == ["table"]
     assert task.failed == []
 
 
-def test_one_failed_model(get_job_id, extended_sdk):
-    get_job_id.side_effect = [None, "id"]
-
-    project = Mock(artifacts=[])
-    model = Mock(status=Status.ERROR)
-    models = {"table": model}
+def test_one_failed_model(mock_extended_sdk):
+    models = {
+        "table": MockModel(statuses=[Status.ERROR]),
+    }
 
     task = MockTask(
-        project=project,
+        project=Mock(),
         models=models,
     )
-    run_task(task, extended_sdk)
+    run_task(task, mock_extended_sdk)
 
     assert task.iteration_count == 2
     assert task.completed == []
     assert task.failed == ["table"]
 
 
-def test_model_taking_awhile(get_job_id, extended_sdk):
-    get_job_id.side_effect = [None, "id", "id"]
-
-    project = Mock(artifacts=[])
-    model = Mock()
-    status = PropertyMock(side_effect=[Status.ACTIVE, Status.COMPLETED])
-    type(model).status = status
-    models = {"table": model}
+def test_model_taking_awhile(mock_extended_sdk):
+    models = {
+        "table": MockModel(statuses=[Status.ACTIVE, Status.ACTIVE, Status.COMPLETED]),
+    }
 
     task = MockTask(
-        project=project,
+        project=Mock(),
         models=models,
     )
-    run_task(task, extended_sdk)
+    run_task(task, mock_extended_sdk)
 
-    assert task.iteration_count == 3
+    assert task.iteration_count == 4
     assert task.completed == ["table"]
     assert task.failed == []
 
 
-def test_lose_contact_with_model(get_job_id, extended_sdk):
-    get_job_id.side_effect = [None, "id", "id", "id"]
-
-    project = Mock(artifacts=[])
-    model = Mock(status=Status.ACTIVE)
-    model.refresh.side_effect = Exception()
-    models = {"table": model}
+def test_lose_contact_with_model(mock_extended_sdk):
+    # By only setting one status, subsequent calls to `refresh` will throw
+    # an IndexError (as a stand-in for SDK refresh errors)
+    models = {
+        "table": MockModel(statuses=[Status.ACTIVE]),
+    }
 
     task = MockTask(
-        project=project,
+        project=Mock(),
         models=models,
     )
-    run_task(task, extended_sdk)
+    run_task(task, mock_extended_sdk)
 
     # Bail after refresh fails MAX_REFRESH_ATTEMPTS times
-    assert task.iteration_count == 4
+    # (first iteration creates the job, +4 refresh failures)
+    assert task.iteration_count == 5
     assert task.completed == []
     assert task.failed == []
     assert task.lost_contact == ["table"]
 
 
-def test_refresh_status_can_tolerate_blips(get_job_id, extended_sdk):
-    get_job_id.side_effect = [None, "id", "id"]
-
-    project = Mock(artifacts=[])
-    model = Mock()
-    status = PropertyMock(side_effect=[Status.ACTIVE, Status.COMPLETED])
-    type(model).status = status
-    model.refresh.side_effect = [Exception(), None]
-    models = {"table": model}
+def test_refresh_status_can_tolerate_blips(mock_extended_sdk):
+    models = {
+        "table": MockModel(
+            statuses=[Status.ACTIVE, None, Status.ACTIVE, Status.COMPLETED]
+        ),
+    }
 
     task = MockTask(
-        project=project,
+        project=Mock(),
         models=models,
     )
-    run_task(task, extended_sdk)
+    run_task(task, mock_extended_sdk)
 
-    assert task.iteration_count == 3
+    # 1. Create
+    # 2. Active
+    # 3. Blip
+    # 4. Active
+    # 5. Completed
+    assert task.iteration_count == 5
     assert task.completed == ["table"]
     assert task.failed == []
     assert task.lost_contact == []
 
 
-def test_defers_submission_if_no_room_in_project(get_job_id, extended_sdk):
-    get_job_id.side_effect = [None, None, None, "id"]
-    project = Mock()
-    # First time through, we're at the project limit
-    # Second time through, we're below the limit, but still not enough room for this task
-    # Third time through, there is enough space
-    artifacts = PropertyMock(
-        side_effect=[
-            ["art"] * MAX_PROJECT_ARTIFACTS,
-            ["art"] * (MAX_PROJECT_ARTIFACTS - 1),
-            ["art"] * (MAX_PROJECT_ARTIFACTS - 3),
-        ]
-    )
-    type(project).artifacts = artifacts
-    model = Mock(status=Status.COMPLETED)
-    models = {"table": model}
+def test_defers_submission_if_max_jobs_in_flight(mock_extended_sdk):
+    model_1 = MockModel(statuses=[Status.ACTIVE, Status.COMPLETED])
+    model_2 = MockModel(statuses=[Status.ACTIVE, Status.COMPLETED])
+
+    models = {"t1": model_1, "t2": model_2}
 
     task = MockTask(
-        project=project,
+        project=Mock(),
         models=models,
     )
-    run_task(task, extended_sdk)
+    with patch("gretel_trainer.relational.sdk_extras.MAX_IN_FLIGHT_JOBS", 1):
+        run_task(task, mock_extended_sdk)
 
-    assert task.iteration_count == 4
-    assert task.completed == ["table"]
+    # 1: Started, Deferred
+    # 2: Active, Deferred
+    # 3: Completed, Started
+    # 4: Completed, Active
+    # 5: Completed, Completed
+    assert task.iteration_count == 5
+    assert task.completed == ["t1", "t2"]
 
 
-def test_several_models(extended_sdk):
-    project = Mock(artifacts=[])
+def test_defers_submission_if_max_jobs_in_created_state(mock_extended_sdk):
+    # In this test, we're not running into our client-side max jobs limit;
+    # rather, the API is not allowing us to submit due to too many jobs in created state.
+    # The second model fails to be submitted 5 times (e.g. due to other unrelated jobs)
+    # before getting submitted successfully
+    model_1 = MockModel(statuses=[Status.ACTIVE, Status.COMPLETED])
+    model_2 = MockModel(statuses=[Status.ACTIVE, Status.COMPLETED], fail_n_times=5)
 
-    completed_model = Mock(status=Status.COMPLETED)
-    error_model = Mock(status=Status.ERROR)
-    cancelled_model = Mock(status=Status.CANCELLED)
-    lost_model = Mock(status=Status.LOST)
+    models = {"t1": model_1, "t2": model_2}
+
+    task = MockTask(
+        project=Mock(),
+        models=models,
+    )
+    run_task(task, mock_extended_sdk)
+
+    # 1: Started, Deferred
+    # 2: Active, Deferred
+    # 3: Completed, Deferred
+    # 4: Completed, Deferred
+    # 5: Completed, Deferred
+    # 6: Completed, Started
+    # 7: Completed, Active
+    # 8: Completed, Completed
+    assert task.iteration_count == 8
+    assert task.completed == ["t1", "t2"]
+
+
+def test_several_models(mock_extended_sdk):
+    completed_model = MockModel(statuses=[Status.COMPLETED])
+    error_model = MockModel(statuses=[Status.ERROR])
+    cancelled_model = MockModel(statuses=[Status.CANCELLED])
+    lost_model = MockModel(statuses=[Status.LOST])
 
     models = {
         "completed": completed_model,
@@ -209,10 +247,10 @@ def test_several_models(extended_sdk):
     }
 
     task = MockTask(
-        project=project,
+        project=Mock(),
         models=models,
     )
-    run_task(task, extended_sdk)
+    run_task(task, mock_extended_sdk)
 
     assert task.completed == ["completed"]
     assert set(task.failed) == {"error", "cancelled", "lost"}

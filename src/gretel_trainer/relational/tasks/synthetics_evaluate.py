@@ -4,16 +4,14 @@ import logging
 from collections import defaultdict
 from typing import Optional
 
-import smart_open
-
 import gretel_trainer.relational.tasks.common as common
 
 from gretel_client.projects.artifact_handlers import open_artifact
 from gretel_client.projects.jobs import Job
 from gretel_client.projects.models import Model
-from gretel_client.projects.projects import Project
 from gretel_trainer.relational.output_handler import OutputHandler
 from gretel_trainer.relational.table_evaluation import TableEvaluation
+from gretel_trainer.relational.task_runner import TaskContext
 
 logger = logging.getLogger(__name__)
 
@@ -25,24 +23,22 @@ class SyntheticsEvaluateTask:
         self,
         individual_evaluate_models: dict[str, Model],
         cross_table_evaluate_models: dict[str, Model],
-        project: Project,
         subdir: str,
         output_handler: OutputHandler,
         evaluations: dict[str, TableEvaluation],
-        multitable: common._MultiTable,
+        ctx: TaskContext,
     ):
         self.jobs = {}
         for table, model in individual_evaluate_models.items():
             self.jobs[f"individual-{table}"] = model
         for table, model in cross_table_evaluate_models.items():
             self.jobs[f"cross_table-{table}"] = model
-        self.project = project
         self.subdir = subdir
         self.output_handler = output_handler
         self.evaluations = evaluations
-        self.multitable = multitable
         self.completed = []
         self.failed = []
+        self.ctx = ctx
         # Nested dict organizing by table > sqs_type > file_type, e.g.
         # {
         #     "users": {
@@ -67,15 +63,8 @@ class SyntheticsEvaluateTask:
     def table_collection(self) -> list[str]:
         return list(self.jobs.keys())
 
-    @property
-    def artifacts_per_job(self) -> int:
-        return 2
-
     def more_to_do(self) -> bool:
         return len(self.completed + self.failed) < len(self.jobs)
-
-    def wait(self) -> None:
-        common.wait(self.multitable._refresh_interval)
 
     def is_finished(self, table: str) -> bool:
         return table in (self.completed + self.failed)
@@ -85,7 +74,7 @@ class SyntheticsEvaluateTask:
 
     def handle_completed(self, table: str, job: Job) -> None:
         self.completed.append(table)
-        common.log_success(table, ACTION)
+        common.log_success(table, self.action(job))
 
         model = self.get_job(table)
         sqs_type, table_name = table.split("-", 1)
@@ -96,7 +85,7 @@ class SyntheticsEvaluateTask:
         json_filepath = self.output_handler.filepath_for(
             f"{filename_stem}.json", subdir=self.subdir
         )
-        json_ok = self.multitable._extended_sdk.download_file_artifact(
+        json_ok = self.ctx.extended_sdk.download_file_artifact(
             model, "report_json", json_filepath
         )
         if json_ok:
@@ -112,26 +101,26 @@ class SyntheticsEvaluateTask:
         html_filepath = self.output_handler.filepath_for(
             f"{filename_stem}.html", subdir=self.subdir
         )
-        html_ok = self.multitable._extended_sdk.download_file_artifact(
+        html_ok = self.ctx.extended_sdk.download_file_artifact(
             model, "report", html_filepath
         )
         if html_ok:
             self.report_filepaths[table_name][sqs_type]["html"] = html_filepath
 
-        common.cleanup(sdk=self.multitable._extended_sdk, project=self.project, job=job)
+        common.cleanup(sdk=self.ctx.extended_sdk, project=self.ctx.project, job=job)
 
     def handle_failed(self, table: str, job: Job) -> None:
         self.failed.append(table)
-        common.log_failed(table, ACTION)
-        common.cleanup(sdk=self.multitable._extended_sdk, project=self.project, job=job)
+        common.log_failed(table, self.action(job))
+        common.cleanup(sdk=self.ctx.extended_sdk, project=self.ctx.project, job=job)
 
     def handle_lost_contact(self, table: str, job: Job) -> None:
         self.failed.append(table)
         common.log_lost_contact(table)
-        common.cleanup(sdk=self.multitable._extended_sdk, project=self.project, job=job)
+        common.cleanup(sdk=self.ctx.extended_sdk, project=self.ctx.project, job=job)
 
     def handle_in_progress(self, table: str, job: Job) -> None:
-        common.log_in_progress(table, job.status, ACTION)
+        common.log_in_progress(table, job.status, self.action(job))
 
     def each_iteration(self) -> None:
         pass
