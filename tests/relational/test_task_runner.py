@@ -3,8 +3,8 @@ from unittest.mock import Mock, patch
 
 import pytest
 
+from gretel_client.projects.exceptions import MaxConcurrentJobsException
 from gretel_client.projects.jobs import Job, Status
-from gretel_client.rest import ApiException
 from gretel_trainer.relational.sdk_extras import ExtendedGretelSDK
 from gretel_trainer.relational.task_runner import run_task, TaskContext
 
@@ -70,7 +70,7 @@ class MockModel:
     def submit(self):
         if self._fail_count < self._fail_n_times:
             self._fail_count += 1
-            raise ApiException("Maximum number of...")
+            raise MaxConcurrentJobsException()
         self.identifier = "identifier"
 
     def refresh(self):

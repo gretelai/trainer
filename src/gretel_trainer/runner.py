@@ -40,10 +40,10 @@ from typing import List, Optional, Tuple, Union
 import pandas as pd
 
 from gretel_client.projects import Project
+from gretel_client.projects.exceptions import MaxConcurrentJobsException
 from gretel_client.projects.jobs import ACTIVE_STATES
 from gretel_client.projects.models import Model, Status
 from gretel_client.projects.records import RecordHandler
-from gretel_client.rest import ApiException
 from gretel_client.users.users import get_me
 from gretel_trainer.strategy import Partition, PartitionConstraints, PartitionStrategy
 
@@ -105,14 +105,9 @@ def _maybe_submit_job(
 ) -> Optional[Union[Model, RecordHandler]]:
     try:
         job = job.submit()
-    except ApiException as err:
-        if "Maximum number of" in str(err):
-            logger.warning(
-                "Rate limiting: Max jobs created, skipping new job for now..."
-            )
-            return None
-        else:
-            raise
+    except MaxConcurrentJobsException:
+        logger.warning("Rate limiting: Max jobs created, skipping new job for now...")
+        return None
 
     return job
 

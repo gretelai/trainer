@@ -7,11 +7,11 @@ from typing import Optional, Union
 import pandas as pd
 
 from gretel_client.projects.artifact_handlers import open_artifact
+from gretel_client.projects.exceptions import MaxConcurrentJobsException
 from gretel_client.projects.jobs import Job, Status
 from gretel_client.projects.models import Model
 from gretel_client.projects.projects import Project
 from gretel_client.projects.records import RecordHandler
-from gretel_client.rest import ApiException
 from gretel_trainer.relational.core import MultiTableException
 
 logger = logging.getLogger(__name__)
@@ -82,12 +82,9 @@ class ExtendedGretelSDK:
             try:
                 job.submit()
                 return 1
-            except ApiException as ex:
-                if "Maximum number of" in str(ex):
-                    self._log_waiting(table_name, action)
-                    return 0
-                else:
-                    raise
+            except MaxConcurrentJobsException:
+                self._log_waiting(table_name, action)
+                return 0
         else:
             self._log_waiting(table_name, action)
             return 0
