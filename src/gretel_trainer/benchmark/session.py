@@ -209,11 +209,13 @@ class Session:
             trainer_project_index=trainer_project_index,
             artifact_key=artifact_key,
         )
+        snapshot_dest = str(self._config.working_dir / f"{run_key.identifier}_result_data.csv")
         executor = Executor(
             strategy=strategy,
             run_identifier=run_identifier,
             evaluate_project=self._project,
             config=self._config,
+            snapshot=lambda: self.export_results(snapshot_dest),
         )
         self._gretel_executors[run_key] = executor
 
@@ -231,11 +233,13 @@ class Session:
             config=self._config,
             artifact_key=artifact_key,
         )
+        snapshot_dest = str(self._config.working_dir / f"{run_key.identifier}_result_data.csv")
         executor = Executor(
             strategy=strategy,
             run_identifier=run_identifier,
             evaluate_project=self._project,
             config=self._config,
+            snapshot=lambda: self.export_results(snapshot_dest),
         )
         self._custom_executors[run_key] = executor
 

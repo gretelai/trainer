@@ -1,7 +1,7 @@
 import logging
 
 from enum import Enum
-from typing import Optional, Protocol
+from typing import Callable, Optional, Protocol
 
 from gretel_client.projects.models import Model
 from gretel_client.projects.projects import Project
@@ -66,11 +66,13 @@ class Executor:
         run_identifier: str,
         evaluate_project: Project,
         config: BenchmarkConfig,
+        snapshot: Callable[[], None],
     ):
         self.strategy = strategy
         self.run_identifier = run_identifier
         self.evaluate_project = evaluate_project
         self.config = config
+        self.snapshot = snapshot
 
         self.status = Status.NotStarted
         self.exception: Optional[Exception] = None
@@ -81,10 +83,13 @@ class Executor:
         self._maybe_skip()
         if self.status.can_proceed:
             self._train()
+            self.snapshot()
         if self.status.can_proceed:
             self._generate()
+            self.snapshot()
         if self.status.can_proceed:
             self._evaluate()
+            self.snapshot()
 
     def get_report_score(self, key: str) -> Optional[int]:
         if self.evaluate_report_json is None:

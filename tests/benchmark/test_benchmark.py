@@ -247,15 +247,23 @@ def test_run_happy_path_gretel_sdk(
     assert result["Generate time (sec)"] == 15
     assert result["Total time (sec)"] == 45
 
-    # The synthetic data is written to the working directory
     working_dir_contents = os.listdir(working_dir)
-    assert len(working_dir_contents) == 1
+    assert len(working_dir_contents) == 2
+    print(working_dir_contents)
+
+    # The synthetic data is written to the working directory
     filename = f"synth_{model_name}-iris.csv"
     assert filename in working_dir_contents
     df = pd.read_csv(f"{working_dir}/{filename}")
     pdtest.assert_frame_equal(
         df, pd.DataFrame(data={"synthetic": [1, 2], "data": [3, 4]})
     )
+
+    # Snapshot results are written to the working directory
+    filename = f"{model_name}-iris_result_data.csv"
+    assert filename in working_dir_contents
+    df = pd.read_csv(f"{working_dir}/{filename}")
+    pdtest.assert_frame_equal(df, session.results)
 
 
 def test_sdk_model_failure(working_dir, iris, project):
