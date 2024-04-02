@@ -20,6 +20,7 @@ various models and handlers used. The context object has the following shape:
     }
 }
 """
+
 from __future__ import annotations
 
 import json

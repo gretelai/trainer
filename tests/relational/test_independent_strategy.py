@@ -18,7 +18,10 @@ def test_preparing_training_data_does_not_mutate_source_data(pets):
 
     strategy = IndependentStrategy()
 
-    with tempfile.NamedTemporaryFile() as pets_dest, tempfile.NamedTemporaryFile() as humans_dest:
+    with (
+        tempfile.NamedTemporaryFile() as pets_dest,
+        tempfile.NamedTemporaryFile() as humans_dest,
+    ):
         strategy.prepare_training_data(
             pets, {"pets": pets_dest.name, "humans": humans_dest.name}
         )
@@ -30,7 +33,10 @@ def test_preparing_training_data_does_not_mutate_source_data(pets):
 def test_prepare_training_data_removes_primary_and_foreign_keys(pets):
     strategy = IndependentStrategy()
 
-    with tempfile.NamedTemporaryFile() as pets_dest, tempfile.NamedTemporaryFile() as humans_dest:
+    with (
+        tempfile.NamedTemporaryFile() as pets_dest,
+        tempfile.NamedTemporaryFile() as humans_dest,
+    ):
         training_data = strategy.prepare_training_data(
             pets, {"pets": pets_dest.name, "humans": humans_dest.name}
         )
@@ -42,7 +48,10 @@ def test_prepare_training_data_removes_primary_and_foreign_keys(pets):
 def test_prepare_training_data_subset_of_tables(pets):
     strategy = IndependentStrategy()
 
-    with tempfile.NamedTemporaryFile() as pets_dest, tempfile.NamedTemporaryFile() as humans_dest:
+    with (
+        tempfile.NamedTemporaryFile() as pets_dest,
+        tempfile.NamedTemporaryFile() as humans_dest,
+    ):
         training_data = strategy.prepare_training_data(
             pets, {"humans": humans_dest.name}
         )
@@ -53,7 +62,10 @@ def test_prepare_training_data_subset_of_tables(pets):
 def test_prepare_training_data_join_table(insurance):
     strategy = IndependentStrategy()
 
-    with tempfile.NamedTemporaryFile() as beneficiary_dest, tempfile.NamedTemporaryFile() as policies_dest:
+    with (
+        tempfile.NamedTemporaryFile() as beneficiary_dest,
+        tempfile.NamedTemporaryFile() as policies_dest,
+    ):
         training_data = strategy.prepare_training_data(
             insurance,
             {

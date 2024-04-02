@@ -62,9 +62,10 @@ class IndependentStrategy:
                 continue
 
             source_path = rel_data.get_table_source(table)
-            with open_artifact(source_path, "rb") as src, open_artifact(
-                path, "wb"
-            ) as dest:
+            with (
+                open_artifact(source_path, "rb") as src,
+                open_artifact(path, "wb") as dest,
+            ):
                 pd.DataFrame(columns=use_columns).to_csv(dest, index=False)
                 for chunk in pd.read_csv(src, usecols=use_columns, chunksize=10_000):
                     chunk.to_csv(dest, index=False, mode="a", header=False)

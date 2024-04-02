@@ -61,11 +61,10 @@ def output_handler(tmpdir, project):
 
 @pytest.fixture()
 def project():
-    with patch(
-        "gretel_trainer.relational.multi_table.create_project"
-    ) as create_project, patch(
-        "gretel_trainer.relational.multi_table.get_project"
-    ) as get_project:
+    with (
+        patch("gretel_trainer.relational.multi_table.create_project") as create_project,
+        patch("gretel_trainer.relational.multi_table.get_project") as get_project,
+    ):
         project = Mock()
         project.name = "name"
         project.display_name = "display_name"

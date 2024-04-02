@@ -6,6 +6,7 @@ the "Connector.extract" method, a "RelationalData" instance is provided
 which you can then use with the "MultiTable" class to process data with
 Gretel Transforms, Classify, Synthetics, or a combination of both.
 """
+
 from __future__ import annotations
 
 import logging

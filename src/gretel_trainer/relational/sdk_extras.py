@@ -56,9 +56,10 @@ class ExtendedGretelSDK:
         out_path: Union[str, Path],
     ) -> bool:
         try:
-            with gretel_object.get_artifact_handle(artifact_name) as src, open_artifact(
-                out_path, "wb"
-            ) as dest:
+            with (
+                gretel_object.get_artifact_handle(artifact_name) as src,
+                open_artifact(out_path, "wb") as dest,
+            ):
                 shutil.copyfileobj(src, dest)
             return True
         except:

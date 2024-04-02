@@ -20,7 +20,10 @@ def test_preparing_training_data_does_not_mutate_source_data(pets):
 
     strategy = AncestralStrategy()
 
-    with tempfile.NamedTemporaryFile() as pets_dest, tempfile.NamedTemporaryFile() as humans_dest:
+    with (
+        tempfile.NamedTemporaryFile() as pets_dest,
+        tempfile.NamedTemporaryFile() as humans_dest,
+    ):
         strategy.prepare_training_data(
             pets, {"pets": pets_dest.name, "humans": humans_dest.name}
         )
@@ -32,7 +35,10 @@ def test_preparing_training_data_does_not_mutate_source_data(pets):
 def test_prepare_training_data_subset_of_tables(pets):
     strategy = AncestralStrategy()
 
-    with tempfile.NamedTemporaryFile() as pets_dest, tempfile.NamedTemporaryFile() as humans_dest:
+    with (
+        tempfile.NamedTemporaryFile() as pets_dest,
+        tempfile.NamedTemporaryFile() as humans_dest,
+    ):
         # We aren't synthesizing the "humans" table, so it is not in this list argument...
         training_data = strategy.prepare_training_data(pets, {"pets": pets_dest.name})
 
@@ -53,7 +59,10 @@ def test_prepare_training_data_subset_of_tables(pets):
 def test_prepare_training_data_returns_multigenerational_data(pets):
     strategy = AncestralStrategy()
 
-    with tempfile.NamedTemporaryFile() as pets_dest, tempfile.NamedTemporaryFile() as humans_dest:
+    with (
+        tempfile.NamedTemporaryFile() as pets_dest,
+        tempfile.NamedTemporaryFile() as humans_dest,
+    ):
         training_data = strategy.prepare_training_data(
             pets, {"pets": pets_dest.name, "humans": humans_dest.name}
         )
@@ -64,7 +73,10 @@ def test_prepare_training_data_returns_multigenerational_data(pets):
 
 
 def test_prepare_training_data_drops_highly_unique_categorical_ancestor_fields(art):
-    with tempfile.NamedTemporaryFile() as artists_csv, tempfile.NamedTemporaryFile() as paintings_csv:
+    with (
+        tempfile.NamedTemporaryFile() as artists_csv,
+        tempfile.NamedTemporaryFile() as paintings_csv,
+    ):
         pd.DataFrame(
             data={
                 "id": [f"A{i}" for i in range(100)],
@@ -84,7 +96,10 @@ def test_prepare_training_data_drops_highly_unique_categorical_ancestor_fields(a
 
     strategy = AncestralStrategy()
 
-    with tempfile.NamedTemporaryFile() as artists_dest, tempfile.NamedTemporaryFile() as paintings_dest:
+    with (
+        tempfile.NamedTemporaryFile() as artists_dest,
+        tempfile.NamedTemporaryFile() as paintings_dest,
+    ):
         training_data = strategy.prepare_training_data(
             art,
             {
@@ -111,7 +126,10 @@ def test_prepare_training_data_drops_highly_nan_ancestor_fields(art):
         else:
             highly_nan_names.append("some name")
 
-    with tempfile.NamedTemporaryFile() as artists_csv, tempfile.NamedTemporaryFile() as paintings_csv:
+    with (
+        tempfile.NamedTemporaryFile() as artists_csv,
+        tempfile.NamedTemporaryFile() as paintings_csv,
+    ):
         pd.DataFrame(
             data={
                 "id": [f"A{i}" for i in range(100)],
@@ -131,7 +149,10 @@ def test_prepare_training_data_drops_highly_nan_ancestor_fields(art):
 
     strategy = AncestralStrategy()
 
-    with tempfile.NamedTemporaryFile() as artists_dest, tempfile.NamedTemporaryFile() as paintings_dest:
+    with (
+        tempfile.NamedTemporaryFile() as artists_dest,
+        tempfile.NamedTemporaryFile() as paintings_dest,
+    ):
         training_data = strategy.prepare_training_data(
             art,
             {
@@ -155,7 +176,10 @@ def test_prepare_training_data_translates_alphanumeric_keys_and_adds_min_max_rec
 ):
     strategy = AncestralStrategy()
 
-    with tempfile.NamedTemporaryFile() as artists_dest, tempfile.NamedTemporaryFile() as paintings_dest:
+    with (
+        tempfile.NamedTemporaryFile() as artists_dest,
+        tempfile.NamedTemporaryFile() as paintings_dest,
+    ):
         training_data = strategy.prepare_training_data(
             art,
             {
@@ -191,7 +215,12 @@ def test_prepare_training_data_translates_alphanumeric_keys_and_adds_min_max_rec
 
 def test_prepare_training_data_with_composite_keys(tpch):
     strategy = AncestralStrategy()
-    with tempfile.NamedTemporaryFile() as supplier_dest, tempfile.NamedTemporaryFile() as part_dest, tempfile.NamedTemporaryFile() as partsupp_dest, tempfile.NamedTemporaryFile() as lineitem_dest:
+    with (
+        tempfile.NamedTemporaryFile() as supplier_dest,
+        tempfile.NamedTemporaryFile() as part_dest,
+        tempfile.NamedTemporaryFile() as partsupp_dest,
+        tempfile.NamedTemporaryFile() as lineitem_dest,
+    ):
         training_data = strategy.prepare_training_data(
             tpch,
             {

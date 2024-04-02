@@ -25,14 +25,12 @@ class TableEvaluation:
     @overload
     def _field_from_json(
         self, report_json: Optional[dict], entry: str, field: Literal["score"]
-    ) -> Optional[int]:
-        ...
+    ) -> Optional[int]: ...
 
     @overload
     def _field_from_json(
         self, report_json: Optional[dict], entry: str, field: Literal["grade"]
-    ) -> Optional[str]:
-        ...
+    ) -> Optional[str]: ...
 
     def _field_from_json(
         self, report_json: Optional[dict], entry: str, field: str

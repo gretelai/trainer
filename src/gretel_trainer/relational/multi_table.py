@@ -3,6 +3,7 @@ This module provides the "MultiTable" class to users. This allows you to
 take extracted data from a database or data warehouse, and process it
 with Gretel using Transforms, Classify, and Synthetics.
 """
+
 from __future__ import annotations
 
 import json
@@ -574,9 +575,10 @@ class MultiTable:
             if isinstance(data_source, pd.DataFrame):
                 data_source.to_csv(transforms_run_path, index=False)
             else:
-                with open_artifact(data_source, "rb") as src, open_artifact(
-                    transforms_run_path, "wb"
-                ) as dest:
+                with (
+                    open_artifact(data_source, "rb") as src,
+                    open_artifact(transforms_run_path, "wb") as dest,
+                ):
                     shutil.copyfileobj(src, dest)
             transforms_run_paths[table] = transforms_run_path
 

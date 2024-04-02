@@ -129,8 +129,9 @@ class ClassifyTask:
 
         destpath = self.output_handler.filepath_for(filename)
 
-        with job.get_artifact_handle(artifact_name) as src, open_artifact(
-            str(destpath), "wb"
-        ) as dest:
+        with (
+            job.get_artifact_handle(artifact_name) as src,
+            open_artifact(str(destpath), "wb") as dest,
+        ):
             shutil.copyfileobj(src, dest)
         self.result_filepaths[table] = destpath
