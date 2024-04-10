@@ -46,12 +46,14 @@ class BenchmarkConfig:
         trainer: bool = False,
         working_dir: Optional[Union[str, Path]] = None,
         additional_report_scores: Optional[list[str]] = None,
+        n_jobs: int = 5,
     ):
         self.project_display_name = project_display_name or _default_name()
         self.working_dir = Path(working_dir or self.project_display_name)
         self.refresh_interval = refresh_interval
         self.trainer = trainer
         self.additional_report_scores = additional_report_scores or []
+        self.n_jobs = n_jobs
 
 
 class Timer:

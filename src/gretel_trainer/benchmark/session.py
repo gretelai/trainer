@@ -52,7 +52,7 @@ class Session:
         self._gretel_executors: dict[RunKey, Executor] = {}
         self._custom_executors: dict[RunKey, Executor] = {}
         self._trainer_project_names: dict[str, str] = {}
-        self._thread_pool = ThreadPoolExecutor(5)
+        self._thread_pool = ThreadPoolExecutor(self._config.n_jobs)
         self._futures: dict[FutureKeyT, Future] = {}
 
         self._report_scores = {
