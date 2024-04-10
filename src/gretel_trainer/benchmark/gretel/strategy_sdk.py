@@ -64,12 +64,12 @@ class GretelSDKStrategy:
     def train(self) -> None:
         model_config = self._format_model_config()
         data_source = self.artifact_key or self.dataset.data_source
-        self.model = self.project.create_model_obj(
+        _model = self.project.create_model_obj(
             model_config=model_config, data_source=data_source
         )
         # Calling this in lieu of submit_cloud() is supposed to avoid
         # artifact upload. Doesn't work for more recent client versions!
-        self.model.submit(runner_mode=RunnerMode.CLOUD)
+        self.model = _model.submit(runner_mode=RunnerMode.CLOUD)
         job_status = self._await_job(self.model, "training")
         if job_status in END_STATES and job_status != Status.COMPLETED:
             raise BenchmarkException("Training failed")
@@ -78,10 +78,10 @@ class GretelSDKStrategy:
         if self.model is None:
             raise BenchmarkException("Cannot generate before training")
 
-        self.record_handler = self.model.create_record_handler_obj(
+        _record_handler = self.model.create_record_handler_obj(
             params={"num_records": self.dataset.row_count}
         )
-        self.record_handler.submit_cloud()
+        self.record_handler = _record_handler.submit_cloud()
         job_status = self._await_job(self.record_handler, "generation")
         if job_status == Status.COMPLETED:
             self._download_synthetic_data(self.record_handler)

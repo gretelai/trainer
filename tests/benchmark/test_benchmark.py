@@ -209,12 +209,14 @@ def test_run_happy_path_gretel_sdk(
         status=Status.COMPLETED,
         billing_details={"total_time_seconds": 15},
     )
+    record_handler.submit_cloud.return_value = record_handler
 
     model = Mock(
         status=Status.COMPLETED,
         billing_details={"total_time_seconds": 30},
     )
     model.create_record_handler_obj.return_value = record_handler
+    model.submit.return_value = model
 
     evaluate_model = Mock(
         status=Status.COMPLETED,
@@ -268,6 +270,7 @@ def test_sdk_model_failure(working_dir, iris, project):
         status=Status.ERROR,
         billing_details={"total_time_seconds": 30},
     )
+    model.submit.return_value = model
 
     project.create_model_obj.side_effect = [model]
 
@@ -309,6 +312,7 @@ def test_custom_gretel_model_configs_do_not_overwrite_each_other(
         status=Status.ERROR,
         billing_details={"total_time_seconds": 30},
     )
+    model.submit.return_value = model
     project.create_model_obj.return_value = model
 
     pets = create_dataset(df, datatype="tabular", name="pets")
