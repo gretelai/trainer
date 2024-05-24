@@ -94,7 +94,6 @@ Modules
    quickstart.rst
    trainer.rst
    models.rst
-   relational.rst
 
 
 
