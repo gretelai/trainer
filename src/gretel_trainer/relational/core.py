@@ -742,7 +742,12 @@ class RelationalData:
         are made, e.g. the following (and others) are all valid outputs:
         [p1, p2, c1, c2] or [p2, c2, p1, c1] or [p2, p1, c1, c2] etc.
         """
-        return list(reversed(list(topological_sort(self.graph))))
+        try:
+            return list(reversed(list(topological_sort(self.graph))))
+        except networkx.NetworkXUnfeasible:
+            print("Cycle detected")
+            print(networkx.find_cycle(self.graph))
+            return list(self.graph.nodes)
 
     def get_primary_key(self, table: str) -> list[str]:
         """
