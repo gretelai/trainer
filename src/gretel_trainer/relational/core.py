@@ -723,15 +723,19 @@ class RelationalData:
         and all subsequent tables that are discovered.
         """
 
-        def _add_children(descendants, table):
+        def _add_children(descendants: set, table: str, visited: set):
             children = list(self.graph.predecessors(table))
             if len(children) > 0:
                 descendants.update(children)
                 for child in children:
-                    _add_children(descendants, child)
+                    if child in visited:
+                        continue
+                    visited.add(child)
+                    _add_children(descendants, child, visited)
 
+        visited = set()
         descendants = set()
-        _add_children(descendants, table)
+        _add_children(descendants, table, visited)
 
         return list(descendants)
 
