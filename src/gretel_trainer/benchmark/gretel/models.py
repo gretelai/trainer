@@ -86,6 +86,10 @@ class GretelTabularDP(GretelModel):
     config = "synthetics/tabular-differential-privacy"
 
 
+class GretelNavigatorFT(GretelModel):
+    config = "synthetics/navigator-ft"
+
+
 class _GretelModelWithOverrides(GretelModel):
     _delegate: GretelModel
     _name: str
