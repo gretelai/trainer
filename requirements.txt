@@ -1,7 +1,7 @@
 boto3~=1.20
 gretel-client>=0.17.7
 pandas~=1.5
-pydantic~=1.9
+pydantic>=2
 requests~=2.25
 smart_open[s3]~=5.2
 typing_extensions~=4.7

@@ -9,7 +9,7 @@ from typing import List, Optional, Union
 
 import pandas as pd
 
-from pydantic import BaseModel, Field, PrivateAttr
+from pydantic.v1 import BaseModel, Field, PrivateAttr
 
 
 class RowPartition(BaseModel):
