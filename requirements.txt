@@ -1,5 +1,6 @@
 boto3~=1.20
-gretel-client>=0.17.7
+gretel-client>=0.20.0
+numpy~=1.20
 pandas~=1.5
 pydantic>=2
 requests~=2.25
