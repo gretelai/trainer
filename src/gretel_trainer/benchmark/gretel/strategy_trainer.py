@@ -67,7 +67,9 @@ class GretelTrainerStrategy:
 
         self.generate_timer = Timer()
         with self.generate_timer:
-            synthetic_data = self.trainer.generate(num_records=self.dataset.row_count)
+            synthetic_data = self.trainer.generate(
+                num_records=self.config.generate_num_records or self.dataset.row_count
+            )
         synthetic_data.to_csv(self._synthetic_data_path, index=False)
 
     @property

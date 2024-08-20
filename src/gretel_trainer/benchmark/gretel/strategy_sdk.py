@@ -79,7 +79,10 @@ class GretelSDKStrategy:
             raise BenchmarkException("Cannot generate before training")
 
         _record_handler = self.model.create_record_handler_obj(
-            params={"num_records": self.dataset.row_count}
+            params={
+                "num_records": self.config.generate_num_records
+                or self.dataset.row_count
+            }
         )
         self.record_handler = _record_handler.submit_cloud()
         job_status = self._await_job(self.record_handler, "generation")

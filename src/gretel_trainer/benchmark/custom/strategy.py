@@ -32,7 +32,7 @@ class CustomStrategy:
         self.generate_timer = Timer()
         with self.generate_timer:
             synthetic_df = self.benchmark_model.generate(
-                num_records=self.dataset.row_count,
+                num_records=self.config.generate_num_records or self.dataset.row_count,
             )
             synthetic_df.to_csv(self._synthetic_data_path, index=False)
 

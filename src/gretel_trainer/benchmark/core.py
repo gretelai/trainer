@@ -47,13 +47,35 @@ class BenchmarkConfig:
         working_dir: Optional[Union[str, Path]] = None,
         additional_report_scores: Optional[list[str]] = None,
         n_jobs: int = 5,
+        generate_num_records: Optional[int] = None,
     ):
+        """Configuration for a benchmark comparison.
+
+        Args:
+            project_display_name: visible name for the Gretel project
+                containing all artifacts and models for this benchmark run,
+                uses name based on start time if None
+            refresh_interval: interval in seconds between refreshes for job
+                status
+            trainer: use GretelTrainer for training and generation when True
+            working_dir: local directory to store benchmark artifacts, if None,
+                defaults to the project_display_name
+            additional_report_scores: other scores besides SQS to extract and
+                show in the results DataFrame, uses abbreviations for scores,
+                valid values are FCS, PCS, DFS, PPL
+            n_jobs: max jobs to submit to Gretel in parallel, increase to run
+                large benchmarks faster, but Gretel also has server-side
+                limitations, so be considerate to other users
+            generate_num_records: number of records to generate for evaluation,
+                use the size of each input dataset if None or 0
+        """
         self.project_display_name = project_display_name or _default_name()
         self.working_dir = Path(working_dir or self.project_display_name)
         self.refresh_interval = refresh_interval
         self.trainer = trainer
         self.additional_report_scores = additional_report_scores or []
         self.n_jobs = n_jobs
+        self.generate_num_records = generate_num_records
 
 
 class Timer:
