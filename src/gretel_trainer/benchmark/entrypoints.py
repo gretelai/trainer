@@ -92,7 +92,7 @@ def _entrypoint(
 def _verify_client_config(session: ClientConfig):
     try:
         current_user_email = session.email
-        logger.info(f"Using gretel client configured with {current_user_email}!r")
+        logger.info(f"Using gretel client configured with {current_user_email!r}")
     except Exception as e:
         raise BenchmarkException(
             "Invalid gretel client configuration, please make sure to configure the "

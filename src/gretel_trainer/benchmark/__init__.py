@@ -15,5 +15,6 @@ from gretel_trainer.benchmark.gretel.models import (
     GretelGPTX,
     GretelLSTM,
     GretelModel,
+    GretelNavigatorFT,
 )
 from gretel_trainer.benchmark.log import set_log_level

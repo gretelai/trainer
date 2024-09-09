@@ -30,6 +30,8 @@ ALL_REPORT_SCORES = {
     "PCS": "principal_component_stability",
     "FDS": "field_distribution_stability",
     "PPL": "privacy_protection_level",
+    "AIA": "attribute_inference_attack_score",
+    "DPS": "data_privacy_score",
 }
 
 FutureKeyT = Union[str, RunKey]
