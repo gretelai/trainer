@@ -1,5 +1,6 @@
 import copy
 import gzip
+import logging
 
 from pathlib import Path
 from typing import Optional
@@ -19,6 +20,8 @@ from gretel_trainer.benchmark.core import (
 from gretel_trainer.benchmark.gretel.models import GretelModel, GretelModelConfig
 from gretel_trainer.benchmark.job_spec import JobSpec
 from gretel_trainer.benchmark.sdk_extras import await_job
+
+logger = logging.getLogger(__name__)
 
 
 class GretelSDKStrategy:
@@ -67,6 +70,7 @@ class GretelSDKStrategy:
         _model = self.project.create_model_obj(
             model_config=model_config, data_source=data_source
         )
+        logging.info("Created model(name=%s,id=%s)", _model.name, _model.id)
         # Calling this in lieu of submit_cloud() is supposed to avoid
         # artifact upload. Doesn't work for more recent client versions!
         self.model = _model.submit(runner_mode=RunnerMode.CLOUD)
