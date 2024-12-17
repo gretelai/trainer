@@ -8,7 +8,7 @@ import gretel_trainer.models
 
 from gretel_client.projects.exceptions import ModelConfigError
 from gretel_client.projects.models import read_model_config
-from gretel_trainer.benchmark.core import BenchmarkException, Dataset, Datatype
+from gretel_trainer.benchmark.core import BenchmarkException, Dataset
 
 GretelModelConfig = Union[str, Path, dict]
 
