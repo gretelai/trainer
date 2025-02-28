@@ -1,6 +1,6 @@
 import logging
 
-from enum import Enum
+from enum import StrEnum
 from typing import Callable, Optional, Protocol
 
 from gretel_client.projects.models import Model
@@ -9,7 +9,7 @@ from gretel_trainer.benchmark.core import BenchmarkConfig, Dataset, log, run_out
 from gretel_trainer.benchmark.sdk_extras import create_evaluate_model, run_evaluate
 
 
-class Status(str, Enum):
+class Status(StrEnum):
     NotStarted = "Not started"
     Skipped = "Skipped"
     Training = "Training"

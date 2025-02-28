@@ -4,7 +4,7 @@ import time
 
 from dataclasses import dataclass, field
 from datetime import datetime
-from enum import Enum
+from enum import StrEnum
 from pathlib import Path
 from typing import Optional, Union
 
@@ -17,7 +17,7 @@ class BenchmarkException(Exception):
     pass
 
 
-class Datatype(str, Enum):
+class Datatype(StrEnum):
     TABULAR = "tabular"
     TIME_SERIES = "time_series"
     NATURAL_LANGUAGE = "natural_language"
